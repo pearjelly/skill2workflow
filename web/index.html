@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>skill2workflow LiteGraph Editor</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litegraph.js@0.7.18/css/litegraph.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">s2w</span>
+          <div>
+            <h1>skill2workflow</h1>
+            <p>Workflow DSL Visual Editor</p>
+          </div>
+        </div>
+        <div class="toolbar" aria-label="Workflow actions">
+          <button id="load-sample" type="button">Load Example</button>
+          <label class="file-action">
+            <input id="file-input" type="file" accept="application/json,.json" />
+            Load JSON
+          </label>
+          <button id="fit-view" type="button">Fit</button>
+          <button id="validate-graph" type="button">Validate</button>
+          <button id="save-graph" type="button">Save JSON</button>
+        </div>
+        <div id="status-pill" class="status-pill status-idle">Idle</div>
+      </header>
+
+      <section class="workspace" aria-label="Workflow graph editor">
+        <div class="canvas-region">
+          <canvas id="graph-canvas"></canvas>
+        </div>
+        <aside class="inspector" aria-label="Node parameters">
+          <div class="inspector-header">
+            <p>Node</p>
+            <strong id="node-heading">No selection</strong>
+          </div>
+          <form id="node-form" class="node-form">
+            <label>
+              Workflow ID
+              <input id="node-id" type="text" readonly />
+            </label>
+            <label>
+              Type
+              <input id="node-type" type="text" readonly />
+            </label>
+            <label>
+              Run Status
+              <input id="node-status" type="text" readonly />
+            </label>
+            <label>
+              Title
+              <input id="node-title" type="text" />
+            </label>
+            <label>
+              Description
+              <textarea id="node-description" rows="5"></textarea>
+            </label>
+            <label>
+              Source
+              <textarea id="node-source" rows="4" readonly></textarea>
+            </label>
+          </form>
+          <div class="validation-panel">
+            <p>Validation</p>
+            <ul id="validation-list"></ul>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/litegraph.js@0.7.18/build/litegraph.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

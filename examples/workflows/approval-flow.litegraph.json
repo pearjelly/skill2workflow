@@ -1,0 +1,476 @@
+{
+  "version": "skill2workflow-litegraph-0.1.0",
+  "workflow": {
+    "id": "workflow_approval_flow",
+    "name": "approval-flow",
+    "version": "0.1.0",
+    "status": "draft",
+    "description": "Convert approval work into a controlled workflow.",
+    "entry": "start"
+  },
+  "last_node_id": 7,
+  "last_link_id": 9,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "skill2workflow/start",
+      "pos": [
+        80,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "title": "Start",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "start",
+        "node_type": "start",
+        "description": "Workflow entry point.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null
+      }
+    },
+    {
+      "id": 2,
+      "type": "skill2workflow/step",
+      "pos": [
+        340,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "Explore project context",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_001_explore_project_context",
+        "node_type": "step",
+        "description": "Explore project context",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/approval-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 1,
+          "line": 16,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_001_explore_project_context_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "agent_instruction",
+          "instruction": "Explore project context"
+        },
+        "retry": {
+          "max_attempts": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "skill2workflow/step",
+      "pos": [
+        600,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "title": "Draft workflow",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_002_draft_workflow",
+        "node_type": "step",
+        "description": "Draft workflow",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/approval-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 2,
+          "line": 17,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_002_draft_workflow_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "agent_instruction",
+          "instruction": "Draft workflow"
+        },
+        "retry": {
+          "max_attempts": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "skill2workflow/human_gate",
+      "pos": [
+        860,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "title": "Ask user for approval",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_003_ask_user_for_approval",
+        "node_type": "human_gate",
+        "description": "Ask user for approval",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/approval-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 3,
+          "line": 18,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_003_ask_user_for_approval_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "human_approval",
+          "prompt": "Ask user for approval"
+        },
+        "retry": {
+          "max_attempts": 0
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "skill2workflow/step",
+      "pos": [
+        1120,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "title": "Publish workflow",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_004_publish_workflow",
+        "node_type": "step",
+        "description": "Publish workflow",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/approval-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 4,
+          "line": 19,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_004_publish_workflow_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "agent_instruction",
+          "instruction": "Publish workflow"
+        },
+        "retry": {
+          "max_attempts": 0
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "skill2workflow/failure",
+      "pos": [
+        1120,
+        260
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "title": "Failure",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 6
+        },
+        {
+          "name": "in_2",
+          "type": "flow",
+          "link": 7
+        },
+        {
+          "name": "in_3",
+          "type": "flow",
+          "link": 8
+        },
+        {
+          "name": "in_4",
+          "type": "flow",
+          "link": 9
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "workflow_node_id": "failure",
+        "node_type": "failure",
+        "description": "Terminal failure node.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null
+      }
+    },
+    {
+      "id": 7,
+      "type": "skill2workflow/end",
+      "pos": [
+        1640,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "title": "End",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 5
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "workflow_node_id": "end",
+        "node_type": "end",
+        "description": "Workflow completed.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "flow"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "flow"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "flow"
+    ],
+    [
+      4,
+      4,
+      0,
+      5,
+      0,
+      "flow"
+    ],
+    [
+      5,
+      5,
+      0,
+      7,
+      0,
+      "flow"
+    ],
+    [
+      6,
+      2,
+      1,
+      6,
+      0,
+      "flow"
+    ],
+    [
+      7,
+      3,
+      1,
+      6,
+      1,
+      "flow"
+    ],
+    [
+      8,
+      4,
+      1,
+      6,
+      2,
+      "flow"
+    ],
+    [
+      9,
+      5,
+      1,
+      6,
+      3,
+      "flow"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "source_schema_version": "0.1.0",
+    "truth_source": "workflow_dsl"
+  }
+}

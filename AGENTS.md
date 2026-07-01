@@ -15,6 +15,8 @@ This repository is the `skill2workflow` open-source harness.
 - Parse: `PYTHONPATH=src python3 -m skill2workflow.cli parse examples/skills/approval-flow/SKILL.md`
 - Compile: `PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/approval-flow/SKILL.md -o /tmp/skill2workflow-workflow.json`
 - Validate: `PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json`
+- Visualize: `PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json -o /tmp/skill2workflow-litegraph.json`
+- Web preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/`
 
 ## Working Rules
 
@@ -22,4 +24,3 @@ This repository is the `skill2workflow` open-source harness.
 - Add tests before changing parser, compiler, executor, or CLI behavior.
 - Avoid adding runtime dependencies unless they directly support a spec-backed capability.
 - Preserve the approved design spec and update it only when product direction changes.
-

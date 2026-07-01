@@ -1,0 +1,235 @@
+{
+  "schema_version": "0.1.0",
+  "workflow": {
+    "id": "workflow_approval_flow",
+    "name": "approval-flow",
+    "description": "Convert approval work into a controlled workflow.",
+    "version": "0.1.0",
+    "status": "draft"
+  },
+  "entry": "start",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Start",
+      "description": "Workflow entry point.",
+      "on_success": "node_001_explore_project_context"
+    },
+    {
+      "id": "node_001_explore_project_context",
+      "type": "step",
+      "title": "Explore project context",
+      "description": "Explore project context",
+      "requires": [],
+      "produces": [
+        "node_001_explore_project_context_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Explore project context"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/approval-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 1,
+          "line": 16,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_002_draft_workflow",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_002_draft_workflow",
+      "type": "step",
+      "title": "Draft workflow",
+      "description": "Draft workflow",
+      "requires": [],
+      "produces": [
+        "node_002_draft_workflow_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Draft workflow"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/approval-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 2,
+          "line": 17,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_003_ask_user_for_approval",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_003_ask_user_for_approval",
+      "type": "human_gate",
+      "title": "Ask user for approval",
+      "description": "Ask user for approval",
+      "requires": [],
+      "produces": [
+        "node_003_ask_user_for_approval_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "human_approval",
+        "prompt": "Ask user for approval"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/approval-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 3,
+          "line": 18,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_004_publish_workflow",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_004_publish_workflow",
+      "type": "step",
+      "title": "Publish workflow",
+      "description": "Publish workflow",
+      "requires": [],
+      "produces": [
+        "node_004_publish_workflow_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Publish workflow"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/approval-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 4,
+          "line": 19,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "end",
+      "on_failure": "failure"
+    },
+    {
+      "id": "failure",
+      "type": "failure",
+      "title": "Failure",
+      "description": "Terminal failure node."
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "End",
+      "description": "Workflow completed."
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_001_start_to_node_001_explore_project_context",
+      "from": "start",
+      "to": "node_001_explore_project_context",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_002_node_001_explore_project_context_to_node_002_draft_workflow",
+      "from": "node_001_explore_project_context",
+      "to": "node_002_draft_workflow",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_003_node_002_draft_workflow_to_node_003_ask_user_for_approval",
+      "from": "node_002_draft_workflow",
+      "to": "node_003_ask_user_for_approval",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_004_node_003_ask_user_for_approval_to_node_004_publish_workflow",
+      "from": "node_003_ask_user_for_approval",
+      "to": "node_004_publish_workflow",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_005_node_004_publish_workflow_to_end",
+      "from": "node_004_publish_workflow",
+      "to": "end",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_node_001_explore_project_context_failure",
+      "from": "node_001_explore_project_context",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_002_draft_workflow_failure",
+      "from": "node_002_draft_workflow",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_003_ask_user_for_approval_failure",
+      "from": "node_003_ask_user_for_approval",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_004_publish_workflow_failure",
+      "from": "node_004_publish_workflow",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    }
+  ],
+  "state_schema": {},
+  "guards": [
+    {
+      "id": "guard_001",
+      "description": "Do NOT publish until the user approves the draft."
+    }
+  ],
+  "checkpoints": [],
+  "policies": {
+    "default_retry": {
+      "max_attempts": 0
+    },
+    "default_timeout_ms": 300000
+  }
+}
