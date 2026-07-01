@@ -36,7 +36,15 @@ Implemented:
   - structured step details with source line numbers
   - fenced-code exclusion for rule hints
 - Compiler
+  - compiles ordered step details into node titles, descriptions, and source metadata
+  - generates start, ordered step, failure, and end nodes
+  - generates success and failure edges
 - Validator
+  - checks node ids and edge ids
+  - checks edge endpoint references
+  - checks terminal nodes have no outgoing transition
+  - checks node transitions have matching edges
+  - checks edges are declared by node transitions
 - Durable local executor
 - CLI
 - Tests

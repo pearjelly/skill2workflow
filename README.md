@@ -44,7 +44,9 @@ The current implementation is a dependency-light Python harness because the loca
 - Normalize numbered lists, bullet lists, and markdown task checkboxes
 - Ignore fenced code blocks when extracting rule hints
 - Compile Skill IR into Workflow DSL
+- Carry parser source mapping into workflow node metadata
 - Validate Workflow DSL
+- Validate edge ids, edge endpoints, terminal-node edges, and node transition consistency
 - Execute workflows locally
 - Pause at `human_gate`
 - Resume waiting runs
@@ -105,7 +107,7 @@ The current harness implements the first, second, and fourth layers in minimal l
 ```text
 src/skill2workflow/
   parser.py       # SKILL.md -> Skill IR
-  compiler.py     # Skill IR -> Workflow DSL
+  compiler.py     # Skill IR -> Workflow DSL + validation
   executor.py     # Durable local execution
   cli.py          # Command line interface
 examples/skills/  # Example SKILL.md inputs

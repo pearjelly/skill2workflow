@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Set
 
 
 Workflow = Dict[str, object]
@@ -17,9 +17,17 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
 
     name = str(metadata.get("name") or "skill-workflow")
     description = str(metadata.get("description") or ir.get("description") or "")
-    steps = list(ir.get("ordered_steps") or [])
+    steps = _step_records_from_ir(ir)
     if not steps:
-        steps = ["Review skill guidance"]
+        steps = [
+            {
+                "title": "Review skill guidance",
+                "detail": "",
+                "line": None,
+                "section": None,
+                "index": 1,
+            }
+        ]
 
     workflow_id = f"workflow_{_slugify(name)}"
     nodes: List[Dict[str, object]] = [
@@ -33,28 +41,32 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
 
     step_ids = []
     for index, step in enumerate(steps, start=1):
-        title = str(step)
+        title = str(step["title"])
+        detail = str(step.get("detail") or "")
         node_id = f"node_{index:03d}_{_slugify(title)}"
-        node_type = _node_type_for_step(title)
+        node_type = _node_type_for_step(f"{title} {detail}")
         step_ids.append(node_id)
+        source = {
+            "file": ir.get("source_path", "SKILL.md"),
+            "kind": "ordered_step",
+            "index": index,
+        }
+        if step.get("line") is not None:
+            source["line"] = step["line"]
+        if step.get("section"):
+            source["section"] = step["section"]
         nodes.append(
             {
                 "id": node_id,
                 "type": node_type,
                 "title": title,
-                "description": title,
+                "description": detail or title,
                 "requires": [],
                 "produces": [f"{node_id}_result"],
                 "guard": None,
-                "action": _action_for_node(node_type, title),
+                "action": _action_for_node(node_type, _format_instruction(title, detail)),
                 "retry": {"max_attempts": 0},
-                "metadata": {
-                    "source": {
-                        "file": ir.get("source_path", "SKILL.md"),
-                        "kind": "ordered_step",
-                        "index": index,
-                    }
-                },
+                "metadata": {"source": source},
             }
         )
 
@@ -133,12 +145,19 @@ def validate_workflow(workflow: Workflow) -> List[str]:
     nodes = workflow.get("nodes")
     if not isinstance(nodes, list):
         return ["workflow.nodes must be a list"]
+    edges = workflow.get("edges", [])
+    if not isinstance(edges, list):
+        return ["workflow.edges must be a list"]
 
     node_ids = [node.get("id") for node in nodes if isinstance(node, dict)]
     if len(node_ids) != len(set(node_ids)):
         errors.append("node ids must be unique")
 
     node_map = {node.get("id"): node for node in nodes if isinstance(node, dict)}
+    edge_ids = [edge.get("id") for edge in edges if isinstance(edge, dict)]
+    if len(edge_ids) != len(set(edge_ids)):
+        errors.append("edge ids must be unique")
+
     entry = workflow.get("entry")
     if entry not in node_map:
         errors.append("workflow.entry must reference an existing node")
@@ -153,6 +172,11 @@ def validate_workflow(workflow: Workflow) -> List[str]:
             continue
         node_id = node.get("id")
         node_type = node.get("type")
+        if node_type in {"end", "failure"}:
+            for key in ("on_success", "on_failure"):
+                if node.get(key):
+                    errors.append(f"{node_id} {node_type} must not define {key}")
+            continue
         if node_type not in {"end", "failure"} and not node.get("on_success"):
             errors.append(f"{node_id} must define on_success")
         if node_type == "human_gate" and not node.get("on_failure"):
@@ -162,6 +186,9 @@ def validate_workflow(workflow: Workflow) -> List[str]:
             if target is not None and target not in node_map:
                 errors.append(f"{node_id}.{key} references missing node {target}")
 
+    edge_pairs = _validate_edges(edges, node_map, errors)
+    _validate_transition_edges(node_map, edge_pairs, errors)
+
     if entry in node_map:
         reachable = _reachable_nodes(node_map, str(entry))
         unreachable = sorted(set(node_map) - reachable)
@@ -169,6 +196,57 @@ def validate_workflow(workflow: Workflow) -> List[str]:
             errors.append(f"unreachable nodes: {', '.join(unreachable)}")
 
     return errors
+
+
+def _validate_edges(
+    edges: List[Dict[str, object]],
+    node_map: Dict[object, Dict[str, object]],
+    errors: List[str],
+) -> Set[tuple]:
+    edge_pairs = set()
+    for edge in edges:
+        if not isinstance(edge, dict):
+            errors.append("all edges must be objects")
+            continue
+
+        edge_id = str(edge.get("id") or "<missing edge id>")
+        source = edge.get("from")
+        target = edge.get("to")
+
+        if source not in node_map:
+            errors.append(f"{edge_id}.from references missing node {source}")
+        if target not in node_map:
+            errors.append(f"{edge_id}.to references missing node {target}")
+        if source in node_map and node_map[source].get("type") in {"end", "failure"}:
+            errors.append(f"{edge_id} must not originate from terminal node {source}")
+
+        if source in node_map and target in node_map:
+            edge_pairs.add((source, target))
+            transition_targets = _transition_targets(node_map[source])
+            if target not in transition_targets:
+                errors.append(f"{edge_id} from {source} to {target} is not declared by node transitions")
+
+    return edge_pairs
+
+
+def _validate_transition_edges(
+    node_map: Dict[object, Dict[str, object]],
+    edge_pairs: Set[tuple],
+    errors: List[str],
+) -> None:
+    for node_id, node in node_map.items():
+        if node.get("type") in {"end", "failure"}:
+            continue
+        for key in ("on_success", "on_failure"):
+            target = node.get(key)
+            if target is None or target not in node_map:
+                continue
+            if (node_id, target) not in edge_pairs:
+                errors.append(f"{node_id}.{key} must have matching edge to {target}")
+
+
+def _transition_targets(node: Dict[str, object]) -> Set[object]:
+    return {node[key] for key in ("on_success", "on_failure") if node.get(key) is not None}
 
 
 def _node_type_for_step(title: str) -> str:
@@ -184,6 +262,49 @@ def _node_type_for_step(title: str) -> str:
     if any(term in lowered for term in tool_terms):
         return "tool_call"
     return "step"
+
+
+def _step_records_from_ir(ir: Dict[str, object]) -> List[Dict[str, object]]:
+    details = ir.get("ordered_step_details")
+    if isinstance(details, list) and details:
+        records = []
+        for index, item in enumerate(details, start=1):
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            if not title:
+                continue
+            records.append(
+                {
+                    "title": title,
+                    "detail": str(item.get("detail") or "").strip(),
+                    "line": item.get("line"),
+                    "section": item.get("section"),
+                    "index": index,
+                }
+            )
+        return records
+
+    records = []
+    for index, step in enumerate(list(ir.get("ordered_steps") or []), start=1):
+        title = str(step).strip()
+        if title:
+            records.append(
+                {
+                    "title": title,
+                    "detail": "",
+                    "line": None,
+                    "section": None,
+                    "index": index,
+                }
+            )
+    return records
+
+
+def _format_instruction(title: str, detail: str) -> str:
+    if detail:
+        return f"{title} — {detail}"
+    return title
 
 
 def _action_for_node(node_type: str, title: str) -> Dict[str, str]:
@@ -222,4 +343,3 @@ def _reachable_nodes(node_map: Dict[object, Dict[str, object]], entry: str) -> S
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "_", value.strip().lower()).strip("_")
     return slug or "node"
-
