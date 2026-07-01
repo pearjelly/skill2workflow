@@ -1,0 +1,128 @@
+# skill2workflow
+
+From Agent Skills to Controlled Enterprise Workflows.
+
+`skill2workflow` is an open-source Agent Workflow Runtime for enterprise AI adoption. It converts standard `SKILL.md` capability descriptions into controlled workflows that can be validated, visualized, executed, resumed, and audited.
+
+The core idea is simple:
+
+- Skills answer: "Can the agent do this?"
+- Workflows answer: "Will it follow the required process every time?"
+- A durable executor answers: "Can the process recover, pause, resume, and leave an audit trail?"
+
+This repository is intentionally starting with a small executable harness instead of a large platform shell. The first closed loop is:
+
+```text
+SKILL.md -> Skill IR -> Workflow DSL -> Local Executor -> Run Log
+```
+
+LiteGraph visualization, enterprise control plane features, and connector plugins are part of the staged roadmap in the approved spec.
+
+## Why This Exists
+
+Agent skills have already proven useful for adapting AI systems to new tasks. They are fast to write, easy to share, and effective for many lightweight tasks.
+
+Enterprise workflows need more control:
+
+- Mandatory execution order
+- Human approval gates
+- Durable state
+- Failure handling
+- Recoverability
+- Versioning
+- Auditability
+- Integration hooks
+
+`skill2workflow` bridges that gap by compiling skills into an execution-controlled workflow runtime.
+
+## Current Harness
+
+The current implementation is a dependency-light Python harness because the local bootstrap environment does not include Node.js or npm. It implements the first executable slice of the product:
+
+- Parse standard `SKILL.md` into Skill IR
+- Compile Skill IR into Workflow DSL
+- Validate Workflow DSL
+- Execute workflows locally
+- Pause at `human_gate`
+- Resume waiting runs
+- Persist run state as JSON
+
+## Quickstart
+
+Run tests:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
+
+Parse a Skill:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli parse examples/skills/approval-flow/SKILL.md
+```
+
+Compile a workflow:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/approval-flow/SKILL.md -o /tmp/skill2workflow-workflow.json
+```
+
+Validate it:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json
+```
+
+Run it:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state
+```
+
+Resume a waiting run:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-state
+```
+
+## Architecture
+
+The approved architecture has five layers:
+
+1. Skill Ingestion / Parser
+2. DSL Compiler / Validator
+3. LiteGraph Editor
+4. Durable Executor
+5. Enterprise Control Plane
+
+The current harness implements the first, second, and fourth layers in minimal local form. The third and fifth layers are designed in the spec and will be added through small closed loops.
+
+## Repository Layout
+
+```text
+src/skill2workflow/
+  parser.py       # SKILL.md -> Skill IR
+  compiler.py     # Skill IR -> Workflow DSL
+  executor.py     # Durable local execution
+  cli.py          # Command line interface
+examples/skills/  # Example SKILL.md inputs
+tests/            # Unit tests
+docs/             # Product spec and implementation plans
+```
+
+## Roadmap
+
+- Loop 1: Parser closed loop
+- Loop 2: Compiler and validator closed loop
+- Loop 3: Durable executor closed loop
+- Loop 4: LiteGraph visual workflow editor
+- Loop 5: Minimal enterprise control plane
+
+See the approved design spec:
+
+`docs/superpowers/specs/2026-07-01-skill2workflow-design.md`
+
+## License
+
+Apache-2.0
+

@@ -1,0 +1,49 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import TestCase
+
+from skill2workflow.executor import LocalExecutor
+
+
+class ExecutorTests(TestCase):
+    def test_run_pauses_at_human_gate_and_resume_completes(self):
+        workflow = {
+            "schema_version": "0.1.0",
+            "workflow": {
+                "id": "workflow_approval",
+                "name": "approval",
+                "version": "0.1.0",
+                "status": "published",
+            },
+            "entry": "start",
+            "nodes": [
+                {
+                    "id": "start",
+                    "type": "start",
+                    "title": "Start",
+                    "on_success": "review",
+                },
+                {
+                    "id": "review",
+                    "type": "human_gate",
+                    "title": "Review",
+                    "on_success": "end",
+                    "on_failure": "failure",
+                },
+                {"id": "failure", "type": "failure", "title": "Failure"},
+                {"id": "end", "type": "end", "title": "End"},
+            ],
+            "edges": [],
+        }
+
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp))
+            waiting = executor.run(workflow)
+            self.assertEqual(waiting["status"], "waiting")
+            self.assertEqual(waiting["current_node"], "review")
+
+            completed = executor.resume(waiting["run_id"], approved=True)
+
+        self.assertEqual(completed["status"], "completed")
+        self.assertEqual(completed["current_node"], "end")
+

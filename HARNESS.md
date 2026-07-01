@@ -1,0 +1,47 @@
+# Project Harness
+
+This file describes the executable project harness for the current open-source bootstrap.
+
+## Local Verification
+
+Run all tests:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+```
+
+Run the CLI closed loop:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli parse examples/skills/approval-flow/SKILL.md
+PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/approval-flow/SKILL.md -o /tmp/skill2workflow-workflow.json
+PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json
+PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state
+```
+
+The sample workflow pauses at a human approval gate. Resume it with:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-state
+```
+
+## Current Scope
+
+Implemented:
+
+- Parser
+- Compiler
+- Validator
+- Durable local executor
+- CLI
+- Tests
+- Example Skill
+
+Not implemented yet:
+
+- LiteGraph editor
+- SQLite persistence
+- Enterprise control plane UI
+- Connector registry runtime
+- GitHub release automation
+

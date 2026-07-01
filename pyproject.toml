@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skill2workflow"
+version = "0.1.0"
+description = "Compile Agent Skills into controlled enterprise workflows."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "skill2workflow contributors" }
+]
+keywords = [
+  "agent",
+  "workflow",
+  "skills",
+  "enterprise-ai",
+  "runtime",
+  "litegraph"
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Topic :: Software Development :: Libraries :: Application Frameworks"
+]
+
+[project.scripts]
+skill2workflow = "skill2workflow.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
