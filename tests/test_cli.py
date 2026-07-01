@@ -1,4 +1,6 @@
 import json
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -41,6 +43,40 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(graph["version"], "skill2workflow-litegraph-0.1.0")
         self.assertEqual(graph["nodes"][-1]["properties"]["run_status"], "completed")
+
+    def test_control_plane_commands_publish_list_and_run_published_workflow(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "workflow.json"
+            state_dir = tmp_path / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+
+            with redirect_stdout(StringIO()):
+                publish_exit = main(["publish", str(workflow_path), "--state-dir", str(state_dir)])
+                workflows_exit = main(["workflows", "--state-dir", str(state_dir)])
+                run_exit = main(
+                    [
+                        "run-published",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                    ]
+                )
+
+            from skill2workflow.control_plane import LocalControlPlane
+
+            control = LocalControlPlane(state_dir)
+            workflow_records = control.list_workflows()
+            run_summary = control.list_runs()[0]
+
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(workflows_exit, 0)
+        self.assertEqual(run_exit, 0)
+        self.assertEqual(workflow_records[0]["workflow_id"], "workflow_demo")
+        self.assertEqual(workflow_records[0]["status"], "published")
+        self.assertEqual(run_summary["workflow_version"], "0.1.0")
 
 
 def _workflow():

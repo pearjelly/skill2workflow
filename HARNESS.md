@@ -41,6 +41,17 @@ python3 -m http.server 4173
 
 Then visit `http://localhost:4173/web/`.
 
+Run the minimal control plane closed loop:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
+```
+
 ## Current Scope
 
 Implemented:
@@ -73,6 +84,13 @@ Implemented:
   - exposes node parameters in an inspector
   - supports simple title and description edits in the LiteGraph view
   - marks invalid graph connections in the UI
+- Minimal local control plane
+  - publishes immutable workflow artifacts
+  - tracks draft, published, and deprecated lifecycle state through a local registry index
+  - runs published workflow versions
+  - keeps run state bound to workflow id and version
+  - records workflow publish, deprecate, and run events in an audit JSONL log
+  - exposes connector registry placeholders
 - CLI
 - Tests
 - Example Skill
@@ -82,5 +100,5 @@ Not implemented yet:
 - DSL write-back from the visual editor
 - SQLite persistence
 - Enterprise control plane UI
-- Connector registry runtime
+- Connector runtime
 - GitHub release automation
