@@ -40,6 +40,9 @@ Enterprise workflows need more control:
 The current implementation is a dependency-light Python harness because the local bootstrap environment does not include Node.js or npm. It implements the first executable slice of the product:
 
 - Parse standard `SKILL.md` into Skill IR
+- Preserve checklist source mapping with step title, detail, section, and line number
+- Normalize numbered lists, bullet lists, and markdown task checkboxes
+- Ignore fenced code blocks when extracting rule hints
 - Compile Skill IR into Workflow DSL
 - Validate Workflow DSL
 - Execute workflows locally
@@ -125,4 +128,3 @@ See the approved design spec:
 ## License
 
 Apache-2.0
-
