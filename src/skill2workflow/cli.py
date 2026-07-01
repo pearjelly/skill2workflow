@@ -38,6 +38,10 @@ def main(argv=None) -> int:
     runs_cmd = subparsers.add_parser("runs", help="List local runs")
     runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
 
+    show_cmd = subparsers.add_parser("show", help="Show a local run detail")
+    show_cmd.add_argument("run_id")
+    show_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+
     args = parser.parse_args(argv)
 
     if args.command == "parse":
@@ -81,6 +85,10 @@ def main(argv=None) -> int:
         _print_json(LocalExecutor(args.state_dir).list_runs())
         return 0
 
+    if args.command == "show":
+        _print_json(LocalExecutor(args.state_dir).get_run(args.run_id))
+        return 0
+
     return 1
 
 
@@ -94,4 +102,3 @@ def _print_json(value) -> None:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

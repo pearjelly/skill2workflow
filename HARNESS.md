@@ -25,6 +25,13 @@ The sample workflow pauses at a human approval gate. Resume it with:
 PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-state
 ```
 
+List summaries and inspect full run logs:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-state
+PYTHONPATH=src python3 -m skill2workflow.cli show <run_id> --state-dir /tmp/skill2workflow-state
+```
+
 ## Current Scope
 
 Implemented:
@@ -46,6 +53,10 @@ Implemented:
   - checks node transitions have matching edges
   - checks edges are declared by node transitions
 - Durable local executor
+  - records terminal node results
+  - records human gate approvals and rejections
+  - supports rejected human gate failure paths
+  - exposes run summaries and full run details
 - CLI
 - Tests
 - Example Skill
