@@ -50,6 +50,12 @@ class LocalExecutor:
         if not isinstance(next_node, str):
             raise ValueError(f"run {run_id} cannot resume from {node['id']}")
 
+        state["node_results"][node["id"]] = {
+            "status": "approved" if approved else "rejected",
+            "title": node.get("title", node["id"]),
+            "approved": approved,
+            "timestamp": _now(),
+        }
         state["events"].append(
             {
                 "type": "human_gate_resumed",
@@ -66,8 +72,11 @@ class LocalExecutor:
     def list_runs(self) -> List[RunState]:
         runs = []
         for path in sorted(self.runs_dir.glob("*.json")):
-            runs.append(json.loads(path.read_text(encoding="utf-8")))
+            runs.append(_summarize_run(json.loads(path.read_text(encoding="utf-8"))))
         return runs
+
+    def get_run(self, run_id: str) -> RunState:
+        return self._load(run_id)
 
     def _drive(self, state: RunState) -> RunState:
         workflow = state["workflow"]
@@ -81,12 +90,22 @@ class LocalExecutor:
 
             if node_type == "end":
                 state["status"] = "completed"
+                state["node_results"][current_id] = {
+                    "status": "completed",
+                    "title": node.get("title", current_id),
+                    "timestamp": _now(),
+                }
                 self._event(state, "run_completed", current_id)
                 self._save(state)
                 return state
 
             if node_type == "failure":
                 state["status"] = "failed"
+                state["node_results"][current_id] = {
+                    "status": "failed",
+                    "title": node.get("title", current_id),
+                    "timestamp": _now(),
+                }
                 self._event(state, "run_failed", current_id)
                 self._save(state)
                 return state
@@ -148,3 +167,14 @@ class LocalExecutor:
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
+
+def _summarize_run(state: RunState) -> RunState:
+    return {
+        "run_id": state["run_id"],
+        "workflow_id": state["workflow_id"],
+        "workflow_version": state["workflow_version"],
+        "status": state["status"],
+        "current_node": state["current_node"],
+        "event_count": len(state.get("events", [])),
+        "node_result_count": len(state.get("node_results", {})),
+    }

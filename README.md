@@ -51,6 +51,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Pause at `human_gate`
 - Resume waiting runs
 - Persist run state as JSON
+- List run summaries and inspect full run logs
 
 ## Quickstart
 
@@ -88,6 +89,18 @@ Resume a waiting run:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-state
+```
+
+List local run summaries:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-state
+```
+
+Inspect a full run log:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli show <run_id> --state-dir /tmp/skill2workflow-state
 ```
 
 ## Architecture
