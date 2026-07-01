@@ -30,6 +30,11 @@ PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/sk
 Implemented:
 
 - Parser
+  - frontmatter extraction
+  - hard gate extraction
+  - checklist normalization
+  - structured step details with source line numbers
+  - fenced-code exclusion for rule hints
 - Compiler
 - Validator
 - Durable local executor
@@ -44,4 +49,3 @@ Not implemented yet:
 - Enterprise control plane UI
 - Connector registry runtime
 - GitHub release automation
-
