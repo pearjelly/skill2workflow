@@ -10,6 +10,7 @@ from pathlib import Path
 from .compiler import compile_ir_to_workflow, validate_workflow
 from .executor import LocalExecutor
 from .parser import parse_skill_file
+from .visualizer import workflow_to_litegraph
 
 
 def main(argv=None) -> int:
@@ -25,6 +26,11 @@ def main(argv=None) -> int:
 
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
     validate_cmd.add_argument("workflow", type=Path)
+
+    visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
+    visualize_cmd.add_argument("workflow", type=Path)
+    visualize_cmd.add_argument("--run-state", type=Path)
+    visualize_cmd.add_argument("-o", "--output", type=Path)
 
     run_cmd = subparsers.add_parser("run", help="Run a Workflow DSL JSON file")
     run_cmd.add_argument("workflow", type=Path)
@@ -64,6 +70,21 @@ def main(argv=None) -> int:
                 print(error, file=sys.stderr)
             return 1
         print("valid")
+        return 0
+
+    if args.command == "visualize":
+        workflow = _load_json(args.workflow)
+        errors = validate_workflow(workflow)
+        if errors:
+            for error in errors:
+                print(error, file=sys.stderr)
+            return 1
+        run_state = _load_json(args.run_state) if args.run_state else None
+        graph = workflow_to_litegraph(workflow, run_state=run_state)
+        if args.output:
+            args.output.write_text(json.dumps(graph, ensure_ascii=False, indent=2), encoding="utf-8")
+        else:
+            _print_json(graph)
         return 0
 
     if args.command == "run":
