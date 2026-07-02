@@ -8,6 +8,8 @@ Run all tests:
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
+python3 -m py_compile src/skill2workflow/*.py
+git diff --check
 ```
 
 Run the CLI closed loop:
@@ -134,6 +136,12 @@ Implemented:
   - gives compiled `human_gate` nodes a default manual connector binding
   - gives compiled `tool_call` nodes a default HTTP connector binding
   - executes HTTP requests with the Python standard library
+- Open-source release readiness
+  - documents contributor setup and PR expectations in `CONTRIBUTING.md`
+  - provides GitHub issue templates for bugs, feature requests, and workflow examples
+  - documents first release scope in `docs/releases/v0.1.0.md`
+  - documents Workflow DSL `0.1.0` compatibility in `docs/workflow-dsl-compatibility.md`
+  - documents stable and experimental surfaces in `docs/stability.md`
 - CLI
 - Tests
 - Example Skill

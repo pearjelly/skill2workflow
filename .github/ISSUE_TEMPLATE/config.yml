@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Roadmap
+    url: https://github.com/pearjelly/skill2workflow/blob/main/ROADMAP.md
+    about: Check the staged delivery plan before opening broad feature requests.
+  - name: Workflow DSL Contract
+    url: https://github.com/pearjelly/skill2workflow/blob/main/docs/workflow-dsl-contract.md
+    about: Read the current Workflow DSL public contract.

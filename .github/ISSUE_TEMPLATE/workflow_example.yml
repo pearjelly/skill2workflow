@@ -1,0 +1,57 @@
+name: Workflow example
+description: Share a real-world workflow scenario that skill2workflow should support.
+title: "example: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Workflow examples help prioritize parser, DSL, executor, control-plane, and connector work. Do not include secrets, customer data, or private credentials.
+  - type: dropdown
+    id: domain
+    attributes:
+      label: Domain
+      options:
+        - Approval
+        - Sales
+        - Customer Service
+        - Risk / Compliance
+        - Operations
+        - Finance
+        - Engineering
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow outline
+      description: List the mandatory steps, human gates, failure paths, and integrations.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: control_needs
+    attributes:
+      label: Control requirements
+      description: What must be enforced rather than merely suggested by an Agent skill?
+      placeholder: "Mandatory approval before external API call; audit every decision."
+    validations:
+      required: true
+  - type: textarea
+    id: current_skill
+    attributes:
+      label: Existing Skill or SOP snippet
+      description: Paste a sanitized SKILL.md or SOP excerpt if available.
+      render: markdown
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: How would you know the workflow is safely supported?
+    validations:
+      required: true
