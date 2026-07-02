@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
+from .dashboard import build_control_snapshot
 from .executor import LocalExecutor
 from .parser import parse_skill_file
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
@@ -111,6 +112,14 @@ def main(argv=None) -> int:
 
     connectors_cmd = subparsers.add_parser("connectors", help="List connector manifests")
     connectors_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+
+    control_snapshot_cmd = subparsers.add_parser(
+        "control-snapshot",
+        help="Export a read-only control-plane snapshot for the local UI",
+    )
+    control_snapshot_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    control_snapshot_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_snapshot_cmd.add_argument("-o", "--output", type=Path)
 
     args = parser.parse_args(argv)
 
@@ -257,6 +266,14 @@ def main(argv=None) -> int:
 
     if args.command == "connectors":
         _print_json(LocalControlPlane(args.state_dir).list_connectors())
+        return 0
+
+    if args.command == "control-snapshot":
+        snapshot = build_control_snapshot(args.state_dir, storage=args.storage)
+        if args.output:
+            args.output.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
+        else:
+            _print_json(snapshot)
         return 0
 
     return 1

@@ -68,6 +68,8 @@ The current implementation is a dependency-light Python harness because the loca
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Audit connector execution events through the control plane
+- Export a read-only control-plane snapshot for local operator inspection
+- Inspect workflows, runs, audit events, and version deltas in a static local control-plane UI
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
 ## Quickstart
@@ -211,6 +213,26 @@ List connector manifests:
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 ```
 
+Export a control-plane snapshot:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
+```
+
+Open the local control-plane inspector:
+
+```bash
+python3 -m http.server 4173
+```
+
+Then open:
+
+```text
+http://localhost:4173/web/control.html
+```
+
+The inspector can load `examples/control-plane-snapshot.json` or a local snapshot exported by `control-snapshot`.
+
 ## Architecture
 
 The approved architecture has five layers:
@@ -231,12 +253,14 @@ src/skill2workflow/
   compiler.py     # Skill IR -> Workflow DSL + validation
   connectors.py    # Built-in connector manifests and local connector execution
   control_plane.py # Local workflow registry, audit log, and connector audit events
+  dashboard.py     # Read-only control-plane snapshot aggregation
   executor.py     # Durable local execution
   storage.py      # JSON and SQLite local persistence backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON
   cli.py          # Command line interface
 examples/skills/  # Example SKILL.md inputs
 examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
+examples/control-plane-snapshot.json # Example control-plane UI snapshot
 schemas/           # Versioned Workflow DSL JSON Schema
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
@@ -263,8 +287,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Connector Runtime MVP
 - Authoring Experience
 - Open Source Release Readiness
+- Local Control Plane UI
 
-Next priority is Loop 13 Local Control Plane UI.
+Next priority is Loop 14 Release Tagging.
 
 See:
 

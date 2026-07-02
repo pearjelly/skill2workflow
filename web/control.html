@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>skill2workflow Control Plane</title>
+    <link rel="stylesheet" href="./control.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">s2w</span>
+          <div>
+            <h1>skill2workflow</h1>
+            <p>Control Plane</p>
+          </div>
+        </div>
+        <div class="toolbar" aria-label="Control plane actions">
+          <button id="load-example" type="button">Load Example</button>
+          <label class="file-action">
+            <input id="snapshot-file" type="file" accept="application/json,.json" />
+            Load Snapshot
+          </label>
+          <input id="filter-input" type="search" placeholder="Filter" aria-label="Filter rows" />
+        </div>
+        <div id="status-pill" class="status-pill">Idle</div>
+      </header>
+
+      <section class="summary-band" aria-label="Summary">
+        <div class="metric">
+          <span>Workflows</span>
+          <strong id="metric-workflows">0</strong>
+        </div>
+        <div class="metric">
+          <span>Runs</span>
+          <strong id="metric-runs">0</strong>
+        </div>
+        <div class="metric">
+          <span>Audit Events</span>
+          <strong id="metric-audit">0</strong>
+        </div>
+        <div class="metric">
+          <span>Connectors</span>
+          <strong id="metric-connectors">0</strong>
+        </div>
+      </section>
+
+      <section class="workspace" aria-label="Control plane inspector">
+        <section class="main-panel">
+          <nav class="tabs" aria-label="Control plane views">
+            <button class="tab is-active" type="button" data-view="workflows">Registry</button>
+            <button class="tab" type="button" data-view="runs">Runs</button>
+            <button class="tab" type="button" data-view="audit">Audit</button>
+            <button class="tab" type="button" data-view="connectors">Connectors</button>
+            <button class="tab" type="button" data-view="versions">Compare</button>
+          </nav>
+
+          <div class="table-wrap" data-panel="workflows">
+            <table>
+              <thead>
+                <tr>
+                  <th>Workflow</th>
+                  <th>Version</th>
+                  <th>Status</th>
+                  <th>Artifact</th>
+                  <th>Published</th>
+                </tr>
+              </thead>
+              <tbody id="workflow-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrap" data-panel="runs" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>Run</th>
+                  <th>Workflow</th>
+                  <th>Status</th>
+                  <th>Current Node</th>
+                  <th>Events</th>
+                </tr>
+              </thead>
+              <tbody id="run-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrap" data-panel="audit" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Workflow</th>
+                  <th>Run</th>
+                  <th>Node</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody id="audit-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrap" data-panel="connectors" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>Connector</th>
+                  <th>Kind</th>
+                  <th>Status</th>
+                  <th>Node Types</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody id="connector-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrap" data-panel="versions" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>Workflow</th>
+                  <th>Versions</th>
+                  <th>Checksum</th>
+                  <th>Nodes</th>
+                  <th>Edges</th>
+                </tr>
+              </thead>
+              <tbody id="version-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="detail-panel" aria-label="Selection detail">
+          <div class="detail-header">
+            <p>Selection</p>
+            <strong id="detail-title">Snapshot</strong>
+          </div>
+          <dl class="status-grid" id="status-grid"></dl>
+          <pre id="detail-json">{}</pre>
+        </aside>
+      </section>
+    </main>
+    <script src="./control.js"></script>
+  </body>
+</html>

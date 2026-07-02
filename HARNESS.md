@@ -70,7 +70,10 @@ PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workfl
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type connector_completed
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
 ```
+
+Open the local control-plane inspector at `http://localhost:4173/web/control.html` after starting `python3 -m http.server 4173`.
 
 ## Current Scope
 
@@ -131,6 +134,8 @@ Implemented:
   - records connector execution events in audit storage for published runs
   - imports existing JSON registry and audit files when opening SQLite control-plane storage
   - exposes built-in connector manifests
+  - exports a read-only local operator snapshot through `control-snapshot`
+  - provides a static control-plane inspector for workflows, runs, audit events, connectors, and version comparisons
 - Connector runtime
   - provides active `manual` and `http` connector manifests
   - gives compiled `human_gate` nodes a default manual connector binding
