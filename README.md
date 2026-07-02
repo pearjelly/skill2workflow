@@ -176,6 +176,9 @@ Run a published version and inspect audit events:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli control-run <run_id> --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
 ```
 
@@ -186,6 +189,13 @@ PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flo
 ```
 
 For SQLite-backed control-plane metadata, pass `--storage sqlite` to `workflows`, `workflow`, `deprecate`, and `audit` as well.
+
+Filter audit events:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --workflow-id workflow_approval_flow --version 0.1.0
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type run_completed
+```
 
 List connector placeholders:
 
@@ -237,8 +247,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Workflow DSL Contract
 - Visual Write-Back
 - SQLite durability for run state, workflow registry, and audit events
+- Control Plane Hardening
 
-Next priorities are control-plane hardening and the first connector runtime boundary.
+Next priorities are the first connector runtime boundary and authoring experience improvements.
 
 See:
 

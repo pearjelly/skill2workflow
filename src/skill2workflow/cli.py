@@ -86,9 +86,28 @@ def main(argv=None) -> int:
     run_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
+    resume_published_cmd = subparsers.add_parser("resume-published", help="Resume a waiting published run")
+    resume_published_cmd.add_argument("run_id")
+    resume_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    resume_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_published_cmd.add_argument("--reject", action="store_true")
+
+    control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
+    control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    control_runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
+    control_run_cmd = subparsers.add_parser("control-run", help="Show a control-plane run detail")
+    control_run_cmd.add_argument("run_id")
+    control_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    control_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
     audit_cmd = subparsers.add_parser("audit", help="List control plane audit events")
     audit_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     audit_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    audit_cmd.add_argument("--workflow-id", default="")
+    audit_cmd.add_argument("--version", default="")
+    audit_cmd.add_argument("--run-id", default="")
+    audit_cmd.add_argument("--event-type", default="")
 
     connectors_cmd = subparsers.add_parser("connectors", help="List connector registry placeholders")
     connectors_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -209,8 +228,31 @@ def main(argv=None) -> int:
             )
         )
 
+    if args.command == "resume-published":
+        return _control_action(
+            lambda: LocalControlPlane(args.state_dir, storage=args.storage).resume_published_run(
+                args.run_id, approved=not args.reject
+            )
+        )
+
+    if args.command == "control-runs":
+        _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_runs())
+        return 0
+
+    if args.command == "control-run":
+        return _control_action(
+            lambda: LocalControlPlane(args.state_dir, storage=args.storage).get_run(args.run_id)
+        )
+
     if args.command == "audit":
-        _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_audit_events())
+        _print_json(
+            LocalControlPlane(args.state_dir, storage=args.storage).list_audit_events(
+                workflow_id=args.workflow_id,
+                version=args.version,
+                run_id=args.run_id,
+                event_type=args.event_type,
+            )
+        )
         return 0
 
     if args.command == "connectors":

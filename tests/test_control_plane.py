@@ -112,6 +112,42 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(run_state["status"], "completed")
         self.assertEqual(audit_types_after_run, ["workflow_published", "run_started", "run_completed"])
 
+    def test_resume_published_run_records_resume_and_terminal_audit(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_approval_workflow(version="5.0.0"))
+
+            waiting = control.run_published_workflow("workflow_control", "5.0.0")
+            completed = control.resume_published_run(waiting["run_id"], approved=True)
+            detail = control.get_run(waiting["run_id"])
+            audit_events = control.list_audit_events(run_id=waiting["run_id"])
+            completed_events = control.list_audit_events(event_type="run_completed")
+
+        self.assertEqual(waiting["status"], "waiting")
+        self.assertEqual(completed["status"], "completed")
+        self.assertEqual(detail["status"], "completed")
+        self.assertEqual(
+            [event["type"] for event in audit_events],
+            ["run_started", "run_waiting", "run_resumed", "run_completed"],
+        )
+        self.assertEqual(completed_events[0]["run_id"], waiting["run_id"])
+
+    def test_audit_events_can_filter_by_workflow_version_and_run_id(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="6.0.0"))
+            control.publish_workflow(_workflow(version="7.0.0"))
+
+            first = control.run_published_workflow("workflow_control", "6.0.0")
+            second = control.run_published_workflow("workflow_control", "7.0.0")
+            version_events = control.list_audit_events(workflow_id="workflow_control", version="6.0.0")
+            run_events = control.list_audit_events(run_id=second["run_id"])
+
+        self.assertTrue(all(event.get("workflow_version") == "6.0.0" for event in version_events))
+        self.assertEqual([event["type"] for event in run_events], ["run_started", "run_completed"])
+        self.assertEqual(run_events[0]["run_id"], second["run_id"])
+        self.assertNotEqual(first["run_id"], second["run_id"])
+
     def test_connector_registry_returns_placeholder_connectors(self):
         with TemporaryDirectory() as tmp:
             connectors = LocalControlPlane(Path(tmp)).list_connectors()
@@ -137,4 +173,34 @@ def _workflow(version: str):
             {"id": "end", "type": "end", "title": "End"},
         ],
         "edges": [{"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}],
+    }
+
+
+def _approval_workflow(version: str):
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {
+            "id": "workflow_control",
+            "name": "control",
+            "version": version,
+            "status": "draft",
+        },
+        "entry": "start",
+        "nodes": [
+            {"id": "start", "type": "start", "title": "Start", "on_success": "review"},
+            {
+                "id": "review",
+                "type": "human_gate",
+                "title": "Review",
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+            {"id": "failure", "type": "failure", "title": "Failure"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_review", "from": "start", "to": "review", "label": "next"},
+            {"id": "edge_review_end", "from": "review", "to": "end", "label": "next"},
+            {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "failure"},
+        ],
     }

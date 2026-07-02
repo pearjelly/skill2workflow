@@ -16,6 +16,7 @@ The bootstrap MVP is in place across all five architecture layers, with the firs
 - Workflow DSL Contract: JSON Schema, structured validation errors, and golden fixture coverage
 - Visual Write-Back: safe LiteGraph title and description edits back to Workflow DSL
 - Runtime Durability: opt-in SQLite storage for run state, workflow registry, and audit events
+- Control Plane Hardening: control-plane resume, run detail, run list, and audit filtering
 
 The default persistence layer remains dependency-light JSON/JSONL. SQLite is available as an opt-in durability backend for run state, workflow registry metadata, and audit events. Published workflow artifacts remain immutable JSON documents in both modes.
 
@@ -31,33 +32,15 @@ The default persistence layer remains dependency-light JSON/JSONL. SQLite is ava
 | Loop 6: Workflow DSL Contract | Complete | JSON Schema, structured validator output, golden workflow fixture coverage |
 | Loop 7: Visual Write-Back | Complete | `write-back` CLI, `Save DSL`, source Workflow DSL embedding, topology-preserving write-back |
 | Loop 8: Runtime Durability | Complete | Storage boundary, SQLite run state, SQLite workflow registry, SQLite audit events, JSON import path |
+| Loop 9: Control Plane Hardening | Complete | `resume-published`, `control-runs`, `control-run`, audit filters, deprecated-version guard |
 
 ## Next Priorities
 
-### 1. Control Plane Hardening
-
-Goal: make the local control plane useful for repeated project work.
-
-Status: next engineering loop.
-
-Deliverables:
-
-- `resume-published` or control-plane-aware resume flow
-- Audit filters by workflow id, version, run id, and event type
-- Run detail command scoped through the control plane
-- Explicit lifecycle behavior for deprecated versions
-
-Success criteria:
-
-- Published runs can be started, paused, resumed, listed, and audited through one control-plane surface
-- Deprecated versions remain inspectable and immutable
-- Audit trails can answer what changed, who/what triggered it, and which run was affected
-
-### 2. Connector Runtime MVP
+### 1. Connector Runtime MVP
 
 Goal: turn connector placeholders into a minimal extension boundary.
 
-Status: starts after the control-plane run lifecycle is hardened enough to record external calls.
+Status: next engineering loop.
 
 Deliverables:
 
@@ -72,7 +55,7 @@ Success criteria:
 - Missing connector bindings fail validation before run
 - Connector execution is logged in node results and audit events
 
-### 3. Authoring Experience
+### 2. Authoring Experience
 
 Goal: improve the visual and CLI authoring flow without weakening Workflow DSL authority.
 
@@ -89,7 +72,7 @@ Success criteria:
 - UI edits are validated through the same DSL contract as CLI edits
 - New write-back fields are allowlisted and covered by tests
 
-### 4. Open Source Release Readiness
+### 3. Open Source Release Readiness
 
 Goal: make the project easier for external contributors to evaluate, run, and extend.
 

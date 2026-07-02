@@ -57,7 +57,12 @@ PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2wo
 PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli control-run <run_id> --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type run_completed
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 ```
@@ -106,8 +111,11 @@ Implemented:
   - publishes immutable workflow artifacts
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions
+  - resumes waiting published runs
+  - lists and shows run state through control-plane commands
   - keeps run state bound to workflow id and version
   - records workflow publish, deprecate, and run events in JSONL or SQLite audit storage
+  - filters audit events by workflow id, version, run id, and event type
   - imports existing JSON registry and audit files when opening SQLite control-plane storage
   - exposes connector registry placeholders
 - CLI
