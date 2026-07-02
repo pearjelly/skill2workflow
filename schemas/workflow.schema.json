@@ -122,6 +122,9 @@
         "retry": {
           "type": ["object", "null"]
         },
+        "connector": {
+          "$ref": "#/$defs/connector_binding"
+        },
         "metadata": {
           "type": "object"
         },
@@ -130,6 +133,24 @@
         },
         "on_failure": {
           "type": "string"
+        }
+      }
+    },
+    "connector_binding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string"
+        },
+        "request": {
+          "type": "object",
+          "description": "Optional connector request metadata. The built-in HTTP connector uses this object."
         }
       }
     },

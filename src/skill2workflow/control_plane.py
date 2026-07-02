@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
+from .connectors import default_connectors
 from .compiler import validate_workflow
 from .executor import LocalExecutor, RunState
 from .storage import create_control_store
@@ -17,31 +18,6 @@ from .storage import create_control_store
 Workflow = Dict[str, object]
 WorkflowRecord = Dict[str, object]
 AuditEvent = Dict[str, object]
-
-
-DEFAULT_CONNECTORS: List[Dict[str, object]] = [
-    {
-        "id": "manual",
-        "name": "Manual Human Gate",
-        "kind": "human_gate",
-        "status": "placeholder",
-        "description": "Placeholder for human approval and manual review integrations.",
-    },
-    {
-        "id": "http",
-        "name": "HTTP Tool Call",
-        "kind": "tool_call",
-        "status": "placeholder",
-        "description": "Placeholder for generic HTTP connector bindings.",
-    },
-    {
-        "id": "lark",
-        "name": "Lark / Feishu",
-        "kind": "enterprise_surface",
-        "status": "placeholder",
-        "description": "Placeholder for enterprise IM, approval, task, and document connectors.",
-    },
-]
 
 
 class LocalControlPlane:
@@ -153,6 +129,7 @@ class LocalControlPlane:
                 "timestamp": started_at,
             }
         )
+        self._append_connector_audit_events(state, workflow_id, version)
         self._append_audit(
             {
                 "type": f"run_{state['status']}",
@@ -168,6 +145,7 @@ class LocalControlPlane:
         current = self.executor.get_run(run_id)
         workflow_id = str(current.get("workflow_id", "workflow"))
         workflow_version = str(current.get("workflow_version", "0.1.0"))
+        previous_event_count = len(current.get("events", [])) if isinstance(current.get("events"), list) else 0
         self._workflow_record(workflow_id, workflow_version)
         state = self.executor.resume(run_id, approved=approved)
         self._append_audit(
@@ -180,6 +158,7 @@ class LocalControlPlane:
                 "timestamp": _now(),
             }
         )
+        self._append_connector_audit_events(state, workflow_id, workflow_version, start_index=previous_event_count)
         self._append_audit(
             {
                 "type": f"run_{state['status']}",
@@ -215,13 +194,12 @@ class LocalControlPlane:
             events = [event for event in events if str(event.get("type", "")) == event_type]
         return events
 
-
     def list_connectors(self) -> List[Dict[str, object]]:
         if self.connectors_path.exists():
             connectors = _load_json(self.connectors_path)
             if isinstance(connectors, list):
                 return connectors
-        return copy.deepcopy(DEFAULT_CONNECTORS)
+        return default_connectors()
 
     def _workflow_record(self, workflow_id: str, version: str) -> WorkflowRecord:
         index = self._load_index()
@@ -241,6 +219,37 @@ class LocalControlPlane:
 
     def _append_audit(self, event: AuditEvent) -> None:
         self.store.append_audit(event)
+
+    def _append_connector_audit_events(
+        self,
+        state: RunState,
+        workflow_id: str,
+        workflow_version: str,
+        start_index: int = 0,
+    ) -> None:
+        events = state.get("events", [])
+        if not isinstance(events, list):
+            return
+        run_id = str(state.get("run_id", ""))
+        for event in events[start_index:]:
+            if not isinstance(event, dict):
+                continue
+            event_type = str(event.get("type", ""))
+            if not event_type.startswith("connector_"):
+                continue
+            self._append_audit(
+                {
+                    "type": event_type,
+                    "run_id": run_id,
+                    "workflow_id": workflow_id,
+                    "workflow_version": workflow_version,
+                    "node_id": event.get("node_id", ""),
+                    "connector_id": event.get("connector_id", ""),
+                    "connector_kind": event.get("connector_kind", ""),
+                    "connector_status": event.get("connector_status", ""),
+                    "timestamp": event.get("timestamp", _now()),
+                }
+            )
 
 
 def _workflow_identity(workflow: Workflow) -> tuple:
