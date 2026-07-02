@@ -104,7 +104,6 @@ Implemented:
 
 Not implemented yet:
 
-- DSL write-back from the visual editor
 - SQLite persistence
 - Enterprise control plane UI
 - Connector runtime
