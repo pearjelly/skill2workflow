@@ -62,19 +62,23 @@ def main(argv=None) -> int:
     publish_cmd = subparsers.add_parser("publish", help="Publish an immutable Workflow DSL version")
     publish_cmd.add_argument("workflow", type=Path)
     publish_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     deprecate_cmd = subparsers.add_parser("deprecate", help="Deprecate a published workflow version")
     deprecate_cmd.add_argument("workflow_id")
     deprecate_cmd.add_argument("--version", required=True)
     deprecate_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    deprecate_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     workflows_cmd = subparsers.add_parser("workflows", help="List published workflow versions")
     workflows_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    workflows_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     workflow_cmd = subparsers.add_parser("workflow", help="Show a published workflow version")
     workflow_cmd.add_argument("workflow_id")
     workflow_cmd.add_argument("--version", required=True)
     workflow_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    workflow_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     run_published_cmd = subparsers.add_parser("run-published", help="Run a published workflow version")
     run_published_cmd.add_argument("workflow_id")
@@ -84,6 +88,7 @@ def main(argv=None) -> int:
 
     audit_cmd = subparsers.add_parser("audit", help="List control plane audit events")
     audit_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    audit_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     connectors_cmd = subparsers.add_parser("connectors", help="List connector registry placeholders")
     connectors_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -174,21 +179,27 @@ def main(argv=None) -> int:
 
     if args.command == "publish":
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir).publish_workflow(_load_json(args.workflow))
+            lambda: LocalControlPlane(args.state_dir, storage=args.storage).publish_workflow(
+                _load_json(args.workflow)
+            )
         )
 
     if args.command == "deprecate":
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir).deprecate_workflow(args.workflow_id, args.version)
+            lambda: LocalControlPlane(args.state_dir, storage=args.storage).deprecate_workflow(
+                args.workflow_id, args.version
+            )
         )
 
     if args.command == "workflows":
-        _print_json(LocalControlPlane(args.state_dir).list_workflows())
+        _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_workflows())
         return 0
 
     if args.command == "workflow":
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir).get_workflow(args.workflow_id, args.version)
+            lambda: LocalControlPlane(args.state_dir, storage=args.storage).get_workflow(
+                args.workflow_id, args.version
+            )
         )
 
     if args.command == "run-published":
@@ -199,7 +210,7 @@ def main(argv=None) -> int:
         )
 
     if args.command == "audit":
-        _print_json(LocalControlPlane(args.state_dir).list_audit_events())
+        _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_audit_events())
         return 0
 
     if args.command == "connectors":

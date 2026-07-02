@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -71,6 +72,45 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(run_state["status"], "completed")
         self.assertEqual(run_summary["run_id"], run_state["run_id"])
         self.assertEqual(run_summary["workflow_id"], "workflow_control")
+
+    def test_sqlite_storage_persists_workflow_registry_and_audit_events(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+
+            record = control.publish_workflow(_workflow(version="3.0.0"))
+            deprecated = control.deprecate_workflow("workflow_control", "3.0.0")
+            records = LocalControlPlane(state_dir, storage="sqlite").list_workflows()
+            audit_types = [event["type"] for event in control.list_audit_events()]
+
+            with sqlite3.connect(state_dir / "control.sqlite3") as connection:
+                workflow_rows = connection.execute("select workflow_id, version, status from workflow_versions").fetchall()
+                audit_rows = connection.execute("select event_type from audit_events order by sequence").fetchall()
+
+        self.assertEqual(record["workflow_id"], "workflow_control")
+        self.assertEqual(deprecated["status"], "deprecated")
+        self.assertEqual(records[0]["status"], "deprecated")
+        self.assertEqual(workflow_rows, [("workflow_control", "3.0.0", "deprecated")])
+        self.assertEqual([row[0] for row in audit_rows], ["workflow_published", "workflow_deprecated"])
+        self.assertEqual(audit_types, ["workflow_published", "workflow_deprecated"])
+
+    def test_sqlite_storage_imports_existing_json_registry_and_audit(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            json_control = LocalControlPlane(state_dir)
+            json_control.publish_workflow(_workflow(version="4.0.0"))
+
+            sqlite_control = LocalControlPlane(state_dir, storage="sqlite")
+            records = sqlite_control.list_workflows()
+            audit_types_before_run = [event["type"] for event in sqlite_control.list_audit_events()]
+            run_state = sqlite_control.run_published_workflow("workflow_control", "4.0.0")
+            audit_types_after_run = [event["type"] for event in sqlite_control.list_audit_events()]
+
+        self.assertEqual(records[0]["workflow_id"], "workflow_control")
+        self.assertEqual(records[0]["version"], "4.0.0")
+        self.assertEqual(audit_types_before_run, ["workflow_published"])
+        self.assertEqual(run_state["status"], "completed")
+        self.assertEqual(audit_types_after_run, ["workflow_published", "run_started", "run_completed"])
 
     def test_connector_registry_returns_placeholder_connectors(self):
         with TemporaryDirectory() as tmp:

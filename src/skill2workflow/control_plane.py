@@ -11,6 +11,7 @@ from typing import Dict, List
 
 from .compiler import validate_workflow
 from .executor import LocalExecutor, RunState
+from .storage import create_control_store
 
 
 Workflow = Dict[str, object]
@@ -49,10 +50,9 @@ class LocalControlPlane:
     def __init__(self, state_dir: Path, storage: str = "json"):
         self.state_dir = Path(state_dir)
         self.workflows_dir = self.state_dir / "workflows"
-        self.index_path = self.workflows_dir / "index.json"
-        self.audit_path = self.state_dir / "audit.log.jsonl"
         self.connectors_path = self.state_dir / "connectors.json"
         self.executor = LocalExecutor(self.state_dir, storage=storage)
+        self.store = create_control_store(self.state_dir, storage=storage)
         self.workflows_dir.mkdir(parents=True, exist_ok=True)
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
@@ -171,13 +171,7 @@ class LocalControlPlane:
         return self.executor.get_run(run_id)
 
     def list_audit_events(self) -> List[AuditEvent]:
-        if not self.audit_path.exists():
-            return []
-        events = []
-        for line in self.audit_path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                events.append(json.loads(line))
-        return events
+        return self.store.list_audit_events()
 
     def list_connectors(self) -> List[Dict[str, object]]:
         if self.connectors_path.exists():
@@ -197,20 +191,13 @@ class LocalControlPlane:
         return self.workflows_dir / _safe_name(workflow_id) / f"{_safe_name(version)}.json"
 
     def _load_index(self) -> Dict[str, WorkflowRecord]:
-        if not self.index_path.exists():
-            return {}
-        index = _load_json(self.index_path)
-        if not isinstance(index, dict):
-            raise ValueError("workflow index must be an object")
-        return index
+        return self.store.load_index()
 
     def _save_index(self, index: Dict[str, WorkflowRecord]) -> None:
-        self.index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.store.save_index(index)
 
     def _append_audit(self, event: AuditEvent) -> None:
-        self.audit_path.parent.mkdir(parents=True, exist_ok=True)
-        with self.audit_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+        self.store.append_audit(event)
 
 
 def _workflow_identity(workflow: Workflow) -> tuple:
