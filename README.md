@@ -249,7 +249,7 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - SQLite durability for run state, workflow registry, and audit events
 - Control Plane Hardening
 
-Next priorities are the first connector runtime boundary and authoring experience improvements.
+Next priorities are Loop 10 Connector Runtime MVP and Loop 11 Authoring Experience.
 
 See:
 
