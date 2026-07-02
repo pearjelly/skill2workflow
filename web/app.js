@@ -26,6 +26,7 @@
   let canvas;
   let selectedNode = null;
   let currentWorkflow = {};
+  let currentWorkflowDsl = null;
   let validationErrors = [];
 
   const els = {};
@@ -58,6 +59,9 @@
         return canvas;
       },
       validateGraph: validateGraph,
+      toWorkflowDsl: function () {
+        return currentWorkflowDsl ? workflowDslFromGraph() : null;
+      },
     };
 
     bindEvents();
@@ -72,6 +76,7 @@
     els.fileInput = document.getElementById("file-input");
     els.fitView = document.getElementById("fit-view");
     els.validateGraph = document.getElementById("validate-graph");
+    els.saveWorkflow = document.getElementById("save-workflow");
     els.saveGraph = document.getElementById("save-graph");
     els.status = document.getElementById("status-pill");
     els.nodeHeading = document.getElementById("node-heading");
@@ -89,6 +94,7 @@
     els.loadSample.addEventListener("click", loadSample);
     els.fitView.addEventListener("click", fitGraph);
     els.validateGraph.addEventListener("click", validateGraph);
+    els.saveWorkflow.addEventListener("click", saveWorkflow);
     els.saveGraph.addEventListener("click", saveGraph);
     els.fileInput.addEventListener("change", loadSelectedFile);
     els.nodeTitle.addEventListener("input", updateSelectedNode);
@@ -200,10 +206,12 @@
 
   function loadDocument(documentJson, label) {
     try {
-      const graphJson = normalizeDocument(documentJson);
+      const normalized = normalizeDocument(documentJson);
+      const graphJson = normalized.graphJson;
       graph.clear();
       graph.configure(graphJson);
       currentWorkflow = graphJson.workflow || {};
+      currentWorkflowDsl = normalized.workflowDsl ? deepClone(normalized.workflowDsl) : null;
       applyNodeTheme(new Set());
       renderInspector(null);
       validateGraph();
@@ -217,10 +225,17 @@
 
   function normalizeDocument(documentJson) {
     if (documentJson.version === GRAPH_VERSION && Array.isArray(documentJson.nodes) && Array.isArray(documentJson.links)) {
-      return documentJson;
+      const sourceWorkflow = documentJson.extra && documentJson.extra.source_workflow;
+      return {
+        graphJson: documentJson,
+        workflowDsl: sourceWorkflow && sourceWorkflow.nodes ? sourceWorkflow : null,
+      };
     }
     if (Array.isArray(documentJson.nodes) && Array.isArray(documentJson.edges) && documentJson.workflow) {
-      return workflowDslToLiteGraph(documentJson);
+      return {
+        graphJson: workflowDslToLiteGraph(documentJson),
+        workflowDsl: documentJson,
+      };
     }
     throw new Error("Expected Workflow DSL JSON or skill2workflow LiteGraph JSON.");
   }
@@ -302,6 +317,7 @@
       extra: {
         source_schema_version: workflow.schema_version,
         truth_source: "workflow_dsl",
+        source_workflow: deepClone(workflow),
       },
     };
   }
@@ -432,17 +448,23 @@
       return [];
     }
     if (Array.isArray(graph.links)) {
-      return graph.links.map(linkFromArray).filter(Boolean);
+      return graph.links.map(normalizeLink).filter(Boolean);
     }
     return Object.keys(graph.links)
       .map(function (key) {
-        const link = graph.links[key];
-        if (Array.isArray(link)) {
-          return linkFromArray(link);
-        }
-        return link;
+        return normalizeLink(graph.links[key]);
       })
       .filter(Boolean);
+  }
+
+  function normalizeLink(link) {
+    if (Array.isArray(link)) {
+      return linkFromArray(link);
+    }
+    if (link && typeof link === "object") {
+      return link;
+    }
+    return null;
   }
 
   function linkFromArray(link) {
@@ -548,19 +570,172 @@
   }
 
   function saveGraph() {
-    validateGraph();
+    if (validateGraph().length) {
+      return;
+    }
     const serialized = graph.serialize();
+    const sourceWorkflow = currentWorkflowDsl ? workflowDslFromGraph() : null;
     const graphJson = Object.assign({}, serialized, {
       version: GRAPH_VERSION,
       workflow: currentWorkflow,
-      extra: Object.assign({}, serialized.extra || {}, { truth_source: "workflow_dsl" }),
+      extra: Object.assign(
+        {},
+        serialized.extra || {},
+        { truth_source: "workflow_dsl" },
+        sourceWorkflow ? { source_workflow: sourceWorkflow } : {}
+      ),
     });
-    const blob = new Blob([JSON.stringify(graphJson, null, 2)], { type: "application/json" });
+    downloadJson(graphJson, (currentWorkflow.name || "workflow") + ".litegraph.json");
+  }
+
+  function saveWorkflow() {
+    const graphErrors = validateGraph();
+    if (graphErrors.length) {
+      return;
+    }
+    if (!currentWorkflowDsl) {
+      renderValidation(["Load Workflow DSL or a LiteGraph JSON with embedded source workflow before saving DSL."]);
+      setStatus("No source DSL", "invalid");
+      return;
+    }
+
+    const workflow = workflowDslFromGraph();
+    const workflowErrors = validateWorkflowDsl(workflow);
+    if (workflowErrors.length) {
+      renderValidation(workflowErrors);
+      setStatus("Invalid DSL", "invalid");
+      return;
+    }
+    downloadJson(workflow, (currentWorkflow.name || "workflow") + ".workflow.json");
+    setStatus("DSL saved", "valid");
+  }
+
+  function workflowDslFromGraph() {
+    const workflow = deepClone(currentWorkflowDsl);
+    const graphNodeByWorkflowId = {};
+    graph._nodes.forEach(function (node) {
+      if (node.properties && node.properties.workflow_node_id) {
+        graphNodeByWorkflowId[node.properties.workflow_node_id] = node;
+      }
+    });
+    workflow.nodes.forEach(function (node) {
+      const graphNode = graphNodeByWorkflowId[node.id];
+      if (!graphNode) {
+        return;
+      }
+      node.title = graphNode.title || node.title;
+      const description = graphNode.properties && graphNode.properties.description ? graphNode.properties.description : "";
+      if (description || Object.prototype.hasOwnProperty.call(node, "description")) {
+        node.description = description;
+      }
+    });
+    return workflow;
+  }
+
+  function validateWorkflowDsl(workflow) {
+    const errors = [];
+    if (!workflow || !Array.isArray(workflow.nodes) || !Array.isArray(workflow.edges)) {
+      return ["Workflow DSL must contain nodes and edges arrays."];
+    }
+    const nodeIds = workflow.nodes.map(function (node) {
+      return node.id;
+    });
+    const nodeIdSet = new Set(nodeIds);
+    if (nodeIdSet.size !== nodeIds.length) {
+      errors.push("Workflow node ids must be unique.");
+    }
+    if (!nodeIdSet.has(workflow.entry)) {
+      errors.push("Workflow entry must reference an existing node.");
+    }
+    if (!workflow.nodes.some(function (node) { return node.type === "end"; })) {
+      errors.push("Workflow must contain at least one end node.");
+    }
+    const workflowEdges = workflowEdgeSet(workflow);
+    const graphEdges = graphEdgeSet();
+    if (!sameSet(workflowEdges, graphEdges)) {
+      errors.push("Graph topology does not match Workflow DSL.");
+    }
+    workflow.nodes.forEach(function (node) {
+      if (TERMINAL_TYPES.has(node.type)) {
+        if (node.on_success || node.on_failure) {
+          errors.push(node.id + " is terminal and must not define transitions.");
+        }
+        return;
+      }
+      if (!node.on_success) {
+        errors.push(node.id + " must define on_success.");
+      }
+      if (node.type === "human_gate" && !node.on_failure) {
+        errors.push(node.id + " human_gate must define on_failure.");
+      }
+      ["on_success", "on_failure"].forEach(function (key) {
+        if (node[key] && !nodeIdSet.has(node[key])) {
+          errors.push(node.id + "." + key + " references missing node " + node[key] + ".");
+        }
+      });
+    });
+    workflow.edges.forEach(function (edge) {
+      if (!nodeIdSet.has(edge.from)) {
+        errors.push(edge.id + ".from references missing node " + edge.from + ".");
+      }
+      if (!nodeIdSet.has(edge.to)) {
+        errors.push(edge.id + ".to references missing node " + edge.to + ".");
+      }
+    });
+    return errors;
+  }
+
+  function workflowEdgeSet(workflow) {
+    return new Set(
+      workflow.edges.map(function (edge) {
+        const kind = String(edge.label || "").toLowerCase() === "failure" ? "failure" : "success";
+        return edge.from + "->" + edge.to + ":" + kind;
+      })
+    );
+  }
+
+  function graphEdgeSet() {
+    const graphNodeById = {};
+    graph._nodes.forEach(function (node) {
+      graphNodeById[node.id] = node;
+    });
+    const edges = new Set();
+    currentLinks().forEach(function (link) {
+      const source = graphNodeById[link.origin_id];
+      const target = graphNodeById[link.target_id];
+      if (!source || !target || !source.properties || !target.properties) {
+        return;
+      }
+      const output = source.outputs && source.outputs[link.origin_slot];
+      const kind = output && output.name === "failure" ? "failure" : "success";
+      edges.add(source.properties.workflow_node_id + "->" + target.properties.workflow_node_id + ":" + kind);
+    });
+    return edges;
+  }
+
+  function sameSet(left, right) {
+    if (left.size !== right.size) {
+      return false;
+    }
+    for (const item of left) {
+      if (!right.has(item)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function downloadJson(value, filename) {
+    const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = (currentWorkflow.name || "workflow") + ".litegraph.json";
+    link.download = filename;
     link.click();
     URL.revokeObjectURL(link.href);
+  }
+
+  function deepClone(value) {
+    return JSON.parse(JSON.stringify(value));
   }
 
   function fitGraph() {

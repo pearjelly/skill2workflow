@@ -99,6 +99,42 @@ class CliTests(TestCase):
         self.assertIn("errors", payload)
         self.assertTrue(any(error["code"] == "edge_target_missing" for error in payload["errors"]))
 
+    def test_write_back_command_writes_edited_workflow_dsl(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "workflow.json"
+            graph_path = tmp_path / "graph.json"
+            output_path = tmp_path / "edited-workflow.json"
+            workflow = _workflow()
+            workflow_path.write_text(json.dumps(workflow), encoding="utf-8")
+
+            from skill2workflow.visualizer import workflow_to_litegraph
+
+            graph = workflow_to_litegraph(workflow)
+            graph["nodes"][0]["title"] = "Edited Start"
+            graph["nodes"][0]["properties"]["description"] = "Edited entry point."
+            graph_path.write_text(json.dumps(graph), encoding="utf-8")
+            stdout = StringIO()
+
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "write-back",
+                        str(workflow_path),
+                        str(graph_path),
+                        "-o",
+                        str(output_path),
+                    ]
+                )
+
+            edited = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertEqual(edited["nodes"][0]["title"], "Edited Start")
+        self.assertEqual(edited["nodes"][0]["description"], "Edited entry point.")
+        self.assertEqual(edited["edges"], workflow["edges"])
+
 
 def _workflow():
     return {

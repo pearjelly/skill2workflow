@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from skill2workflow.visualizer import workflow_to_litegraph
+from skill2workflow.visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 
 
 class VisualizerTests(TestCase):
@@ -60,6 +60,59 @@ class VisualizerTests(TestCase):
                 [3, 2, 1, 3, 0, "flow"],
             ],
         )
+
+    def test_apply_litegraph_edits_to_workflow_updates_parameters_only(self):
+        workflow = _approval_workflow()
+        graph = workflow_to_litegraph(workflow)
+        review = next(node for node in graph["nodes"] if node["properties"]["workflow_node_id"] == "review")
+        review["title"] = "Executive Review"
+        review["properties"]["description"] = "Executive approval gate."
+
+        updated = apply_litegraph_edits_to_workflow(workflow, graph)
+        updated_review = next(node for node in updated["nodes"] if node["id"] == "review")
+        original_review = next(node for node in workflow["nodes"] if node["id"] == "review")
+
+        self.assertEqual(updated_review["title"], "Executive Review")
+        self.assertEqual(updated_review["description"], "Executive approval gate.")
+        self.assertEqual(updated_review["on_success"], "end")
+        self.assertEqual(updated_review["on_failure"], "failure")
+        self.assertEqual(updated_review["metadata"], {"source": {"file": "SKILL.md", "line": 12}})
+        self.assertEqual(original_review["title"], "Review")
+
+    def test_apply_litegraph_edits_to_workflow_accepts_object_links(self):
+        workflow = _approval_workflow()
+        graph = workflow_to_litegraph(workflow)
+        graph["links"] = [
+            {
+                "id": link[0],
+                "origin_id": link[1],
+                "origin_slot": link[2],
+                "target_id": link[3],
+                "target_slot": link[4],
+                "type": link[5],
+            }
+            for link in graph["links"]
+        ]
+
+        updated = apply_litegraph_edits_to_workflow(workflow, graph)
+
+        self.assertEqual(updated["nodes"], workflow["nodes"])
+
+    def test_apply_litegraph_edits_to_workflow_rejects_topology_changes(self):
+        workflow = _approval_workflow()
+        graph = workflow_to_litegraph(workflow)
+        graph["links"] = graph["links"][:-1]
+
+        with self.assertRaisesRegex(ValueError, "graph topology does not match workflow DSL"):
+            apply_litegraph_edits_to_workflow(workflow, graph)
+
+    def test_apply_litegraph_edits_to_workflow_rejects_duplicate_node_mapping(self):
+        workflow = _approval_workflow()
+        graph = workflow_to_litegraph(workflow)
+        graph["nodes"].append(dict(graph["nodes"][0]))
+
+        with self.assertRaisesRegex(ValueError, "graph node set does not match workflow DSL"):
+            apply_litegraph_edits_to_workflow(workflow, graph)
 
 
 def _approval_workflow():

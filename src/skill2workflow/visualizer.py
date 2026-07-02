@@ -1,8 +1,9 @@
-"""Convert Workflow DSL documents into LiteGraph-compatible graph JSON."""
+"""Convert between Workflow DSL documents and LiteGraph-compatible graph JSON."""
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional
+import copy
+from typing import Dict, Iterable, List, Optional, Tuple
 
 
 LiteGraph = Dict[str, object]
@@ -61,8 +62,44 @@ def workflow_to_litegraph(workflow: Workflow, run_state: Optional[RunState] = No
         "extra": {
             "source_schema_version": workflow.get("schema_version"),
             "truth_source": "workflow_dsl",
+            "source_workflow": copy.deepcopy(workflow),
         },
     }
+
+
+def apply_litegraph_edits_to_workflow(workflow: Workflow, graph: LiteGraph) -> Workflow:
+    """Apply safe LiteGraph parameter edits back to Workflow DSL.
+
+    This write-back intentionally preserves workflow topology. Node ids, edges,
+    transitions, source metadata, guards, policies, and execution semantics stay
+    in the Workflow DSL. The LiteGraph view may update only node title and
+    description.
+    """
+    workflow_nodes = _workflow_nodes(workflow)
+    graph_nodes = _graph_nodes(graph)
+    _assert_matching_node_ids(workflow_nodes, graph_nodes)
+    _assert_matching_topology(workflow, graph)
+
+    graph_by_workflow_id = {
+        str(node["properties"]["workflow_node_id"]): node
+        for node in graph_nodes
+        if isinstance(node.get("properties"), dict)
+    }
+    updated = copy.deepcopy(workflow)
+    for node in updated.get("nodes", []):
+        if not isinstance(node, dict) or not node.get("id"):
+            continue
+        graph_node = graph_by_workflow_id[str(node["id"])]
+        title = str(graph_node.get("title") or "").strip()
+        if not title:
+            raise ValueError(f"graph node {node['id']} title must not be empty")
+        node["title"] = title
+        properties = graph_node.get("properties", {})
+        if isinstance(properties, dict):
+            description = str(properties.get("description") or "")
+            if description or "description" in node:
+                node["description"] = description
+    return updated
 
 
 def _workflow_nodes(workflow: Workflow) -> List[Dict[str, object]]:
@@ -70,6 +107,13 @@ def _workflow_nodes(workflow: Workflow) -> List[Dict[str, object]]:
     if not isinstance(nodes, list):
         return []
     return [node for node in nodes if isinstance(node, dict) and node.get("id")]
+
+
+def _graph_nodes(graph: LiteGraph) -> List[Dict[str, object]]:
+    nodes = graph.get("nodes", [])
+    if not isinstance(nodes, list):
+        raise ValueError("LiteGraph graph.nodes must be a list")
+    return [node for node in nodes if isinstance(node, dict)]
 
 
 def _workflow_edges(workflow: Workflow, nodes: List[Dict[str, object]]) -> List[Dict[str, object]]:
@@ -96,6 +140,89 @@ def _workflow_edges(workflow: Workflow, nodes: List[Dict[str, object]]) -> List[
                     }
                 )
     return derived_edges
+
+
+def _assert_matching_node_ids(
+    workflow_nodes: List[Dict[str, object]],
+    graph_nodes: List[Dict[str, object]],
+) -> None:
+    workflow_ids = {str(node["id"]) for node in workflow_nodes}
+    graph_ids = []
+    for node in graph_nodes:
+        properties = node.get("properties", {})
+        if not isinstance(properties, dict) or not properties.get("workflow_node_id"):
+            raise ValueError("LiteGraph node is missing properties.workflow_node_id")
+        graph_ids.append(str(properties["workflow_node_id"]))
+
+    if len(graph_ids) != len(set(graph_ids)) or workflow_ids != set(graph_ids):
+        raise ValueError("graph node set does not match workflow DSL")
+
+
+def _assert_matching_topology(workflow: Workflow, graph: LiteGraph) -> None:
+    workflow_nodes = _workflow_nodes(workflow)
+    workflow_edges = _workflow_edges(workflow, workflow_nodes)
+    expected = {
+        (
+            str(edge["from"]),
+            str(edge["to"]),
+            "failure" if str(edge.get("label") or "").lower() == "failure" else "success",
+        )
+        for edge in workflow_edges
+    }
+    actual = _graph_edge_set(graph)
+    if expected != actual:
+        raise ValueError("graph topology does not match workflow DSL")
+
+
+def _graph_edge_set(graph: LiteGraph) -> set:
+    graph_nodes = _graph_nodes(graph)
+    graph_nodes_by_id = {node.get("id"): node for node in graph_nodes}
+    graph_workflow_ids = {
+        node.get("id"): str(node.get("properties", {}).get("workflow_node_id"))
+        for node in graph_nodes
+        if isinstance(node.get("properties"), dict)
+    }
+
+    edges = set()
+    for link in _graph_links(graph):
+        normalized = _normalize_graph_link(link)
+        if normalized is None:
+            continue
+        source_graph_id, source_slot, target_graph_id = normalized
+        source_node = graph_nodes_by_id.get(source_graph_id)
+        if not isinstance(source_node, dict):
+            continue
+        source_outputs = source_node.get("outputs", [])
+        output_name = "success"
+        if isinstance(source_outputs, list) and 0 <= source_slot < len(source_outputs):
+            output = source_outputs[source_slot]
+            if isinstance(output, dict):
+                output_name = str(output.get("name") or "success")
+        if output_name != "failure":
+            output_name = "success"
+        if source_graph_id in graph_workflow_ids and target_graph_id in graph_workflow_ids:
+            edges.add((graph_workflow_ids[source_graph_id], graph_workflow_ids[target_graph_id], output_name))
+    return edges
+
+
+def _graph_links(graph: LiteGraph) -> List[object]:
+    links = graph.get("links", [])
+    if isinstance(links, list):
+        return [link for link in links if isinstance(link, (list, dict))]
+    if isinstance(links, dict):
+        return [link for link in links.values() if isinstance(link, (list, dict))]
+    return []
+
+
+def _normalize_graph_link(link: object) -> Optional[Tuple[object, int, object]]:
+    try:
+        if isinstance(link, list) and len(link) >= 5:
+            return link[1], int(link[2]), link[3]
+        if isinstance(link, dict):
+            return link.get("origin_id"), int(link.get("origin_slot", 0)), link.get("target_id")
+    except (TypeError, ValueError):
+        return None
+    return None
 
 
 def _litegraph_node(

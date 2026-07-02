@@ -11,7 +11,7 @@ from .compiler import compile_ir_to_workflow, validate_workflow, validate_workfl
 from .control_plane import LocalControlPlane
 from .executor import LocalExecutor
 from .parser import parse_skill_file
-from .visualizer import workflow_to_litegraph
+from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 
 
 def main(argv=None) -> int:
@@ -33,6 +33,11 @@ def main(argv=None) -> int:
     visualize_cmd.add_argument("workflow", type=Path)
     visualize_cmd.add_argument("--run-state", type=Path)
     visualize_cmd.add_argument("-o", "--output", type=Path)
+
+    write_back_cmd = subparsers.add_parser("write-back", help="Apply safe LiteGraph edits back to Workflow DSL")
+    write_back_cmd.add_argument("workflow", type=Path)
+    write_back_cmd.add_argument("litegraph", type=Path)
+    write_back_cmd.add_argument("-o", "--output", type=Path)
 
     run_cmd = subparsers.add_parser("run", help="Run a Workflow DSL JSON file")
     run_cmd.add_argument("workflow", type=Path)
@@ -127,6 +132,18 @@ def main(argv=None) -> int:
             _print_json(graph)
         return 0
 
+    if args.command == "write-back":
+        try:
+            updated = _write_back_workflow(_load_json(args.workflow), _load_json(args.litegraph))
+        except ValueError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        if args.output:
+            args.output.write_text(json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8")
+        else:
+            _print_json(updated)
+        return 0
+
     if args.command == "run":
         workflow = _load_json(args.workflow)
         errors = validate_workflow(workflow)
@@ -200,6 +217,14 @@ def _control_action(callback) -> int:
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1
+
+
+def _write_back_workflow(workflow, graph):
+    updated = apply_litegraph_edits_to_workflow(workflow, graph)
+    errors = validate_workflow(updated)
+    if errors:
+        raise ValueError("; ".join(errors))
+    return updated
 
 
 if __name__ == "__main__":
