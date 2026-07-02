@@ -31,6 +31,15 @@ class DslContractTests(TestCase):
         self.assertEqual(validate_workflow(workflow), [])
         self.assertEqual(workflow["schema_version"], "0.1.0")
 
+    def test_all_example_workflows_are_valid_contract_fixtures(self):
+        workflow_paths = sorted((ROOT / "examples" / "workflows").glob("*.workflow.json"))
+
+        self.assertGreaterEqual(len(workflow_paths), 2)
+        for path in workflow_paths:
+            with self.subTest(path=path.name):
+                workflow = json.loads(path.read_text(encoding="utf-8"))
+                self.assertEqual(validate_workflow_structured(workflow), [])
+
     def test_structured_validation_errors_have_codes_paths_and_messages(self):
         workflow = {
             "schema_version": "0.1.0",

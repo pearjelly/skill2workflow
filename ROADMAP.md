@@ -17,12 +17,14 @@ Current capability snapshot:
 - Control plane: immutable workflow publish, version lifecycle, published-version runs, resume, audit log, and filtered audit queries
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, and connector audit events
+- Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 
 Important boundaries:
 
 - Published workflow artifacts remain immutable JSON documents in both storage modes.
 - The visual graph is an editor/view. Workflow DSL remains the execution truth source.
 - Connector runtime is an MVP boundary. Enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
+- Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
 
 ## Completed Loops
 
@@ -38,35 +40,17 @@ Important boundaries:
 | Loop 8: Runtime Durability | Complete | Storage boundary, SQLite run state, SQLite workflow registry, SQLite audit events, JSON import path |
 | Loop 9: Control Plane Hardening | Complete | `resume-published`, `control-runs`, `control-run`, audit filters, deprecated-version guard |
 | Loop 10: Connector Runtime MVP | Complete | Active connector manifests, manual and HTTP bindings, HTTP execution, connector run events, connector audit events |
+| Loop 11: Authoring Experience | Complete | Example gallery, richer LiteGraph parameter forms, safe action/retry/HTTP request write-back, authoring docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-### Loop 11: Authoring Experience
-
-Goal: improve the visual and CLI authoring flow without weakening Workflow DSL authority.
-
-Status: next engineering loop.
-
-Scope:
-
-- Better LiteGraph parameter forms for supported node fields
-- Example workflow gallery
-- Documentation for adding node types and compiler rules
-- Expanded write-back for explicitly safe node parameters
-
-Acceptance criteria:
-
-- Contributors can inspect and edit example workflows without reading code first
-- UI edits are validated through the same DSL contract as CLI edits
-- New write-back fields are allowlisted and covered by tests
-
 ### Loop 12: Open Source Release Readiness
 
 Goal: make the project easier for external contributors to evaluate, run, and extend.
 
-Status: follows Loop 11, with small docs-only PRs allowed in parallel.
+Status: next engineering loop.
 
 Scope:
 
@@ -103,12 +87,13 @@ Status: first MVP shipped in Loop 10. Future work should harden connector ergono
 
 ### v0.3: Authoring Experience
 
-Target: make workflow inspection and editing easier without making the visual graph authoritative.
+Status: first MVP shipped in Loop 11. Future work should improve editor ergonomics and broaden safe write-back only where semantics are explicit.
 
 - Better LiteGraph parameter forms
 - Example workflow gallery
 - Expanded safe write-back beyond title and description
 - Contributor docs for node types and compiler rules
+- Future: node creation flows, schema-backed forms, and run/audit overlays in the editor
 
 ### v0.4: Open Source Release Baseline
 

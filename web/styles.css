@@ -34,6 +34,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -98,6 +99,7 @@ textarea {
 }
 
 .toolbar button,
+.toolbar select,
 .file-action {
   display: inline-flex;
   align-items: center;
@@ -113,14 +115,20 @@ textarea {
 }
 
 .toolbar button:hover,
+.toolbar select:hover,
 .file-action:hover {
   border-color: var(--accent);
   color: var(--accent-strong);
 }
 
 .toolbar button:active,
+.toolbar select:active,
 .file-action:active {
   transform: translateY(1px);
+}
+
+.toolbar select {
+  min-width: 148px;
 }
 
 .file-action input {
@@ -228,6 +236,7 @@ textarea {
 }
 
 .node-form input,
+.node-form select,
 .node-form textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -239,15 +248,42 @@ textarea {
 }
 
 .node-form input[readonly],
+.node-form select[readonly],
 .node-form textarea[readonly] {
   color: #566273;
   background: #f4f6f9;
 }
 
 .node-form input:focus,
+.node-form select:focus,
 .node-form textarea:focus {
   border-color: var(--accent);
   outline: 2px solid rgba(23, 105, 170, 0.16);
+}
+
+.form-section {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f8fafc;
+}
+
+.form-section[hidden] {
+  display: none;
+}
+
+.form-section.nested {
+  background: #ffffff;
+}
+
+.form-section p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
 }
 
 .validation-panel {

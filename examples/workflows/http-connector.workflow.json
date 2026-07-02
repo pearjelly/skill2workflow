@@ -1,0 +1,132 @@
+{
+  "schema_version": "0.1.0",
+  "workflow": {
+    "id": "workflow_http_connector",
+    "name": "http-connector",
+    "description": "Example workflow with an editable HTTP connector request.",
+    "version": "0.1.0",
+    "status": "draft"
+  },
+  "entry": "start",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Start",
+      "description": "Workflow entry point.",
+      "on_success": "review"
+    },
+    {
+      "id": "review",
+      "type": "human_gate",
+      "title": "Review request",
+      "description": "Manual approval before sending the request.",
+      "action": {
+        "kind": "human_approval",
+        "prompt": "Approve the outbound connector request."
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "connector": {
+        "id": "manual",
+        "kind": "manual"
+      },
+      "on_success": "call_api",
+      "on_failure": "failure"
+    },
+    {
+      "id": "call_api",
+      "type": "tool_call",
+      "title": "Call HTTP endpoint",
+      "description": "Send a JSON payload through the built-in HTTP connector.",
+      "action": {
+        "kind": "tool_call",
+        "instruction": "Send the approved payload to the configured HTTP endpoint."
+      },
+      "retry": {
+        "max_attempts": 1
+      },
+      "connector": {
+        "id": "http",
+        "kind": "http",
+        "request": {
+          "method": "POST",
+          "url": "http://127.0.0.1:8080/example",
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "source": "skill2workflow",
+            "example": true
+          },
+          "timeout_ms": 3000
+        }
+      },
+      "on_success": "end",
+      "on_failure": "failure"
+    },
+    {
+      "id": "failure",
+      "type": "failure",
+      "title": "Failure",
+      "description": "Terminal failure node."
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "End",
+      "description": "Workflow completed."
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_start_review",
+      "from": "start",
+      "to": "review",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_review_api",
+      "from": "review",
+      "to": "call_api",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_review_failure",
+      "from": "review",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_api_end",
+      "from": "call_api",
+      "to": "end",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_api_failure",
+      "from": "call_api",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    }
+  ],
+  "state_schema": {},
+  "guards": [],
+  "checkpoints": [],
+  "policies": {
+    "default_retry": {
+      "max_attempts": 0
+    },
+    "default_timeout_ms": 300000
+  }
+}

@@ -79,6 +79,53 @@ class VisualizerTests(TestCase):
         self.assertEqual(updated_review["metadata"], {"source": {"file": "SKILL.md", "line": 12}})
         self.assertEqual(original_review["title"], "Review")
 
+    def test_apply_litegraph_edits_to_workflow_updates_safe_authoring_fields(self):
+        workflow = _authoring_workflow()
+        graph = workflow_to_litegraph(workflow)
+        review = next(node for node in graph["nodes"] if node["properties"]["workflow_node_id"] == "review")
+        api = next(node for node in graph["nodes"] if node["properties"]["workflow_node_id"] == "call_api")
+
+        review["properties"]["action"]["prompt"] = "Escalate to finance reviewer."
+        review["properties"]["retry"]["max_attempts"] = 2
+        api["properties"]["action"]["instruction"] = "Send the normalized approval payload."
+        api["properties"]["connector"]["request"]["method"] = "PUT"
+        api["properties"]["connector"]["request"]["url"] = "https://example.test/approval"
+        api["properties"]["connector"]["request"]["headers"] = {"X-Workflow": "approval"}
+        api["properties"]["connector"]["request"]["body"] = {"approved": True}
+        api["properties"]["connector"]["request"]["timeout_ms"] = 1000
+
+        updated = apply_litegraph_edits_to_workflow(workflow, graph)
+        updated_review = next(node for node in updated["nodes"] if node["id"] == "review")
+        updated_api = next(node for node in updated["nodes"] if node["id"] == "call_api")
+
+        self.assertEqual(updated_review["action"]["prompt"], "Escalate to finance reviewer.")
+        self.assertEqual(updated_review["retry"]["max_attempts"], 2)
+        self.assertEqual(updated_api["action"]["instruction"], "Send the normalized approval payload.")
+        self.assertEqual(
+            updated_api["connector"],
+            {
+                "id": "http",
+                "kind": "http",
+                "request": {
+                    "method": "PUT",
+                    "url": "https://example.test/approval",
+                    "headers": {"X-Workflow": "approval"},
+                    "body": {"approved": True},
+                    "timeout_ms": 1000,
+                },
+            },
+        )
+        self.assertEqual(workflow["nodes"][1]["action"]["prompt"], "Review request.")
+
+    def test_apply_litegraph_edits_to_workflow_rejects_connector_identity_changes(self):
+        workflow = _authoring_workflow()
+        graph = workflow_to_litegraph(workflow)
+        api = next(node for node in graph["nodes"] if node["properties"]["workflow_node_id"] == "call_api")
+        api["properties"]["connector"]["id"] = "lark"
+
+        with self.assertRaisesRegex(ValueError, "connector identity cannot be changed"):
+            apply_litegraph_edits_to_workflow(workflow, graph)
+
     def test_apply_litegraph_edits_to_workflow_accepts_object_links(self):
         workflow = _approval_workflow()
         graph = workflow_to_litegraph(workflow)
@@ -149,5 +196,69 @@ def _approval_workflow():
             {"id": "edge_start_review", "from": "start", "to": "review", "label": "next"},
             {"id": "edge_review_end", "from": "review", "to": "end", "label": "next"},
             {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "failure"},
+        ],
+    }
+
+
+def _authoring_workflow():
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {
+            "id": "workflow_authoring",
+            "name": "authoring",
+            "version": "0.1.0",
+            "status": "draft",
+        },
+        "entry": "start",
+        "nodes": [
+            {
+                "id": "start",
+                "type": "start",
+                "title": "Start",
+                "description": "Workflow entry point.",
+                "on_success": "review",
+            },
+            {
+                "id": "review",
+                "type": "human_gate",
+                "title": "Review",
+                "description": "Human review gate.",
+                "action": {"kind": "human_approval", "prompt": "Review request."},
+                "retry": {"max_attempts": 0},
+                "connector": {"id": "manual", "kind": "manual"},
+                "on_success": "call_api",
+                "on_failure": "failure",
+                "metadata": {"source": {"file": "SKILL.md", "line": 12}},
+            },
+            {
+                "id": "call_api",
+                "type": "tool_call",
+                "title": "Call API",
+                "description": "Notify API.",
+                "action": {"kind": "tool_call", "instruction": "Send approval payload."},
+                "retry": {"max_attempts": 0},
+                "connector": {
+                    "id": "http",
+                    "kind": "http",
+                    "request": {
+                        "method": "POST",
+                        "url": "https://example.test/old",
+                        "headers": {"Content-Type": "application/json"},
+                        "body": {"approved": False},
+                        "timeout_ms": 2000,
+                    },
+                },
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+            {"id": "failure", "type": "failure", "title": "Failure"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_review", "from": "start", "to": "review", "label": "next"},
+            {"id": "edge_review_api", "from": "review", "to": "call_api", "label": "next"},
+            {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "failure"},
+            {"id": "edge_api_end", "from": "call_api", "to": "end", "label": "next"},
+            {"id": "edge_api_failure", "from": "call_api", "to": "failure", "label": "failure"},
         ],
     }

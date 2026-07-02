@@ -21,6 +21,10 @@
     failed: "#b42318",
   };
   const TERMINAL_TYPES = new Set(["end", "failure"]);
+  const EXAMPLES = {
+    "approval-flow.workflow.json": "../examples/workflows/approval-flow.workflow.json",
+    "http-connector.workflow.json": "../examples/workflows/http-connector.workflow.json",
+  };
 
   let graph;
   let canvas;
@@ -72,6 +76,7 @@
 
   function cacheElements() {
     els.canvas = document.getElementById("graph-canvas");
+    els.exampleSelect = document.getElementById("example-select");
     els.loadSample = document.getElementById("load-sample");
     els.fileInput = document.getElementById("file-input");
     els.fitView = document.getElementById("fit-view");
@@ -85,6 +90,17 @@
     els.nodeStatus = document.getElementById("node-status");
     els.nodeTitle = document.getElementById("node-title");
     els.nodeDescription = document.getElementById("node-description");
+    els.nodeAction = document.getElementById("node-action");
+    els.nodeRetryMax = document.getElementById("node-retry-max");
+    els.connectorSection = document.getElementById("connector-section");
+    els.nodeConnectorId = document.getElementById("node-connector-id");
+    els.nodeConnectorKind = document.getElementById("node-connector-kind");
+    els.httpSection = document.getElementById("http-section");
+    els.nodeHttpMethod = document.getElementById("node-http-method");
+    els.nodeHttpUrl = document.getElementById("node-http-url");
+    els.nodeHttpHeaders = document.getElementById("node-http-headers");
+    els.nodeHttpBody = document.getElementById("node-http-body");
+    els.nodeHttpTimeout = document.getElementById("node-http-timeout");
     els.nodeSource = document.getElementById("node-source");
     els.validationList = document.getElementById("validation-list");
   }
@@ -99,6 +115,13 @@
     els.fileInput.addEventListener("change", loadSelectedFile);
     els.nodeTitle.addEventListener("input", updateSelectedNode);
     els.nodeDescription.addEventListener("input", updateSelectedNode);
+    els.nodeAction.addEventListener("input", updateSelectedNode);
+    els.nodeRetryMax.addEventListener("input", updateSelectedNode);
+    els.nodeHttpMethod.addEventListener("input", updateSelectedNode);
+    els.nodeHttpUrl.addEventListener("input", updateSelectedNode);
+    els.nodeHttpHeaders.addEventListener("input", updateSelectedNode);
+    els.nodeHttpBody.addEventListener("input", updateSelectedNode);
+    els.nodeHttpTimeout.addEventListener("input", updateSelectedNode);
   }
 
   function registerNodeTypes() {
@@ -177,12 +200,14 @@
 
   async function loadSample() {
     setStatus("Loading", "idle");
+    const exampleName = els.exampleSelect && els.exampleSelect.value ? els.exampleSelect.value : "approval-flow.workflow.json";
+    const exampleUrl = EXAMPLES[exampleName] || EXAMPLES["approval-flow.workflow.json"];
     try {
-      const response = await fetch("../examples/workflows/approval-flow.workflow.json", { cache: "no-store" });
+      const response = await fetch(exampleUrl, { cache: "no-store" });
       if (!response.ok) {
         throw new Error("example workflow unavailable");
       }
-      loadDocument(await response.json(), "approval-flow.workflow.json");
+      loadDocument(await response.json(), exampleName);
     } catch (error) {
       loadDocument(defaultWorkflow(), "embedded-example");
     }
@@ -267,11 +292,12 @@
           description: node.description || "",
           run_status: "not_started",
           source: source,
-          requires: node.requires || [],
-          produces: node.produces || [],
-          guard: node.guard || null,
-          action: node.action || null,
-          retry: node.retry || null,
+          requires: cloneOrDefault(node.requires, []),
+          produces: cloneOrDefault(node.produces, []),
+          guard: cloneOrDefault(node.guard, null),
+          action: cloneOrDefault(node.action, null),
+          retry: cloneOrDefault(node.retry, null),
+          connector: cloneOrDefault(node.connector, null),
         },
       };
     });
@@ -547,19 +573,48 @@
   function renderInspector(node) {
     selectedNode = node;
     const hasNode = Boolean(node);
+    const props = hasNode ? node.properties || {} : {};
+    const action = props.action && typeof props.action === "object" ? props.action : null;
+    const retry = props.retry && typeof props.retry === "object" ? props.retry : null;
+    const connector = props.connector && typeof props.connector === "object" ? props.connector : null;
+    const request = connector && connector.request && typeof connector.request === "object" ? connector.request : {};
     els.nodeHeading.textContent = hasNode ? node.title : "No selection";
-    els.nodeId.value = hasNode ? node.properties.workflow_node_id || "" : "";
-    els.nodeType.value = hasNode ? node.properties.node_type || "" : "";
-    els.nodeStatus.value = hasNode ? node.properties.run_status || "" : "";
+    els.nodeId.value = hasNode ? props.workflow_node_id || "" : "";
+    els.nodeType.value = hasNode ? props.node_type || "" : "";
+    els.nodeStatus.value = hasNode ? props.run_status || "" : "";
     els.nodeTitle.value = hasNode ? node.title || "" : "";
-    els.nodeDescription.value = hasNode ? node.properties.description || "" : "";
-    els.nodeSource.value = hasNode ? JSON.stringify(node.properties.source || {}, null, 2) : "";
+    els.nodeDescription.value = hasNode ? props.description || "" : "";
+    els.nodeAction.value = action ? action.prompt || action.instruction || "" : "";
+    els.nodeRetryMax.value = retry && retry.max_attempts !== undefined ? retry.max_attempts : "";
+    els.nodeConnectorId.value = connector ? connector.id || "" : "";
+    els.nodeConnectorKind.value = connector ? connector.kind || "" : "";
+    els.nodeHttpMethod.value = request.method || "";
+    els.nodeHttpUrl.value = request.url || "";
+    els.nodeHttpHeaders.value = stringifyJsonInput(request.headers || {});
+    els.nodeHttpBody.value = stringifyJsonInput(request.body === undefined ? {} : request.body);
+    els.nodeHttpTimeout.value = request.timeout_ms !== undefined ? request.timeout_ms : "";
+    els.nodeSource.value = hasNode ? JSON.stringify(props.source || {}, null, 2) : "";
+    els.connectorSection.hidden = !connector;
+    els.httpSection.hidden = !connector || connector.id !== "http";
     els.nodeTitle.disabled = !hasNode;
     els.nodeDescription.disabled = !hasNode;
+    els.nodeAction.disabled = !hasNode || !action;
+    els.nodeRetryMax.disabled = !hasNode || !retry;
+    els.nodeHttpMethod.disabled = !hasNode || !connector || connector.id !== "http";
+    els.nodeHttpUrl.disabled = !hasNode || !connector || connector.id !== "http";
+    els.nodeHttpHeaders.disabled = !hasNode || !connector || connector.id !== "http";
+    els.nodeHttpBody.disabled = !hasNode || !connector || connector.id !== "http";
+    els.nodeHttpTimeout.disabled = !hasNode || !connector || connector.id !== "http";
   }
 
   function updateSelectedNode() {
     if (!selectedNode) {
+      return;
+    }
+    const syncResult = syncInspectorToSelectedNode(false);
+    if (!syncResult.ok) {
+      renderValidation([syncResult.error]);
+      setStatus("Invalid input", "invalid");
       return;
     }
     selectedNode.title = els.nodeTitle.value;
@@ -569,12 +624,93 @@
     validateGraph();
   }
 
+  function syncInspectorToSelectedNode(strict) {
+    if (!selectedNode || !selectedNode.properties) {
+      return { ok: true };
+    }
+    const props = selectedNode.properties;
+    if (props.action && typeof props.action === "object") {
+      if (Object.prototype.hasOwnProperty.call(props.action, "prompt")) {
+        props.action.prompt = els.nodeAction.value;
+      } else if (Object.prototype.hasOwnProperty.call(props.action, "instruction")) {
+        props.action.instruction = els.nodeAction.value;
+      }
+    }
+    if (props.retry && typeof props.retry === "object" && els.nodeRetryMax.value !== "") {
+      const maxAttempts = Number(els.nodeRetryMax.value);
+      if (!Number.isInteger(maxAttempts) || maxAttempts < 0) {
+        return { ok: false, error: "Retry attempts must be a non-negative integer." };
+      }
+      props.retry.max_attempts = maxAttempts;
+    }
+    const connector = props.connector;
+    if (!connector || typeof connector !== "object" || connector.id !== "http") {
+      return { ok: true };
+    }
+    connector.request = connector.request && typeof connector.request === "object" ? connector.request : {};
+    connector.request.method = els.nodeHttpMethod.value.trim();
+    connector.request.url = els.nodeHttpUrl.value.trim();
+    if (els.nodeHttpTimeout.value !== "") {
+      const timeout = Number(els.nodeHttpTimeout.value);
+      if (!Number.isInteger(timeout) || timeout < 0) {
+        return { ok: false, error: "HTTP timeout must be a non-negative integer." };
+      }
+      connector.request.timeout_ms = timeout;
+    }
+    const headers = parseJsonInput(els.nodeHttpHeaders.value, "Headers JSON", strict);
+    if (!headers.ok) {
+      return headers;
+    }
+    if (headers.hasValue) {
+      if (!headers.value || typeof headers.value !== "object" || Array.isArray(headers.value)) {
+        return { ok: false, error: "Headers JSON must be an object." };
+      }
+      connector.request.headers = headers.value;
+    }
+    const body = parseJsonInput(els.nodeHttpBody.value, "Body JSON", strict);
+    if (!body.ok) {
+      return body;
+    }
+    if (body.hasValue) {
+      connector.request.body = body.value;
+    }
+    return { ok: true };
+  }
+
+  function parseJsonInput(text, label, strict) {
+    const trimmed = String(text || "").trim();
+    if (!trimmed) {
+      return { ok: true, hasValue: false };
+    }
+    try {
+      return { ok: true, hasValue: true, value: JSON.parse(trimmed) };
+    } catch (error) {
+      if (!strict) {
+        return { ok: false, error: label + " must be valid JSON." };
+      }
+      return { ok: false, error: label + " must be valid JSON: " + error.message };
+    }
+  }
+
+  function stringifyJsonInput(value) {
+    return JSON.stringify(value, null, 2);
+  }
+
   function saveGraph() {
     if (validateGraph().length) {
       return;
     }
     const serialized = graph.serialize();
-    const sourceWorkflow = currentWorkflowDsl ? workflowDslFromGraph() : null;
+    let sourceWorkflow = null;
+    if (currentWorkflowDsl) {
+      try {
+        sourceWorkflow = workflowDslFromGraph();
+      } catch (error) {
+        renderValidation([error.message]);
+        setStatus("Invalid DSL", "invalid");
+        return;
+      }
+    }
     const graphJson = Object.assign({}, serialized, {
       version: GRAPH_VERSION,
       workflow: currentWorkflow,
@@ -599,7 +735,14 @@
       return;
     }
 
-    const workflow = workflowDslFromGraph();
+    let workflow;
+    try {
+      workflow = workflowDslFromGraph();
+    } catch (error) {
+      renderValidation([error.message]);
+      setStatus("Invalid DSL", "invalid");
+      return;
+    }
     const workflowErrors = validateWorkflowDsl(workflow);
     if (workflowErrors.length) {
       renderValidation(workflowErrors);
@@ -611,6 +754,10 @@
   }
 
   function workflowDslFromGraph() {
+    const syncResult = syncInspectorToSelectedNode(true);
+    if (!syncResult.ok) {
+      throw new Error(syncResult.error);
+    }
     const workflow = deepClone(currentWorkflowDsl);
     const graphNodeByWorkflowId = {};
     graph._nodes.forEach(function (node) {
@@ -628,8 +775,68 @@
       if (description || Object.prototype.hasOwnProperty.call(node, "description")) {
         node.description = description;
       }
+      applyAuthoringProperties(node, graphNode.properties || {});
     });
     return workflow;
+  }
+
+  function applyAuthoringProperties(node, props) {
+    applyActionProperties(node, props.action);
+    applyRetryProperties(node, props.retry);
+    applyConnectorProperties(node, props.connector);
+  }
+
+  function applyActionProperties(node, graphAction) {
+    if (!node.action || !graphAction) {
+      return;
+    }
+    if (graphAction.kind !== node.action.kind) {
+      throw new Error(node.id + " action kind cannot be changed.");
+    }
+    if (Object.prototype.hasOwnProperty.call(node.action, "prompt") && graphAction.prompt !== undefined) {
+      node.action.prompt = String(graphAction.prompt || "");
+    }
+    if (Object.prototype.hasOwnProperty.call(node.action, "instruction") && graphAction.instruction !== undefined) {
+      node.action.instruction = String(graphAction.instruction || "");
+    }
+  }
+
+  function applyRetryProperties(node, graphRetry) {
+    if (!node.retry || !graphRetry || graphRetry.max_attempts === undefined) {
+      return;
+    }
+    const maxAttempts = Number(graphRetry.max_attempts);
+    if (!Number.isInteger(maxAttempts) || maxAttempts < 0) {
+      throw new Error(node.id + " retry.max_attempts must be a non-negative integer.");
+    }
+    node.retry.max_attempts = maxAttempts;
+  }
+
+  function applyConnectorProperties(node, graphConnector) {
+    if (!node.connector || !graphConnector) {
+      return;
+    }
+    if (graphConnector.id !== node.connector.id || graphConnector.kind !== node.connector.kind) {
+      throw new Error(node.id + " connector identity cannot be changed.");
+    }
+    if (node.connector.id !== "http" || !graphConnector.request) {
+      return;
+    }
+    node.connector.request = node.connector.request && typeof node.connector.request === "object"
+      ? node.connector.request
+      : {};
+    const request = graphConnector.request;
+    if (request.method !== undefined) node.connector.request.method = String(request.method || "");
+    if (request.url !== undefined) node.connector.request.url = String(request.url || "");
+    if (request.headers !== undefined) node.connector.request.headers = deepClone(request.headers);
+    if (request.body !== undefined) node.connector.request.body = deepClone(request.body);
+    if (request.timeout_ms !== undefined) {
+      const timeout = Number(request.timeout_ms);
+      if (!Number.isInteger(timeout) || timeout < 0) {
+        throw new Error(node.id + " connector.request.timeout_ms must be a non-negative integer.");
+      }
+      node.connector.request.timeout_ms = timeout;
+    }
   }
 
   function validateWorkflowDsl(workflow) {
@@ -667,6 +874,26 @@
       }
       if (node.type === "human_gate" && !node.on_failure) {
         errors.push(node.id + " human_gate must define on_failure.");
+      }
+      if (node.type === "tool_call" && (!node.connector || !node.connector.id)) {
+        errors.push(node.id + " tool_call must define connector.id.");
+      }
+      if (node.retry && node.retry.max_attempts !== undefined) {
+        const maxAttempts = Number(node.retry.max_attempts);
+        if (!Number.isInteger(maxAttempts) || maxAttempts < 0) {
+          errors.push(node.id + " retry.max_attempts must be a non-negative integer.");
+        }
+      }
+      if (node.connector && node.connector.id === "http" && node.connector.request) {
+        if (node.connector.request.headers !== undefined && !plainObject(node.connector.request.headers)) {
+          errors.push(node.id + " connector.request.headers must be an object.");
+        }
+        if (node.connector.request.timeout_ms !== undefined) {
+          const timeout = Number(node.connector.request.timeout_ms);
+          if (!Number.isInteger(timeout) || timeout < 0) {
+            errors.push(node.id + " connector.request.timeout_ms must be a non-negative integer.");
+          }
+        }
       }
       ["on_success", "on_failure"].forEach(function (key) {
         if (node[key] && !nodeIdSet.has(node[key])) {
@@ -725,6 +952,10 @@
     return true;
   }
 
+  function plainObject(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+
   function downloadJson(value, filename) {
     const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
     const link = document.createElement("a");
@@ -736,6 +967,13 @@
 
   function deepClone(value) {
     return JSON.parse(JSON.stringify(value));
+  }
+
+  function cloneOrDefault(value, fallback) {
+    if (value === undefined || value === null) {
+      return fallback;
+    }
+    return deepClone(value);
   }
 
   function fitGraph() {
