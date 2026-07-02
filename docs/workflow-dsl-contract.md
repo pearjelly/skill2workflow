@@ -4,6 +4,8 @@ This document describes the public contract for Workflow DSL `0.1.0`.
 
 The Workflow DSL is the execution truth source for `skill2workflow`. Visual graphs, generated LiteGraph JSON, and future UI editors must round-trip through this DSL before execution or publication.
 
+See `docs/workflow-dsl-compatibility.md` for the release-line compatibility policy and `docs/stability.md` for stable versus experimental surfaces.
+
 ## Schema
 
 The versioned JSON Schema lives at:
@@ -120,6 +122,8 @@ examples/workflows/approval-flow.workflow.json
 Contract tests verify that fixture stays valid under the structured validator.
 
 ## Compatibility Policy
+
+The detailed policy lives in `docs/workflow-dsl-compatibility.md`.
 
 For `0.1.x`:
 

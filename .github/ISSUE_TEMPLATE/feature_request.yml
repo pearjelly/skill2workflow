@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose a new capability or improvement.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for focused feature requests. Broad platform ideas are easier to evaluate when split into small closed loops.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Parser
+        - Compiler / Validator
+        - Workflow DSL
+        - Executor
+        - Control Plane
+        - Connector Runtime
+        - LiteGraph Editor
+        - Documentation
+        - Packaging / Release
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What enterprise AI workflow problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the smallest useful closed loop.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include workarounds or narrower versions of the request.
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility impact
+      description: Does this affect Workflow DSL, CLI commands, published artifacts, or existing examples?
+      placeholder: "No DSL impact expected."
+    validations:
+      required: true

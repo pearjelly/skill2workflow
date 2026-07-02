@@ -9,6 +9,8 @@ This repository is the `skill2workflow` open-source harness.
 - Current implementation language: Python 3.9 standard library for the bootstrap harness.
 - Long-term UI direction: LiteGraph-style visual editor, aligned with the approved spec.
 - Roadmap index: `ROADMAP.md`; approved product spec remains under `docs/superpowers/specs/`.
+- Contributor entry point: `CONTRIBUTING.md`.
+- Compatibility notes: `docs/workflow-dsl-contract.md`, `docs/workflow-dsl-compatibility.md`, and `docs/stability.md`.
 
 ## Local Commands
 
@@ -35,6 +37,7 @@ This repository is the `skill2workflow` open-source harness.
 - Filter connector audit: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type connector_completed`
 - Audit with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite`
 - Connectors: `PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control`
+- Release notes: `docs/releases/v0.1.0.md`
 
 ## Working Rules
 
@@ -42,3 +45,4 @@ This repository is the `skill2workflow` open-source harness.
 - Add tests before changing parser, compiler, executor, or CLI behavior.
 - Avoid adding runtime dependencies unless they directly support a spec-backed capability.
 - Preserve the approved design spec and update it only when product direction changes.
+- Keep `CONTRIBUTING.md`, issue templates, release notes, and compatibility docs aligned when public contributor workflows change.

@@ -18,6 +18,7 @@ Current capability snapshot:
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, and connector audit events
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
+- Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
 
 Important boundaries:
 
@@ -25,6 +26,7 @@ Important boundaries:
 - The visual graph is an editor/view. Workflow DSL remains the execution truth source.
 - Connector runtime is an MVP boundary. Enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
 - Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
+- `0.1.x` compatibility is documented for Workflow DSL `0.1.0`; undocumented internals remain experimental.
 
 ## Completed Loops
 
@@ -41,29 +43,31 @@ Important boundaries:
 | Loop 9: Control Plane Hardening | Complete | `resume-published`, `control-runs`, `control-run`, audit filters, deprecated-version guard |
 | Loop 10: Connector Runtime MVP | Complete | Active connector manifests, manual and HTTP bindings, HTTP execution, connector run events, connector audit events |
 | Loop 11: Authoring Experience | Complete | Example gallery, richer LiteGraph parameter forms, safe action/retry/HTTP request write-back, authoring docs |
+| Loop 12: Open Source Release Readiness | Complete | `CONTRIBUTING.md`, issue templates, release notes, DSL compatibility policy, stability boundaries |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-### Loop 12: Open Source Release Readiness
+### Loop 13: Local Control Plane UI
 
-Goal: make the project easier for external contributors to evaluate, run, and extend.
+Goal: give the local runtime an inspectable operator surface.
 
 Status: next engineering loop.
 
 Scope:
 
-- CONTRIBUTING guide
-- Issue templates for bug reports, feature requests, and workflow examples
-- First release notes and version tag
-- Clear compatibility notes for Workflow DSL `0.1.0`
+- Workflow registry view
+- Run list and run detail view
+- Audit log view
+- Published workflow version comparison
+- Local-only static UI or dependency-light web surface aligned with the existing harness
 
 Acceptance criteria:
 
-- A new contributor can run tests and the sample workflow from a fresh checkout
-- Early adopters can tell which APIs are stable and which are experimental
-- Release notes map product goals to concrete shipped capabilities
+- Users can inspect published workflows, runs, and audit events without manually reading JSON files
+- The UI uses existing control-plane commands or storage APIs and does not create a second execution truth source
+- Tests and docs cover the new inspection path
 
 ## Version Milestones
 
@@ -97,17 +101,18 @@ Status: first MVP shipped in Loop 11. Future work should improve editor ergonomi
 
 ### v0.4: Open Source Release Baseline
 
-Target: make the project ready for broader external evaluation.
+Status: first MVP shipped in Loop 12. Future work should add release automation after the tag workflow is settled.
 
 - CONTRIBUTING guide
 - Issue templates
 - First release notes
 - Workflow DSL `0.1.0` compatibility notes
 - Clear stable vs experimental API boundaries
+- Future: automated GitHub release workflow and signed release artifacts
 
 ### v0.5: Local Control Plane UI
 
-Target: give the local runtime an inspectable operator surface.
+Status: next milestone, starting with Loop 13.
 
 - Workflow registry view
 - Run list and run detail view

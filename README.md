@@ -68,6 +68,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Audit connector execution events through the control plane
+- Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
 ## Quickstart
 
@@ -239,7 +240,10 @@ examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
 schemas/           # Versioned Workflow DSL JSON Schema
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
+docs/releases/    # Release notes
 web/              # Static LiteGraph visual editor
+.github/          # CI and issue templates
+CONTRIBUTING.md   # Contributor guide
 ROADMAP.md        # Open-source delivery roadmap
 ```
 
@@ -258,14 +262,19 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Control Plane Hardening
 - Connector Runtime MVP
 - Authoring Experience
+- Open Source Release Readiness
 
-Next priority is Loop 12 Open Source Release Readiness.
+Next priority is Loop 13 Local Control Plane UI.
 
 See:
 
+- `CONTRIBUTING.md`
 - `ROADMAP.md`
 - `docs/authoring.md`
+- `docs/releases/v0.1.0.md`
+- `docs/stability.md`
 - `docs/workflow-dsl-contract.md`
+- `docs/workflow-dsl-compatibility.md`
 - `docs/superpowers/specs/2026-07-01-skill2workflow-design.md`
 
 ## License
