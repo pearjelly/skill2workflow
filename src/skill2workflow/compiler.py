@@ -7,6 +7,7 @@ from typing import Dict, List, Set
 
 
 Workflow = Dict[str, object]
+ValidationError = Dict[str, object]
 
 
 def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
@@ -141,59 +142,122 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
 
 def validate_workflow(workflow: Workflow) -> List[str]:
     """Return human-readable validation errors for a Workflow DSL document."""
-    errors: List[str] = []
+    return [str(error["message"]) for error in validate_workflow_structured(workflow)]
+
+
+def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
+    """Return machine-readable validation errors for a Workflow DSL document."""
+    errors: List[ValidationError] = []
+    if workflow.get("schema_version") != "0.1.0":
+        errors.append(
+            _validation_error(
+                "unsupported_schema_version",
+                "workflow.schema_version must be 0.1.0",
+                ["schema_version"],
+            )
+        )
+
+    workflow_meta = workflow.get("workflow")
+    if not isinstance(workflow_meta, dict):
+        errors.append(
+            _validation_error(
+                "workflow_metadata_invalid",
+                "workflow.workflow must be an object",
+                ["workflow"],
+            )
+        )
+
     nodes = workflow.get("nodes")
     if not isinstance(nodes, list):
-        return ["workflow.nodes must be a list"]
+        errors.append(_validation_error("nodes_not_list", "workflow.nodes must be a list", ["nodes"]))
+        return errors
     edges = workflow.get("edges", [])
     if not isinstance(edges, list):
-        return ["workflow.edges must be a list"]
+        errors.append(_validation_error("edges_not_list", "workflow.edges must be a list", ["edges"]))
+        return errors
 
     node_ids = [node.get("id") for node in nodes if isinstance(node, dict)]
     if len(node_ids) != len(set(node_ids)):
-        errors.append("node ids must be unique")
+        errors.append(_validation_error("duplicate_node_id", "node ids must be unique", ["nodes"]))
 
     node_map = {node.get("id"): node for node in nodes if isinstance(node, dict)}
+    node_index_map = {node.get("id"): index for index, node in enumerate(nodes) if isinstance(node, dict)}
     edge_ids = [edge.get("id") for edge in edges if isinstance(edge, dict)]
     if len(edge_ids) != len(set(edge_ids)):
-        errors.append("edge ids must be unique")
+        errors.append(_validation_error("duplicate_edge_id", "edge ids must be unique", ["edges"]))
 
     entry = workflow.get("entry")
     if entry not in node_map:
-        errors.append("workflow.entry must reference an existing node")
+        errors.append(
+            _validation_error(
+                "entry_missing",
+                "workflow.entry must reference an existing node",
+                ["entry"],
+            )
+        )
 
     end_nodes = [node for node in nodes if isinstance(node, dict) and node.get("type") == "end"]
     if not end_nodes:
-        errors.append("workflow must contain at least one end node")
+        errors.append(_validation_error("end_node_missing", "workflow must contain at least one end node", ["nodes"]))
 
-    for node in nodes:
+    for index, node in enumerate(nodes):
         if not isinstance(node, dict):
-            errors.append("all nodes must be objects")
+            errors.append(_validation_error("node_not_object", "all nodes must be objects", ["nodes", index]))
             continue
         node_id = node.get("id")
         node_type = node.get("type")
         if node_type in {"end", "failure"}:
             for key in ("on_success", "on_failure"):
                 if node.get(key):
-                    errors.append(f"{node_id} {node_type} must not define {key}")
+                    errors.append(
+                        _validation_error(
+                            "terminal_transition_declared",
+                            f"{node_id} {node_type} must not define {key}",
+                            ["nodes", index, key],
+                        )
+                    )
             continue
         if node_type not in {"end", "failure"} and not node.get("on_success"):
-            errors.append(f"{node_id} must define on_success")
+            errors.append(
+                _validation_error(
+                    "node_success_missing",
+                    f"{node_id} must define on_success",
+                    ["nodes", index, "on_success"],
+                )
+            )
         if node_type == "human_gate" and not node.get("on_failure"):
-            errors.append(f"{node_id} human_gate must define on_failure")
+            errors.append(
+                _validation_error(
+                    "human_gate_failure_missing",
+                    f"{node_id} human_gate must define on_failure",
+                    ["nodes", index, "on_failure"],
+                )
+            )
         for key in ("on_success", "on_failure"):
             target = node.get(key)
             if target is not None and target not in node_map:
-                errors.append(f"{node_id}.{key} references missing node {target}")
+                errors.append(
+                    _validation_error(
+                        "node_transition_target_missing",
+                        f"{node_id}.{key} references missing node {target}",
+                        ["nodes", index, key],
+                    )
+                )
 
     edge_pairs = _validate_edges(edges, node_map, errors)
-    _validate_transition_edges(node_map, edge_pairs, errors)
+    _validate_transition_edges(node_map, edge_pairs, errors, node_index_map)
 
     if entry in node_map:
         reachable = _reachable_nodes(node_map, str(entry))
         unreachable = sorted(set(node_map) - reachable)
         if unreachable:
-            errors.append(f"unreachable nodes: {', '.join(unreachable)}")
+            errors.append(
+                _validation_error(
+                    "unreachable_nodes",
+                    f"unreachable nodes: {', '.join(unreachable)}",
+                    ["nodes"],
+                )
+            )
 
     return errors
 
@@ -201,12 +265,12 @@ def validate_workflow(workflow: Workflow) -> List[str]:
 def _validate_edges(
     edges: List[Dict[str, object]],
     node_map: Dict[object, Dict[str, object]],
-    errors: List[str],
+    errors: List[ValidationError],
 ) -> Set[tuple]:
     edge_pairs = set()
-    for edge in edges:
+    for index, edge in enumerate(edges):
         if not isinstance(edge, dict):
-            errors.append("all edges must be objects")
+            errors.append(_validation_error("edge_not_object", "all edges must be objects", ["edges", index]))
             continue
 
         edge_id = str(edge.get("id") or "<missing edge id>")
@@ -214,17 +278,41 @@ def _validate_edges(
         target = edge.get("to")
 
         if source not in node_map:
-            errors.append(f"{edge_id}.from references missing node {source}")
+            errors.append(
+                _validation_error(
+                    "edge_source_missing",
+                    f"{edge_id}.from references missing node {source}",
+                    ["edges", index, "from"],
+                )
+            )
         if target not in node_map:
-            errors.append(f"{edge_id}.to references missing node {target}")
+            errors.append(
+                _validation_error(
+                    "edge_target_missing",
+                    f"{edge_id}.to references missing node {target}",
+                    ["edges", index, "to"],
+                )
+            )
         if source in node_map and node_map[source].get("type") in {"end", "failure"}:
-            errors.append(f"{edge_id} must not originate from terminal node {source}")
+            errors.append(
+                _validation_error(
+                    "terminal_edge_source",
+                    f"{edge_id} must not originate from terminal node {source}",
+                    ["edges", index, "from"],
+                )
+            )
 
         if source in node_map and target in node_map:
             edge_pairs.add((source, target))
             transition_targets = _transition_targets(node_map[source])
             if target not in transition_targets:
-                errors.append(f"{edge_id} from {source} to {target} is not declared by node transitions")
+                errors.append(
+                    _validation_error(
+                        "edge_not_declared_by_transition",
+                        f"{edge_id} from {source} to {target} is not declared by node transitions",
+                        ["edges", index],
+                    )
+                )
 
     return edge_pairs
 
@@ -232,7 +320,8 @@ def _validate_edges(
 def _validate_transition_edges(
     node_map: Dict[object, Dict[str, object]],
     edge_pairs: Set[tuple],
-    errors: List[str],
+    errors: List[ValidationError],
+    node_index_map: Dict[object, int],
 ) -> None:
     for node_id, node in node_map.items():
         if node.get("type") in {"end", "failure"}:
@@ -242,7 +331,22 @@ def _validate_transition_edges(
             if target is None or target not in node_map:
                 continue
             if (node_id, target) not in edge_pairs:
-                errors.append(f"{node_id}.{key} must have matching edge to {target}")
+                errors.append(
+                    _validation_error(
+                        "transition_edge_missing",
+                        f"{node_id}.{key} must have matching edge to {target}",
+                        ["nodes", node_index_map.get(node_id, 0), key],
+                    )
+                )
+
+
+def _validation_error(code: str, message: str, path: List[object]) -> ValidationError:
+    return {
+        "code": code,
+        "message": message,
+        "path": path,
+        "severity": "error",
+    }
 
 
 def _transition_targets(node: Dict[str, object]) -> Set[object]:

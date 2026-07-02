@@ -32,6 +32,8 @@ The current persistence layer is dependency-light JSON. The approved product dir
 
 Goal: make the DSL stable enough for external contributors and future UI write-back.
 
+Status: initial contract in progress. Workflow DSL `0.1.0` now has a JSON Schema, structured validation errors, and golden fixture coverage.
+
 Deliverables:
 
 - JSON Schema for Workflow DSL

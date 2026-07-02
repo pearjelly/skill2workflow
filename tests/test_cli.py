@@ -1,5 +1,5 @@
 import json
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -77,6 +77,27 @@ class CliTests(TestCase):
         self.assertEqual(workflow_records[0]["workflow_id"], "workflow_demo")
         self.assertEqual(workflow_records[0]["status"], "published")
         self.assertEqual(run_summary["workflow_version"], "0.1.0")
+
+    def test_validate_command_can_emit_structured_json_errors(self):
+        with TemporaryDirectory() as tmp:
+            workflow_path = Path(tmp) / "workflow.json"
+            invalid = _workflow()
+            invalid["edges"][0]["to"] = "missing"
+            workflow_path.write_text(json.dumps(invalid), encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(["validate", str(workflow_path), "--format", "json"])
+
+        payload = json.loads(stdout.getvalue())
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(payload["valid"], False)
+        self.assertEqual(payload["schema_version"], "0.1.0")
+        self.assertIn("errors", payload)
+        self.assertTrue(any(error["code"] == "edge_target_missing" for error in payload["errors"]))
 
 
 def _workflow():
