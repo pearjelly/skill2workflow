@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -105,6 +106,41 @@ class ExecutorTests(TestCase):
         self.assertIn("workflow", detail)
         self.assertIn("events", detail)
         self.assertIn("node_results", detail)
+
+    def test_sqlite_storage_persists_run_state_and_event_rows_across_instances(self):
+        workflow = _approval_workflow()
+
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            waiting = LocalExecutor(state_dir, storage="sqlite").run(workflow)
+
+            restarted = LocalExecutor(state_dir, storage="sqlite")
+            detail = restarted.get_run(waiting["run_id"])
+            completed = restarted.resume(waiting["run_id"], approved=True)
+            summary = restarted.list_runs()[0]
+
+            db_path = state_dir / "runs.sqlite3"
+            with sqlite3.connect(db_path) as connection:
+                event_rows = connection.execute(
+                    "select event_type, node_id from run_events where run_id = ? order by sequence",
+                    (waiting["run_id"],),
+                ).fetchall()
+
+        self.assertEqual(detail["status"], "waiting")
+        self.assertEqual(detail["current_node"], "review")
+        self.assertEqual(completed["status"], "completed")
+        self.assertEqual(summary["status"], "completed")
+        self.assertEqual(summary["event_count"], len(event_rows))
+        self.assertEqual(
+            [row[0] for row in event_rows],
+            [
+                "node_started",
+                "node_completed",
+                "human_gate_waiting",
+                "human_gate_resumed",
+                "run_completed",
+            ],
+        )
 
 
 def _approval_workflow():

@@ -20,12 +20,14 @@ PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workfl
 PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json -o /tmp/skill2workflow-litegraph.json
 PYTHONPATH=src python3 -m skill2workflow.cli write-back /tmp/skill2workflow-workflow.json /tmp/skill2workflow-litegraph.json -o /tmp/skill2workflow-edited-workflow.json
 PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state
+PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite
 ```
 
 The sample workflow pauses at a human approval gate. Resume it with:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-state
+PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite
 ```
 
 List summaries and inspect full run logs:
@@ -33,6 +35,8 @@ List summaries and inspect full run logs:
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-state
 PYTHONPATH=src python3 -m skill2workflow.cli show <run_id> --state-dir /tmp/skill2workflow-state
+PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli show <run_id> --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite
 ```
 
 Open the LiteGraph editor:
@@ -50,6 +54,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflo
 PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 ```
@@ -78,6 +83,9 @@ Implemented:
   - checks node transitions have matching edges
   - checks edges are declared by node transitions
 - Durable local executor
+  - supports JSON file run storage by default
+  - supports opt-in SQLite run storage through `--storage sqlite`
+  - stores queryable run event rows in SQLite
   - records terminal node results
   - records human gate approvals and rejections
   - supports rejected human gate failure paths
@@ -104,7 +112,7 @@ Implemented:
 
 Not implemented yet:
 
-- SQLite persistence
+- Full SQLite migration for workflow registry and audit JSONL
 - Enterprise control plane UI
 - Connector runtime
 - GitHub release automation

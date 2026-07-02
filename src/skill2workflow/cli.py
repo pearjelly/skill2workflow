@@ -42,18 +42,22 @@ def main(argv=None) -> int:
     run_cmd = subparsers.add_parser("run", help="Run a Workflow DSL JSON file")
     run_cmd.add_argument("workflow", type=Path)
     run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     resume_cmd = subparsers.add_parser("resume", help="Resume a waiting run")
     resume_cmd.add_argument("run_id")
     resume_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    resume_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
     resume_cmd.add_argument("--reject", action="store_true")
 
     runs_cmd = subparsers.add_parser("runs", help="List local runs")
     runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     show_cmd = subparsers.add_parser("show", help="Show a local run detail")
     show_cmd.add_argument("run_id")
     show_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    show_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     publish_cmd = subparsers.add_parser("publish", help="Publish an immutable Workflow DSL version")
     publish_cmd.add_argument("workflow", type=Path)
@@ -76,6 +80,7 @@ def main(argv=None) -> int:
     run_published_cmd.add_argument("workflow_id")
     run_published_cmd.add_argument("--version", required=True)
     run_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     audit_cmd = subparsers.add_parser("audit", help="List control plane audit events")
     audit_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -151,20 +156,20 @@ def main(argv=None) -> int:
             for error in errors:
                 print(error, file=sys.stderr)
             return 1
-        _print_json(LocalExecutor(args.state_dir).run(workflow))
+        _print_json(LocalExecutor(args.state_dir, storage=args.storage).run(workflow))
         return 0
 
     if args.command == "resume":
-        state = LocalExecutor(args.state_dir).resume(args.run_id, approved=not args.reject)
+        state = LocalExecutor(args.state_dir, storage=args.storage).resume(args.run_id, approved=not args.reject)
         _print_json(state)
         return 0
 
     if args.command == "runs":
-        _print_json(LocalExecutor(args.state_dir).list_runs())
+        _print_json(LocalExecutor(args.state_dir, storage=args.storage).list_runs())
         return 0
 
     if args.command == "show":
-        _print_json(LocalExecutor(args.state_dir).get_run(args.run_id))
+        _print_json(LocalExecutor(args.state_dir, storage=args.storage).get_run(args.run_id))
         return 0
 
     if args.command == "publish":
@@ -188,7 +193,9 @@ def main(argv=None) -> int:
 
     if args.command == "run-published":
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir).run_published_workflow(args.workflow_id, args.version)
+            lambda: LocalControlPlane(args.state_dir, storage=args.storage).run_published_workflow(
+                args.workflow_id, args.version
+            )
         )
 
     if args.command == "audit":

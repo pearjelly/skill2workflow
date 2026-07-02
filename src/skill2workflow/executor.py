@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
+
+from .storage import create_run_store
 
 
 RunState = Dict[str, object]
 
 
 class LocalExecutor:
-    """Execute Workflow DSL with JSON-backed local run state."""
+    """Execute Workflow DSL with pluggable local run-state storage."""
 
-    def __init__(self, state_dir: Path):
+    def __init__(self, state_dir: Path, storage: str = "json"):
         self.state_dir = Path(state_dir)
-        self.runs_dir = self.state_dir / "runs"
-        self.runs_dir.mkdir(parents=True, exist_ok=True)
+        self.store = create_run_store(self.state_dir, storage)
 
     def run(self, workflow: Dict[str, object]) -> RunState:
         workflow_meta = workflow.get("workflow", {})
@@ -70,10 +70,7 @@ class LocalExecutor:
         return self._drive(state)
 
     def list_runs(self) -> List[RunState]:
-        runs = []
-        for path in sorted(self.runs_dir.glob("*.json")):
-            runs.append(_summarize_run(json.loads(path.read_text(encoding="utf-8"))))
-        return runs
+        return [_summarize_run(state) for state in self.store.list()]
 
     def get_run(self, run_id: str) -> RunState:
         return self._load(run_id)
@@ -150,14 +147,10 @@ class LocalExecutor:
         )
 
     def _save(self, state: RunState) -> None:
-        path = self.runs_dir / f"{state['run_id']}.json"
-        path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.store.save(state)
 
     def _load(self, run_id: str) -> RunState:
-        path = self.runs_dir / f"{run_id}.json"
-        if not path.exists():
-            raise FileNotFoundError(f"run not found: {run_id}")
-        return json.loads(path.read_text(encoding="utf-8"))
+        return self.store.load(run_id)
 
     @staticmethod
     def _node_map(workflow: Dict[str, object]) -> Dict[str, Dict[str, object]]:

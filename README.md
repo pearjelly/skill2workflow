@@ -52,8 +52,9 @@ The current implementation is a dependency-light Python harness because the loca
 - Execute workflows locally
 - Pause at `human_gate`
 - Resume waiting runs
-- Persist run state as JSON
+- Persist run state as JSON or opt-in SQLite
 - List run summaries and inspect full run logs
+- Store queryable run event rows when SQLite storage is enabled
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
 - Open a static LiteGraph visual editor for graph inspection and parameter edits
 - Write safe LiteGraph title and description edits back to Workflow DSL
@@ -125,11 +126,19 @@ Run it:
 PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state
 ```
 
+Run it with SQLite-backed run storage:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state --storage sqlite
+```
+
 Resume a waiting run:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-state
 ```
+
+For SQLite-backed runs, pass `--storage sqlite` to `resume`, `runs`, and `show` as well.
 
 List local run summaries:
 
@@ -163,6 +172,12 @@ PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flo
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
 ```
 
+Use SQLite run storage for published runs:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --storage sqlite
+```
+
 List connector placeholders:
 
 ```bash
@@ -179,7 +194,7 @@ The approved architecture has five layers:
 4. Durable Executor
 5. Enterprise Control Plane
 
-The current harness implements all five layers in minimal local form. The control plane is JSON-backed for the bootstrap phase: published workflow artifacts are immutable, lifecycle state lives in a registry index, and audit events are stored as JSONL.
+The current harness implements all five layers in minimal local form. Run state can use JSON files or SQLite. Published workflow artifacts, lifecycle registry state, and audit events remain JSON/JSONL during the bootstrap phase.
 
 ## Repository Layout
 
@@ -189,6 +204,7 @@ src/skill2workflow/
   compiler.py     # Skill IR -> Workflow DSL + validation
   control_plane.py # Local workflow registry, audit log, and connector placeholders
   executor.py     # Durable local execution
+  storage.py      # JSON and SQLite run-state storage backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON
   cli.py          # Command line interface
 examples/skills/  # Example SKILL.md inputs
@@ -209,8 +225,11 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - LiteGraph Editor
 - Durable Executor
 - Minimal Control Plane
+- Workflow DSL Contract
+- Visual Write-Back
+- SQLite run-state storage
 
-Next priorities are DSL contract hardening, visual editor write-back, SQLite durability, control-plane hardening, and the first connector runtime boundary.
+Next priorities are completing the SQLite durability upgrade, control-plane hardening, and the first connector runtime boundary.
 
 See:
 

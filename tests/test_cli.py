@@ -78,6 +78,74 @@ class CliTests(TestCase):
         self.assertEqual(workflow_records[0]["status"], "published")
         self.assertEqual(run_summary["workflow_version"], "0.1.0")
 
+    def test_run_published_command_can_use_sqlite_storage(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "workflow.json"
+            state_dir = tmp_path / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+
+            with redirect_stdout(StringIO()):
+                publish_exit = main(["publish", str(workflow_path), "--state-dir", str(state_dir)])
+                run_exit = main(
+                    [
+                        "run-published",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+                runs_exit = main(["runs", "--state-dir", str(state_dir), "--storage", "sqlite"])
+
+            from skill2workflow.control_plane import LocalControlPlane
+
+            run_summary = LocalControlPlane(state_dir, storage="sqlite").list_runs()[0]
+            db_exists = (state_dir / "runs.sqlite3").exists()
+
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(run_exit, 0)
+        self.assertEqual(runs_exit, 0)
+        self.assertEqual(run_summary["workflow_id"], "workflow_demo")
+        self.assertTrue(db_exists)
+
+    def test_run_and_list_runs_can_use_sqlite_storage(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "workflow.json"
+            state_dir = tmp_path / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            run_stdout = StringIO()
+            runs_stdout = StringIO()
+
+            with redirect_stdout(run_stdout):
+                run_exit = main(
+                    [
+                        "run",
+                        str(workflow_path),
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            with redirect_stdout(runs_stdout):
+                runs_exit = main(["runs", "--state-dir", str(state_dir), "--storage", "sqlite"])
+
+            run_state = json.loads(run_stdout.getvalue())
+            run_summaries = json.loads(runs_stdout.getvalue())
+            db_exists = (state_dir / "runs.sqlite3").exists()
+
+        self.assertEqual(run_exit, 0)
+        self.assertEqual(runs_exit, 0)
+        self.assertEqual(run_state["status"], "completed")
+        self.assertEqual(run_summaries[0]["run_id"], run_state["run_id"])
+        self.assertEqual(run_summaries[0]["status"], "completed")
+        self.assertTrue(db_exists)
+
     def test_validate_command_can_emit_structured_json_errors(self):
         with TemporaryDirectory() as tmp:
             workflow_path = Path(tmp) / "workflow.json"

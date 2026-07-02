@@ -59,6 +59,19 @@ class ControlPlaneTests(TestCase):
         self.assertIn("run_completed", audit_types)
         self.assertEqual(audit_events[1]["run_id"], run_state["run_id"])
 
+    def test_run_published_workflow_can_use_sqlite_run_storage(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="2.0.0"))
+
+            run_state = control.run_published_workflow("workflow_control", "2.0.0")
+            run_summary = LocalControlPlane(state_dir, storage="sqlite").list_runs()[0]
+
+        self.assertEqual(run_state["status"], "completed")
+        self.assertEqual(run_summary["run_id"], run_state["run_id"])
+        self.assertEqual(run_summary["workflow_id"], "workflow_control")
+
     def test_connector_registry_returns_placeholder_connectors(self):
         with TemporaryDirectory() as tmp:
             connectors = LocalControlPlane(Path(tmp)).list_connectors()
