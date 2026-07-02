@@ -172,6 +172,86 @@ class CliTests(TestCase):
         self.assertEqual([event["type"] for event in audit_events], ["workflow_published", "workflow_deprecated"])
         self.assertTrue(control_db_exists)
 
+    def test_published_run_resume_detail_and_audit_filters(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "approval-workflow.json"
+            state_dir = tmp_path / "state"
+            workflow_path.write_text(json.dumps(_approval_workflow()), encoding="utf-8")
+            run_stdout = StringIO()
+            resume_stdout = StringIO()
+            runs_stdout = StringIO()
+            detail_stdout = StringIO()
+            audit_stdout = StringIO()
+
+            with redirect_stdout(StringIO()):
+                publish_exit = main(
+                    ["publish", str(workflow_path), "--state-dir", str(state_dir), "--storage", "sqlite"]
+                )
+            with redirect_stdout(run_stdout):
+                run_exit = main(
+                    [
+                        "run-published",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            run_state = json.loads(run_stdout.getvalue())
+            with redirect_stdout(resume_stdout):
+                resume_exit = main(
+                    [
+                        "resume-published",
+                        run_state["run_id"],
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            with redirect_stdout(runs_stdout):
+                runs_exit = main(["control-runs", "--state-dir", str(state_dir), "--storage", "sqlite"])
+            with redirect_stdout(detail_stdout):
+                detail_exit = main(
+                    ["control-run", run_state["run_id"], "--state-dir", str(state_dir), "--storage", "sqlite"]
+                )
+            with redirect_stdout(audit_stdout):
+                audit_exit = main(
+                    [
+                        "audit",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                        "--run-id",
+                        run_state["run_id"],
+                        "--event-type",
+                        "run_completed",
+                    ]
+                )
+
+            resumed = json.loads(resume_stdout.getvalue())
+            run_summaries = json.loads(runs_stdout.getvalue())
+            detail = json.loads(detail_stdout.getvalue())
+            audit_events = json.loads(audit_stdout.getvalue())
+
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(run_exit, 0)
+        self.assertEqual(resume_exit, 0)
+        self.assertEqual(runs_exit, 0)
+        self.assertEqual(detail_exit, 0)
+        self.assertEqual(audit_exit, 0)
+        self.assertEqual(run_state["status"], "waiting")
+        self.assertEqual(resumed["status"], "completed")
+        self.assertEqual(run_summaries[0]["run_id"], run_state["run_id"])
+        self.assertEqual(detail["status"], "completed")
+        self.assertEqual([event["type"] for event in audit_events], ["run_completed"])
+        self.assertEqual(audit_events[0]["run_id"], run_state["run_id"])
+
     def test_run_and_list_runs_can_use_sqlite_storage(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -274,4 +354,29 @@ def _workflow():
             {"id": "end", "type": "end", "title": "End"},
         ],
         "edges": [{"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}],
+    }
+
+
+def _approval_workflow():
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {"id": "workflow_demo", "name": "demo", "version": "0.1.0", "status": "draft"},
+        "entry": "start",
+        "nodes": [
+            {"id": "start", "type": "start", "title": "Start", "on_success": "review"},
+            {
+                "id": "review",
+                "type": "human_gate",
+                "title": "Review",
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+            {"id": "failure", "type": "failure", "title": "Failure"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_review", "from": "start", "to": "review", "label": "next"},
+            {"id": "edge_review_end", "from": "review", "to": "end", "label": "next"},
+            {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "failure"},
+        ],
     }

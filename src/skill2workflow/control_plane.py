@@ -164,14 +164,57 @@ class LocalControlPlane:
         )
         return state
 
+    def resume_published_run(self, run_id: str, approved: bool = True) -> RunState:
+        current = self.executor.get_run(run_id)
+        workflow_id = str(current.get("workflow_id", "workflow"))
+        workflow_version = str(current.get("workflow_version", "0.1.0"))
+        self._workflow_record(workflow_id, workflow_version)
+        state = self.executor.resume(run_id, approved=approved)
+        self._append_audit(
+            {
+                "type": "run_resumed",
+                "run_id": run_id,
+                "workflow_id": workflow_id,
+                "workflow_version": workflow_version,
+                "approved": approved,
+                "timestamp": _now(),
+            }
+        )
+        self._append_audit(
+            {
+                "type": f"run_{state['status']}",
+                "run_id": run_id,
+                "workflow_id": workflow_id,
+                "workflow_version": workflow_version,
+                "timestamp": _now(),
+            }
+        )
+        return state
+
     def list_runs(self) -> List[RunState]:
         return self.executor.list_runs()
 
     def get_run(self, run_id: str) -> RunState:
         return self.executor.get_run(run_id)
 
-    def list_audit_events(self) -> List[AuditEvent]:
-        return self.store.list_audit_events()
+    def list_audit_events(
+        self,
+        workflow_id: str = "",
+        version: str = "",
+        run_id: str = "",
+        event_type: str = "",
+    ) -> List[AuditEvent]:
+        events = self.store.list_audit_events()
+        if workflow_id:
+            events = [event for event in events if str(event.get("workflow_id", "")) == workflow_id]
+        if version:
+            events = [event for event in events if str(event.get("workflow_version", "")) == version]
+        if run_id:
+            events = [event for event in events if str(event.get("run_id", "")) == run_id]
+        if event_type:
+            events = [event for event in events if str(event.get("type", "")) == event_type]
+        return events
+
 
     def list_connectors(self) -> List[Dict[str, object]]:
         if self.connectors_path.exists():
