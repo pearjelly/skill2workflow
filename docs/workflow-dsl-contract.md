@@ -32,6 +32,36 @@ The schema documents the stable top-level shape:
 
 It also documents the initial node and edge shapes. The current schema intentionally allows additional properties so the compiler, executor, visual editor, and connector runtime can add metadata without breaking old readers.
 
+## Connector Binding
+
+Connector-capable nodes declare a `connector` object directly on the node:
+
+```json
+{
+  "id": "call_api",
+  "type": "tool_call",
+  "title": "Call API",
+  "connector": {
+    "id": "http",
+    "kind": "http",
+    "request": {
+      "method": "POST",
+      "url": "http://127.0.0.1:8080/example",
+      "body": {"example": true}
+    }
+  }
+}
+```
+
+Built-in bindings:
+
+- `manual`: default binding for compiled `human_gate` nodes. Human gates still pause and resume through run state.
+- `http`: default binding for compiled `tool_call` nodes. When `connector.request` is present, the local executor performs the HTTP request and records connector events.
+
+Validation requires `tool_call` nodes to declare `connector.id`. Missing bindings produce `connector_binding_missing`.
+
+Published runs promote connector runtime events into control-plane audit events, including `connector_started`, `connector_completed`, and `connector_failed`.
+
 ## Validation
 
 The CLI keeps the existing human-readable mode:

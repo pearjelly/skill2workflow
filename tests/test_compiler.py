@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from skill2workflow.compiler import compile_ir_to_workflow, validate_workflow
+from skill2workflow.compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 
 
 class CompilerTests(TestCase):
@@ -78,6 +78,31 @@ class CompilerTests(TestCase):
         )
         self.assertEqual(review["type"], "human_gate")
 
+    def test_compile_binds_default_connectors_for_connector_nodes(self):
+        ir = {
+            "metadata": {"name": "tool-flow", "description": "Tool workflow"},
+            "hard_gates": [],
+            "ordered_steps": [
+                "Run tool to fetch account data",
+                "Ask user for approval",
+            ],
+            "tool_hints": [],
+            "human_gates": [],
+            "verification_rules": [],
+            "source_path": "SKILL.md",
+        }
+
+        workflow = compile_ir_to_workflow(ir)
+        errors = validate_workflow(workflow)
+
+        tool_node = next(node for node in workflow["nodes"] if node["type"] == "tool_call")
+        human_node = next(node for node in workflow["nodes"] if node["type"] == "human_gate")
+        self.assertEqual(errors, [])
+        self.assertEqual(tool_node["connector"]["id"], "http")
+        self.assertEqual(tool_node["connector"]["kind"], "http")
+        self.assertEqual(human_node["connector"]["id"], "manual")
+        self.assertEqual(human_node["connector"]["kind"], "manual")
+
     def test_validate_rejects_invalid_edges(self):
         workflow = {
             "schema_version": "0.1.0",
@@ -132,3 +157,28 @@ class CompilerTests(TestCase):
 
         self.assertIn("end end must not define on_success", errors)
         self.assertIn("edge_2 must not originate from terminal node end", errors)
+
+    def test_validate_rejects_tool_call_without_connector_binding(self):
+        workflow = {
+            "schema_version": "0.1.0",
+            "workflow": {
+                "id": "workflow_missing_connector",
+                "name": "missing-connector",
+                "version": "0.1.0",
+                "status": "draft",
+            },
+            "entry": "start",
+            "nodes": [
+                {"id": "start", "type": "start", "title": "Start", "on_success": "tool"},
+                {"id": "tool", "type": "tool_call", "title": "Call tool", "on_success": "end"},
+                {"id": "end", "type": "end", "title": "End"},
+            ],
+            "edges": [
+                {"id": "edge_start_tool", "from": "start", "to": "tool", "label": "next"},
+                {"id": "edge_tool_end", "from": "tool", "to": "end", "label": "next"},
+            ],
+        }
+
+        errors = validate_workflow_structured(workflow)
+
+        self.assertTrue(any(error["code"] == "connector_binding_missing" for error in errors))

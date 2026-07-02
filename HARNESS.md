@@ -63,6 +63,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill
 PYTHONPATH=src python3 -m skill2workflow.cli control-run <run_id> --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type run_completed
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type connector_completed
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 ```
@@ -90,6 +91,7 @@ Implemented:
   - checks terminal nodes have no outgoing transition
   - checks node transitions have matching edges
   - checks edges are declared by node transitions
+  - requires `tool_call` nodes to declare `connector.id`
 - Durable local executor
   - supports JSON file run storage by default
   - supports opt-in SQLite run storage through `--storage sqlite`
@@ -97,11 +99,14 @@ Implemented:
   - records terminal node results
   - records human gate approvals and rejections
   - supports rejected human gate failure paths
+  - executes connector-bound `tool_call` nodes through the built-in HTTP connector
+  - records connector start, completion, and failure events in run state
   - exposes run summaries and full run details
 - LiteGraph visualization
   - converts Workflow DSL into LiteGraph-compatible graph JSON
   - embeds source Workflow DSL in generated LiteGraph JSON for safe write-back
   - preserves workflow node ids, node types, descriptions, source metadata, and run status
+  - includes connector metadata in node properties for inspection
   - includes a static web editor that loads Workflow DSL or LiteGraph JSON
   - exposes node parameters in an inspector
   - supports simple title and description edits in the LiteGraph view
@@ -116,8 +121,14 @@ Implemented:
   - keeps run state bound to workflow id and version
   - records workflow publish, deprecate, and run events in JSONL or SQLite audit storage
   - filters audit events by workflow id, version, run id, and event type
+  - records connector execution events in audit storage for published runs
   - imports existing JSON registry and audit files when opening SQLite control-plane storage
-  - exposes connector registry placeholders
+  - exposes built-in connector manifests
+- Connector runtime
+  - provides active `manual` and `http` connector manifests
+  - gives compiled `human_gate` nodes a default manual connector binding
+  - gives compiled `tool_call` nodes a default HTTP connector binding
+  - executes HTTP requests with the Python standard library
 - CLI
 - Tests
 - Example Skill
@@ -125,5 +136,5 @@ Implemented:
 Not implemented yet:
 
 - Enterprise control plane UI
-- Connector runtime
+- Enterprise connector credential management
 - GitHub release automation

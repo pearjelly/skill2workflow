@@ -109,7 +109,7 @@ def main(argv=None) -> int:
     audit_cmd.add_argument("--run-id", default="")
     audit_cmd.add_argument("--event-type", default="")
 
-    connectors_cmd = subparsers.add_parser("connectors", help="List connector registry placeholders")
+    connectors_cmd = subparsers.add_parser("connectors", help="List connector manifests")
     connectors_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
 
     args = parser.parse_args(argv)

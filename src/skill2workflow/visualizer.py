@@ -258,6 +258,7 @@ def _litegraph_node(
             "guard": node.get("guard"),
             "action": node.get("action"),
             "retry": node.get("retry"),
+            "connector": node.get("connector"),
         },
     }
 

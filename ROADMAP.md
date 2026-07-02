@@ -6,7 +6,7 @@ The execution source of truth remains the Workflow DSL. LiteGraph and future UI 
 
 ## Current Status
 
-`main` now contains a runnable v0.1 bootstrap harness. It demonstrates the five-layer architecture in local form and proves the core product direction: standard Agent skills can be compiled into workflow definitions that are controlled by a durable execution and control-plane layer.
+`main` now contains a runnable local harness. It demonstrates the five-layer architecture in local form and proves the core product direction: standard Agent skills can be compiled into workflow definitions that are controlled by a durable execution and control-plane layer.
 
 Current capability snapshot:
 
@@ -16,12 +16,13 @@ Current capability snapshot:
 - Runtime: local executor supports run state, human-gate pause/resume, run listing, and run detail
 - Control plane: immutable workflow publish, version lifecycle, published-version runs, resume, audit log, and filtered audit queries
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
+- Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, and connector audit events
 
 Important boundaries:
 
 - Published workflow artifacts remain immutable JSON documents in both storage modes.
 - The visual graph is an editor/view. Workflow DSL remains the execution truth source.
-- Connector execution is still a placeholder boundary. The next loop turns it into a minimal runtime capability.
+- Connector runtime is an MVP boundary. Enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
 
 ## Completed Loops
 
@@ -36,38 +37,17 @@ Important boundaries:
 | Loop 7: Visual Write-Back | Complete | `write-back` CLI, `Save DSL`, source Workflow DSL embedding, topology-preserving write-back |
 | Loop 8: Runtime Durability | Complete | Storage boundary, SQLite run state, SQLite workflow registry, SQLite audit events, JSON import path |
 | Loop 9: Control Plane Hardening | Complete | `resume-published`, `control-runs`, `control-run`, audit filters, deprecated-version guard |
+| Loop 10: Connector Runtime MVP | Complete | Active connector manifests, manual and HTTP bindings, HTTP execution, connector run events, connector audit events |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-### Loop 10: Connector Runtime MVP
-
-Goal: turn connector placeholders into a minimal extension boundary.
-
-Status: next engineering loop.
-
-Scope:
-
-- Connector manifest shape
-- Built-in manual connector for human gates
-- Connector binding metadata in Workflow DSL
-- Minimal HTTP connector for connector-capable nodes
-- Connector execution records in run state and audit events
-
-Acceptance criteria:
-
-- A node can declare the connector it needs
-- Missing connector bindings fail validation before run
-- Connector execution is logged with workflow id, workflow version, run id, and node id
-- JSON storage and SQLite storage both support the same connector event model
-- Existing non-connector workflows keep working without migration
-
 ### Loop 11: Authoring Experience
 
 Goal: improve the visual and CLI authoring flow without weakening Workflow DSL authority.
 
-Status: after Loop 10, or earlier for independent documentation-only pieces.
+Status: next engineering loop.
 
 Scope:
 
@@ -86,7 +66,7 @@ Acceptance criteria:
 
 Goal: make the project easier for external contributors to evaluate, run, and extend.
 
-Status: follows Loop 10/11, with small docs-only PRs allowed in parallel.
+Status: follows Loop 11, with small docs-only PRs allowed in parallel.
 
 Scope:
 
@@ -105,21 +85,21 @@ Acceptance criteria:
 
 ### v0.1: Bootstrap Harness
 
-Status: current `main` baseline.
+Status: delivered by Loops 1-9.
 
-- Loops 1-9
 - Parser, compiler, validator, executor, LiteGraph view, write-back, control plane, JSON/SQLite durability
 - Suitable for local evaluation and early contributor onboarding
 
 ### v0.2: Connector Runtime
 
-Target: make external work execution explicit and auditable.
+Status: first MVP shipped in Loop 10. Future work should harden connector ergonomics and product-specific extensions.
 
 - Connector manifests
 - Connector binding validation
 - Manual and HTTP connector implementations
 - Connector execution audit events
 - Connector test fixtures
+- Future: connector credentials, retries/timeouts per connector, and product-specific connector packages
 
 ### v0.3: Authoring Experience
 

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
+from .connectors import ConnectorExecutionError, connector_ref, execute_connector
 from .storage import create_run_store
 
 
@@ -50,17 +51,22 @@ class LocalExecutor:
         if not isinstance(next_node, str):
             raise ValueError(f"run {run_id} cannot resume from {node['id']}")
 
-        state["node_results"][node["id"]] = {
+        result = {
             "status": "approved" if approved else "rejected",
             "title": node.get("title", node["id"]),
             "approved": approved,
             "timestamp": _now(),
         }
+        if node.get("type") == "human_gate":
+            result["connector"] = connector_ref(node.get("connector") or {"id": "manual", "kind": "manual"})
+        state["node_results"][node["id"]] = result
         state["events"].append(
             {
                 "type": "human_gate_resumed",
                 "node_id": node["id"],
                 "approved": approved,
+                "connector_id": "manual",
+                "connector_kind": "manual",
                 "timestamp": _now(),
             }
         )
@@ -109,9 +115,20 @@ class LocalExecutor:
 
             if node_type == "human_gate":
                 state["status"] = "waiting"
-                self._event(state, "human_gate_waiting", current_id)
+                self._event(
+                    state,
+                    "human_gate_waiting",
+                    current_id,
+                    {"connector_id": "manual", "connector_kind": "manual"},
+                )
                 self._save(state)
                 return state
+
+            if node_type == "tool_call":
+                finished = self._execute_connector_node(state, node, current_id, node_map)
+                if finished is not None:
+                    return finished
+                continue
 
             self._event(state, "node_started", current_id)
             state["node_results"][current_id] = {
@@ -137,14 +154,107 @@ class LocalExecutor:
         self._save(state)
         return state
 
-    def _event(self, state: RunState, event_type: str, node_id: str) -> None:
-        state["events"].append(
-            {
-                "type": event_type,
-                "node_id": node_id,
+    def _execute_connector_node(
+        self,
+        state: RunState,
+        node: Dict[str, object],
+        current_id: str,
+        node_map: Dict[str, Dict[str, object]],
+    ):
+        ref = connector_ref(node.get("connector"))
+        if not ref["id"]:
+            state["status"] = "failed"
+            state["error"] = f"{current_id} has no connector binding"
+            state["node_results"][current_id] = {
+                "status": "failed",
+                "title": node.get("title", current_id),
+                "error": state["error"],
                 "timestamp": _now(),
             }
+            self._event(state, "run_failed", current_id)
+            self._save(state)
+            return state
+
+        self._event(state, "node_started", current_id)
+        self._event(
+            state,
+            "connector_started",
+            current_id,
+            {
+                "connector_id": ref["id"],
+                "connector_kind": ref["kind"],
+                "connector_status": "running",
+            },
         )
+        try:
+            connector_result = execute_connector(node)
+        except ConnectorExecutionError as error:
+            connector_result = {
+                "status": "failed",
+                "connector": ref,
+                "error": str(error),
+                "output": {},
+            }
+
+        result_status = str(connector_result.get("status", "failed"))
+        node_result = {
+            "status": result_status,
+            "title": node.get("title", current_id),
+            "connector": connector_result.get("connector", ref),
+            "output": connector_result.get("output", {}),
+            "timestamp": _now(),
+        }
+        if connector_result.get("error"):
+            node_result["error"] = connector_result["error"]
+        state["node_results"][current_id] = node_result
+
+        if result_status == "completed":
+            self._event(
+                state,
+                "connector_completed",
+                current_id,
+                {
+                    "connector_id": ref["id"],
+                    "connector_kind": ref["kind"],
+                    "connector_status": "completed",
+                },
+            )
+            self._event(state, "node_completed", current_id)
+            next_node = node.get("on_success")
+        else:
+            self._event(
+                state,
+                "connector_failed",
+                current_id,
+                {
+                    "connector_id": ref["id"],
+                    "connector_kind": ref["kind"],
+                    "connector_status": "failed",
+                },
+            )
+            self._event(state, "node_failed", current_id)
+            next_node = node.get("on_failure")
+
+        if not isinstance(next_node, str) or next_node not in node_map:
+            state["status"] = "failed"
+            state["error"] = f"{current_id} has no valid connector transition target"
+            self._event(state, "run_failed", current_id)
+            self._save(state)
+            return state
+
+        state["current_node"] = next_node
+        self._save(state)
+        return None
+
+    def _event(self, state: RunState, event_type: str, node_id: str, extra: Dict[str, object] = None) -> None:
+        event = {
+            "type": event_type,
+            "node_id": node_id,
+            "timestamp": _now(),
+        }
+        if extra:
+            event.update(extra)
+        state["events"].append(event)
 
     def _save(self, state: RunState) -> None:
         self.store.save(state)

@@ -1,4 +1,7 @@
+import json
 import sqlite3
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -148,14 +151,43 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(run_events[0]["run_id"], second["run_id"])
         self.assertNotEqual(first["run_id"], second["run_id"])
 
-    def test_connector_registry_returns_placeholder_connectors(self):
+    def test_connector_registry_returns_active_connector_manifests(self):
         with TemporaryDirectory() as tmp:
             connectors = LocalControlPlane(Path(tmp)).list_connectors()
 
         connector_ids = {connector["id"] for connector in connectors}
         self.assertIn("manual", connector_ids)
         self.assertIn("http", connector_ids)
-        self.assertTrue(all(connector["status"] == "placeholder" for connector in connectors))
+        self.assertTrue(all(connector["status"] == "active" for connector in connectors))
+        self.assertTrue(all("node_types" in connector for connector in connectors))
+
+    def test_published_connector_run_records_connector_audit_events(self):
+        server = _ConnectorTestServer()
+
+        try:
+            with TemporaryDirectory() as tmp:
+                control = LocalControlPlane(Path(tmp), storage="sqlite")
+                control.publish_workflow(_connector_workflow("8.0.0", server.url))
+
+                run_state = control.run_published_workflow("workflow_connector", "8.0.0")
+                started_events = control.list_audit_events(
+                    run_id=run_state["run_id"],
+                    event_type="connector_started",
+                )
+                completed_events = control.list_audit_events(
+                    run_id=run_state["run_id"],
+                    event_type="connector_completed",
+                )
+        finally:
+            server.close()
+
+        self.assertEqual(run_state["status"], "completed")
+        self.assertEqual(started_events[0]["workflow_id"], "workflow_connector")
+        self.assertEqual(started_events[0]["workflow_version"], "8.0.0")
+        self.assertEqual(started_events[0]["node_id"], "call_api")
+        self.assertEqual(started_events[0]["connector_id"], "http")
+        self.assertEqual(completed_events[0]["connector_status"], "completed")
+        self.assertEqual(completed_events[0]["node_id"], "call_api")
 
 
 def _workflow(version: str):
@@ -204,3 +236,79 @@ def _approval_workflow(version: str):
             {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "failure"},
         ],
     }
+
+
+def _connector_workflow(version: str, url: str):
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {
+            "id": "workflow_connector",
+            "name": "connector",
+            "version": version,
+            "status": "draft",
+        },
+        "entry": "start",
+        "nodes": [
+            {"id": "start", "type": "start", "title": "Start", "on_success": "call_api"},
+            {
+                "id": "call_api",
+                "type": "tool_call",
+                "title": "Call API",
+                "connector": {
+                    "id": "http",
+                    "kind": "http",
+                    "request": {
+                        "method": "POST",
+                        "url": url,
+                        "headers": {"Content-Type": "application/json"},
+                        "body": {"approved": True},
+                        "timeout_ms": 2000,
+                    },
+                },
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+            {"id": "failure", "type": "failure", "title": "Failure"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_call", "from": "start", "to": "call_api", "label": "next"},
+            {"id": "edge_call_end", "from": "call_api", "to": "end", "label": "next"},
+            {"id": "edge_call_failure", "from": "call_api", "to": "failure", "label": "failure"},
+        ],
+    }
+
+
+class _ConnectorRequestHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw_body = self.rfile.read(length).decode("utf-8")
+        body = json.loads(raw_body) if raw_body else None
+        self.server.requests.append({"path": self.path, "body": body})
+        payload = json.dumps({"ok": True}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format, *args):
+        return
+
+
+class _ConnectorTestServer:
+    def __init__(self):
+        self._server = HTTPServer(("127.0.0.1", 0), _ConnectorRequestHandler)
+        self._server.requests = []
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    @property
+    def url(self) -> str:
+        host, port = self._server.server_address
+        return f"http://{host}:{port}/connector"
+
+    def close(self):
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=2)

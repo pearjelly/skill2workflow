@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Set
 
+from .connectors import default_connector_binding
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -56,20 +57,22 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
             source["line"] = step["line"]
         if step.get("section"):
             source["section"] = step["section"]
-        nodes.append(
-            {
-                "id": node_id,
-                "type": node_type,
-                "title": title,
-                "description": detail or title,
-                "requires": [],
-                "produces": [f"{node_id}_result"],
-                "guard": None,
-                "action": _action_for_node(node_type, _format_instruction(title, detail)),
-                "retry": {"max_attempts": 0},
-                "metadata": {"source": source},
-            }
-        )
+        node = {
+            "id": node_id,
+            "type": node_type,
+            "title": title,
+            "description": detail or title,
+            "requires": [],
+            "produces": [f"{node_id}_result"],
+            "guard": None,
+            "action": _action_for_node(node_type, _format_instruction(title, detail)),
+            "retry": {"max_attempts": 0},
+            "metadata": {"source": source},
+        }
+        connector = default_connector_binding(node_type)
+        if connector:
+            node["connector"] = connector
+        nodes.append(node)
 
     nodes.extend(
         [
@@ -233,6 +236,7 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
                     ["nodes", index, "on_failure"],
                 )
             )
+        _validate_connector_binding(node, index, errors)
         for key in ("on_success", "on_failure"):
             target = node.get(key)
             if target is not None and target not in node_map:
@@ -338,6 +342,43 @@ def _validate_transition_edges(
                         ["nodes", node_index_map.get(node_id, 0), key],
                     )
                 )
+
+
+def _validate_connector_binding(
+    node: Dict[str, object],
+    index: int,
+    errors: List[ValidationError],
+) -> None:
+    node_type = node.get("type")
+    connector = node.get("connector")
+    if node_type == "tool_call" and not connector:
+        errors.append(
+            _validation_error(
+                "connector_binding_missing",
+                f"{node.get('id')} tool_call must define connector.id",
+                ["nodes", index, "connector"],
+            )
+        )
+        return
+    if connector is None:
+        return
+    if not isinstance(connector, dict):
+        errors.append(
+            _validation_error(
+                "connector_binding_invalid",
+                f"{node.get('id')} connector must be an object",
+                ["nodes", index, "connector"],
+            )
+        )
+        return
+    if not connector.get("id"):
+        errors.append(
+            _validation_error(
+                "connector_binding_missing",
+                f"{node.get('id')} connector.id is required",
+                ["nodes", index, "connector", "id"],
+            )
+        )
 
 
 def _validation_error(code: str, message: str, path: List[object]) -> ValidationError:

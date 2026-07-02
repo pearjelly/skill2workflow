@@ -46,7 +46,8 @@
         "produces": [],
         "guard": null,
         "action": null,
-        "retry": null
+        "retry": null,
+        "connector": null
       }
     },
     {
@@ -110,7 +111,8 @@
         },
         "retry": {
           "max_attempts": 0
-        }
+        },
+        "connector": null
       }
     },
     {
@@ -174,7 +176,8 @@
         },
         "retry": {
           "max_attempts": 0
-        }
+        },
+        "connector": null
       }
     },
     {
@@ -238,6 +241,10 @@
         },
         "retry": {
           "max_attempts": 0
+        },
+        "connector": {
+          "id": "manual",
+          "kind": "manual"
         }
       }
     },
@@ -302,7 +309,8 @@
         },
         "retry": {
           "max_attempts": 0
-        }
+        },
+        "connector": null
       }
     },
     {
@@ -353,7 +361,8 @@
         "produces": [],
         "guard": null,
         "action": null,
-        "retry": null
+        "retry": null,
+        "connector": null
       }
     },
     {
@@ -389,7 +398,8 @@
         "produces": [],
         "guard": null,
         "action": null,
-        "retry": null
+        "retry": null,
+        "connector": null
       }
     }
   ],
@@ -573,6 +583,10 @@
               "line": 18,
               "section": "Checklist"
             }
+          },
+          "connector": {
+            "id": "manual",
+            "kind": "manual"
           },
           "on_success": "node_004_publish_workflow",
           "on_failure": "failure"

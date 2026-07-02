@@ -16,7 +16,7 @@ This repository is intentionally starting with a small executable harness instea
 SKILL.md -> Skill IR -> Workflow DSL -> Local Executor -> Run Log
 ```
 
-LiteGraph visualization, enterprise control plane features, and connector plugins are part of the staged roadmap in the approved spec.
+LiteGraph visualization, enterprise control plane features, and connector expansion are part of the staged roadmap in the approved spec.
 
 ## Why This Exists
 
@@ -55,13 +55,17 @@ The current implementation is a dependency-light Python harness because the loca
 - Persist run state as JSON or opt-in SQLite
 - List run summaries and inspect full run logs
 - Store queryable run event rows when SQLite storage is enabled
+- Bind `human_gate` nodes to the built-in manual connector
+- Bind and validate `tool_call` connector metadata
+- Execute minimal HTTP connector calls from connector-bound `tool_call` nodes
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
 - Open a static LiteGraph visual editor for graph inspection and parameter edits
 - Write safe LiteGraph title and description edits back to Workflow DSL
 - Publish immutable workflow versions into a local control plane
 - Run published workflow versions and write audit events
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
-- List connector registry placeholders
+- List built-in connector manifests
+- Audit connector execution events through the control plane
 
 ## Quickstart
 
@@ -197,7 +201,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workfl
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type run_completed
 ```
 
-List connector placeholders:
+List connector manifests:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
@@ -221,7 +225,8 @@ The current harness implements all five layers in minimal local form. Run state,
 src/skill2workflow/
   parser.py       # SKILL.md -> Skill IR
   compiler.py     # Skill IR -> Workflow DSL + validation
-  control_plane.py # Local workflow registry, audit log, and connector placeholders
+  connectors.py    # Built-in connector manifests and local connector execution
+  control_plane.py # Local workflow registry, audit log, and connector audit events
   executor.py     # Durable local execution
   storage.py      # JSON and SQLite local persistence backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON
@@ -248,8 +253,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Visual Write-Back
 - SQLite durability for run state, workflow registry, and audit events
 - Control Plane Hardening
+- Connector Runtime MVP
 
-Next priorities are Loop 10 Connector Runtime MVP and Loop 11 Authoring Experience.
+Next priorities are Loop 11 Authoring Experience and Loop 12 Open Source Release Readiness.
 
 See:
 
