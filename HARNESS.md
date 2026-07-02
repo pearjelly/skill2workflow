@@ -19,6 +19,8 @@ PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workfl
 PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json -o /tmp/skill2workflow-litegraph.json
 PYTHONPATH=src python3 -m skill2workflow.cli write-back /tmp/skill2workflow-workflow.json /tmp/skill2workflow-litegraph.json -o /tmp/skill2workflow-edited-workflow.json
+PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json
+PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-connector.workflow.json -o examples/workflows/http-connector.litegraph.json
 PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state
 PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite
 ```
@@ -109,8 +111,11 @@ Implemented:
   - includes connector metadata in node properties for inspection
   - includes a static web editor that loads Workflow DSL or LiteGraph JSON
   - exposes node parameters in an inspector
+  - provides an example workflow gallery
   - supports simple title and description edits in the LiteGraph view
+  - supports safe action, retry, and HTTP connector request edits in the LiteGraph view
   - writes title and description edits back to Workflow DSL without changing topology
+  - writes allowlisted authoring fields back to Workflow DSL without changing connector identity
   - marks invalid graph connections in the UI
 - Minimal local control plane
   - publishes immutable workflow artifacts

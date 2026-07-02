@@ -18,6 +18,10 @@
           </div>
         </div>
         <div class="toolbar" aria-label="Workflow actions">
+          <select id="example-select" aria-label="Example workflow">
+            <option value="approval-flow.workflow.json">Approval Flow</option>
+            <option value="http-connector.workflow.json">HTTP Connector</option>
+          </select>
           <button id="load-sample" type="button">Load Example</button>
           <label class="file-action">
             <input id="file-input" type="file" accept="application/json,.json" />
@@ -61,6 +65,48 @@
               Description
               <textarea id="node-description" rows="5"></textarea>
             </label>
+            <label>
+              Action
+              <textarea id="node-action" rows="4"></textarea>
+            </label>
+            <label>
+              Retry Attempts
+              <input id="node-retry-max" type="number" min="0" step="1" />
+            </label>
+            <div id="connector-section" class="form-section">
+              <p>Connector</p>
+              <label>
+                Connector ID
+                <input id="node-connector-id" type="text" readonly />
+              </label>
+              <label>
+                Connector Kind
+                <input id="node-connector-kind" type="text" readonly />
+              </label>
+              <div id="http-section" class="form-section nested">
+                <p>HTTP Request</p>
+                <label>
+                  Method
+                  <input id="node-http-method" type="text" />
+                </label>
+                <label>
+                  URL
+                  <input id="node-http-url" type="text" />
+                </label>
+                <label>
+                  Headers JSON
+                  <textarea id="node-http-headers" rows="4"></textarea>
+                </label>
+                <label>
+                  Body JSON
+                  <textarea id="node-http-body" rows="5"></textarea>
+                </label>
+                <label>
+                  Timeout MS
+                  <input id="node-http-timeout" type="number" min="0" step="1" />
+                </label>
+              </div>
+            </div>
             <label>
               Source
               <textarea id="node-source" rows="4" readonly></textarea>

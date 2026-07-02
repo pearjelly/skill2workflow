@@ -71,9 +71,9 @@ def apply_litegraph_edits_to_workflow(workflow: Workflow, graph: LiteGraph) -> W
     """Apply safe LiteGraph parameter edits back to Workflow DSL.
 
     This write-back intentionally preserves workflow topology. Node ids, edges,
-    transitions, source metadata, guards, policies, and execution semantics stay
-    in the Workflow DSL. The LiteGraph view may update only node title and
-    description.
+    transitions, source metadata, guards, policies, and connector identities
+    stay in the Workflow DSL. The LiteGraph view may update only allowlisted
+    authoring parameters.
     """
     workflow_nodes = _workflow_nodes(workflow)
     graph_nodes = _graph_nodes(graph)
@@ -99,7 +99,83 @@ def apply_litegraph_edits_to_workflow(workflow: Workflow, graph: LiteGraph) -> W
             description = str(properties.get("description") or "")
             if description or "description" in node:
                 node["description"] = description
+            _apply_action_edits(node, properties.get("action"))
+            _apply_retry_edits(node, properties.get("retry"))
+            _apply_connector_edits(node, properties.get("connector"))
     return updated
+
+
+def _apply_action_edits(node: Dict[str, object], graph_action: object) -> None:
+    action = node.get("action")
+    if action is None or graph_action is None:
+        return
+    if not isinstance(action, dict) or not isinstance(graph_action, dict):
+        raise ValueError(f"{node['id']} action must remain an object")
+    if graph_action.get("kind", action.get("kind")) != action.get("kind"):
+        raise ValueError(f"{node['id']} action kind cannot be changed")
+    for key in ("prompt", "instruction"):
+        if key in graph_action and (key in action or _action_kind_supports_key(action.get("kind"), key)):
+            action[key] = str(graph_action.get(key) or "")
+
+
+def _action_kind_supports_key(kind: object, key: str) -> bool:
+    return (kind == "human_approval" and key == "prompt") or (
+        kind in {"tool_call", "verification", "agent_instruction"} and key == "instruction"
+    )
+
+
+def _apply_retry_edits(node: Dict[str, object], graph_retry: object) -> None:
+    retry = node.get("retry")
+    if retry is None or graph_retry is None:
+        return
+    if not isinstance(retry, dict) or not isinstance(graph_retry, dict):
+        raise ValueError(f"{node['id']} retry must remain an object")
+    if "max_attempts" in graph_retry:
+        retry["max_attempts"] = _non_negative_int(graph_retry["max_attempts"], f"{node['id']} retry.max_attempts")
+
+
+def _apply_connector_edits(node: Dict[str, object], graph_connector: object) -> None:
+    connector = node.get("connector")
+    if connector is None or graph_connector is None:
+        return
+    if not isinstance(connector, dict) or not isinstance(graph_connector, dict):
+        raise ValueError(f"{node['id']} connector must remain an object")
+    if graph_connector.get("id") != connector.get("id") or graph_connector.get("kind") != connector.get("kind"):
+        raise ValueError(f"{node['id']} connector identity cannot be changed")
+    if connector.get("id") != "http" or "request" not in graph_connector:
+        return
+    graph_request = graph_connector.get("request")
+    if graph_request is None:
+        return
+    if not isinstance(graph_request, dict):
+        raise ValueError(f"{node['id']} connector.request must remain an object")
+    request = connector.setdefault("request", {})
+    if not isinstance(request, dict):
+        raise ValueError(f"{node['id']} connector.request must remain an object")
+    for key in ("method", "url"):
+        if key in graph_request:
+            request[key] = str(graph_request.get(key) or "")
+    if "headers" in graph_request:
+        if not isinstance(graph_request["headers"], dict):
+            raise ValueError(f"{node['id']} connector.request.headers must be an object")
+        request["headers"] = copy.deepcopy(graph_request["headers"])
+    if "body" in graph_request:
+        request["body"] = copy.deepcopy(graph_request["body"])
+    if "timeout_ms" in graph_request:
+        request["timeout_ms"] = _non_negative_int(
+            graph_request["timeout_ms"],
+            f"{node['id']} connector.request.timeout_ms",
+        )
+
+
+def _non_negative_int(value: object, label: str) -> int:
+    try:
+        integer = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f"{label} must be a non-negative integer")
+    if integer < 0:
+        raise ValueError(f"{label} must be a non-negative integer")
+    return integer
 
 
 def _workflow_nodes(workflow: Workflow) -> List[Dict[str, object]]:
@@ -253,12 +329,12 @@ def _litegraph_node(
             "description": str(node.get("description") or ""),
             "run_status": _run_status(node_id, run_state),
             "source": source,
-            "requires": node.get("requires", []),
-            "produces": node.get("produces", []),
-            "guard": node.get("guard"),
-            "action": node.get("action"),
-            "retry": node.get("retry"),
-            "connector": node.get("connector"),
+            "requires": copy.deepcopy(node.get("requires", [])),
+            "produces": copy.deepcopy(node.get("produces", [])),
+            "guard": copy.deepcopy(node.get("guard")),
+            "action": copy.deepcopy(node.get("action")),
+            "retry": copy.deepcopy(node.get("retry")),
+            "connector": copy.deepcopy(node.get("connector")),
         },
     }
 

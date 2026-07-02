@@ -1,0 +1,445 @@
+{
+  "version": "skill2workflow-litegraph-0.1.0",
+  "workflow": {
+    "id": "workflow_http_connector",
+    "name": "http-connector",
+    "version": "0.1.0",
+    "status": "draft",
+    "description": "Example workflow with an editable HTTP connector request.",
+    "entry": "start"
+  },
+  "last_node_id": 5,
+  "last_link_id": 5,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "skill2workflow/start",
+      "pos": [
+        80,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "title": "Start",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "start",
+        "node_type": "start",
+        "description": "Workflow entry point.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    },
+    {
+      "id": 2,
+      "type": "skill2workflow/human_gate",
+      "pos": [
+        340,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "Review request",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "review",
+        "node_type": "human_gate",
+        "description": "Manual approval before sending the request.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": {
+          "kind": "human_approval",
+          "prompt": "Approve the outbound connector request."
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": {
+          "id": "manual",
+          "kind": "manual"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "skill2workflow/tool_call",
+      "pos": [
+        600,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "title": "Call HTTP endpoint",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "call_api",
+        "node_type": "tool_call",
+        "description": "Send a JSON payload through the built-in HTTP connector.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": {
+          "kind": "tool_call",
+          "instruction": "Send the approved payload to the configured HTTP endpoint."
+        },
+        "retry": {
+          "max_attempts": 1
+        },
+        "connector": {
+          "id": "http",
+          "kind": "http",
+          "request": {
+            "method": "POST",
+            "url": "http://127.0.0.1:8080/example",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "source": "skill2workflow",
+              "example": true
+            },
+            "timeout_ms": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "skill2workflow/failure",
+      "pos": [
+        600,
+        260
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "title": "Failure",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 3
+        },
+        {
+          "name": "in_2",
+          "type": "flow",
+          "link": 5
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "workflow_node_id": "failure",
+        "node_type": "failure",
+        "description": "Terminal failure node.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    },
+    {
+      "id": 5,
+      "type": "skill2workflow/end",
+      "pos": [
+        1120,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "title": "End",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 4
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "workflow_node_id": "end",
+        "node_type": "end",
+        "description": "Workflow completed.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "flow"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "flow"
+    ],
+    [
+      3,
+      2,
+      1,
+      4,
+      0,
+      "flow"
+    ],
+    [
+      4,
+      3,
+      0,
+      5,
+      0,
+      "flow"
+    ],
+    [
+      5,
+      3,
+      1,
+      4,
+      1,
+      "flow"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "source_schema_version": "0.1.0",
+    "truth_source": "workflow_dsl",
+    "source_workflow": {
+      "schema_version": "0.1.0",
+      "workflow": {
+        "id": "workflow_http_connector",
+        "name": "http-connector",
+        "description": "Example workflow with an editable HTTP connector request.",
+        "version": "0.1.0",
+        "status": "draft"
+      },
+      "entry": "start",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "start",
+          "title": "Start",
+          "description": "Workflow entry point.",
+          "on_success": "review"
+        },
+        {
+          "id": "review",
+          "type": "human_gate",
+          "title": "Review request",
+          "description": "Manual approval before sending the request.",
+          "action": {
+            "kind": "human_approval",
+            "prompt": "Approve the outbound connector request."
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "connector": {
+            "id": "manual",
+            "kind": "manual"
+          },
+          "on_success": "call_api",
+          "on_failure": "failure"
+        },
+        {
+          "id": "call_api",
+          "type": "tool_call",
+          "title": "Call HTTP endpoint",
+          "description": "Send a JSON payload through the built-in HTTP connector.",
+          "action": {
+            "kind": "tool_call",
+            "instruction": "Send the approved payload to the configured HTTP endpoint."
+          },
+          "retry": {
+            "max_attempts": 1
+          },
+          "connector": {
+            "id": "http",
+            "kind": "http",
+            "request": {
+              "method": "POST",
+              "url": "http://127.0.0.1:8080/example",
+              "headers": {
+                "Content-Type": "application/json"
+              },
+              "body": {
+                "source": "skill2workflow",
+                "example": true
+              },
+              "timeout_ms": 3000
+            }
+          },
+          "on_success": "end",
+          "on_failure": "failure"
+        },
+        {
+          "id": "failure",
+          "type": "failure",
+          "title": "Failure",
+          "description": "Terminal failure node."
+        },
+        {
+          "id": "end",
+          "type": "end",
+          "title": "End",
+          "description": "Workflow completed."
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge_start_review",
+          "from": "start",
+          "to": "review",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_review_api",
+          "from": "review",
+          "to": "call_api",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_review_failure",
+          "from": "review",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_api_end",
+          "from": "call_api",
+          "to": "end",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_api_failure",
+          "from": "call_api",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        }
+      ],
+      "state_schema": {},
+      "guards": [],
+      "checkpoints": [],
+      "policies": {
+        "default_retry": {
+          "max_attempts": 0
+        },
+        "default_timeout_ms": 300000
+      }
+    }
+  }
+}
