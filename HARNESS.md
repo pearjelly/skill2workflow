@@ -18,6 +18,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/approval-fl
 PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json
 PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json -o /tmp/skill2workflow-litegraph.json
+PYTHONPATH=src python3 -m skill2workflow.cli write-back /tmp/skill2workflow-workflow.json /tmp/skill2workflow-litegraph.json -o /tmp/skill2workflow-edited-workflow.json
 PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state
 ```
 
@@ -83,10 +84,12 @@ Implemented:
   - exposes run summaries and full run details
 - LiteGraph visualization
   - converts Workflow DSL into LiteGraph-compatible graph JSON
+  - embeds source Workflow DSL in generated LiteGraph JSON for safe write-back
   - preserves workflow node ids, node types, descriptions, source metadata, and run status
   - includes a static web editor that loads Workflow DSL or LiteGraph JSON
   - exposes node parameters in an inspector
   - supports simple title and description edits in the LiteGraph view
+  - writes title and description edits back to Workflow DSL without changing topology
   - marks invalid graph connections in the UI
 - Minimal local control plane
   - publishes immutable workflow artifacts

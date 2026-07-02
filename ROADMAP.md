@@ -51,6 +51,8 @@ Success criteria:
 
 Goal: make LiteGraph edits round-trip safely into Workflow DSL.
 
+Status: initial write-back in progress. Title and description edits now round-trip safely while Workflow DSL topology remains authoritative.
+
 Deliverables:
 
 - Save edited title and description back to Workflow DSL
