@@ -15,8 +15,9 @@ The bootstrap MVP is in place across all five architecture layers, with the firs
 - Minimal Control Plane: immutable publish, run published version, audit log, connector placeholders
 - Workflow DSL Contract: JSON Schema, structured validation errors, and golden fixture coverage
 - Visual Write-Back: safe LiteGraph title and description edits back to Workflow DSL
+- Runtime Durability: opt-in SQLite storage for run state, workflow registry, and audit events
 
-The default persistence layer remains dependency-light JSON. SQLite run-state storage is available as an opt-in durability backend while workflow registry and audit persistence continue to use JSON/JSONL.
+The default persistence layer remains dependency-light JSON/JSONL. SQLite is available as an opt-in durability backend for run state, workflow registry metadata, and audit events. Published workflow artifacts remain immutable JSON documents in both modes.
 
 ## Completed Loops
 
@@ -29,35 +30,15 @@ The default persistence layer remains dependency-light JSON. SQLite run-state st
 | Loop 5: Control Plane | Complete | Immutable publish, workflow lifecycle index, published-version runs, audit JSONL, connector placeholders |
 | Loop 6: Workflow DSL Contract | Complete | JSON Schema, structured validator output, golden workflow fixture coverage |
 | Loop 7: Visual Write-Back | Complete | `write-back` CLI, `Save DSL`, source Workflow DSL embedding, topology-preserving write-back |
+| Loop 8: Runtime Durability | Complete | Storage boundary, SQLite run state, SQLite workflow registry, SQLite audit events, JSON import path |
 
 ## Next Priorities
 
-### 1. Runtime Durability Upgrade
-
-Goal: move from JSON files to a stronger local persistence model without changing user-facing semantics.
-
-Status: initial slice in progress. Local and published runs can opt into SQLite run-state storage with queryable run event rows; workflow registry and audit JSONL migration are still pending.
-
-Deliverables:
-
-- Storage boundary that keeps executor semantics independent from file format
-- SQLite-backed run state for local and published runs
-- Event log table for run events
-- Basic migration or import path from current JSON state where practical
-- Resume behavior tested across process restarts
-
-Success criteria:
-
-- Run state survives interruption and restart
-- Audit and run events are queryable without reading full JSON blobs
-- Existing CLI workflows continue to work
-- JSON persistence can remain as a simple fallback or compatibility fixture
-
-### 2. Control Plane Hardening
+### 1. Control Plane Hardening
 
 Goal: make the local control plane useful for repeated project work.
 
-Status: follows the SQLite durability loop.
+Status: next engineering loop.
 
 Deliverables:
 
@@ -72,11 +53,11 @@ Success criteria:
 - Deprecated versions remain inspectable and immutable
 - Audit trails can answer what changed, who/what triggered it, and which run was affected
 
-### 3. Connector Runtime MVP
+### 2. Connector Runtime MVP
 
 Goal: turn connector placeholders into a minimal extension boundary.
 
-Status: starts after the run and audit state model is durable enough to record external calls.
+Status: starts after the control-plane run lifecycle is hardened enough to record external calls.
 
 Deliverables:
 
@@ -91,7 +72,7 @@ Success criteria:
 - Missing connector bindings fail validation before run
 - Connector execution is logged in node results and audit events
 
-### 4. Authoring Experience
+### 3. Authoring Experience
 
 Goal: improve the visual and CLI authoring flow without weakening Workflow DSL authority.
 
@@ -108,7 +89,7 @@ Success criteria:
 - UI edits are validated through the same DSL contract as CLI edits
 - New write-back fields are allowlisted and covered by tests
 
-### 5. Open Source Release Readiness
+### 4. Open Source Release Readiness
 
 Goal: make the project easier for external contributors to evaluate, run, and extend.
 

@@ -60,6 +60,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Write safe LiteGraph title and description edits back to Workflow DSL
 - Publish immutable workflow versions into a local control plane
 - Run published workflow versions and write audit events
+- Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List connector registry placeholders
 
 ## Quickstart
@@ -158,6 +159,12 @@ Publish a workflow version:
 PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control
 ```
 
+Publish with SQLite-backed control-plane metadata:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control --storage sqlite
+```
+
 List and inspect published workflow versions:
 
 ```bash
@@ -178,6 +185,8 @@ Use SQLite run storage for published runs:
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --storage sqlite
 ```
 
+For SQLite-backed control-plane metadata, pass `--storage sqlite` to `workflows`, `workflow`, `deprecate`, and `audit` as well.
+
 List connector placeholders:
 
 ```bash
@@ -194,7 +203,7 @@ The approved architecture has five layers:
 4. Durable Executor
 5. Enterprise Control Plane
 
-The current harness implements all five layers in minimal local form. Run state can use JSON files or SQLite. Published workflow artifacts, lifecycle registry state, and audit events remain JSON/JSONL during the bootstrap phase.
+The current harness implements all five layers in minimal local form. Run state, lifecycle registry state, and audit events can use JSON/JSONL or SQLite. Published workflow artifacts remain immutable JSON documents in both modes.
 
 ## Repository Layout
 
@@ -204,7 +213,7 @@ src/skill2workflow/
   compiler.py     # Skill IR -> Workflow DSL + validation
   control_plane.py # Local workflow registry, audit log, and connector placeholders
   executor.py     # Durable local execution
-  storage.py      # JSON and SQLite run-state storage backends
+  storage.py      # JSON and SQLite local persistence backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON
   cli.py          # Command line interface
 examples/skills/  # Example SKILL.md inputs
@@ -227,9 +236,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Minimal Control Plane
 - Workflow DSL Contract
 - Visual Write-Back
-- SQLite run-state storage
+- SQLite durability for run state, workflow registry, and audit events
 
-Next priorities are completing the SQLite durability upgrade, control-plane hardening, and the first connector runtime boundary.
+Next priorities are control-plane hardening and the first connector runtime boundary.
 
 See:
 

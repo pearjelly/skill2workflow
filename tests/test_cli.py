@@ -112,6 +112,66 @@ class CliTests(TestCase):
         self.assertEqual(run_summary["workflow_id"], "workflow_demo")
         self.assertTrue(db_exists)
 
+    def test_control_plane_commands_can_use_sqlite_storage(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "workflow.json"
+            state_dir = tmp_path / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            workflows_stdout = StringIO()
+            workflow_stdout = StringIO()
+            audit_stdout = StringIO()
+
+            with redirect_stdout(StringIO()):
+                publish_exit = main(
+                    ["publish", str(workflow_path), "--state-dir", str(state_dir), "--storage", "sqlite"]
+                )
+            with redirect_stdout(workflows_stdout):
+                workflows_exit = main(["workflows", "--state-dir", str(state_dir), "--storage", "sqlite"])
+            with redirect_stdout(workflow_stdout):
+                workflow_exit = main(
+                    [
+                        "workflow",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            with redirect_stdout(StringIO()):
+                deprecate_exit = main(
+                    [
+                        "deprecate",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            with redirect_stdout(audit_stdout):
+                audit_exit = main(["audit", "--state-dir", str(state_dir), "--storage", "sqlite"])
+
+            workflow_records = json.loads(workflows_stdout.getvalue())
+            workflow_detail = json.loads(workflow_stdout.getvalue())
+            audit_events = json.loads(audit_stdout.getvalue())
+            control_db_exists = (state_dir / "control.sqlite3").exists()
+
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(workflows_exit, 0)
+        self.assertEqual(workflow_exit, 0)
+        self.assertEqual(deprecate_exit, 0)
+        self.assertEqual(audit_exit, 0)
+        self.assertEqual(workflow_records[0]["workflow_id"], "workflow_demo")
+        self.assertEqual(workflow_detail["workflow"]["id"], "workflow_demo")
+        self.assertEqual([event["type"] for event in audit_events], ["workflow_published", "workflow_deprecated"])
+        self.assertTrue(control_db_exists)
+
     def test_run_and_list_runs_can_use_sqlite_storage(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

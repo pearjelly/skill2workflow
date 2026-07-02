@@ -51,11 +51,14 @@ Run the minimal control plane closed loop:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
-PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 ```
 
@@ -101,10 +104,11 @@ Implemented:
   - marks invalid graph connections in the UI
 - Minimal local control plane
   - publishes immutable workflow artifacts
-  - tracks draft, published, and deprecated lifecycle state through a local registry index
+  - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions
   - keeps run state bound to workflow id and version
-  - records workflow publish, deprecate, and run events in an audit JSONL log
+  - records workflow publish, deprecate, and run events in JSONL or SQLite audit storage
+  - imports existing JSON registry and audit files when opening SQLite control-plane storage
   - exposes connector registry placeholders
 - CLI
 - Tests
@@ -112,7 +116,6 @@ Implemented:
 
 Not implemented yet:
 
-- Full SQLite migration for workflow registry and audit JSONL
 - Enterprise control plane UI
 - Connector runtime
 - GitHub release automation
