@@ -17,6 +17,9 @@ This repository is the `skill2workflow` open-source harness.
 - Validate: `PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json`
 - Visualize: `PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json -o /tmp/skill2workflow-litegraph.json`
 - Web preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/`
+- Publish: `PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control`
+- Run published: `PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control`
+- Audit: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control`
 
 ## Working Rules
 

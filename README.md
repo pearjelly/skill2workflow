@@ -54,6 +54,9 @@ The current implementation is a dependency-light Python harness because the loca
 - List run summaries and inspect full run logs
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
 - Open a static LiteGraph visual editor for graph inspection and parameter edits
+- Publish immutable workflow versions into a local control plane
+- Run published workflow versions and write audit events
+- List connector registry placeholders
 
 ## Quickstart
 
@@ -125,6 +128,32 @@ Inspect a full run log:
 PYTHONPATH=src python3 -m skill2workflow.cli show <run_id> --state-dir /tmp/skill2workflow-state
 ```
 
+Publish a workflow version:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control
+```
+
+List and inspect published workflow versions:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
+```
+
+Run a published version and inspect audit events:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
+```
+
+List connector placeholders:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
+```
+
 ## Architecture
 
 The approved architecture has five layers:
@@ -135,7 +164,7 @@ The approved architecture has five layers:
 4. Durable Executor
 5. Enterprise Control Plane
 
-The current harness implements the first, second, and fourth layers in minimal local form. The third and fifth layers are designed in the spec and will be added through small closed loops.
+The current harness implements all five layers in minimal local form. The control plane is JSON-backed for the bootstrap phase: published workflow artifacts are immutable, lifecycle state lives in a registry index, and audit events are stored as JSONL.
 
 ## Repository Layout
 
@@ -143,6 +172,7 @@ The current harness implements the first, second, and fourth layers in minimal l
 src/skill2workflow/
   parser.py       # SKILL.md -> Skill IR
   compiler.py     # Skill IR -> Workflow DSL + validation
+  control_plane.py # Local workflow registry, audit log, and connector placeholders
   executor.py     # Durable local execution
   visualizer.py   # Workflow DSL -> LiteGraph JSON
   cli.py          # Command line interface
