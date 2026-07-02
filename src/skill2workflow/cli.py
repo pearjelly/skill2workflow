@@ -7,7 +7,7 @@ import json
 import sys
 from pathlib import Path
 
-from .compiler import compile_ir_to_workflow, validate_workflow
+from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
 from .executor import LocalExecutor
 from .parser import parse_skill_file
@@ -27,6 +27,7 @@ def main(argv=None) -> int:
 
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
     validate_cmd.add_argument("workflow", type=Path)
+    validate_cmd.add_argument("--format", choices=["text", "json"], default="text")
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
     visualize_cmd.add_argument("workflow", type=Path)
@@ -93,7 +94,17 @@ def main(argv=None) -> int:
 
     if args.command == "validate":
         workflow = _load_json(args.workflow)
-        errors = validate_workflow(workflow)
+        structured_errors = validate_workflow_structured(workflow)
+        if args.format == "json":
+            _print_json(
+                {
+                    "valid": not structured_errors,
+                    "schema_version": workflow.get("schema_version"),
+                    "errors": structured_errors,
+                }
+            )
+            return 1 if structured_errors else 0
+        errors = [str(error["message"]) for error in structured_errors]
         if errors:
             for error in errors:
                 print(error, file=sys.stderr)

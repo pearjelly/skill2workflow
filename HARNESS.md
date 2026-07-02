@@ -16,6 +16,7 @@ Run the CLI closed loop:
 PYTHONPATH=src python3 -m skill2workflow.cli parse examples/skills/approval-flow/SKILL.md
 PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/approval-flow/SKILL.md -o /tmp/skill2workflow-workflow.json
 PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json
+PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json -o /tmp/skill2workflow-litegraph.json
 PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state
 ```
@@ -67,6 +68,9 @@ Implemented:
   - generates start, ordered step, failure, and end nodes
   - generates success and failure edges
 - Validator
+  - documents Workflow DSL `0.1.0` with `schemas/workflow.schema.json`
+  - exposes structured validation errors through `validate_workflow_structured`
+  - supports `validate --format json` for tool and UI integrations
   - checks node ids and edge ids
   - checks edge endpoint references
   - checks terminal nodes have no outgoing transition

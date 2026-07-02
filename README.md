@@ -46,7 +46,9 @@ The current implementation is a dependency-light Python harness because the loca
 - Compile Skill IR into Workflow DSL
 - Carry parser source mapping into workflow node metadata
 - Validate Workflow DSL
+- Document the Workflow DSL with a versioned JSON Schema
 - Validate edge ids, edge endpoints, terminal-node edges, and node transition consistency
+- Emit structured machine-readable validation errors
 - Execute workflows locally
 - Pause at `human_gate`
 - Resume waiting runs
@@ -82,6 +84,12 @@ Validate it:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json
+```
+
+Emit structured validation errors:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json --format json
 ```
 
 Generate LiteGraph JSON:
@@ -178,6 +186,7 @@ src/skill2workflow/
   cli.py          # Command line interface
 examples/skills/  # Example SKILL.md inputs
 examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
+schemas/           # Versioned Workflow DSL JSON Schema
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
 web/              # Static LiteGraph visual editor
@@ -199,6 +208,7 @@ Next priorities are DSL contract hardening, visual editor write-back, SQLite dur
 See:
 
 - `ROADMAP.md`
+- `docs/workflow-dsl-contract.md`
 - `docs/superpowers/specs/2026-07-01-skill2workflow-design.md`
 
 ## License
