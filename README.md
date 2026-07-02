@@ -181,19 +181,25 @@ examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
 web/              # Static LiteGraph visual editor
+ROADMAP.md        # Open-source delivery roadmap
 ```
 
 ## Roadmap
 
-- Loop 1: Parser closed loop
-- Loop 2: Compiler and validator closed loop
-- Loop 3: Durable executor closed loop
-- Loop 4: LiteGraph visual workflow editor
-- Loop 5: Minimal enterprise control plane
+The bootstrap MVP now covers all five approved architecture layers in minimal local form:
 
-See the approved design spec:
+- Parser
+- Compiler and Validator
+- LiteGraph Editor
+- Durable Executor
+- Minimal Control Plane
 
-`docs/superpowers/specs/2026-07-01-skill2workflow-design.md`
+Next priorities are DSL contract hardening, visual editor write-back, SQLite durability, control-plane hardening, and the first connector runtime boundary.
+
+See:
+
+- `ROADMAP.md`
+- `docs/superpowers/specs/2026-07-01-skill2workflow-design.md`
 
 ## License
 

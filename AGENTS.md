@@ -8,6 +8,7 @@ This repository is the `skill2workflow` open-source harness.
 - Execution truth source: Workflow DSL, not the visual graph.
 - Current implementation language: Python 3.9 standard library for the bootstrap harness.
 - Long-term UI direction: LiteGraph-style visual editor, aligned with the approved spec.
+- Roadmap index: `ROADMAP.md`; approved product spec remains under `docs/superpowers/specs/`.
 
 ## Local Commands
 
