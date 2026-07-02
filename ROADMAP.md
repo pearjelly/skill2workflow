@@ -16,7 +16,7 @@ The bootstrap MVP is in place across all five architecture layers, with the firs
 - Workflow DSL Contract: JSON Schema, structured validation errors, and golden fixture coverage
 - Visual Write-Back: safe LiteGraph title and description edits back to Workflow DSL
 
-The current persistence layer is dependency-light JSON. The approved product direction still points toward SQLite for local durability once the runtime contract is stable.
+The default persistence layer remains dependency-light JSON. SQLite run-state storage is available as an opt-in durability backend while workflow registry and audit persistence continue to use JSON/JSONL.
 
 ## Completed Loops
 
@@ -36,12 +36,12 @@ The current persistence layer is dependency-light JSON. The approved product dir
 
 Goal: move from JSON files to a stronger local persistence model without changing user-facing semantics.
 
-Status: next engineering loop.
+Status: initial slice in progress. Local and published runs can opt into SQLite run-state storage with queryable run event rows; workflow registry and audit JSONL migration are still pending.
 
 Deliverables:
 
 - Storage boundary that keeps executor semantics independent from file format
-- SQLite-backed run state
+- SQLite-backed run state for local and published runs
 - Event log table for run events
 - Basic migration or import path from current JSON state where practical
 - Resume behavior tested across process restarts

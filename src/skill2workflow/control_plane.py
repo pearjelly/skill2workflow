@@ -46,13 +46,13 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
 class LocalControlPlane:
     """Manage local workflow versions, published runs, and audit events."""
 
-    def __init__(self, state_dir: Path):
+    def __init__(self, state_dir: Path, storage: str = "json"):
         self.state_dir = Path(state_dir)
         self.workflows_dir = self.state_dir / "workflows"
         self.index_path = self.workflows_dir / "index.json"
         self.audit_path = self.state_dir / "audit.log.jsonl"
         self.connectors_path = self.state_dir / "connectors.json"
-        self.executor = LocalExecutor(self.state_dir)
+        self.executor = LocalExecutor(self.state_dir, storage=storage)
         self.workflows_dir.mkdir(parents=True, exist_ok=True)
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
