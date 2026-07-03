@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">skill2workflow system design</title>
+  <desc id="desc">A system diagram showing SKILL.md compiled into Skill IR, Workflow DSL, a LiteGraph editor view, a durable executor, connectors, run state, and a control plane audit trail.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#0f172a" flood-opacity="0.14"/>
+    </filter>
+    <style>
+      .bg { fill: #f8fafc; }
+      .panel { fill: #ffffff; stroke: #d7dde7; stroke-width: 1.4; filter: url(#shadow); }
+      .panel-soft { fill: #f3f7fb; stroke: #d7dde7; stroke-width: 1.4; }
+      .title { fill: #111827; font: 700 30px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .subtitle { fill: #64748b; font: 500 16px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .label { fill: #111827; font: 700 20px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .small { fill: #475569; font: 500 14px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .tiny { fill: #64748b; font: 700 12px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0.6px; }
+      .mono { fill: #334155; font: 600 13px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+      .line { stroke: #475569; stroke-width: 2.4; fill: none; marker-end: url(#arrow); }
+      .line-soft { stroke: #94a3b8; stroke-width: 2; fill: none; stroke-dasharray: 7 7; marker-end: url(#arrow); }
+      .blue { fill: #e8f2fb; stroke: #1769aa; }
+      .green { fill: #e8f6ef; stroke: #087443; }
+      .amber { fill: #fff3d8; stroke: #956300; }
+      .violet { fill: #f0edff; stroke: #5d3fd3; }
+      .red { fill: #fdeceb; stroke: #b42318; }
+      .slate { fill: #eef2f7; stroke: #64748b; }
+      .pill-text { fill: #0f172a; font: 700 13px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1200" height="680" rx="28"/>
+
+  <text x="56" y="70" class="title">From Agent Skills to Controlled Enterprise Workflows</text>
+  <text x="56" y="100" class="subtitle">Workflow DSL is the execution truth source; LiteGraph is an editor and view.</text>
+
+  <rect x="52" y="132" width="1096" height="416" rx="22" class="panel"/>
+
+  <rect x="86" y="188" width="152" height="104" rx="14" class="panel-soft blue"/>
+  <text x="112" y="226" class="label">SKILL.md</text>
+  <text x="112" y="255" class="small">Rules, gates,</text>
+  <text x="112" y="277" class="small">checklists</text>
+
+  <rect x="286" y="188" width="164" height="104" rx="14" class="panel-soft slate"/>
+  <text x="324" y="226" class="label">Parser</text>
+  <text x="318" y="255" class="small">Skill IR with</text>
+  <text x="318" y="277" class="small">source mapping</text>
+
+  <rect x="506" y="174" width="188" height="132" rx="16" class="panel-soft green"/>
+  <text x="548" y="219" class="label">Workflow DSL</text>
+  <text x="548" y="249" class="small">Nodes, edges, guards,</text>
+  <text x="548" y="271" class="small">checkpoints, policies</text>
+
+  <rect x="748" y="188" width="166" height="104" rx="14" class="panel-soft violet"/>
+  <text x="787" y="226" class="label">Validator</text>
+  <text x="781" y="255" class="small">Schema and graph</text>
+  <text x="781" y="277" class="small">consistency checks</text>
+
+  <rect x="956" y="188" width="156" height="104" rx="14" class="panel-soft amber"/>
+  <text x="982" y="226" class="label">Publish</text>
+  <text x="978" y="255" class="small">Immutable version</text>
+  <text x="978" y="277" class="small">in local registry</text>
+
+  <path d="M238 240 L286 240" class="line"/>
+  <path d="M450 240 L506 240" class="line"/>
+  <path d="M694 240 L748 240" class="line"/>
+  <path d="M914 240 L956 240" class="line"/>
+
+  <rect x="126" y="380" width="196" height="100" rx="14" class="panel-soft violet"/>
+  <text x="160" y="418" class="label">LiteGraph Editor</text>
+  <text x="158" y="447" class="small">Visual inspection and</text>
+  <text x="158" y="469" class="small">allowlisted write-back</text>
+
+  <rect x="390" y="380" width="188" height="100" rx="14" class="panel-soft blue"/>
+  <text x="426" y="418" class="label">Executor</text>
+  <text x="426" y="447" class="small">Run, pause, resume,</text>
+  <text x="426" y="469" class="small">checkpoint state</text>
+
+  <rect x="646" y="380" width="184" height="100" rx="14" class="panel-soft amber"/>
+  <text x="682" y="418" class="label">Connectors</text>
+  <text x="682" y="447" class="small">Manual gates and</text>
+  <text x="682" y="469" class="small">HTTP tool calls</text>
+
+  <rect x="902" y="380" width="186" height="100" rx="14" class="panel-soft green"/>
+  <text x="936" y="418" class="label">Control Plane</text>
+  <text x="936" y="447" class="small">Runs, versions, audit,</text>
+  <text x="936" y="469" class="small">operator snapshot</text>
+
+  <path d="M600 306 C600 352 500 346 484 380" class="line"/>
+  <path d="M600 306 C575 362 306 338 224 380" class="line-soft"/>
+  <path d="M578 430 L646 430" class="line"/>
+  <path d="M830 430 L902 430" class="line"/>
+  <path d="M995 380 C1005 332 1032 324 1034 292" class="line-soft"/>
+
+  <rect x="108" y="560" width="238" height="58" rx="12" class="panel-soft slate"/>
+  <text x="132" y="584" class="tiny">SOURCE MAPPING</text>
+  <text x="132" y="606" class="mono">SKILL.md line -> node metadata</text>
+
+  <rect x="382" y="560" width="222" height="58" rx="12" class="panel-soft amber"/>
+  <text x="406" y="584" class="tiny">HUMAN GATES</text>
+  <text x="406" y="606" class="mono">approval pauses and resumes</text>
+
+  <rect x="640" y="560" width="236" height="58" rx="12" class="panel-soft blue"/>
+  <text x="664" y="584" class="tiny">DURABLE STATE</text>
+  <text x="664" y="606" class="mono">JSON/JSONL or SQLite storage</text>
+
+  <rect x="912" y="560" width="184" height="58" rx="12" class="panel-soft green"/>
+  <text x="936" y="584" class="tiny">AUDIT TRAIL</text>
+  <text x="936" y="606" class="mono">publish and run events</text>
+
+  <path d="M224 480 C224 520 224 532 224 560" class="line-soft"/>
+  <path d="M484 480 C484 520 493 532 493 560" class="line-soft"/>
+  <path d="M738 480 C738 520 758 532 758 560" class="line-soft"/>
+  <path d="M995 480 C995 520 1004 532 1004 560" class="line-soft"/>
+</svg>

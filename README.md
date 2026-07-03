@@ -18,6 +18,26 @@ SKILL.md -> Skill IR -> Workflow DSL -> Local Executor -> Run Log
 
 LiteGraph visualization, enterprise control plane features, and connector expansion are part of the staged roadmap in the approved spec.
 
+## Visual Overview
+
+### Controlled Workflow Authoring
+
+<p align="center">
+  <img src="docs/assets/skill2workflow-editor.jpg" alt="skill2workflow LiteGraph editor showing a sales follow-up workflow with node validation and an HTTP connector node selected" width="100%">
+</p>
+
+The visual editor loads Workflow DSL, renders it as a LiteGraph-compatible graph, and exposes allowlisted edits for node text, retry policy, actions, and HTTP connector request metadata. The graph is a view and editor; Workflow DSL remains the execution truth source.
+
+### Local Control Plane And Audit Trail
+
+![Control-plane screenshot showing workflow registry metrics, audit events, connector count, and snapshot detail](docs/assets/skill2workflow-control-plane.jpg)
+
+The local control-plane inspector reads exported snapshots so operators can inspect published workflow versions, runs, audit events, connectors, and version comparisons without adding a server dependency.
+
+### System Design
+
+![System design diagram showing SKILL.md compiled into Skill IR, Workflow DSL, LiteGraph, executor, connectors, and control-plane audit](docs/assets/skill2workflow-system-design.svg)
+
 ## Why This Exists
 
 Agent skills have already proven useful for adapting AI systems to new tasks. They are fast to write, easy to share, and effective for many lightweight tasks.
@@ -285,6 +305,7 @@ examples/control-plane-snapshot.json # Example control-plane UI snapshot
 schemas/           # Versioned Workflow DSL JSON Schema
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
+docs/assets/      # README screenshots and system design diagrams
 docs/examples.md  # Enterprise workflow example pack guide
 docs/releases/    # Release notes
 web/              # Static LiteGraph editor and control-plane inspector
