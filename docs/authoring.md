@@ -15,7 +15,13 @@ examples/workflows/
 Current examples:
 
 - `approval-flow.workflow.json`: approval-oriented flow with a manual human gate
+- `sales-follow-up.workflow.json`: sales follow-up with account-owner approval and CRM update boundary
+- `customer-service-escalation.workflow.json`: support escalation with SLA check, lead approval, and handoff audit
+- `risk-review.workflow.json`: risk decisioning with policy check, analyst approval, and disposition audit
+- `operations-analysis.workflow.json`: operating metrics analysis with owner confirmation and action tracking
 - `http-connector.workflow.json`: authoring example with manual approval followed by an HTTP connector request
+
+See `docs/examples.md` for scenario notes and inspection commands.
 
 Regenerate a LiteGraph fixture from a Workflow DSL file:
 

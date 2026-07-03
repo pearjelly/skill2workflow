@@ -1,0 +1,333 @@
+{
+  "schema_version": "0.1.0",
+  "workflow": {
+    "id": "workflow_customer_service_escalation",
+    "name": "customer-service-escalation",
+    "description": "Controlled customer service escalation workflow with SLA checks, lead approval, and handoff audit.",
+    "version": "0.1.0",
+    "status": "draft"
+  },
+  "entry": "start",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Start",
+      "description": "Workflow entry point.",
+      "on_success": "node_001_classify_customer_issue"
+    },
+    {
+      "id": "node_001_classify_customer_issue",
+      "type": "step",
+      "title": "Classify customer issue",
+      "description": "summarize the symptom, affected customer, product area, and current severity",
+      "requires": [],
+      "produces": [
+        "node_001_classify_customer_issue_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Classify customer issue — summarize the symptom, affected customer, product area, and current severity"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 1,
+          "line": 16,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_002_check_sla_and_customer_history",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_002_check_sla_and_customer_history",
+      "type": "verification",
+      "title": "Check SLA and customer history",
+      "description": "compare the case against SLA commitments and recent customer interactions",
+      "requires": [],
+      "produces": [
+        "node_002_check_sla_and_customer_history_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "verification",
+        "instruction": "Check SLA and customer history — compare the case against SLA commitments and recent customer interactions"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 2,
+          "line": 17,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_003_draft_escalation_plan",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_003_draft_escalation_plan",
+      "type": "step",
+      "title": "Draft escalation plan",
+      "description": "identify target owner, escalation reason, customer message, and expected response time",
+      "requires": [],
+      "produces": [
+        "node_003_draft_escalation_plan_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Draft escalation plan — identify target owner, escalation reason, customer message, and expected response time"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 3,
+          "line": 18,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_004_ask_support_lead_for_approval",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_004_ask_support_lead_for_approval",
+      "type": "human_gate",
+      "title": "Ask support lead for approval",
+      "description": "wait for support lead approval before handoff or customer notification",
+      "requires": [],
+      "produces": [
+        "node_004_ask_support_lead_for_approval_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "human_approval",
+        "prompt": "Ask support lead for approval — wait for support lead approval before handoff or customer notification"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 4,
+          "line": 19,
+          "section": "Checklist"
+        }
+      },
+      "connector": {
+        "id": "manual",
+        "kind": "manual"
+      },
+      "on_success": "node_005_run_support_handoff_command",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_005_run_support_handoff_command",
+      "type": "tool_call",
+      "title": "Run support handoff command",
+      "description": "create the escalation task and notify the assigned owner",
+      "requires": [],
+      "produces": [
+        "node_005_run_support_handoff_command_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "tool_call",
+        "instruction": "Run support handoff command — create the escalation task and notify the assigned owner"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 5,
+          "line": 20,
+          "section": "Checklist"
+        }
+      },
+      "connector": {
+        "id": "http",
+        "kind": "http"
+      },
+      "on_success": "node_006_verify_escalation_acknowledgement",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_006_verify_escalation_acknowledgement",
+      "type": "verification",
+      "title": "Verify escalation acknowledgement",
+      "description": "check that the owner, SLA target, and acknowledgement timestamp are recorded",
+      "requires": [],
+      "produces": [
+        "node_006_verify_escalation_acknowledgement_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "verification",
+        "instruction": "Verify escalation acknowledgement — check that the owner, SLA target, and acknowledgement timestamp are recorded"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 6,
+          "line": 21,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "end",
+      "on_failure": "failure"
+    },
+    {
+      "id": "failure",
+      "type": "failure",
+      "title": "Failure",
+      "description": "Terminal failure node."
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "End",
+      "description": "Workflow completed."
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_001_start_to_node_001_classify_customer_issue",
+      "from": "start",
+      "to": "node_001_classify_customer_issue",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_002_node_001_classify_customer_issue_to_node_002_check_sla_and_customer_history",
+      "from": "node_001_classify_customer_issue",
+      "to": "node_002_check_sla_and_customer_history",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_003_node_002_check_sla_and_customer_history_to_node_003_draft_escalation_plan",
+      "from": "node_002_check_sla_and_customer_history",
+      "to": "node_003_draft_escalation_plan",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_004_node_003_draft_escalation_plan_to_node_004_ask_support_lead_for_approval",
+      "from": "node_003_draft_escalation_plan",
+      "to": "node_004_ask_support_lead_for_approval",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_005_node_004_ask_support_lead_for_approval_to_node_005_run_support_handoff_command",
+      "from": "node_004_ask_support_lead_for_approval",
+      "to": "node_005_run_support_handoff_command",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_006_node_005_run_support_handoff_command_to_node_006_verify_escalation_acknowledgement",
+      "from": "node_005_run_support_handoff_command",
+      "to": "node_006_verify_escalation_acknowledgement",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_007_node_006_verify_escalation_acknowledgement_to_end",
+      "from": "node_006_verify_escalation_acknowledgement",
+      "to": "end",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_node_001_classify_customer_issue_failure",
+      "from": "node_001_classify_customer_issue",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_002_check_sla_and_customer_history_failure",
+      "from": "node_002_check_sla_and_customer_history",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_003_draft_escalation_plan_failure",
+      "from": "node_003_draft_escalation_plan",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_004_ask_support_lead_for_approval_failure",
+      "from": "node_004_ask_support_lead_for_approval",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_005_run_support_handoff_command_failure",
+      "from": "node_005_run_support_handoff_command",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_006_verify_escalation_acknowledgement_failure",
+      "from": "node_006_verify_escalation_acknowledgement",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    }
+  ],
+  "state_schema": {},
+  "guards": [
+    {
+      "id": "guard_001",
+      "description": "Do NOT notify the customer or reassign the case until the support lead approves the escalation plan."
+    }
+  ],
+  "checkpoints": [],
+  "policies": {
+    "default_retry": {
+      "max_attempts": 0
+    },
+    "default_timeout_ms": 300000
+  }
+}

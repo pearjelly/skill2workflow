@@ -1,0 +1,994 @@
+{
+  "version": "skill2workflow-litegraph-0.1.0",
+  "workflow": {
+    "id": "workflow_customer_service_escalation",
+    "name": "customer-service-escalation",
+    "version": "0.1.0",
+    "status": "draft",
+    "description": "Controlled customer service escalation workflow with SLA checks, lead approval, and handoff audit.",
+    "entry": "start"
+  },
+  "last_node_id": 9,
+  "last_link_id": 13,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "skill2workflow/start",
+      "pos": [
+        80,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "title": "Start",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "start",
+        "node_type": "start",
+        "description": "Workflow entry point.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    },
+    {
+      "id": 2,
+      "type": "skill2workflow/step",
+      "pos": [
+        340,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "Classify customer issue",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_001_classify_customer_issue",
+        "node_type": "step",
+        "description": "summarize the symptom, affected customer, product area, and current severity",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 1,
+          "line": 16,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_001_classify_customer_issue_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "agent_instruction",
+          "instruction": "Classify customer issue — summarize the symptom, affected customer, product area, and current severity"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": null
+      }
+    },
+    {
+      "id": 3,
+      "type": "skill2workflow/verification",
+      "pos": [
+        600,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "title": "Check SLA and customer history",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_002_check_sla_and_customer_history",
+        "node_type": "verification",
+        "description": "compare the case against SLA commitments and recent customer interactions",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 2,
+          "line": 17,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_002_check_sla_and_customer_history_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "verification",
+          "instruction": "Check SLA and customer history — compare the case against SLA commitments and recent customer interactions"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": null
+      }
+    },
+    {
+      "id": 4,
+      "type": "skill2workflow/step",
+      "pos": [
+        860,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "title": "Draft escalation plan",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_003_draft_escalation_plan",
+        "node_type": "step",
+        "description": "identify target owner, escalation reason, customer message, and expected response time",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 3,
+          "line": 18,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_003_draft_escalation_plan_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "agent_instruction",
+          "instruction": "Draft escalation plan — identify target owner, escalation reason, customer message, and expected response time"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": null
+      }
+    },
+    {
+      "id": 5,
+      "type": "skill2workflow/human_gate",
+      "pos": [
+        1120,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "title": "Ask support lead for approval",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_004_ask_support_lead_for_approval",
+        "node_type": "human_gate",
+        "description": "wait for support lead approval before handoff or customer notification",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 4,
+          "line": 19,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_004_ask_support_lead_for_approval_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "human_approval",
+          "prompt": "Ask support lead for approval — wait for support lead approval before handoff or customer notification"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": {
+          "id": "manual",
+          "kind": "manual"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "skill2workflow/tool_call",
+      "pos": [
+        1380,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "title": "Run support handoff command",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_005_run_support_handoff_command",
+        "node_type": "tool_call",
+        "description": "create the escalation task and notify the assigned owner",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 5,
+          "line": 20,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_005_run_support_handoff_command_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "tool_call",
+          "instruction": "Run support handoff command — create the escalation task and notify the assigned owner"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": {
+          "id": "http",
+          "kind": "http"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "skill2workflow/verification",
+      "pos": [
+        1640,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "title": "Verify escalation acknowledgement",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            7
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            13
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_006_verify_escalation_acknowledgement",
+        "node_type": "verification",
+        "description": "check that the owner, SLA target, and acknowledgement timestamp are recorded",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/customer-service-escalation/SKILL.md",
+          "kind": "ordered_step",
+          "index": 6,
+          "line": 21,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_006_verify_escalation_acknowledgement_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "verification",
+          "instruction": "Verify escalation acknowledgement — check that the owner, SLA target, and acknowledgement timestamp are recorded"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": null
+      }
+    },
+    {
+      "id": 8,
+      "type": "skill2workflow/failure",
+      "pos": [
+        1640,
+        260
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "title": "Failure",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 8
+        },
+        {
+          "name": "in_2",
+          "type": "flow",
+          "link": 9
+        },
+        {
+          "name": "in_3",
+          "type": "flow",
+          "link": 10
+        },
+        {
+          "name": "in_4",
+          "type": "flow",
+          "link": 11
+        },
+        {
+          "name": "in_5",
+          "type": "flow",
+          "link": 12
+        },
+        {
+          "name": "in_6",
+          "type": "flow",
+          "link": 13
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "workflow_node_id": "failure",
+        "node_type": "failure",
+        "description": "Terminal failure node.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    },
+    {
+      "id": 9,
+      "type": "skill2workflow/end",
+      "pos": [
+        2160,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "title": "End",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 7
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "workflow_node_id": "end",
+        "node_type": "end",
+        "description": "Workflow completed.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "flow"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "flow"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "flow"
+    ],
+    [
+      4,
+      4,
+      0,
+      5,
+      0,
+      "flow"
+    ],
+    [
+      5,
+      5,
+      0,
+      6,
+      0,
+      "flow"
+    ],
+    [
+      6,
+      6,
+      0,
+      7,
+      0,
+      "flow"
+    ],
+    [
+      7,
+      7,
+      0,
+      9,
+      0,
+      "flow"
+    ],
+    [
+      8,
+      2,
+      1,
+      8,
+      0,
+      "flow"
+    ],
+    [
+      9,
+      3,
+      1,
+      8,
+      1,
+      "flow"
+    ],
+    [
+      10,
+      4,
+      1,
+      8,
+      2,
+      "flow"
+    ],
+    [
+      11,
+      5,
+      1,
+      8,
+      3,
+      "flow"
+    ],
+    [
+      12,
+      6,
+      1,
+      8,
+      4,
+      "flow"
+    ],
+    [
+      13,
+      7,
+      1,
+      8,
+      5,
+      "flow"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "source_schema_version": "0.1.0",
+    "truth_source": "workflow_dsl",
+    "source_workflow": {
+      "schema_version": "0.1.0",
+      "workflow": {
+        "id": "workflow_customer_service_escalation",
+        "name": "customer-service-escalation",
+        "description": "Controlled customer service escalation workflow with SLA checks, lead approval, and handoff audit.",
+        "version": "0.1.0",
+        "status": "draft"
+      },
+      "entry": "start",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "start",
+          "title": "Start",
+          "description": "Workflow entry point.",
+          "on_success": "node_001_classify_customer_issue"
+        },
+        {
+          "id": "node_001_classify_customer_issue",
+          "type": "step",
+          "title": "Classify customer issue",
+          "description": "summarize the symptom, affected customer, product area, and current severity",
+          "requires": [],
+          "produces": [
+            "node_001_classify_customer_issue_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "agent_instruction",
+            "instruction": "Classify customer issue — summarize the symptom, affected customer, product area, and current severity"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/customer-service-escalation/SKILL.md",
+              "kind": "ordered_step",
+              "index": 1,
+              "line": 16,
+              "section": "Checklist"
+            }
+          },
+          "on_success": "node_002_check_sla_and_customer_history",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_002_check_sla_and_customer_history",
+          "type": "verification",
+          "title": "Check SLA and customer history",
+          "description": "compare the case against SLA commitments and recent customer interactions",
+          "requires": [],
+          "produces": [
+            "node_002_check_sla_and_customer_history_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "verification",
+            "instruction": "Check SLA and customer history — compare the case against SLA commitments and recent customer interactions"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/customer-service-escalation/SKILL.md",
+              "kind": "ordered_step",
+              "index": 2,
+              "line": 17,
+              "section": "Checklist"
+            }
+          },
+          "on_success": "node_003_draft_escalation_plan",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_003_draft_escalation_plan",
+          "type": "step",
+          "title": "Draft escalation plan",
+          "description": "identify target owner, escalation reason, customer message, and expected response time",
+          "requires": [],
+          "produces": [
+            "node_003_draft_escalation_plan_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "agent_instruction",
+            "instruction": "Draft escalation plan — identify target owner, escalation reason, customer message, and expected response time"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/customer-service-escalation/SKILL.md",
+              "kind": "ordered_step",
+              "index": 3,
+              "line": 18,
+              "section": "Checklist"
+            }
+          },
+          "on_success": "node_004_ask_support_lead_for_approval",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_004_ask_support_lead_for_approval",
+          "type": "human_gate",
+          "title": "Ask support lead for approval",
+          "description": "wait for support lead approval before handoff or customer notification",
+          "requires": [],
+          "produces": [
+            "node_004_ask_support_lead_for_approval_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "human_approval",
+            "prompt": "Ask support lead for approval — wait for support lead approval before handoff or customer notification"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/customer-service-escalation/SKILL.md",
+              "kind": "ordered_step",
+              "index": 4,
+              "line": 19,
+              "section": "Checklist"
+            }
+          },
+          "connector": {
+            "id": "manual",
+            "kind": "manual"
+          },
+          "on_success": "node_005_run_support_handoff_command",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_005_run_support_handoff_command",
+          "type": "tool_call",
+          "title": "Run support handoff command",
+          "description": "create the escalation task and notify the assigned owner",
+          "requires": [],
+          "produces": [
+            "node_005_run_support_handoff_command_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "tool_call",
+            "instruction": "Run support handoff command — create the escalation task and notify the assigned owner"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/customer-service-escalation/SKILL.md",
+              "kind": "ordered_step",
+              "index": 5,
+              "line": 20,
+              "section": "Checklist"
+            }
+          },
+          "connector": {
+            "id": "http",
+            "kind": "http"
+          },
+          "on_success": "node_006_verify_escalation_acknowledgement",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_006_verify_escalation_acknowledgement",
+          "type": "verification",
+          "title": "Verify escalation acknowledgement",
+          "description": "check that the owner, SLA target, and acknowledgement timestamp are recorded",
+          "requires": [],
+          "produces": [
+            "node_006_verify_escalation_acknowledgement_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "verification",
+            "instruction": "Verify escalation acknowledgement — check that the owner, SLA target, and acknowledgement timestamp are recorded"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/customer-service-escalation/SKILL.md",
+              "kind": "ordered_step",
+              "index": 6,
+              "line": 21,
+              "section": "Checklist"
+            }
+          },
+          "on_success": "end",
+          "on_failure": "failure"
+        },
+        {
+          "id": "failure",
+          "type": "failure",
+          "title": "Failure",
+          "description": "Terminal failure node."
+        },
+        {
+          "id": "end",
+          "type": "end",
+          "title": "End",
+          "description": "Workflow completed."
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge_001_start_to_node_001_classify_customer_issue",
+          "from": "start",
+          "to": "node_001_classify_customer_issue",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_002_node_001_classify_customer_issue_to_node_002_check_sla_and_customer_history",
+          "from": "node_001_classify_customer_issue",
+          "to": "node_002_check_sla_and_customer_history",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_003_node_002_check_sla_and_customer_history_to_node_003_draft_escalation_plan",
+          "from": "node_002_check_sla_and_customer_history",
+          "to": "node_003_draft_escalation_plan",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_004_node_003_draft_escalation_plan_to_node_004_ask_support_lead_for_approval",
+          "from": "node_003_draft_escalation_plan",
+          "to": "node_004_ask_support_lead_for_approval",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_005_node_004_ask_support_lead_for_approval_to_node_005_run_support_handoff_command",
+          "from": "node_004_ask_support_lead_for_approval",
+          "to": "node_005_run_support_handoff_command",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_006_node_005_run_support_handoff_command_to_node_006_verify_escalation_acknowledgement",
+          "from": "node_005_run_support_handoff_command",
+          "to": "node_006_verify_escalation_acknowledgement",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_007_node_006_verify_escalation_acknowledgement_to_end",
+          "from": "node_006_verify_escalation_acknowledgement",
+          "to": "end",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_node_001_classify_customer_issue_failure",
+          "from": "node_001_classify_customer_issue",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_002_check_sla_and_customer_history_failure",
+          "from": "node_002_check_sla_and_customer_history",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_003_draft_escalation_plan_failure",
+          "from": "node_003_draft_escalation_plan",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_004_ask_support_lead_for_approval_failure",
+          "from": "node_004_ask_support_lead_for_approval",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_005_run_support_handoff_command_failure",
+          "from": "node_005_run_support_handoff_command",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_006_verify_escalation_acknowledgement_failure",
+          "from": "node_006_verify_escalation_acknowledgement",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        }
+      ],
+      "state_schema": {},
+      "guards": [
+        {
+          "id": "guard_001",
+          "description": "Do NOT notify the customer or reassign the case until the support lead approves the escalation plan."
+        }
+      ],
+      "checkpoints": [],
+      "policies": {
+        "default_retry": {
+          "max_attempts": 0
+        },
+        "default_timeout_ms": 300000
+      }
+    }
+  }
+}

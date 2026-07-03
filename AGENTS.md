@@ -10,6 +10,7 @@ This repository is the `skill2workflow` open-source harness.
 - Long-term UI direction: LiteGraph-style visual editor, aligned with the approved spec.
 - Roadmap index: `ROADMAP.md`; approved product spec remains under `docs/superpowers/specs/`.
 - Contributor entry point: `CONTRIBUTING.md`.
+- Example pack guide: `docs/examples.md`.
 - Compatibility notes: `docs/workflow-dsl-contract.md`, `docs/workflow-dsl-compatibility.md`, and `docs/stability.md`.
 - Release process: `docs/release-process.md`.
 
@@ -24,6 +25,7 @@ This repository is the `skill2workflow` open-source harness.
 - Write-back: `PYTHONPATH=src python3 -m skill2workflow.cli write-back /tmp/skill2workflow-workflow.json /tmp/skill2workflow-litegraph.json -o /tmp/skill2workflow-edited-workflow.json`
 - Validate HTTP connector example: `PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json`
 - Visualize HTTP connector example: `PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-connector.workflow.json -o examples/workflows/http-connector.litegraph.json`
+- Example fixture sync: `PYTHONPATH=src python3 -m unittest tests.test_examples -v`
 - Web preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/`
 - Control UI preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/control.html`
 - Run with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite`
