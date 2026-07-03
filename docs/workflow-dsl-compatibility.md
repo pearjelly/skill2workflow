@@ -76,6 +76,14 @@ The editor must not change:
 - Policy semantics
 - Connector id or kind
 
+## Connector Runtime Boundary
+
+Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on `tool_call` nodes. The current local runtime supports method, URL, headers, body, and per-request timeout metadata as documented in `docs/connectors.md`.
+
+`retry.max_attempts` and `policies.default_retry` remain policy metadata in the current local executor. They are preserved by readers and editable through the visual layer, but they do not imply automatic retry execution until that behavior is implemented with tests and compatibility notes.
+
+Workflow DSL examples and fixtures must not store secrets. Credential storage, token injection, secret redaction, IAM, connector marketplaces, and product-specific SaaS connectors are outside the `0.1.x` built-in connector boundary.
+
 ## Consumer Guidance
 
 Consumers should:

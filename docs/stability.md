@@ -14,6 +14,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Published workflow artifact immutability
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode
+- Built-in connector runtime boundaries documented in `docs/connectors.md`
 
 ## Experimental
 
@@ -26,6 +27,8 @@ These surfaces may change while the project learns from real workflows:
 - Visual write-back allowlist beyond the documented fields
 - Connector manifest details beyond built-in `manual` and `http`
 - HTTP connector request metadata shape
+- Automatic retry behavior for connector-bound nodes
+- Enterprise credential storage, token injection, secret redaction, and IAM
 - Local control-plane storage file layout
 - Executor event taxonomy beyond documented audit examples
 - Future UI/API boundaries

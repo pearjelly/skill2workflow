@@ -141,6 +141,8 @@ Implemented:
   - gives compiled `human_gate` nodes a default manual connector binding
   - gives compiled `tool_call` nodes a default HTTP connector binding
   - executes HTTP requests with the Python standard library
+  - covers HTTP connector success, HTTP error, invalid request metadata, JSON body, headers, and timeout behavior with deterministic local tests
+  - documents retry, timeout, and credential boundaries in `docs/connectors.md`
 - Open-source release readiness
   - documents contributor setup and PR expectations in `CONTRIBUTING.md`
   - provides GitHub issue templates for bugs, feature requests, and workflow examples

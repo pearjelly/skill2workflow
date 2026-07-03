@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import socket
 import urllib.error
 import urllib.request
 from typing import Dict, List
@@ -106,7 +107,10 @@ def _execute_http_connector(binding: object) -> ConnectorResult:
     body = request_spec.get("body")
     data = None
     if body is not None:
-        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        try:
+            data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        except (TypeError, ValueError) as error:
+            raise ConnectorExecutionError(f"http connector request.body must be JSON serializable: {error}")
         if not any(key.lower() == "content-type" for key in headers):
             headers["Content-Type"] = "application/json"
 
@@ -138,7 +142,11 @@ def _execute_http_connector(binding: object) -> ConnectorResult:
             },
             "error": f"HTTP {error.code}",
         }
+    except (TimeoutError, socket.timeout) as error:
+        raise ConnectorExecutionError(f"http connector timed out: {error}")
     except urllib.error.URLError as error:
+        if isinstance(error.reason, (TimeoutError, socket.timeout)):
+            raise ConnectorExecutionError(f"http connector timed out: {error.reason}")
         raise ConnectorExecutionError(str(error.reason))
 
 
