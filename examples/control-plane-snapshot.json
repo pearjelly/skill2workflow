@@ -1,0 +1,175 @@
+{
+  "schema_version": "skill2workflow-control-snapshot-0.1.0",
+  "summary": {
+    "workflow_count": 3,
+    "run_count": 1,
+    "audit_event_count": 7,
+    "connector_count": 2,
+    "status_counts": {
+      "published": 3
+    },
+    "run_status_counts": {
+      "completed": 1
+    }
+  },
+  "workflows": [
+    {
+      "workflow_id": "workflow_approval_flow",
+      "name": "approval-flow",
+      "version": "0.1.0",
+      "status": "published",
+      "checksum": "bf8dcbb60b02c56972fbb603e37e25ba9aaca2e3b40bdf9fc32646157ce298de",
+      "artifact": "workflows/workflow_approval_flow/0.1.0.json",
+      "published_at": "2026-07-02T10:08:12.180330+00:00"
+    },
+    {
+      "workflow_id": "workflow_approval_flow",
+      "name": "approval-flow",
+      "version": "0.2.0",
+      "status": "published",
+      "checksum": "05b4f110466c72269068ab6d8a46eb0d88b6b8ed417e7acef6b463f36eba1338",
+      "artifact": "workflows/workflow_approval_flow/0.2.0.json",
+      "published_at": "2026-07-02T10:08:12.655620+00:00"
+    },
+    {
+      "workflow_id": "workflow_http_connector",
+      "name": "http-connector",
+      "version": "0.1.0",
+      "status": "published",
+      "checksum": "6cb33e6af2a56a4d9c9257d288c52e82f5b57034d84fb85d421e11e181d4126c",
+      "artifact": "workflows/workflow_http_connector/0.1.0.json",
+      "published_at": "2026-07-02T10:08:14.770977+00:00"
+    }
+  ],
+  "runs": [
+    {
+      "run_id": "run_3ae543f4f9f9",
+      "workflow_id": "workflow_approval_flow",
+      "workflow_version": "0.2.0",
+      "status": "completed",
+      "current_node": "end",
+      "event_count": 11,
+      "node_result_count": 6,
+      "created_at": "",
+      "updated_at": ""
+    }
+  ],
+  "audit_events": [
+    {
+      "checksum": "bf8dcbb60b02c56972fbb603e37e25ba9aaca2e3b40bdf9fc32646157ce298de",
+      "timestamp": "2026-07-02T10:08:12.180330+00:00",
+      "type": "workflow_published",
+      "workflow_id": "workflow_approval_flow",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "checksum": "05b4f110466c72269068ab6d8a46eb0d88b6b8ed417e7acef6b463f36eba1338",
+      "timestamp": "2026-07-02T10:08:12.655620+00:00",
+      "type": "workflow_published",
+      "workflow_id": "workflow_approval_flow",
+      "workflow_version": "0.2.0"
+    },
+    {
+      "run_id": "run_3ae543f4f9f9",
+      "timestamp": "2026-07-02T10:08:13.084892+00:00",
+      "type": "run_started",
+      "workflow_id": "workflow_approval_flow",
+      "workflow_version": "0.2.0"
+    },
+    {
+      "run_id": "run_3ae543f4f9f9",
+      "timestamp": "2026-07-02T10:08:13.090656+00:00",
+      "type": "run_waiting",
+      "workflow_id": "workflow_approval_flow",
+      "workflow_version": "0.2.0"
+    },
+    {
+      "approved": true,
+      "run_id": "run_3ae543f4f9f9",
+      "timestamp": "2026-07-02T10:08:14.237865+00:00",
+      "type": "run_resumed",
+      "workflow_id": "workflow_approval_flow",
+      "workflow_version": "0.2.0"
+    },
+    {
+      "run_id": "run_3ae543f4f9f9",
+      "timestamp": "2026-07-02T10:08:14.238101+00:00",
+      "type": "run_completed",
+      "workflow_id": "workflow_approval_flow",
+      "workflow_version": "0.2.0"
+    },
+    {
+      "checksum": "6cb33e6af2a56a4d9c9257d288c52e82f5b57034d84fb85d421e11e181d4126c",
+      "timestamp": "2026-07-02T10:08:14.770977+00:00",
+      "type": "workflow_published",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    }
+  ],
+  "connectors": [
+    {
+      "id": "manual",
+      "name": "Manual Human Gate",
+      "kind": "manual",
+      "status": "active",
+      "node_types": [
+        "human_gate"
+      ],
+      "description": "Built-in connector for local human approval and manual review gates.",
+      "config_schema": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    {
+      "id": "http",
+      "name": "HTTP Connector",
+      "kind": "http",
+      "status": "active",
+      "node_types": [
+        "tool_call"
+      ],
+      "description": "Built-in connector for minimal HTTP requests from tool-call nodes.",
+      "config_schema": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "method": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "headers": {
+                "type": "object"
+              },
+              "body": {},
+              "timeout_ms": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "url"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "version_comparisons": [
+    {
+      "workflow_id": "workflow_approval_flow",
+      "versions": [
+        "0.1.0",
+        "0.2.0"
+      ],
+      "from_status": "published",
+      "to_status": "published",
+      "checksum_changed": true,
+      "node_count_delta": 0,
+      "edge_count_delta": 0
+    }
+  ]
+}

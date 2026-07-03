@@ -19,6 +19,7 @@ Current capability snapshot:
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, and connector audit events
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
+- Local control-plane UI: read-only snapshot export and static inspector for workflows, runs, audit events, connectors, and version comparisons
 
 Important boundaries:
 
@@ -44,30 +45,30 @@ Important boundaries:
 | Loop 10: Connector Runtime MVP | Complete | Active connector manifests, manual and HTTP bindings, HTTP execution, connector run events, connector audit events |
 | Loop 11: Authoring Experience | Complete | Example gallery, richer LiteGraph parameter forms, safe action/retry/HTTP request write-back, authoring docs |
 | Loop 12: Open Source Release Readiness | Complete | `CONTRIBUTING.md`, issue templates, release notes, DSL compatibility policy, stability boundaries |
+| Loop 13: Local Control Plane UI | Complete | `control-snapshot`, example snapshot fixture, static control-plane inspector, docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-### Loop 13: Local Control Plane UI
+### Loop 14: Release Tagging
 
-Goal: give the local runtime an inspectable operator surface.
+Goal: publish the first GitHub release tag from the documented v0.1.0 release scope.
 
 Status: next engineering loop.
 
 Scope:
 
-- Workflow registry view
-- Run list and run detail view
-- Audit log view
-- Published workflow version comparison
-- Local-only static UI or dependency-light web surface aligned with the existing harness
+- Verify `main` against release checklist
+- Create annotated `v0.1.0` tag
+- Create GitHub release using `docs/releases/v0.1.0.md`
+- Update release automation notes for future tags
 
 Acceptance criteria:
 
-- Users can inspect published workflows, runs, and audit events without manually reading JSON files
-- The UI uses existing control-plane commands or storage APIs and does not create a second execution truth source
-- Tests and docs cover the new inspection path
+- `v0.1.0` tag points at a green `main`
+- GitHub release notes match the repository docs
+- Follow-up release automation work is clearly scoped
 
 ## Version Milestones
 
@@ -112,12 +113,13 @@ Status: first MVP shipped in Loop 12. Future work should add release automation 
 
 ### v0.5: Local Control Plane UI
 
-Status: next milestone, starting with Loop 13.
+Status: first MVP shipped in Loop 13. Future work should connect run/audit overlays back into the graph view.
 
 - Workflow registry view
 - Run list and run detail view
 - Audit log view
 - Published workflow version comparison
+- Future: live local server mode, graph overlays, and workflow artifact diff views
 
 ### v1.0: Production Baseline
 

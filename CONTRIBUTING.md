@@ -57,6 +57,18 @@ Then visit:
 http://localhost:4173/web/
 ```
 
+Generate a control-plane snapshot and inspect it locally:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
+```
+
+Then visit:
+
+```text
+http://localhost:4173/web/control.html
+```
+
 ## Contribution Lanes
 
 Good first contribution lanes:

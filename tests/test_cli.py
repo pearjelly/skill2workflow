@@ -252,6 +252,48 @@ class CliTests(TestCase):
         self.assertEqual([event["type"] for event in audit_events], ["run_completed"])
         self.assertEqual(audit_events[0]["run_id"], run_state["run_id"])
 
+    def test_control_snapshot_command_writes_operator_snapshot(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "workflow.json"
+            state_dir = tmp_path / "state"
+            output_path = tmp_path / "snapshot.json"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+
+            with redirect_stdout(StringIO()):
+                publish_exit = main(["publish", str(workflow_path), "--state-dir", str(state_dir)])
+                run_exit = main(
+                    [
+                        "run-published",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                    ]
+                )
+                snapshot_exit = main(
+                    [
+                        "control-snapshot",
+                        "--state-dir",
+                        str(state_dir),
+                        "-o",
+                        str(output_path),
+                    ]
+                )
+
+            snapshot = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(run_exit, 0)
+        self.assertEqual(snapshot_exit, 0)
+        self.assertEqual(snapshot["schema_version"], "skill2workflow-control-snapshot-0.1.0")
+        self.assertEqual(snapshot["summary"]["workflow_count"], 1)
+        self.assertEqual(snapshot["summary"]["run_count"], 1)
+        self.assertEqual(snapshot["workflows"][0]["workflow_id"], "workflow_demo")
+        self.assertEqual(snapshot["runs"][0]["workflow_id"], "workflow_demo")
+        self.assertIn("run_completed", {event["type"] for event in snapshot["audit_events"]})
+
     def test_run_and_list_runs_can_use_sqlite_storage(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
