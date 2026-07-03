@@ -135,7 +135,8 @@ Implemented:
   - imports existing JSON registry and audit files when opening SQLite control-plane storage
   - exposes built-in connector manifests
   - exports a read-only local operator snapshot through `control-snapshot`
-  - provides a static control-plane inspector for workflows, runs, audit events, connectors, and version comparisons
+  - derives operator insights for attention items, recent events, connector events, and version changes
+  - provides a static control-plane inspector for operator insights, workflows, runs, audit events, connectors, and version comparisons
 - Connector runtime
   - provides active `manual` and `http` connector manifests
   - gives compiled `human_gate` nodes a default manual connector binding
