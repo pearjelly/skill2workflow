@@ -67,12 +67,31 @@ Goal: improve connector reliability and testability without adding external serv
 
 Status: next engineering loop.
 
+Initial PR boundary:
+
+- Start with tests and docs before changing connector runtime behavior.
+- Prefer a new `tests/test_connectors.py` fixture harness so connector behavior is isolated from executor lifecycle tests.
+- Keep any runtime edits limited to bugs or ambiguity exposed by the new tests.
+- Do not change Workflow DSL `0.1.0` shape in this loop unless the compatibility document is updated in the same PR.
+
 Scope:
 
 - Add focused connector tests around HTTP timeout, request body, headers, HTTP error handling, and missing request metadata
 - Tighten connector retry/timeout expectations where current DSL policy already expresses them
 - Add a connector fixture harness that can run without external network dependencies
 - Document the credential boundary clearly: examples may use static local request metadata, but real secrets stay out of Workflow DSL
+
+Loop 17 connector behavior matrix:
+
+| Area | Target behavior | Evidence |
+| --- | --- | --- |
+| Local fixture harness | Connector tests run against a standard-library local HTTP server or deterministic fake, with no public network dependency | `tests/test_connectors.py` |
+| HTTP success | Method, headers, JSON body, and `timeout_ms` are passed through request execution; response is normalized into connector output | Connector unit test plus executor event coverage |
+| HTTP error | HTTP 4xx/5xx responses return failed connector results with status code, headers, body, and error string | Connector unit test |
+| Invalid request | Missing `connector.request`, missing URL, unsupported URL scheme, and malformed metadata fail before external network calls | Connector unit test |
+| Timeout boundary | `timeout_ms` conversion is deterministic; timeout failures become explicit connector execution errors | Connector unit test and docs |
+| Retry boundary | `retry.max_attempts` remains a DSL policy field until executor retry behavior is implemented with tests | Docs and compatibility notes |
+| Credential boundary | Workflow DSL fixtures do not store secrets; credential management remains outside the built-in connector MVP | Docs |
 
 Acceptance criteria:
 
@@ -101,17 +120,18 @@ Loop 17 explicit non-goals:
 
 Loop 17 expected file changes:
 
-- `tests/test_connectors.py` or focused additions to `tests/test_executor.py` for connector behavior coverage.
+- `tests/test_connectors.py` for connector behavior coverage; only add to `tests/test_executor.py` when the executor event lifecycle needs coverage.
 - `src/skill2workflow/connectors.py` only if tests expose missing MVP guardrails.
 - `src/skill2workflow/executor.py` only if retry/timeout semantics need a runtime boundary fix.
-- `docs/connectors.md` or `docs/stability.md` updates for timeout, retry, HTTP failure, and credential boundaries.
+- `docs/connectors.md` if a focused connector guide is introduced, or `docs/stability.md` updates for timeout, retry, HTTP failure, and credential boundaries.
+- `docs/workflow-dsl-compatibility.md` only if the loop clarifies compatibility guarantees for connector request metadata.
 - `examples/workflows/http-connector.workflow.json` updates only when fixture behavior must show a documented connector boundary.
 
 Loop 17 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
-- `PYTHONPATH=src python3 -m unittest tests.test_connectors tests.test_executor -v`
+- `PYTHONPATH=src python3 -m unittest tests.test_connectors tests.test_executor -v` once `tests/test_connectors.py` is introduced
 - `PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json`
 - `git diff --check`
 
