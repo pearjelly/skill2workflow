@@ -20,6 +20,7 @@ Current capability snapshot:
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
 - Local control-plane UI: read-only snapshot export and static inspector for workflows, runs, audit events, connectors, and version comparisons
+- Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
 
 Important boundaries:
 
@@ -47,6 +48,7 @@ Important boundaries:
 | Loop 12: Open Source Release Readiness | Complete | `CONTRIBUTING.md`, issue templates, release notes, DSL compatibility policy, stability boundaries |
 | Loop 13: Local Control Plane UI | Complete | `control-snapshot`, example snapshot fixture, static control-plane inspector, docs |
 | Loop 14: Release Tagging | Complete | Annotated `v0.1.0` tag, GitHub release, release notes published from verified `main` |
+| Loop 15: Release Automation | Complete | Read-only release preflight script, version/tag/notes guards, CI dry-run, maintainer docs |
 
 ## Active Roadmap
 
@@ -59,66 +61,43 @@ Post-`v0.1.0` work has four priorities:
 3. harden connector behavior without overbuilding a marketplace,
 4. improve local operator visibility while keeping Workflow DSL authoritative.
 
-### Loop 15: Release Automation
+### Loop 16: Workflow Example Pack
 
-Goal: make future release tags repeatable without relying on a manual checklist.
+Goal: make real enterprise workflow scenarios easy to inspect beyond the approval and HTTP connector fixtures.
 
 Status: next engineering loop.
 
 Scope:
 
-- Add a documented release checklist command path
-- Add a GitHub Actions release workflow draft or scriptable release helper
-- Validate that release notes, package version, and tag name agree before publishing
-- Keep manual release creation available as a fallback
+- Add representative `SKILL.md` examples for sales follow-up, customer service escalation, risk review, and operations analysis
+- Compile and commit matching Workflow DSL fixtures for each scenario
+- Generate LiteGraph fixtures so examples are immediately inspectable in the static editor
+- Add example documentation that explains the business process, control points, and expected runtime behavior
+- Keep all examples dependency-free and local-first
 
 Acceptance criteria:
 
-- Maintainers can run one documented command path before creating a release
-- Automation rejects mismatched version/tag/release-note inputs
-- Release automation remains optional until it has been exercised on a patch release
+- Each example skill compiles to valid Workflow DSL
+- Each workflow fixture validates through the structured validator
+- Each LiteGraph fixture opens in the existing editor without making the visual graph authoritative
+- Example docs make the enterprise control value clear: required order, gates, state, and auditability
 
-Loop 15 implementation slices:
+Loop 16 implementation slices:
 
-1. Release preflight command
-   - Add a local command or script that checks clean working tree, package version, release notes file, tag availability, and required verification commands.
-   - It must be read-only by default and safe to run repeatedly.
-2. Version consistency guard
-   - Check that `pyproject.toml`, `src/skill2workflow/__init__.py`, release notes, and requested tag agree.
-   - Fail clearly on mismatches before any GitHub operation.
-3. Release workflow dry-run
-   - Add a GitHub Actions workflow or documented CLI path that can run the preflight without creating a tag or release.
-   - Keep actual tag/release creation manual until a patch release proves the workflow.
-4. Release maintainer docs
-   - Document the manual fallback path used for `v0.1.0`.
-   - Document what evidence should be copied into release PRs.
+1. Scenario selection
+   - Pick four enterprise examples that show different control patterns rather than four copies of the same approval flow.
+2. Example skill authoring
+   - Write realistic `SKILL.md` inputs with hard gates, checklist steps, and clear human or connector boundaries.
+3. Fixture generation
+   - Compile, validate, and visualize every example through the existing CLI.
+4. Example gallery docs
+   - Link the examples from authoring docs and README so contributors can inspect them quickly.
 
-Loop 15 explicit non-goals:
+Loop 16 explicit non-goals:
 
-- Do not auto-publish GitHub Releases from every pushed tag yet.
-- Do not add package upload or registry publication.
-- Do not introduce external release dependencies unless the standard library and GitHub Actions cannot cover the guardrail.
-
-Loop 15 expected file changes:
-
-- `scripts/release_preflight.py` or `src/skill2workflow/release.py` for the standard-library release guard.
-- `tests/test_release_preflight.py` for clean-tree, version mismatch, missing-notes, tag-exists, and dry-run behavior.
-- `docs/release-process.md` for maintainer steps, release PR evidence, and the manual fallback path.
-- `.github/workflows/release-preflight.yml` for CI dry-run coverage that does not create tags or releases.
-
-Loop 15 verification commands:
-
-- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- `python3 -m py_compile src/skill2workflow/*.py`
-- `python3 scripts/release_preflight.py --version 0.1.1 --notes docs/releases/v0.1.1.md --dry-run`
-- `git diff --check`
-
-Loop 15 done means:
-
-- A valid patch-release draft can pass preflight without writing GitHub state.
-- Version, tag, and release-note mismatches fail before any GitHub operation.
-- CI can run the release dry-run path on pull requests.
-- Maintainers still have a documented manual release fallback matching the `v0.1.0` process.
+- Do not add product-specific enterprise connectors.
+- Do not change Workflow DSL semantics solely for an example.
+- Do not make LiteGraph JSON the execution source of truth.
 
 ## Near-Term Loop Queue
 
@@ -126,8 +105,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 15: Release Automation | Next | Make patch releases repeatable and auditable | release checklist command path plus workflow/script guardrails |
-| Loop 16: Workflow Example Pack | Planned | Show enterprise scenarios beyond approval and HTTP examples | validated example skills/workflows for sales, customer service, risk review, and operations analysis |
+| Loop 16: Workflow Example Pack | Next | Show enterprise scenarios beyond approval and HTTP examples | validated example skills/workflows for sales, customer service, risk review, and operations analysis |
 | Loop 17: Connector Runtime Hardening | Planned | Improve connector reliability without adding external services | retry/timeout policy coverage, connector fixture harness, clearer credential boundary docs |
 | Loop 18: Control Plane Operator UX | Planned | Connect control-plane state back to visual inspection | local server or static artifact flow for run/audit overlays and workflow artifact diffs |
 
@@ -155,6 +133,7 @@ Release source:
 
 Release checklist:
 
+- Release preflight passes for the target version and release notes
 - Full unit suite passes
 - Python modules compile
 - Example Workflow DSL fixtures validate
@@ -197,14 +176,15 @@ Status: first MVP shipped in Loop 11. Future work should improve editor ergonomi
 
 ### v0.4: Open Source Release Baseline
 
-Status: first MVP shipped in Loop 12. Future work should add release automation after the tag workflow is settled.
+Status: first MVP shipped in Loop 12. Release guardrails shipped in Loop 15.
 
 - CONTRIBUTING guide
 - Issue templates
 - First release notes
 - Workflow DSL `0.1.0` compatibility notes
 - Clear stable vs experimental API boundaries
-- Future: automated GitHub release workflow and signed release artifacts
+- Read-only release preflight command and CI dry-run
+- Future: automated GitHub release publishing and signed release artifacts
 
 ### v0.5: Local Control Plane UI
 

@@ -90,6 +90,7 @@ Before changing behavior, read:
 - `docs/workflow-dsl-compatibility.md`
 - `docs/stability.md`
 - `docs/authoring.md`
+- `docs/release-process.md`
 
 ## Change Rules
 
@@ -117,6 +118,12 @@ For Workflow DSL or visualizer changes, also run:
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/approval-flow.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-connector.workflow.json -o /tmp/http-connector.litegraph.json
+```
+
+For release PRs, run the release preflight with the target version and notes:
+
+```bash
+PYTHONPATH=src python3 scripts/release_preflight.py --version <version> --notes docs/releases/v<version>.md --dry-run
 ```
 
 For docs-only changes, the full test suite should still pass unless the PR description explains why local verification was not possible.

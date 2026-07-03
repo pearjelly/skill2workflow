@@ -1,0 +1,44 @@
+name: release-preflight
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release-preflight.yml"
+      - "docs/releases/**"
+      - "scripts/release_preflight.py"
+      - "src/skill2workflow/release.py"
+      - "src/skill2workflow/__init__.py"
+      - "pyproject.toml"
+      - "tests/test_release_preflight.py"
+  workflow_dispatch:
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Read package version
+        id: package
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import re
+          from pathlib import Path
+
+          match = re.search(
+              r'(?m)^version\s*=\s*["\']([^"\']+)["\']',
+              Path("pyproject.toml").read_text(encoding="utf-8"),
+          )
+          if not match:
+              raise SystemExit("pyproject.toml does not declare a project version")
+          print(f"version={match.group(1)}")
+          PY
+      - name: Run release preflight dry-run
+        run: |
+          PYTHONPATH=src python scripts/release_preflight.py \
+            --version "${{ steps.package.outputs.version }}" \
+            --notes "docs/releases/v${{ steps.package.outputs.version }}.md" \
+            --dry-run \
+            --skip-git

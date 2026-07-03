@@ -11,6 +11,7 @@ This repository is the `skill2workflow` open-source harness.
 - Roadmap index: `ROADMAP.md`; approved product spec remains under `docs/superpowers/specs/`.
 - Contributor entry point: `CONTRIBUTING.md`.
 - Compatibility notes: `docs/workflow-dsl-contract.md`, `docs/workflow-dsl-compatibility.md`, and `docs/stability.md`.
+- Release process: `docs/release-process.md`.
 
 ## Local Commands
 
@@ -39,6 +40,7 @@ This repository is the `skill2workflow` open-source harness.
 - Audit with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite`
 - Connectors: `PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control`
 - Control snapshot: `PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json`
+- Release preflight dry-run: `PYTHONPATH=src python3 scripts/release_preflight.py --version 0.1.0 --notes docs/releases/v0.1.0.md --dry-run --skip-git`
 - Release notes: `docs/releases/v0.1.0.md`
 
 ## Working Rules

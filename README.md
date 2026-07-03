@@ -70,6 +70,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Audit connector execution events through the control plane
 - Export a read-only control-plane snapshot for local operator inspection
 - Inspect workflows, runs, audit events, and version deltas in a static local control-plane UI
+- Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
 ## Quickstart
@@ -233,6 +234,14 @@ http://localhost:4173/web/control.html
 
 The inspector can load `examples/control-plane-snapshot.json` or a local snapshot exported by `control-snapshot`.
 
+Run release preflight in CI-style dry-run mode:
+
+```bash
+PYTHONPATH=src python3 scripts/release_preflight.py --version 0.1.0 --notes docs/releases/v0.1.0.md --dry-run --skip-git
+```
+
+For real release preparation, follow `docs/release-process.md` and do not skip git checks.
+
 ## Architecture
 
 The approved architecture has five layers:
@@ -257,7 +266,9 @@ src/skill2workflow/
   executor.py     # Durable local execution
   storage.py      # JSON and SQLite local persistence backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON
+  release.py      # Read-only release preflight checks
   cli.py          # Command line interface
+scripts/          # Maintainer command helpers
 examples/skills/  # Example SKILL.md inputs
 examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
 examples/control-plane-snapshot.json # Example control-plane UI snapshot
@@ -288,14 +299,16 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Authoring Experience
 - Open Source Release Readiness
 - Local Control Plane UI
+- Release Automation
 
-Next priority is Loop 15 Release Automation.
+Next priority is Loop 16 Workflow Example Pack.
 
 See:
 
 - `CONTRIBUTING.md`
 - `ROADMAP.md`
 - `docs/authoring.md`
+- `docs/release-process.md`
 - `docs/releases/v0.1.0.md`
 - `docs/stability.md`
 - `docs/workflow-dsl-contract.md`
