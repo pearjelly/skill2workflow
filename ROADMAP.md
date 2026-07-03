@@ -16,7 +16,7 @@ Current capability snapshot:
 - Runtime: local executor supports run state, human-gate pause/resume, run listing, and run detail
 - Control plane: immutable workflow publish, version lifecycle, published-version runs, resume, audit log, and filtered audit queries
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
-- Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, and connector audit events
+- Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
@@ -27,7 +27,7 @@ Important boundaries:
 
 - Published workflow artifacts remain immutable JSON documents in both storage modes.
 - The visual graph is an editor/view. Workflow DSL remains the execution truth source.
-- Connector runtime is an MVP boundary. Enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
+- Connector runtime is an MVP boundary. Automatic retry execution, enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
 - Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
 - `0.1.x` compatibility is documented for Workflow DSL `0.1.0`; undocumented internals remain experimental.
 
@@ -51,96 +51,82 @@ Important boundaries:
 | Loop 14: Release Tagging | Complete | Annotated `v0.1.0` tag, GitHub release, release notes published from verified `main` |
 | Loop 15: Release Automation | Complete | Read-only release preflight script, version/tag/notes guards, CI dry-run, maintainer docs |
 | Loop 16: Workflow Example Pack | Complete | Enterprise example skills, synchronized Workflow DSL and LiteGraph fixtures, example docs and gallery entries |
+| Loop 17: Connector Runtime Hardening | Complete | Deterministic HTTP connector tests, timeout/error normalization, retry/timeout docs, credential boundary docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has two active priorities after Loop 16 made enterprise examples inspectable:
+Post-`v0.1.0` work now has one active priority after Loop 17 hardened the connector runtime:
 
-1. harden connector behavior without overbuilding a marketplace,
-2. improve local operator visibility while keeping Workflow DSL authoritative.
+1. improve local operator visibility while keeping Workflow DSL authoritative.
 
-### Loop 17: Connector Runtime Hardening
+### Loop 18: Control Plane Operator UX
 
-Goal: improve connector reliability and testability without adding external services or a connector marketplace.
+Goal: connect control-plane state back to workflow inspection so local operators can understand runs, audit events, connector outcomes, and workflow version changes without turning the project into a hosted control plane.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Start with tests and docs before changing connector runtime behavior.
-- Prefer a new `tests/test_connectors.py` fixture harness so connector behavior is isolated from executor lifecycle tests.
-- Keep any runtime edits limited to bugs or ambiguity exposed by the new tests.
-- Do not change Workflow DSL `0.1.0` shape in this loop unless the compatibility document is updated in the same PR.
+- Start from exported local control-plane state and static UI improvements.
+- Keep Workflow DSL and published workflow artifacts read-only from the operator UI.
+- Prefer snapshot-driven views before adding any local server mode.
+- Do not introduce auth, RBAC, hosted services, or live multi-user coordination in this loop.
 
 Scope:
 
-- Add focused connector tests around HTTP timeout, request body, headers, HTTP error handling, and missing request metadata
-- Tighten connector retry/timeout expectations where current DSL policy already expresses them
-- Add a connector fixture harness that can run without external network dependencies
-- Document the credential boundary clearly: examples may use static local request metadata, but real secrets stay out of Workflow DSL
-
-Loop 17 connector behavior matrix:
-
-| Area | Target behavior | Evidence |
-| --- | --- | --- |
-| Local fixture harness | Connector tests run against a standard-library local HTTP server or deterministic fake, with no public network dependency | `tests/test_connectors.py` |
-| HTTP success | Method, headers, JSON body, and `timeout_ms` are passed through request execution; response is normalized into connector output | Connector unit test plus executor event coverage |
-| HTTP error | HTTP 4xx/5xx responses return failed connector results with status code, headers, body, and error string | Connector unit test |
-| Invalid request | Missing `connector.request`, missing URL, unsupported URL scheme, and malformed metadata fail before external network calls | Connector unit test |
-| Timeout boundary | `timeout_ms` conversion is deterministic; timeout failures become explicit connector execution errors | Connector unit test and docs |
-| Retry boundary | `retry.max_attempts` remains a DSL policy field until executor retry behavior is implemented with tests | Docs and compatibility notes |
-| Credential boundary | Workflow DSL fixtures do not store secrets; credential management remains outside the built-in connector MVP | Docs |
+- Improve local control-plane inspection for run state, audit events, connector outcomes, and published workflow versions
+- Add graph-adjacent run/audit overlay data where it helps operators reason about execution without mutating workflow DSL
+- Make workflow artifact version differences easier to inspect from exported snapshots
+- Document the operator flow from publish/run/audit/snapshot to local UI review
 
 Acceptance criteria:
 
-- Connector behavior is covered by deterministic local tests
-- HTTP failures produce explicit connector results or connector execution errors
-- Timeout and retry behavior is documented against the current MVP boundary
-- Credential handling remains explicitly out of scope for the built-in connector MVP
+- A local operator can inspect published versions, run status, connector events, audit events, and version comparisons from a static artifact or local UI path
+- The operator UI remains read-only and does not become the execution authority
+- Snapshot generation has tests for any new fields
+- Documentation explains how to generate and inspect the local operator view from a fresh checkout
 
-Loop 17 implementation slices:
+Loop 18 implementation slices:
 
-1. Connector fixture harness
-   - Add local HTTP server or fake connector tests that do not depend on public network access.
-2. HTTP behavior coverage
-   - Cover success, HTTP error, invalid URL, missing request metadata, headers, body serialization, and timeout conversion.
-3. Retry and timeout boundary docs
-   - Clarify what `retry.max_attempts`, connector request timeout, and executor failure behavior mean in the current local runtime.
-4. Credential boundary docs
-   - Document that Workflow DSL fixtures must not contain secrets and that enterprise credential management remains future work.
+1. Snapshot shape review
+   - Identify which run, audit, connector, and version comparison fields are already exported and which small additions would improve inspection.
+2. Static operator UI improvement
+   - Add read-only panels or graph-adjacent overlays that make execution status and connector failures easier to scan.
+3. Version comparison clarity
+   - Make published workflow version differences easier to inspect without changing immutable artifacts.
+4. Operator docs
+   - Document the publish, run, audit, snapshot, and local UI inspection flow.
 
-Loop 17 explicit non-goals:
+Loop 18 explicit non-goals:
 
-- Do not add a connector marketplace.
-- Do not add external connector SDK dependencies.
-- Do not implement enterprise secret storage or IAM.
-- Do not add product-specific SaaS connectors in this loop.
+- Do not add a hosted control plane.
+- Do not add authentication, RBAC, or multi-tenant state.
+- Do not make the visual graph authoritative for execution.
+- Do not add workflow mutation from the operator UI.
 
-Loop 17 expected file changes:
+Loop 18 expected file changes:
 
-- `tests/test_connectors.py` for connector behavior coverage; only add to `tests/test_executor.py` when the executor event lifecycle needs coverage.
-- `src/skill2workflow/connectors.py` only if tests expose missing MVP guardrails.
-- `src/skill2workflow/executor.py` only if retry/timeout semantics need a runtime boundary fix.
-- `docs/connectors.md` if a focused connector guide is introduced, or `docs/stability.md` updates for timeout, retry, HTTP failure, and credential boundaries.
-- `docs/workflow-dsl-compatibility.md` only if the loop clarifies compatibility guarantees for connector request metadata.
-- `examples/workflows/http-connector.workflow.json` updates only when fixture behavior must show a documented connector boundary.
+- `tests/test_dashboard.py` for snapshot shape changes.
+- `src/skill2workflow/dashboard.py` only if exported snapshot fields need to change.
+- `web/control.html` and related static assets for read-only operator UI improvements.
+- `examples/control-plane-snapshot.json` when the committed fixture must show new operator data.
+- `README.md`, `HARNESS.md`, or a focused docs page for the operator inspection flow.
 
-Loop 17 verification commands:
+Loop 18 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
-- `PYTHONPATH=src python3 -m unittest tests.test_connectors tests.test_executor -v` once `tests/test_connectors.py` is introduced
-- `PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json`
+- `PYTHONPATH=src python3 -m unittest tests.test_dashboard tests.test_control_plane -v`
+- `PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json`
 - `git diff --check`
 
-Loop 17 done means:
+Loop 18 done means:
 
-- Connector tests cover the current built-in HTTP connector without depending on the public internet.
-- Connector docs make retry, timeout, HTTP failure, and credential boundaries clear.
-- Existing examples and executor behavior remain compatible with Workflow DSL `0.1.0`.
-- No new runtime dependencies are added.
+- Operators can inspect local control-plane state more clearly from an exported artifact or static UI.
+- Published workflow artifacts remain immutable and Workflow DSL remains authoritative.
+- No hosted service, auth layer, or runtime dependency is added.
 
 ## Near-Term Loop Queue
 
@@ -148,8 +134,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 17: Connector Runtime Hardening | Next | Improve connector reliability without adding external services | retry/timeout policy coverage, connector fixture harness, clearer credential boundary docs |
-| Loop 18: Control Plane Operator UX | Planned | Connect control-plane state back to visual inspection | local server or static artifact flow for run/audit overlays and workflow artifact diffs |
+| Loop 18: Control Plane Operator UX | Next | Connect control-plane state back to visual inspection | static artifact flow for run/audit overlays and workflow artifact diffs |
 
 Loop selection rules:
 
@@ -197,14 +182,14 @@ Status: delivered by Loops 1-9.
 
 ### v0.2: Connector Runtime
 
-Status: first MVP shipped in Loop 10. Future work should harden connector ergonomics and product-specific extensions.
+Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Future work should add explicit retry execution, credential boundaries, and product-specific extensions only when backed by tests and docs.
 
 - Connector manifests
 - Connector binding validation
 - Manual and HTTP connector implementations
 - Connector execution audit events
 - Connector test fixtures
-- Future: connector credentials, retries/timeouts per connector, and product-specific connector packages
+- Future: connector credentials, automatic retry execution, and product-specific connector packages
 
 ### v0.3: Authoring Experience
 

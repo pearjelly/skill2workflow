@@ -11,6 +11,7 @@ This repository is the `skill2workflow` open-source harness.
 - Roadmap index: `ROADMAP.md`; approved product spec remains under `docs/superpowers/specs/`.
 - Contributor entry point: `CONTRIBUTING.md`.
 - Example pack guide: `docs/examples.md`.
+- Connector runtime guide: `docs/connectors.md`.
 - Compatibility notes: `docs/workflow-dsl-contract.md`, `docs/workflow-dsl-compatibility.md`, and `docs/stability.md`.
 - Release process: `docs/release-process.md`.
 

@@ -78,6 +78,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Bind `human_gate` nodes to the built-in manual connector
 - Bind and validate `tool_call` connector metadata
 - Execute minimal HTTP connector calls from connector-bound `tool_call` nodes
+- Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
 - Open a static LiteGraph visual editor for graph inspection and parameter edits
 - Write safe LiteGraph title and description edits back to Workflow DSL
@@ -306,6 +307,7 @@ schemas/           # Versioned Workflow DSL JSON Schema
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
 docs/assets/      # README screenshots and system design diagrams
+docs/connectors.md # Connector runtime behavior and boundary guide
 docs/examples.md  # Enterprise workflow example pack guide
 docs/releases/    # Release notes
 web/              # Static LiteGraph editor and control-plane inspector
@@ -333,14 +335,16 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Local Control Plane UI
 - Release Automation
 - Workflow Example Pack
+- Connector Runtime Hardening
 
-Next priority is Loop 17 Connector Runtime Hardening.
+Next priority is Loop 18 Control Plane Operator UX.
 
 See:
 
 - `CONTRIBUTING.md`
 - `ROADMAP.md`
 - `docs/authoring.md`
+- `docs/connectors.md`
 - `docs/examples.md`
 - `docs/release-process.md`
 - `docs/releases/v0.1.0.md`
