@@ -89,8 +89,8 @@ The current implementation is a dependency-light Python harness because the loca
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Audit connector execution events through the control plane
-- Export a read-only control-plane snapshot for local operator inspection
-- Inspect workflows, runs, audit events, and version deltas in a static local control-plane UI
+- Export a read-only control-plane snapshot with derived operator insights
+- Inspect operator attention items, recent events, connector events, workflows, runs, audit events, and version deltas in a static local control-plane UI
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
@@ -255,6 +255,7 @@ http://localhost:4173/web/control.html
 ```
 
 The inspector can load `examples/control-plane-snapshot.json` or a local snapshot exported by `control-snapshot`.
+It opens on the Operator view, which summarizes attention items, recent audit events, connector event counts, and version changes without mutating workflow artifacts.
 
 Inspect the enterprise example pack:
 
@@ -336,8 +337,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Release Automation
 - Workflow Example Pack
 - Connector Runtime Hardening
+- Control Plane Operator UX
 
-Next priority is Loop 18 Control Plane Operator UX.
+Next priority is Loop 19 Demo And Contributor Onboarding.
 
 See:
 

@@ -20,7 +20,7 @@ Current capability snapshot:
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
-- Local control-plane UI: read-only snapshot export and static inspector for workflows, runs, audit events, connectors, and version comparisons
+- Local control-plane UI: read-only snapshot export, derived operator insights, and static inspector for attention items, recent events, connector events, workflows, runs, audit events, connectors, and version comparisons
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
 
 Important boundaries:
@@ -52,81 +52,80 @@ Important boundaries:
 | Loop 15: Release Automation | Complete | Read-only release preflight script, version/tag/notes guards, CI dry-run, maintainer docs |
 | Loop 16: Workflow Example Pack | Complete | Enterprise example skills, synchronized Workflow DSL and LiteGraph fixtures, example docs and gallery entries |
 | Loop 17: Connector Runtime Hardening | Complete | Deterministic HTTP connector tests, timeout/error normalization, retry/timeout docs, credential boundary docs |
+| Loop 18: Control Plane Operator UX | Complete | Snapshot operator insights, static Operator view, attention/recent/connector/version tables, docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 17 hardened the connector runtime:
+Post-`v0.1.0` work now has one active priority after Loop 18 improved local operator inspection:
 
-1. improve local operator visibility while keeping Workflow DSL authoritative.
+1. make first-run evaluation and contributor onboarding easier without adding platform dependencies.
 
-### Loop 18: Control Plane Operator UX
+### Loop 19: Demo And Contributor Onboarding
 
-Goal: connect control-plane state back to workflow inspection so local operators can understand runs, audit events, connector outcomes, and workflow version changes without turning the project into a hosted control plane.
+Goal: make the project easier to evaluate from a fresh checkout by packaging the shortest deterministic demo path from Skill input to Workflow DSL, publish/run, snapshot export, and local UI inspection.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Start from exported local control-plane state and static UI improvements.
-- Keep Workflow DSL and published workflow artifacts read-only from the operator UI.
-- Prefer snapshot-driven views before adding any local server mode.
-- Do not introduce auth, RBAC, hosted services, or live multi-user coordination in this loop.
+- Start from existing examples and CLI commands.
+- Prefer docs and a deterministic helper script over new runtime features.
+- Keep the demo local-first and dependency-light.
+- Do not add hosted docs, package publishing, analytics, or external services in this loop.
 
 Scope:
 
-- Improve local control-plane inspection for run state, audit events, connector outcomes, and published workflow versions
-- Add graph-adjacent run/audit overlay data where it helps operators reason about execution without mutating workflow DSL
-- Make workflow artifact version differences easier to inspect from exported snapshots
-- Document the operator flow from publish/run/audit/snapshot to local UI review
+- Provide a concise first-run demo path that exercises parser, compiler, validator, publish/run, audit, snapshot, and UI inspection
+- Keep generated demo state deterministic enough for contributors to compare against expected artifacts
+- Document how to reset and rerun the demo locally
+- Link the demo path from README and HARNESS
 
 Acceptance criteria:
 
-- A local operator can inspect published versions, run status, connector events, audit events, and version comparisons from a static artifact or local UI path
-- The operator UI remains read-only and does not become the execution authority
-- Snapshot generation has tests for any new fields
-- Documentation explains how to generate and inspect the local operator view from a fresh checkout
+- A new contributor can run one documented sequence from a fresh checkout and inspect a populated control-plane snapshot
+- The sequence uses only Python standard-library runtime code and committed examples
+- The demo does not require public network access or secrets
+- Tests cover any helper script or generated fixture behavior
 
-Loop 18 implementation slices:
+Loop 19 implementation slices:
 
-1. Snapshot shape review
-   - Identify which run, audit, connector, and version comparison fields are already exported and which small additions would improve inspection.
-2. Static operator UI improvement
-   - Add read-only panels or graph-adjacent overlays that make execution status and connector failures easier to scan.
-3. Version comparison clarity
-   - Make published workflow version differences easier to inspect without changing immutable artifacts.
-4. Operator docs
-   - Document the publish, run, audit, snapshot, and local UI inspection flow.
+1. Demo path design
+   - Decide whether a documented command sequence is enough or whether a small `scripts/` helper is warranted.
+2. Deterministic local state
+   - Generate publish/run/audit/snapshot state from committed examples without public network calls.
+3. Contributor docs
+   - Add a short first-run walkthrough with reset instructions.
+4. Verification
+   - Add tests for any helper script and run the full project harness.
 
-Loop 18 explicit non-goals:
+Loop 19 explicit non-goals:
 
-- Do not add a hosted control plane.
-- Do not add authentication, RBAC, or multi-tenant state.
-- Do not make the visual graph authoritative for execution.
-- Do not add workflow mutation from the operator UI.
+- Do not add package publishing.
+- Do not add a hosted demo service.
+- Do not add telemetry or analytics.
+- Do not introduce runtime dependencies.
 
-Loop 18 expected file changes:
+Loop 19 expected file changes:
 
-- `tests/test_dashboard.py` for snapshot shape changes.
-- `src/skill2workflow/dashboard.py` only if exported snapshot fields need to change.
-- `web/control.html` and related static assets for read-only operator UI improvements.
-- `examples/control-plane-snapshot.json` when the committed fixture must show new operator data.
-- `README.md`, `HARNESS.md`, or a focused docs page for the operator inspection flow.
+- `README.md` and `HARNESS.md` for first-run instructions.
+- `docs/` for a focused walkthrough if the README path becomes too long.
+- `scripts/` only if a helper script materially reduces contributor friction.
+- `tests/` only if a helper script or fixture sync behavior is added.
 
-Loop 18 verification commands:
+Loop 19 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
-- `PYTHONPATH=src python3 -m unittest tests.test_dashboard tests.test_control_plane -v`
-- `PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json`
+- demo commands documented in README/HARNESS
 - `git diff --check`
 
-Loop 18 done means:
+Loop 19 done means:
 
-- Operators can inspect local control-plane state more clearly from an exported artifact or static UI.
-- Published workflow artifacts remain immutable and Workflow DSL remains authoritative.
-- No hosted service, auth layer, or runtime dependency is added.
+- The first-run demo path is clear, repeatable, and local-only.
+- Contributors can produce and inspect a useful control-plane snapshot quickly.
+- No external services, secrets, or new dependencies are required.
 
 ## Near-Term Loop Queue
 
@@ -134,7 +133,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 18: Control Plane Operator UX | Next | Connect control-plane state back to visual inspection | static artifact flow for run/audit overlays and workflow artifact diffs |
+| Loop 19: Demo And Contributor Onboarding | Next | Make first-run evaluation easier | deterministic local demo path and contributor walkthrough |
 
 Loop selection rules:
 
@@ -216,13 +215,14 @@ Status: first MVP shipped in Loop 12. Release guardrails shipped in Loop 15.
 
 ### v0.5: Local Control Plane UI
 
-Status: first MVP shipped in Loop 13. Future work should connect run/audit overlays back into the graph view.
+Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Future work should connect run/audit overlays back into the graph view.
 
 - Workflow registry view
 - Run list and run detail view
 - Audit log view
 - Connector manifest view
 - Published workflow version comparison
+- Operator attention, recent event, connector event, and version change summaries
 - Future: live local server mode, graph overlays, and workflow artifact diff views
 
 ### v1.0: Production Baseline

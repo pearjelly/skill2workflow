@@ -171,5 +171,67 @@
       "node_count_delta": 0,
       "edge_count_delta": 0
     }
-  ]
+  ],
+  "operator_insights": {
+    "attention_counts": {
+      "waiting_runs": 0,
+      "failed_runs": 0,
+      "connector_failures": 0,
+      "version_changes": 1
+    },
+    "attention_items": [],
+    "recent_events": [
+      {
+        "run_id": "run_3ae543f4f9f9",
+        "timestamp": "2026-07-02T10:08:13.084892+00:00",
+        "type": "run_started",
+        "workflow_id": "workflow_approval_flow",
+        "workflow_version": "0.2.0"
+      },
+      {
+        "run_id": "run_3ae543f4f9f9",
+        "timestamp": "2026-07-02T10:08:13.090656+00:00",
+        "type": "run_waiting",
+        "workflow_id": "workflow_approval_flow",
+        "workflow_version": "0.2.0"
+      },
+      {
+        "approved": true,
+        "run_id": "run_3ae543f4f9f9",
+        "timestamp": "2026-07-02T10:08:14.237865+00:00",
+        "type": "run_resumed",
+        "workflow_id": "workflow_approval_flow",
+        "workflow_version": "0.2.0"
+      },
+      {
+        "run_id": "run_3ae543f4f9f9",
+        "timestamp": "2026-07-02T10:08:14.238101+00:00",
+        "type": "run_completed",
+        "workflow_id": "workflow_approval_flow",
+        "workflow_version": "0.2.0"
+      },
+      {
+        "checksum": "6cb33e6af2a56a4d9c9257d288c52e82f5b57034d84fb85d421e11e181d4126c",
+        "timestamp": "2026-07-02T10:08:14.770977+00:00",
+        "type": "workflow_published",
+        "workflow_id": "workflow_http_connector",
+        "workflow_version": "0.1.0"
+      }
+    ],
+    "connector_event_counts": {},
+    "version_changes": [
+      {
+        "kind": "version_change",
+        "workflow_id": "workflow_approval_flow",
+        "versions": [
+          "0.1.0",
+          "0.2.0"
+        ],
+        "label": "0.1.0 -> 0.2.0",
+        "node_count_delta": 0,
+        "edge_count_delta": 0,
+        "checksum_changed": true
+      }
+    ]
+  }
 }

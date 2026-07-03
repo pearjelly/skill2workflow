@@ -37,6 +37,10 @@
           <strong id="metric-runs">0</strong>
         </div>
         <div class="metric">
+          <span>Attention</span>
+          <strong id="metric-attention">0</strong>
+        </div>
+        <div class="metric">
           <span>Audit Events</span>
           <strong id="metric-audit">0</strong>
         </div>
@@ -49,14 +53,78 @@
       <section class="workspace" aria-label="Control plane inspector">
         <section class="main-panel">
           <nav class="tabs" aria-label="Control plane views">
-            <button class="tab is-active" type="button" data-view="workflows">Registry</button>
+            <button class="tab is-active" type="button" data-view="operator">Operator</button>
+            <button class="tab" type="button" data-view="workflows">Registry</button>
             <button class="tab" type="button" data-view="runs">Runs</button>
             <button class="tab" type="button" data-view="audit">Audit</button>
             <button class="tab" type="button" data-view="connectors">Connectors</button>
             <button class="tab" type="button" data-view="versions">Compare</button>
           </nav>
 
-          <div class="table-wrap" data-panel="workflows">
+          <div class="operator-panel" data-panel="operator">
+            <section class="operator-section">
+              <h2>Attention</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Severity</th>
+                    <th>Kind</th>
+                    <th>Workflow</th>
+                    <th>Run</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody id="attention-rows"></tbody>
+              </table>
+            </section>
+            <section class="operator-section">
+              <h2>Recent Events</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Workflow</th>
+                    <th>Run</th>
+                    <th>Node</th>
+                    <th>Timestamp</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-event-rows"></tbody>
+              </table>
+            </section>
+            <section class="operator-section">
+              <h2>Connector Events</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Event</th>
+                    <th>Count</th>
+                    <th>Status</th>
+                    <th>Kind</th>
+                    <th>Scope</th>
+                  </tr>
+                </thead>
+                <tbody id="connector-event-rows"></tbody>
+              </table>
+            </section>
+            <section class="operator-section">
+              <h2>Version Changes</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Workflow</th>
+                    <th>Versions</th>
+                    <th>Checksum</th>
+                    <th>Nodes</th>
+                    <th>Edges</th>
+                  </tr>
+                </thead>
+                <tbody id="operator-version-rows"></tbody>
+              </table>
+            </section>
+          </div>
+
+          <div class="table-wrap" data-panel="workflows" hidden>
             <table>
               <thead>
                 <tr>
