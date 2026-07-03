@@ -53,13 +53,14 @@ Future work should stay in small closed loops. A loop is complete only when it h
 
 ### Loop 14: Release Tagging
 
-Goal: publish the first GitHub release tag from the documented v0.1.0 release scope.
+Goal: publish the first GitHub release tag from the documented `v0.1.0` release scope.
 
 Status: next engineering loop.
 
 Scope:
 
 - Verify `main` against release checklist
+- Confirm `docs/releases/v0.1.0.md` matches the shipped Loop 1-13 scope
 - Create annotated `v0.1.0` tag
 - Create GitHub release using `docs/releases/v0.1.0.md`
 - Update release automation notes for future tags
@@ -70,7 +71,33 @@ Acceptance criteria:
 - GitHub release notes match the repository docs
 - Follow-up release automation work is clearly scoped
 
-## Version Milestones
+## Release Tag Plan
+
+Release tags use semantic versioning. The first public tag is `v0.1.0`; it packages the current local bootstrap through Loop 13, including parser, compiler, validator, LiteGraph editor, durable runtime, local control plane, SQLite durability, connector runtime, authoring experience, open-source readiness, and the local control-plane inspector.
+
+### v0.1.0: First Open-Source Bootstrap Release
+
+Status: ready for Loop 14 tagging.
+
+Release source:
+
+- Branch: `main`
+- Notes: `docs/releases/v0.1.0.md`
+- Compatibility: Workflow DSL `0.1.0`, Python 3.9+, standard-library runtime
+
+Release checklist:
+
+- Full unit suite passes
+- Python modules compile
+- Example Workflow DSL fixtures validate
+- Release notes match the shipped scope
+- Tag and GitHub release are created from the same clean `main`
+
+After this tag, future `0.1.x` releases should be patch-level hardening and docs updates unless they preserve Workflow DSL `0.1.0` compatibility.
+
+## Capability Milestones
+
+The numbered capability milestones below are product roadmap buckets, not already-created Git tags. The first tag, `v0.1.0`, intentionally includes all completed local bootstrap capability buckets through Loop 13.
 
 ### v0.1: Bootstrap Harness
 
@@ -118,6 +145,7 @@ Status: first MVP shipped in Loop 13. Future work should connect run/audit overl
 - Workflow registry view
 - Run list and run detail view
 - Audit log view
+- Connector manifest view
 - Published workflow version comparison
 - Future: live local server mode, graph overlays, and workflow artifact diff views
 

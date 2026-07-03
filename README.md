@@ -265,7 +265,7 @@ schemas/           # Versioned Workflow DSL JSON Schema
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
 docs/releases/    # Release notes
-web/              # Static LiteGraph visual editor
+web/              # Static LiteGraph editor and control-plane inspector
 .github/          # CI and issue templates
 CONTRIBUTING.md   # Contributor guide
 ROADMAP.md        # Open-source delivery roadmap

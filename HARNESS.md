@@ -153,6 +153,6 @@ Implemented:
 
 Not implemented yet:
 
-- Enterprise control plane UI
+- Production-grade enterprise control plane UI
 - Enterprise connector credential management
 - GitHub release automation
