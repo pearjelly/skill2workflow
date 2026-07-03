@@ -1,0 +1,288 @@
+{
+  "schema_version": "0.1.0",
+  "workflow": {
+    "id": "workflow_sales_follow_up",
+    "name": "sales-follow-up",
+    "description": "Controlled sales follow-up workflow with approval, CRM update, and audit checks.",
+    "version": "0.1.0",
+    "status": "draft"
+  },
+  "entry": "start",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Start",
+      "description": "Workflow entry point.",
+      "on_success": "node_001_gather_account_context"
+    },
+    {
+      "id": "node_001_gather_account_context",
+      "type": "step",
+      "title": "Gather account context",
+      "description": "inspect current opportunity stage, last customer touch, and promised next action",
+      "requires": [],
+      "produces": [
+        "node_001_gather_account_context_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Gather account context — inspect current opportunity stage, last customer touch, and promised next action"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 1,
+          "line": 16,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_002_draft_customer_follow_up",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_002_draft_customer_follow_up",
+      "type": "step",
+      "title": "Draft customer follow-up",
+      "description": "prepare a concise follow-up message tied to the current opportunity",
+      "requires": [],
+      "produces": [
+        "node_002_draft_customer_follow_up_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Draft customer follow-up — prepare a concise follow-up message tied to the current opportunity"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 2,
+          "line": 17,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_003_ask_account_owner_for_approval",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_003_ask_account_owner_for_approval",
+      "type": "human_gate",
+      "title": "Ask account owner for approval",
+      "description": "wait for explicit owner approval before sending or recording changes",
+      "requires": [],
+      "produces": [
+        "node_003_ask_account_owner_for_approval_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "human_approval",
+        "prompt": "Ask account owner for approval — wait for explicit owner approval before sending or recording changes"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 3,
+          "line": 18,
+          "section": "Checklist"
+        }
+      },
+      "connector": {
+        "id": "manual",
+        "kind": "manual"
+      },
+      "on_success": "node_004_run_crm_update_command",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_004_run_crm_update_command",
+      "type": "tool_call",
+      "title": "Run CRM update command",
+      "description": "record the follow-up, next task, owner, and due date in CRM",
+      "requires": [],
+      "produces": [
+        "node_004_run_crm_update_command_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "tool_call",
+        "instruction": "Run CRM update command — record the follow-up, next task, owner, and due date in CRM"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 4,
+          "line": 19,
+          "section": "Checklist"
+        }
+      },
+      "connector": {
+        "id": "http",
+        "kind": "http"
+      },
+      "on_success": "node_005_verify_follow_up_audit_trail",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_005_verify_follow_up_audit_trail",
+      "type": "verification",
+      "title": "Verify follow-up audit trail",
+      "description": "check that the message, task, owner, and timestamp are recorded",
+      "requires": [],
+      "produces": [
+        "node_005_verify_follow_up_audit_trail_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "verification",
+        "instruction": "Verify follow-up audit trail — check that the message, task, owner, and timestamp are recorded"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 5,
+          "line": 20,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "end",
+      "on_failure": "failure"
+    },
+    {
+      "id": "failure",
+      "type": "failure",
+      "title": "Failure",
+      "description": "Terminal failure node."
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "End",
+      "description": "Workflow completed."
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_001_start_to_node_001_gather_account_context",
+      "from": "start",
+      "to": "node_001_gather_account_context",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_002_node_001_gather_account_context_to_node_002_draft_customer_follow_up",
+      "from": "node_001_gather_account_context",
+      "to": "node_002_draft_customer_follow_up",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_003_node_002_draft_customer_follow_up_to_node_003_ask_account_owner_for_approval",
+      "from": "node_002_draft_customer_follow_up",
+      "to": "node_003_ask_account_owner_for_approval",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_004_node_003_ask_account_owner_for_approval_to_node_004_run_crm_update_command",
+      "from": "node_003_ask_account_owner_for_approval",
+      "to": "node_004_run_crm_update_command",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_005_node_004_run_crm_update_command_to_node_005_verify_follow_up_audit_trail",
+      "from": "node_004_run_crm_update_command",
+      "to": "node_005_verify_follow_up_audit_trail",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_006_node_005_verify_follow_up_audit_trail_to_end",
+      "from": "node_005_verify_follow_up_audit_trail",
+      "to": "end",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_node_001_gather_account_context_failure",
+      "from": "node_001_gather_account_context",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_002_draft_customer_follow_up_failure",
+      "from": "node_002_draft_customer_follow_up",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_003_ask_account_owner_for_approval_failure",
+      "from": "node_003_ask_account_owner_for_approval",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_004_run_crm_update_command_failure",
+      "from": "node_004_run_crm_update_command",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_005_verify_follow_up_audit_trail_failure",
+      "from": "node_005_verify_follow_up_audit_trail",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    }
+  ],
+  "state_schema": {},
+  "guards": [
+    {
+      "id": "guard_001",
+      "description": "Do NOT send customer-facing follow-up or update CRM until the account owner approves the proposed next action."
+    }
+  ],
+  "checkpoints": [],
+  "policies": {
+    "default_retry": {
+      "max_attempts": 0
+    },
+    "default_timeout_ms": 300000
+  }
+}

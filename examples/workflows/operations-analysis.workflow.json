@@ -1,0 +1,333 @@
+{
+  "schema_version": "0.1.0",
+  "workflow": {
+    "id": "workflow_operations_analysis",
+    "name": "operations-analysis",
+    "description": "Controlled operations analysis workflow with metric query, threshold checks, owner confirmation, and action tracking.",
+    "version": "0.1.0",
+    "status": "draft"
+  },
+  "entry": "start",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Start",
+      "description": "Workflow entry point.",
+      "on_success": "node_001_run_metrics_query_command"
+    },
+    {
+      "id": "node_001_run_metrics_query_command",
+      "type": "tool_call",
+      "title": "Run metrics query command",
+      "description": "collect the KPI slice, date range, and source system outputs",
+      "requires": [],
+      "produces": [
+        "node_001_run_metrics_query_command_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "tool_call",
+        "instruction": "Run metrics query command — collect the KPI slice, date range, and source system outputs"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/operations-analysis/SKILL.md",
+          "kind": "ordered_step",
+          "index": 1,
+          "line": 16,
+          "section": "Checklist"
+        }
+      },
+      "connector": {
+        "id": "http",
+        "kind": "http"
+      },
+      "on_success": "node_002_check_threshold_breaches",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_002_check_threshold_breaches",
+      "type": "verification",
+      "title": "Check threshold breaches",
+      "description": "identify metrics outside expected thresholds and note affected business areas",
+      "requires": [],
+      "produces": [
+        "node_002_check_threshold_breaches_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "verification",
+        "instruction": "Check threshold breaches — identify metrics outside expected thresholds and note affected business areas"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/operations-analysis/SKILL.md",
+          "kind": "ordered_step",
+          "index": 2,
+          "line": 17,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_003_draft_operating_narrative",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_003_draft_operating_narrative",
+      "type": "step",
+      "title": "Draft operating narrative",
+      "description": "explain drivers, impact, assumptions, and recommended actions",
+      "requires": [],
+      "produces": [
+        "node_003_draft_operating_narrative_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Draft operating narrative — explain drivers, impact, assumptions, and recommended actions"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/operations-analysis/SKILL.md",
+          "kind": "ordered_step",
+          "index": 3,
+          "line": 18,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_004_ask_business_owner_to_confirm_action_plan",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_004_ask_business_owner_to_confirm_action_plan",
+      "type": "human_gate",
+      "title": "Ask business owner to confirm action plan",
+      "description": "wait for owner confirmation before publishing the plan",
+      "requires": [],
+      "produces": [
+        "node_004_ask_business_owner_to_confirm_action_plan_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "human_approval",
+        "prompt": "Ask business owner to confirm action plan — wait for owner confirmation before publishing the plan"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/operations-analysis/SKILL.md",
+          "kind": "ordered_step",
+          "index": 4,
+          "line": 19,
+          "section": "Checklist"
+        }
+      },
+      "connector": {
+        "id": "manual",
+        "kind": "manual"
+      },
+      "on_success": "node_005_publish_operating_actions",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_005_publish_operating_actions",
+      "type": "step",
+      "title": "Publish operating actions",
+      "description": "record action owners, due dates, and follow-up cadence",
+      "requires": [],
+      "produces": [
+        "node_005_publish_operating_actions_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Publish operating actions — record action owners, due dates, and follow-up cadence"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/operations-analysis/SKILL.md",
+          "kind": "ordered_step",
+          "index": 5,
+          "line": 20,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "node_006_verify_action_owners_and_follow_up_dates",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_006_verify_action_owners_and_follow_up_dates",
+      "type": "verification",
+      "title": "Verify action owners and follow-up dates",
+      "description": "check that every action has an owner, due date, and review point",
+      "requires": [],
+      "produces": [
+        "node_006_verify_action_owners_and_follow_up_dates_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "verification",
+        "instruction": "Verify action owners and follow-up dates — check that every action has an owner, due date, and review point"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/operations-analysis/SKILL.md",
+          "kind": "ordered_step",
+          "index": 6,
+          "line": 21,
+          "section": "Checklist"
+        }
+      },
+      "on_success": "end",
+      "on_failure": "failure"
+    },
+    {
+      "id": "failure",
+      "type": "failure",
+      "title": "Failure",
+      "description": "Terminal failure node."
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "End",
+      "description": "Workflow completed."
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_001_start_to_node_001_run_metrics_query_command",
+      "from": "start",
+      "to": "node_001_run_metrics_query_command",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_002_node_001_run_metrics_query_command_to_node_002_check_threshold_breaches",
+      "from": "node_001_run_metrics_query_command",
+      "to": "node_002_check_threshold_breaches",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_003_node_002_check_threshold_breaches_to_node_003_draft_operating_narrative",
+      "from": "node_002_check_threshold_breaches",
+      "to": "node_003_draft_operating_narrative",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_004_node_003_draft_operating_narrative_to_node_004_ask_business_owner_to_confirm_action_plan",
+      "from": "node_003_draft_operating_narrative",
+      "to": "node_004_ask_business_owner_to_confirm_action_plan",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_005_node_004_ask_business_owner_to_confirm_action_plan_to_node_005_publish_operating_actions",
+      "from": "node_004_ask_business_owner_to_confirm_action_plan",
+      "to": "node_005_publish_operating_actions",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_006_node_005_publish_operating_actions_to_node_006_verify_action_owners_and_follow_up_dates",
+      "from": "node_005_publish_operating_actions",
+      "to": "node_006_verify_action_owners_and_follow_up_dates",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_007_node_006_verify_action_owners_and_follow_up_dates_to_end",
+      "from": "node_006_verify_action_owners_and_follow_up_dates",
+      "to": "end",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_node_001_run_metrics_query_command_failure",
+      "from": "node_001_run_metrics_query_command",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_002_check_threshold_breaches_failure",
+      "from": "node_002_check_threshold_breaches",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_003_draft_operating_narrative_failure",
+      "from": "node_003_draft_operating_narrative",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_004_ask_business_owner_to_confirm_action_plan_failure",
+      "from": "node_004_ask_business_owner_to_confirm_action_plan",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_005_publish_operating_actions_failure",
+      "from": "node_005_publish_operating_actions",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_006_verify_action_owners_and_follow_up_dates_failure",
+      "from": "node_006_verify_action_owners_and_follow_up_dates",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    }
+  ],
+  "state_schema": {},
+  "guards": [
+    {
+      "id": "guard_001",
+      "description": "Do NOT publish the operating action plan until the responsible business owner confirms the narrative and actions."
+    }
+  ],
+  "checkpoints": [],
+  "policies": {
+    "default_retry": {
+      "max_attempts": 0
+    },
+    "default_timeout_ms": 300000
+  }
+}

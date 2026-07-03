@@ -70,6 +70,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Audit connector execution events through the control plane
 - Export a read-only control-plane snapshot for local operator inspection
 - Inspect workflows, runs, audit events, and version deltas in a static local control-plane UI
+- Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
@@ -234,6 +235,15 @@ http://localhost:4173/web/control.html
 
 The inspector can load `examples/control-plane-snapshot.json` or a local snapshot exported by `control-snapshot`.
 
+Inspect the enterprise example pack:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_examples -v
+PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/sales-follow-up.workflow.json --format json
+```
+
+The examples are documented in `docs/examples.md` and can be loaded from the web editor gallery.
+
 Run release preflight in CI-style dry-run mode:
 
 ```bash
@@ -275,6 +285,7 @@ examples/control-plane-snapshot.json # Example control-plane UI snapshot
 schemas/           # Versioned Workflow DSL JSON Schema
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
+docs/examples.md  # Enterprise workflow example pack guide
 docs/releases/    # Release notes
 web/              # Static LiteGraph editor and control-plane inspector
 .github/          # CI and issue templates
@@ -300,14 +311,16 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Open Source Release Readiness
 - Local Control Plane UI
 - Release Automation
+- Workflow Example Pack
 
-Next priority is Loop 16 Workflow Example Pack.
+Next priority is Loop 17 Connector Runtime Hardening.
 
 See:
 
 - `CONTRIBUTING.md`
 - `ROADMAP.md`
 - `docs/authoring.md`
+- `docs/examples.md`
 - `docs/release-process.md`
 - `docs/releases/v0.1.0.md`
 - `docs/stability.md`

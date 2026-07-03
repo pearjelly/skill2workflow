@@ -18,6 +18,7 @@ Current capability snapshot:
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, and connector audit events
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
+- Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
 - Local control-plane UI: read-only snapshot export and static inspector for workflows, runs, audit events, connectors, and version comparisons
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
@@ -49,78 +50,77 @@ Important boundaries:
 | Loop 13: Local Control Plane UI | Complete | `control-snapshot`, example snapshot fixture, static control-plane inspector, docs |
 | Loop 14: Release Tagging | Complete | Annotated `v0.1.0` tag, GitHub release, release notes published from verified `main` |
 | Loop 15: Release Automation | Complete | Read-only release preflight script, version/tag/notes guards, CI dry-run, maintainer docs |
+| Loop 16: Workflow Example Pack | Complete | Enterprise example skills, synchronized Workflow DSL and LiteGraph fixtures, example docs and gallery entries |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has three active priorities after Loop 15 made releases repeatable:
+Post-`v0.1.0` work now has two active priorities after Loop 16 made enterprise examples inspectable:
 
-1. make real enterprise workflow examples easy to inspect,
-2. harden connector behavior without overbuilding a marketplace,
-3. improve local operator visibility while keeping Workflow DSL authoritative.
+1. harden connector behavior without overbuilding a marketplace,
+2. improve local operator visibility while keeping Workflow DSL authoritative.
 
-### Loop 16: Workflow Example Pack
+### Loop 17: Connector Runtime Hardening
 
-Goal: make real enterprise workflow scenarios easy to inspect beyond the approval and HTTP connector fixtures.
+Goal: improve connector reliability and testability without adding external services or a connector marketplace.
 
 Status: next engineering loop.
 
 Scope:
 
-- Add representative `SKILL.md` examples for sales follow-up, customer service escalation, risk review, and operations analysis
-- Compile and commit matching Workflow DSL fixtures for each scenario
-- Generate LiteGraph fixtures so examples are immediately inspectable in the static editor
-- Add example documentation that explains the business process, control points, and expected runtime behavior
-- Keep all examples dependency-free and local-first
+- Add focused connector tests around HTTP timeout, request body, headers, HTTP error handling, and missing request metadata
+- Tighten connector retry/timeout expectations where current DSL policy already expresses them
+- Add a connector fixture harness that can run without external network dependencies
+- Document the credential boundary clearly: examples may use static local request metadata, but real secrets stay out of Workflow DSL
 
 Acceptance criteria:
 
-- Each example skill compiles to valid Workflow DSL
-- Each workflow fixture validates through the structured validator
-- Each LiteGraph fixture opens in the existing editor without making the visual graph authoritative
-- Example docs make the enterprise control value clear: required order, gates, state, and auditability
+- Connector behavior is covered by deterministic local tests
+- HTTP failures produce explicit connector results or connector execution errors
+- Timeout and retry behavior is documented against the current MVP boundary
+- Credential handling remains explicitly out of scope for the built-in connector MVP
 
-Loop 16 implementation slices:
+Loop 17 implementation slices:
 
-1. Scenario selection
-   - Pick four enterprise examples that show different control patterns rather than four copies of the same approval flow.
-2. Example skill authoring
-   - Write realistic `SKILL.md` inputs with hard gates, checklist steps, and clear human or connector boundaries.
-3. Fixture generation
-   - Compile, validate, and visualize every example through the existing CLI.
-4. Example gallery docs
-   - Link the examples from authoring docs and README so contributors can inspect them quickly.
+1. Connector fixture harness
+   - Add local HTTP server or fake connector tests that do not depend on public network access.
+2. HTTP behavior coverage
+   - Cover success, HTTP error, invalid URL, missing request metadata, headers, body serialization, and timeout conversion.
+3. Retry and timeout boundary docs
+   - Clarify what `retry.max_attempts`, connector request timeout, and executor failure behavior mean in the current local runtime.
+4. Credential boundary docs
+   - Document that Workflow DSL fixtures must not contain secrets and that enterprise credential management remains future work.
 
-Loop 16 explicit non-goals:
+Loop 17 explicit non-goals:
 
-- Do not add product-specific enterprise connectors.
-- Do not change Workflow DSL semantics solely for an example.
-- Do not make LiteGraph JSON the execution source of truth.
+- Do not add a connector marketplace.
+- Do not add external connector SDK dependencies.
+- Do not implement enterprise secret storage or IAM.
+- Do not add product-specific SaaS connectors in this loop.
 
-Loop 16 expected file changes:
+Loop 17 expected file changes:
 
-- `examples/skills/<scenario>/SKILL.md` for each enterprise scenario.
-- `examples/workflows/<scenario>.workflow.json` for compiled Workflow DSL fixtures.
-- `examples/workflows/<scenario>.litegraph.json` for editor-inspectable graph fixtures.
-- `docs/examples.md` or `docs/authoring.md` updates that explain scenario intent, control points, and inspection commands.
-- `README.md` updates that point contributors to the example pack.
+- `tests/test_connectors.py` or focused additions to `tests/test_executor.py` for connector behavior coverage.
+- `src/skill2workflow/connectors.py` only if tests expose missing MVP guardrails.
+- `src/skill2workflow/executor.py` only if retry/timeout semantics need a runtime boundary fix.
+- `docs/connectors.md` or `docs/stability.md` updates for timeout, retry, HTTP failure, and credential boundaries.
+- `examples/workflows/http-connector.workflow.json` updates only when fixture behavior must show a documented connector boundary.
 
-Loop 16 verification commands:
+Loop 17 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
-- `PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/<scenario>/SKILL.md -o examples/workflows/<scenario>.workflow.json`
-- `PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/<scenario>.workflow.json --format json`
-- `PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/<scenario>.workflow.json -o examples/workflows/<scenario>.litegraph.json`
+- `PYTHONPATH=src python3 -m unittest tests.test_connectors tests.test_executor -v`
+- `PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json`
 - `git diff --check`
 
-Loop 16 done means:
+Loop 17 done means:
 
-- At least four enterprise scenarios are committed and documented.
-- Every scenario has a source `SKILL.md`, compiled Workflow DSL fixture, and LiteGraph fixture.
-- Each scenario demonstrates a distinct control pattern, such as required order, human gate, connector boundary, retry/checkpoint policy, or audit-friendly state.
-- The existing gallery and docs make the examples discoverable without adding runtime dependencies.
+- Connector tests cover the current built-in HTTP connector without depending on the public internet.
+- Connector docs make retry, timeout, HTTP failure, and credential boundaries clear.
+- Existing examples and executor behavior remain compatible with Workflow DSL `0.1.0`.
+- No new runtime dependencies are added.
 
 ## Near-Term Loop Queue
 
@@ -128,8 +128,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 16: Workflow Example Pack | Next | Show enterprise scenarios beyond approval and HTTP examples | validated example skills/workflows for sales, customer service, risk review, and operations analysis |
-| Loop 17: Connector Runtime Hardening | Planned | Improve connector reliability without adding external services | retry/timeout policy coverage, connector fixture harness, clearer credential boundary docs |
+| Loop 17: Connector Runtime Hardening | Next | Improve connector reliability without adding external services | retry/timeout policy coverage, connector fixture harness, clearer credential boundary docs |
 | Loop 18: Control Plane Operator UX | Planned | Connect control-plane state back to visual inspection | local server or static artifact flow for run/audit overlays and workflow artifact diffs |
 
 Loop selection rules:
@@ -189,10 +188,11 @@ Status: first MVP shipped in Loop 10. Future work should harden connector ergono
 
 ### v0.3: Authoring Experience
 
-Status: first MVP shipped in Loop 11. Future work should improve editor ergonomics and broaden safe write-back only where semantics are explicit.
+Status: first MVP shipped in Loop 11. Enterprise example pack shipped in Loop 16. Future work should improve editor ergonomics and broaden safe write-back only where semantics are explicit.
 
 - Better LiteGraph parameter forms
 - Example workflow gallery
+- Enterprise example pack for sales, customer service, risk review, and operations analysis
 - Expanded safe write-back beyond title and description
 - Contributor docs for node types and compiler rules
 - Future: node creation flows, schema-backed forms, and run/audit overlays in the editor

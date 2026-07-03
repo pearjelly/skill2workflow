@@ -23,6 +23,10 @@
   const TERMINAL_TYPES = new Set(["end", "failure"]);
   const EXAMPLES = {
     "approval-flow.workflow.json": "../examples/workflows/approval-flow.workflow.json",
+    "sales-follow-up.workflow.json": "../examples/workflows/sales-follow-up.workflow.json",
+    "customer-service-escalation.workflow.json": "../examples/workflows/customer-service-escalation.workflow.json",
+    "risk-review.workflow.json": "../examples/workflows/risk-review.workflow.json",
+    "operations-analysis.workflow.json": "../examples/workflows/operations-analysis.workflow.json",
     "http-connector.workflow.json": "../examples/workflows/http-connector.workflow.json",
   };
 

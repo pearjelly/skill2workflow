@@ -1,0 +1,863 @@
+{
+  "version": "skill2workflow-litegraph-0.1.0",
+  "workflow": {
+    "id": "workflow_sales_follow_up",
+    "name": "sales-follow-up",
+    "version": "0.1.0",
+    "status": "draft",
+    "description": "Controlled sales follow-up workflow with approval, CRM update, and audit checks.",
+    "entry": "start"
+  },
+  "last_node_id": 8,
+  "last_link_id": 11,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "skill2workflow/start",
+      "pos": [
+        80,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "title": "Start",
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "start",
+        "node_type": "start",
+        "description": "Workflow entry point.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    },
+    {
+      "id": 2,
+      "type": "skill2workflow/step",
+      "pos": [
+        340,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "title": "Gather account context",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            2
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            7
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_001_gather_account_context",
+        "node_type": "step",
+        "description": "inspect current opportunity stage, last customer touch, and promised next action",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 1,
+          "line": 16,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_001_gather_account_context_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "agent_instruction",
+          "instruction": "Gather account context — inspect current opportunity stage, last customer touch, and promised next action"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": null
+      }
+    },
+    {
+      "id": 3,
+      "type": "skill2workflow/step",
+      "pos": [
+        600,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "title": "Draft customer follow-up",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            3
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            8
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_002_draft_customer_follow_up",
+        "node_type": "step",
+        "description": "prepare a concise follow-up message tied to the current opportunity",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 2,
+          "line": 17,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_002_draft_customer_follow_up_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "agent_instruction",
+          "instruction": "Draft customer follow-up — prepare a concise follow-up message tied to the current opportunity"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": null
+      }
+    },
+    {
+      "id": 4,
+      "type": "skill2workflow/human_gate",
+      "pos": [
+        860,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "title": "Ask account owner for approval",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            4
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_003_ask_account_owner_for_approval",
+        "node_type": "human_gate",
+        "description": "wait for explicit owner approval before sending or recording changes",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 3,
+          "line": 18,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_003_ask_account_owner_for_approval_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "human_approval",
+          "prompt": "Ask account owner for approval — wait for explicit owner approval before sending or recording changes"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": {
+          "id": "manual",
+          "kind": "manual"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "skill2workflow/tool_call",
+      "pos": [
+        1120,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "title": "Run CRM update command",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            5
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_004_run_crm_update_command",
+        "node_type": "tool_call",
+        "description": "record the follow-up, next task, owner, and due date in CRM",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 4,
+          "line": 19,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_004_run_crm_update_command_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "tool_call",
+          "instruction": "Run CRM update command — record the follow-up, next task, owner, and due date in CRM"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": {
+          "id": "http",
+          "kind": "http"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "skill2workflow/verification",
+      "pos": [
+        1380,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "title": "Verify follow-up audit trail",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "success",
+          "type": "flow",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "failure",
+          "type": "flow",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "workflow_node_id": "node_005_verify_follow_up_audit_trail",
+        "node_type": "verification",
+        "description": "check that the message, task, owner, and timestamp are recorded",
+        "run_status": "not_started",
+        "source": {
+          "file": "examples/skills/sales-follow-up/SKILL.md",
+          "kind": "ordered_step",
+          "index": 5,
+          "line": 20,
+          "section": "Checklist"
+        },
+        "requires": [],
+        "produces": [
+          "node_005_verify_follow_up_audit_trail_result"
+        ],
+        "guard": null,
+        "action": {
+          "kind": "verification",
+          "instruction": "Verify follow-up audit trail — check that the message, task, owner, and timestamp are recorded"
+        },
+        "retry": {
+          "max_attempts": 0
+        },
+        "connector": null
+      }
+    },
+    {
+      "id": 7,
+      "type": "skill2workflow/failure",
+      "pos": [
+        1380,
+        260
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "title": "Failure",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 7
+        },
+        {
+          "name": "in_2",
+          "type": "flow",
+          "link": 8
+        },
+        {
+          "name": "in_3",
+          "type": "flow",
+          "link": 9
+        },
+        {
+          "name": "in_4",
+          "type": "flow",
+          "link": 10
+        },
+        {
+          "name": "in_5",
+          "type": "flow",
+          "link": 11
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "workflow_node_id": "failure",
+        "node_type": "failure",
+        "description": "Terminal failure node.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    },
+    {
+      "id": 8,
+      "type": "skill2workflow/end",
+      "pos": [
+        1900,
+        80
+      ],
+      "size": [
+        260,
+        110
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "title": "End",
+      "inputs": [
+        {
+          "name": "in",
+          "type": "flow",
+          "link": 6
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "workflow_node_id": "end",
+        "node_type": "end",
+        "description": "Workflow completed.",
+        "run_status": "not_started",
+        "source": {},
+        "requires": [],
+        "produces": [],
+        "guard": null,
+        "action": null,
+        "retry": null,
+        "connector": null
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "flow"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "flow"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "flow"
+    ],
+    [
+      4,
+      4,
+      0,
+      5,
+      0,
+      "flow"
+    ],
+    [
+      5,
+      5,
+      0,
+      6,
+      0,
+      "flow"
+    ],
+    [
+      6,
+      6,
+      0,
+      8,
+      0,
+      "flow"
+    ],
+    [
+      7,
+      2,
+      1,
+      7,
+      0,
+      "flow"
+    ],
+    [
+      8,
+      3,
+      1,
+      7,
+      1,
+      "flow"
+    ],
+    [
+      9,
+      4,
+      1,
+      7,
+      2,
+      "flow"
+    ],
+    [
+      10,
+      5,
+      1,
+      7,
+      3,
+      "flow"
+    ],
+    [
+      11,
+      6,
+      1,
+      7,
+      4,
+      "flow"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "source_schema_version": "0.1.0",
+    "truth_source": "workflow_dsl",
+    "source_workflow": {
+      "schema_version": "0.1.0",
+      "workflow": {
+        "id": "workflow_sales_follow_up",
+        "name": "sales-follow-up",
+        "description": "Controlled sales follow-up workflow with approval, CRM update, and audit checks.",
+        "version": "0.1.0",
+        "status": "draft"
+      },
+      "entry": "start",
+      "nodes": [
+        {
+          "id": "start",
+          "type": "start",
+          "title": "Start",
+          "description": "Workflow entry point.",
+          "on_success": "node_001_gather_account_context"
+        },
+        {
+          "id": "node_001_gather_account_context",
+          "type": "step",
+          "title": "Gather account context",
+          "description": "inspect current opportunity stage, last customer touch, and promised next action",
+          "requires": [],
+          "produces": [
+            "node_001_gather_account_context_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "agent_instruction",
+            "instruction": "Gather account context — inspect current opportunity stage, last customer touch, and promised next action"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/sales-follow-up/SKILL.md",
+              "kind": "ordered_step",
+              "index": 1,
+              "line": 16,
+              "section": "Checklist"
+            }
+          },
+          "on_success": "node_002_draft_customer_follow_up",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_002_draft_customer_follow_up",
+          "type": "step",
+          "title": "Draft customer follow-up",
+          "description": "prepare a concise follow-up message tied to the current opportunity",
+          "requires": [],
+          "produces": [
+            "node_002_draft_customer_follow_up_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "agent_instruction",
+            "instruction": "Draft customer follow-up — prepare a concise follow-up message tied to the current opportunity"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/sales-follow-up/SKILL.md",
+              "kind": "ordered_step",
+              "index": 2,
+              "line": 17,
+              "section": "Checklist"
+            }
+          },
+          "on_success": "node_003_ask_account_owner_for_approval",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_003_ask_account_owner_for_approval",
+          "type": "human_gate",
+          "title": "Ask account owner for approval",
+          "description": "wait for explicit owner approval before sending or recording changes",
+          "requires": [],
+          "produces": [
+            "node_003_ask_account_owner_for_approval_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "human_approval",
+            "prompt": "Ask account owner for approval — wait for explicit owner approval before sending or recording changes"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/sales-follow-up/SKILL.md",
+              "kind": "ordered_step",
+              "index": 3,
+              "line": 18,
+              "section": "Checklist"
+            }
+          },
+          "connector": {
+            "id": "manual",
+            "kind": "manual"
+          },
+          "on_success": "node_004_run_crm_update_command",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_004_run_crm_update_command",
+          "type": "tool_call",
+          "title": "Run CRM update command",
+          "description": "record the follow-up, next task, owner, and due date in CRM",
+          "requires": [],
+          "produces": [
+            "node_004_run_crm_update_command_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "tool_call",
+            "instruction": "Run CRM update command — record the follow-up, next task, owner, and due date in CRM"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/sales-follow-up/SKILL.md",
+              "kind": "ordered_step",
+              "index": 4,
+              "line": 19,
+              "section": "Checklist"
+            }
+          },
+          "connector": {
+            "id": "http",
+            "kind": "http"
+          },
+          "on_success": "node_005_verify_follow_up_audit_trail",
+          "on_failure": "failure"
+        },
+        {
+          "id": "node_005_verify_follow_up_audit_trail",
+          "type": "verification",
+          "title": "Verify follow-up audit trail",
+          "description": "check that the message, task, owner, and timestamp are recorded",
+          "requires": [],
+          "produces": [
+            "node_005_verify_follow_up_audit_trail_result"
+          ],
+          "guard": null,
+          "action": {
+            "kind": "verification",
+            "instruction": "Verify follow-up audit trail — check that the message, task, owner, and timestamp are recorded"
+          },
+          "retry": {
+            "max_attempts": 0
+          },
+          "metadata": {
+            "source": {
+              "file": "examples/skills/sales-follow-up/SKILL.md",
+              "kind": "ordered_step",
+              "index": 5,
+              "line": 20,
+              "section": "Checklist"
+            }
+          },
+          "on_success": "end",
+          "on_failure": "failure"
+        },
+        {
+          "id": "failure",
+          "type": "failure",
+          "title": "Failure",
+          "description": "Terminal failure node."
+        },
+        {
+          "id": "end",
+          "type": "end",
+          "title": "End",
+          "description": "Workflow completed."
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge_001_start_to_node_001_gather_account_context",
+          "from": "start",
+          "to": "node_001_gather_account_context",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_002_node_001_gather_account_context_to_node_002_draft_customer_follow_up",
+          "from": "node_001_gather_account_context",
+          "to": "node_002_draft_customer_follow_up",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_003_node_002_draft_customer_follow_up_to_node_003_ask_account_owner_for_approval",
+          "from": "node_002_draft_customer_follow_up",
+          "to": "node_003_ask_account_owner_for_approval",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_004_node_003_ask_account_owner_for_approval_to_node_004_run_crm_update_command",
+          "from": "node_003_ask_account_owner_for_approval",
+          "to": "node_004_run_crm_update_command",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_005_node_004_run_crm_update_command_to_node_005_verify_follow_up_audit_trail",
+          "from": "node_004_run_crm_update_command",
+          "to": "node_005_verify_follow_up_audit_trail",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_006_node_005_verify_follow_up_audit_trail_to_end",
+          "from": "node_005_verify_follow_up_audit_trail",
+          "to": "end",
+          "condition": null,
+          "label": "next"
+        },
+        {
+          "id": "edge_node_001_gather_account_context_failure",
+          "from": "node_001_gather_account_context",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_002_draft_customer_follow_up_failure",
+          "from": "node_002_draft_customer_follow_up",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_003_ask_account_owner_for_approval_failure",
+          "from": "node_003_ask_account_owner_for_approval",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_004_run_crm_update_command_failure",
+          "from": "node_004_run_crm_update_command",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        },
+        {
+          "id": "edge_node_005_verify_follow_up_audit_trail_failure",
+          "from": "node_005_verify_follow_up_audit_trail",
+          "to": "failure",
+          "condition": {
+            "expr": "node.status == 'failed'"
+          },
+          "label": "failure"
+        }
+      ],
+      "state_schema": {},
+      "guards": [
+        {
+          "id": "guard_001",
+          "description": "Do NOT send customer-facing follow-up or update CRM until the account owner approves the proposed next action."
+        }
+      ],
+      "checkpoints": [],
+      "policies": {
+        "default_retry": {
+          "max_attempts": 0
+        },
+        "default_timeout_ms": 300000
+      }
+    }
+  }
+}
