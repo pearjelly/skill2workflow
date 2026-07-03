@@ -54,12 +54,11 @@ Important boundaries:
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work has four priorities:
+Post-`v0.1.0` work now has three active priorities after Loop 15 made releases repeatable:
 
-1. make releases repeatable,
-2. make real enterprise workflow examples easy to inspect,
-3. harden connector behavior without overbuilding a marketplace,
-4. improve local operator visibility while keeping Workflow DSL authoritative.
+1. make real enterprise workflow examples easy to inspect,
+2. harden connector behavior without overbuilding a marketplace,
+3. improve local operator visibility while keeping Workflow DSL authoritative.
 
 ### Loop 16: Workflow Example Pack
 
@@ -98,6 +97,30 @@ Loop 16 explicit non-goals:
 - Do not add product-specific enterprise connectors.
 - Do not change Workflow DSL semantics solely for an example.
 - Do not make LiteGraph JSON the execution source of truth.
+
+Loop 16 expected file changes:
+
+- `examples/skills/<scenario>/SKILL.md` for each enterprise scenario.
+- `examples/workflows/<scenario>.workflow.json` for compiled Workflow DSL fixtures.
+- `examples/workflows/<scenario>.litegraph.json` for editor-inspectable graph fixtures.
+- `docs/examples.md` or `docs/authoring.md` updates that explain scenario intent, control points, and inspection commands.
+- `README.md` updates that point contributors to the example pack.
+
+Loop 16 verification commands:
+
+- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- `python3 -m py_compile src/skill2workflow/*.py`
+- `PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/<scenario>/SKILL.md -o examples/workflows/<scenario>.workflow.json`
+- `PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/<scenario>.workflow.json --format json`
+- `PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/<scenario>.workflow.json -o examples/workflows/<scenario>.litegraph.json`
+- `git diff --check`
+
+Loop 16 done means:
+
+- At least four enterprise scenarios are committed and documented.
+- Every scenario has a source `SKILL.md`, compiled Workflow DSL fixture, and LiteGraph fixture.
+- Each scenario demonstrates a distinct control pattern, such as required order, human gate, connector boundary, retry/checkpoint policy, or audit-friendly state.
+- The existing gallery and docs make the examples discoverable without adding runtime dependencies.
 
 ## Near-Term Loop Queue
 
