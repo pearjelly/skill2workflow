@@ -52,6 +52,13 @@ Important boundaries:
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
+Post-`v0.1.0` work has four priorities:
+
+1. make releases repeatable,
+2. make real enterprise workflow examples easy to inspect,
+3. harden connector behavior without overbuilding a marketplace,
+4. improve local operator visibility while keeping Workflow DSL authoritative.
+
 ### Loop 15: Release Automation
 
 Goal: make future release tags repeatable without relying on a manual checklist.
@@ -70,6 +77,23 @@ Acceptance criteria:
 - Maintainers can run one documented command path before creating a release
 - Automation rejects mismatched version/tag/release-note inputs
 - Release automation remains optional until it has been exercised on a patch release
+
+## Near-Term Loop Queue
+
+This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
+
+| Loop | Status | Goal | Expected artifact |
+| --- | --- | --- | --- |
+| Loop 15: Release Automation | Next | Make patch releases repeatable and auditable | release checklist command path plus workflow/script guardrails |
+| Loop 16: Workflow Example Pack | Planned | Show enterprise scenarios beyond approval and HTTP examples | validated example skills/workflows for sales, customer service, risk review, and operations analysis |
+| Loop 17: Connector Runtime Hardening | Planned | Improve connector reliability without adding external services | retry/timeout policy coverage, connector fixture harness, clearer credential boundary docs |
+| Loop 18: Control Plane Operator UX | Planned | Connect control-plane state back to visual inspection | local server or static artifact flow for run/audit overlays and workflow artifact diffs |
+
+Loop selection rules:
+
+- Pick the next loop only after the previous loop is merged or explicitly deferred.
+- Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
+- Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
 
 ## Release Tag Plan
 
@@ -165,6 +189,7 @@ Target: support real team pilots while keeping the project local-first and open-
 Contributors can help in these areas:
 
 - Parser coverage for real-world `SKILL.md` formats
+- Release automation and package verification
 - Workflow node types and compiler rules
 - Validator improvements and JSON Schema
 - LiteGraph node UI and expanded graph-to-DSL write-back
