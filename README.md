@@ -289,7 +289,7 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Open Source Release Readiness
 - Local Control Plane UI
 
-Next priority is Loop 14 Release Tagging.
+Next priority is Loop 15 Release Automation.
 
 See:
 

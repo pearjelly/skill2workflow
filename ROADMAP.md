@@ -46,30 +46,30 @@ Important boundaries:
 | Loop 11: Authoring Experience | Complete | Example gallery, richer LiteGraph parameter forms, safe action/retry/HTTP request write-back, authoring docs |
 | Loop 12: Open Source Release Readiness | Complete | `CONTRIBUTING.md`, issue templates, release notes, DSL compatibility policy, stability boundaries |
 | Loop 13: Local Control Plane UI | Complete | `control-snapshot`, example snapshot fixture, static control-plane inspector, docs |
+| Loop 14: Release Tagging | Complete | Annotated `v0.1.0` tag, GitHub release, release notes published from verified `main` |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-### Loop 14: Release Tagging
+### Loop 15: Release Automation
 
-Goal: publish the first GitHub release tag from the documented `v0.1.0` release scope.
+Goal: make future release tags repeatable without relying on a manual checklist.
 
 Status: next engineering loop.
 
 Scope:
 
-- Verify `main` against release checklist
-- Confirm `docs/releases/v0.1.0.md` matches the shipped Loop 1-13 scope
-- Create annotated `v0.1.0` tag
-- Create GitHub release using `docs/releases/v0.1.0.md`
-- Update release automation notes for future tags
+- Add a documented release checklist command path
+- Add a GitHub Actions release workflow draft or scriptable release helper
+- Validate that release notes, package version, and tag name agree before publishing
+- Keep manual release creation available as a fallback
 
 Acceptance criteria:
 
-- `v0.1.0` tag points at a green `main`
-- GitHub release notes match the repository docs
-- Follow-up release automation work is clearly scoped
+- Maintainers can run one documented command path before creating a release
+- Automation rejects mismatched version/tag/release-note inputs
+- Release automation remains optional until it has been exercised on a patch release
 
 ## Release Tag Plan
 
@@ -77,11 +77,13 @@ Release tags use semantic versioning. The first public tag is `v0.1.0`; it packa
 
 ### v0.1.0: First Open-Source Bootstrap Release
 
-Status: ready for Loop 14 tagging.
+Status: published in Loop 14.
 
 Release source:
 
 - Branch: `main`
+- Tag: `v0.1.0`
+- Release: `https://github.com/pearjelly/skill2workflow/releases/tag/v0.1.0`
 - Notes: `docs/releases/v0.1.0.md`
 - Compatibility: Workflow DSL `0.1.0`, Python 3.9+, standard-library runtime
 
