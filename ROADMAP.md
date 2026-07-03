@@ -78,6 +78,27 @@ Acceptance criteria:
 - Automation rejects mismatched version/tag/release-note inputs
 - Release automation remains optional until it has been exercised on a patch release
 
+Loop 15 implementation slices:
+
+1. Release preflight command
+   - Add a local command or script that checks clean working tree, package version, release notes file, tag availability, and required verification commands.
+   - It must be read-only by default and safe to run repeatedly.
+2. Version consistency guard
+   - Check that `pyproject.toml`, `src/skill2workflow/__init__.py`, release notes, and requested tag agree.
+   - Fail clearly on mismatches before any GitHub operation.
+3. Release workflow dry-run
+   - Add a GitHub Actions workflow or documented CLI path that can run the preflight without creating a tag or release.
+   - Keep actual tag/release creation manual until a patch release proves the workflow.
+4. Release maintainer docs
+   - Document the manual fallback path used for `v0.1.0`.
+   - Document what evidence should be copied into release PRs.
+
+Loop 15 explicit non-goals:
+
+- Do not auto-publish GitHub Releases from every pushed tag yet.
+- Do not add package upload or registry publication.
+- Do not introduce external release dependencies unless the standard library and GitHub Actions cannot cover the guardrail.
+
 ## Near-Term Loop Queue
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
