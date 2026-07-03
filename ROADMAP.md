@@ -99,6 +99,27 @@ Loop 15 explicit non-goals:
 - Do not add package upload or registry publication.
 - Do not introduce external release dependencies unless the standard library and GitHub Actions cannot cover the guardrail.
 
+Loop 15 expected file changes:
+
+- `scripts/release_preflight.py` or `src/skill2workflow/release.py` for the standard-library release guard.
+- `tests/test_release_preflight.py` for clean-tree, version mismatch, missing-notes, tag-exists, and dry-run behavior.
+- `docs/release-process.md` for maintainer steps, release PR evidence, and the manual fallback path.
+- `.github/workflows/release-preflight.yml` for CI dry-run coverage that does not create tags or releases.
+
+Loop 15 verification commands:
+
+- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- `python3 -m py_compile src/skill2workflow/*.py`
+- `python3 scripts/release_preflight.py --version 0.1.1 --notes docs/releases/v0.1.1.md --dry-run`
+- `git diff --check`
+
+Loop 15 done means:
+
+- A valid patch-release draft can pass preflight without writing GitHub state.
+- Version, tag, and release-note mismatches fail before any GitHub operation.
+- CI can run the release dry-run path on pull requests.
+- Maintainers still have a documented manual release fallback matching the `v0.1.0` process.
+
 ## Near-Term Loop Queue
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
