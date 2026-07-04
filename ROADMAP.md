@@ -22,6 +22,7 @@ Current capability snapshot:
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
 - Local control-plane UI: read-only snapshot export, derived operator insights, and static inspector for attention items, recent events, connector events, workflows, runs, audit events, connectors, and version comparisons
 - Demo onboarding: one-command local demo workspace generation with Workflow DSL, LiteGraph, run state, audit, and control-plane snapshot artifacts
+- Packaging and installability: package metadata guardrails, editable install smoke, and installed `skill2workflow` console-script verification
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
 
 Important boundaries:
@@ -55,84 +56,84 @@ Important boundaries:
 | Loop 17: Connector Runtime Hardening | Complete | Deterministic HTTP connector tests, timeout/error normalization, retry/timeout docs, credential boundary docs |
 | Loop 18: Control Plane Operator UX | Complete | Snapshot operator insights, static Operator view, attention/recent/connector/version tables, docs |
 | Loop 19: Demo And Contributor Onboarding | Complete | Resettable local demo helper, generated onboarding artifacts, README/HARNESS entry path, tests |
+| Loop 20: Packaging And Installability | Complete | Package metadata guards, editable install smoke helper, installed console-script verification, contributor docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 19 made first-run evaluation easier:
+Post-`v0.1.0` work now has one active priority after Loop 20 made package-level usage reliable:
 
-1. make installability and package-level usage reliable without changing runtime behavior.
+1. make runtime policy and recovery behavior explicit enough for realistic local pilots.
 
-### Loop 20: Packaging And Installability
+### Loop 21: Runtime Policy And Recovery
 
-Goal: make local package installation and console-script usage reliable for contributors and early adopters.
+Goal: make workflow execution policy behavior easier to trust by turning retry, timeout, checkpoint, and failure recovery semantics into tested runtime behavior.
 
 Status: next engineering loop.
 
-Execution plan: `docs/superpowers/plans/2026-07-04-packaging-installability.md`.
-
 Initial PR boundary:
 
-- Start from the existing `pyproject.toml` and `skill2workflow` console script.
-- Verify package metadata, editable install, and direct console-script usage from a clean environment path.
-- Keep source-checkout commands available for contributors who do not want to install the package.
-- Keep runtime dependency policy unchanged.
-- Do not publish packages or add release automation in this loop.
+- Start from existing Workflow DSL policy fields and local executor behavior.
+- Keep Workflow DSL authoritative and published workflow artifacts immutable.
+- Prefer deterministic local tests over background workers or external services.
+- Do not add distributed scheduling, queues, RBAC, or connector credential management in this loop.
 
 Scope:
 
-- Add package install smoke coverage for the CLI entry point where practical
-- Document editable install and console-script usage alongside `PYTHONPATH=src` commands
-- Check that packaged metadata includes the expected README, license, Python requirement, and console script
-- Keep demo and contributor commands aligned with installed usage
+- Define which retry and timeout policy fields the local executor should honor first
+- Record policy decisions and retry attempts in run state and audit-friendly event logs
+- Make resume/recovery behavior deterministic when a run stops after a failed or waiting node
+- Document failure semantics for local pilots
 
 Acceptance criteria:
 
-- A contributor can run either source-checkout commands or editable-install commands
-- `skill2workflow` console script behavior is documented and smoke-tested
-- Package metadata remains consistent with release docs and Python 3.9 support
-- No new runtime dependencies are introduced
+- A local pilot can see why a node retried, failed, waited, or recovered
+- Runtime policy behavior is covered by executor/control-plane tests
+- Existing Workflow DSL `0.1.0` fixtures remain valid
+- No background service, external queue, or runtime dependency is introduced
 
-Loop 20 implementation slices:
+Loop 21 implementation slices:
 
-1. Package metadata guardrails
-   - Add tests that pin the expected package name, version, README, license, Python requirement, and `skill2workflow` console script.
-2. Editable install smoke
-   - Add a maintainer script that creates a temporary virtual environment, installs the checkout in editable mode, verifies installed metadata, and runs a representative console-script command.
-3. Contributor docs
-   - Add editable install commands and clarify when to use `PYTHONPATH=src` versus the installed `skill2workflow` command.
-4. Verification
-   - Run full tests, package metadata checks, package smoke, and the demo onboarding path.
+1. Runtime policy inventory
+   - Identify existing retry, timeout, checkpoint, and failure metadata in compiled and example workflows.
+2. Retry and timeout semantics
+   - Implement the smallest deterministic executor behavior that honors already-documented policy fields.
+3. Recovery visibility
+   - Record enough run events for operators to understand retry, timeout, waiting, resume, and terminal failure paths.
+4. Pilot docs
+   - Document local failure/recovery semantics and their current limits.
+5. Verification
+   - Run full tests, focused executor/control-plane tests, demo onboarding, and package smoke.
 
-Loop 20 explicit non-goals:
+Loop 21 explicit non-goals:
 
-- Do not publish to PyPI.
-- Do not add package signing.
-- Do not add binary artifacts.
+- Do not add distributed scheduling.
+- Do not add background workers or external queues.
+- Do not add enterprise credential management.
 - Do not introduce runtime dependencies.
 
-Loop 20 expected file changes:
+Loop 21 expected file changes:
 
-- `README.md`, `HARNESS.md`, and possibly `CONTRIBUTING.md` for editable install guidance.
-- `tests/` for package metadata or console script smoke coverage.
-- `docs/superpowers/plans/2026-07-04-packaging-installability.md` for execution handoff.
-- `pyproject.toml` only if tests expose missing packaging metadata.
-- `scripts/package_smoke.py` if install verification needs a small maintainer helper.
+- `tests/test_executor.py` and possibly `tests/test_control_plane.py` for policy and recovery coverage.
+- `src/skill2workflow/executor.py` for local runtime semantics.
+- `src/skill2workflow/control_plane.py` only if published-run audit events need new policy details.
+- `docs/` and `HARNESS.md` for runtime policy and failure recovery guidance.
 
-Loop 20 verification commands:
+Loop 21 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
 - `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
+- focused executor/control-plane tests documented in the PR
 - `git diff --check`
 
-Loop 20 done means:
+Loop 21 done means:
 
-- Contributors have a documented install path and a verified console-script smoke path.
-- Source-checkout and installed-command guidance are consistent.
-- No new runtime dependencies or publishing side effects are added.
+- Runtime policy behavior is explicit, tested, and inspectable in run state.
+- Local pilots have a documented recovery model for failed and waiting workflows.
+- Workflow DSL remains authoritative and existing examples stay compatible.
 
 ## Near-Term Loop Queue
 
@@ -140,7 +141,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 20: Packaging And Installability | Next | Make local install and console-script usage reliable | editable install docs, console-script smoke coverage, package metadata checks |
+| Loop 21: Runtime Policy And Recovery | Next | Make local retry, timeout, failure, and recovery behavior explicit | executor policy tests, run event visibility, pilot docs |
 
 Loop selection rules:
 

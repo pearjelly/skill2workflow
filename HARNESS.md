@@ -21,6 +21,21 @@ python3 -m json.tool /tmp/skill2workflow-demo/artifacts/control-plane-snapshot.j
 
 Open the local control-plane inspector at `http://localhost:4173/web/control.html` after starting `python3 -m http.server 4173`, then load `/tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json`.
 
+Run the editable install and console-script smoke:
+
+```bash
+python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+```
+
+Manual editable install path:
+
+```bash
+python3 -m venv /tmp/skill2workflow-venv
+/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68"
+/tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
+/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json
+```
+
 Run the CLI closed loop:
 
 ```bash
@@ -150,6 +165,10 @@ Implemented:
   - generates a resettable local demo workspace through `scripts/demo_bootstrap.py`
   - writes Workflow DSL, LiteGraph, and control-plane snapshot artifacts under the demo work directory
   - exercises parse, compile, validate, publish, run, resume, audit, and snapshot paths without network access or secrets
+- Packaging and installability
+  - verifies package metadata and empty runtime dependency policy through `tests/test_packaging.py`
+  - verifies editable install and the installed `skill2workflow` console script through `scripts/package_smoke.py`
+  - keeps source-checkout `PYTHONPATH=src` commands and editable-install commands documented side by side
 - Connector runtime
   - provides active `manual` and `http` connector manifests
   - gives compiled `human_gate` nodes a default manual connector binding

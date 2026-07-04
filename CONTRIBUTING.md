@@ -24,6 +24,21 @@ Run the full test suite:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
+Optionally install the checkout in editable mode to use the `skill2workflow` console script:
+
+```bash
+python3 -m venv /tmp/skill2workflow-venv
+/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68"
+/tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
+/tmp/skill2workflow-venv/bin/skill2workflow --help
+```
+
+You can also run the package smoke helper, which creates its own temporary virtual environment and validates the installed console script:
+
+```bash
+python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+```
+
 Run a fresh-checkout CLI smoke:
 
 ```bash
@@ -109,6 +124,7 @@ Before opening a PR:
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
+python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 git diff --check
 ```
 
