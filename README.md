@@ -92,10 +92,37 @@ The current implementation is a dependency-light Python harness because the loca
 - Export a read-only control-plane snapshot with derived operator insights
 - Inspect operator attention items, recent events, connector events, workflows, runs, audit events, and version deltas in a static local control-plane UI
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
+- Generate a deterministic first-run demo workspace for contributor onboarding
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
 ## Quickstart
+
+Run the shortest local demo from a fresh checkout:
+
+```bash
+python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo
+```
+
+The demo compiles `examples/skills/approval-flow/SKILL.md`, publishes and runs the workflow, resumes the approval gate, and writes artifacts under `/tmp/skill2workflow-demo/artifacts/`:
+
+- `workflow.json`
+- `workflow.litegraph.json`
+- `control-plane-snapshot.json`
+
+Open the local control-plane inspector:
+
+```bash
+python3 -m http.server 4173
+```
+
+Then open:
+
+```text
+http://localhost:4173/web/control.html
+```
+
+Load `/tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json` to inspect the generated operator snapshot. Rerunning the demo resets the work directory by default; pass `--no-reset` to keep existing files.
 
 Run tests:
 
@@ -338,8 +365,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Workflow Example Pack
 - Connector Runtime Hardening
 - Control Plane Operator UX
+- Demo And Contributor Onboarding
 
-Next priority is Loop 19 Demo And Contributor Onboarding.
+Next priority is Loop 20 Packaging And Installability.
 
 See:
 

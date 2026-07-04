@@ -21,6 +21,7 @@ Current capability snapshot:
 - Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
 - Local control-plane UI: read-only snapshot export, derived operator insights, and static inspector for attention items, recent events, connector events, workflows, runs, audit events, connectors, and version comparisons
+- Demo onboarding: one-command local demo workspace generation with Workflow DSL, LiteGraph, run state, audit, and control-plane snapshot artifacts
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
 
 Important boundaries:
@@ -53,79 +54,81 @@ Important boundaries:
 | Loop 16: Workflow Example Pack | Complete | Enterprise example skills, synchronized Workflow DSL and LiteGraph fixtures, example docs and gallery entries |
 | Loop 17: Connector Runtime Hardening | Complete | Deterministic HTTP connector tests, timeout/error normalization, retry/timeout docs, credential boundary docs |
 | Loop 18: Control Plane Operator UX | Complete | Snapshot operator insights, static Operator view, attention/recent/connector/version tables, docs |
+| Loop 19: Demo And Contributor Onboarding | Complete | Resettable local demo helper, generated onboarding artifacts, README/HARNESS entry path, tests |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 18 improved local operator inspection:
+Post-`v0.1.0` work now has one active priority after Loop 19 made first-run evaluation easier:
 
-1. make first-run evaluation and contributor onboarding easier without adding platform dependencies.
+1. make installability and package-level usage reliable without changing runtime behavior.
 
-### Loop 19: Demo And Contributor Onboarding
+### Loop 20: Packaging And Installability
 
-Goal: make the project easier to evaluate from a fresh checkout by packaging the shortest deterministic demo path from Skill input to Workflow DSL, publish/run, snapshot export, and local UI inspection.
+Goal: make local package installation and console-script usage reliable for contributors and early adopters.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Start from existing examples and CLI commands.
-- Prefer docs and a deterministic helper script over new runtime features.
-- Keep the demo local-first and dependency-light.
-- Do not add hosted docs, package publishing, analytics, or external services in this loop.
+- Start from the existing `pyproject.toml` and `skill2workflow` console script.
+- Verify editable install and direct script usage from a clean environment path.
+- Keep runtime dependency policy unchanged.
+- Do not publish packages or add release automation in this loop.
 
 Scope:
 
-- Provide a concise first-run demo path that exercises parser, compiler, validator, publish/run, audit, snapshot, and UI inspection
-- Keep generated demo state deterministic enough for contributors to compare against expected artifacts
-- Document how to reset and rerun the demo locally
-- Link the demo path from README and HARNESS
+- Add package install smoke coverage for the CLI entry point where practical
+- Document editable install and console-script usage alongside `PYTHONPATH=src` commands
+- Check that packaged metadata includes the expected README, license, Python requirement, and console script
+- Keep demo and contributor commands aligned with installed usage
 
 Acceptance criteria:
 
-- A new contributor can run one documented sequence from a fresh checkout and inspect a populated control-plane snapshot
-- The sequence uses only Python standard-library runtime code and committed examples
-- The demo does not require public network access or secrets
-- Tests cover any helper script or generated fixture behavior
+- A contributor can run either source-checkout commands or editable-install commands
+- `skill2workflow` console script behavior is documented and smoke-tested
+- Package metadata remains consistent with release docs and Python 3.9 support
+- No new runtime dependencies are introduced
 
-Loop 19 implementation slices:
+Loop 20 implementation slices:
 
-1. Demo path design
-   - Decide whether a documented command sequence is enough or whether a small `scripts/` helper is warranted.
-2. Deterministic local state
-   - Generate publish/run/audit/snapshot state from committed examples without public network calls.
+1. Install smoke design
+   - Decide whether tests should inspect `pyproject.toml`, invoke the console script, or both.
+2. Console script coverage
+   - Verify a representative command through the installed entry point or a close local equivalent.
 3. Contributor docs
-   - Add a short first-run walkthrough with reset instructions.
+   - Add editable install commands and clarify when to use `PYTHONPATH=src`.
 4. Verification
-   - Add tests for any helper script and run the full project harness.
+   - Run full tests, package metadata checks, and demo onboarding path.
 
-Loop 19 explicit non-goals:
+Loop 20 explicit non-goals:
 
-- Do not add package publishing.
-- Do not add a hosted demo service.
-- Do not add telemetry or analytics.
+- Do not publish to PyPI.
+- Do not add package signing.
+- Do not add binary artifacts.
 - Do not introduce runtime dependencies.
 
-Loop 19 expected file changes:
+Loop 20 expected file changes:
 
-- `README.md` and `HARNESS.md` for first-run instructions.
-- `docs/` for a focused walkthrough if the README path becomes too long.
-- `scripts/` only if a helper script materially reduces contributor friction.
-- `tests/` only if a helper script or fixture sync behavior is added.
+- `README.md`, `HARNESS.md`, and possibly `CONTRIBUTING.md` for editable install guidance.
+- `tests/` for package metadata or console script smoke coverage.
+- `pyproject.toml` only if tests expose missing packaging metadata.
+- `scripts/` only if install verification needs a small maintainer helper.
 
-Loop 19 verification commands:
+Loop 20 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
-- demo commands documented in README/HARNESS
+- `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
+- editable install or console-script smoke command documented in the PR
 - `git diff --check`
 
-Loop 19 done means:
+Loop 20 done means:
 
-- The first-run demo path is clear, repeatable, and local-only.
-- Contributors can produce and inspect a useful control-plane snapshot quickly.
-- No external services, secrets, or new dependencies are required.
+- Contributors have a documented install path and a verified console-script smoke path.
+- Source-checkout and installed-command guidance are consistent.
+- No new runtime dependencies or publishing side effects are added.
 
 ## Near-Term Loop Queue
 
@@ -133,7 +136,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 19: Demo And Contributor Onboarding | Next | Make first-run evaluation easier | deterministic local demo path and contributor walkthrough |
+| Loop 20: Packaging And Installability | Next | Make local install and console-script usage reliable | editable install docs, console-script smoke coverage, package metadata checks |
 
 Loop selection rules:
 
