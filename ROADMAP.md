@@ -13,8 +13,8 @@ Current capability snapshot:
 - Skill ingestion: `SKILL.md` frontmatter, hard gates, and ordered checklist steps become Skill IR
 - DSL authority: Skill IR compiles to Workflow DSL, with JSON Schema and structured validation errors
 - Visual layer: Workflow DSL renders to LiteGraph JSON, and safe visual edits can write back to DSL
-- Runtime: local executor supports run state, human-gate pause/resume, run listing, and run detail
-- Control plane: immutable workflow publish, version lifecycle, published-version runs, resume, audit log, and filtered audit queries
+- Runtime: local executor supports run state, human-gate pause/resume, connector retry policy, recovery events, run listing, and run detail
+- Control plane: immutable workflow publish, version lifecycle, published-version runs, resume, audit log, filtered audit queries, and promoted runtime policy events
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
@@ -23,6 +23,7 @@ Current capability snapshot:
 - Local control-plane UI: read-only snapshot export, derived operator insights, and static inspector for attention items, recent events, connector events, workflows, runs, audit events, connectors, and version comparisons
 - Demo onboarding: one-command local demo workspace generation with Workflow DSL, LiteGraph, run state, audit, and control-plane snapshot artifacts
 - Packaging and installability: package metadata guardrails, editable install smoke, and installed `skill2workflow` console-script verification
+- Runtime policy and recovery: connector-node retry execution, retry/recovery run events, and published-run policy audit promotion
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
 
 Important boundaries:
@@ -57,83 +58,86 @@ Important boundaries:
 | Loop 18: Control Plane Operator UX | Complete | Snapshot operator insights, static Operator view, attention/recent/connector/version tables, docs |
 | Loop 19: Demo And Contributor Onboarding | Complete | Resettable local demo helper, generated onboarding artifacts, README/HARNESS entry path, tests |
 | Loop 20: Packaging And Installability | Complete | Package metadata guards, editable install smoke helper, installed console-script verification, contributor docs |
+| Loop 21: Runtime Policy And Recovery | Complete | Connector retry policy execution, retry/recovery events, audit promotion, runtime policy docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 20 made package-level usage reliable:
+Post-`v0.1.0` work now has one active priority after Loop 21 made runtime retry and recovery behavior visible:
 
-1. make runtime policy and recovery behavior explicit enough for realistic local pilots.
+1. keep connector integration safer by defining credential and secret-handling boundaries before adding more real integrations.
 
-### Loop 21: Runtime Policy And Recovery
+### Loop 22: Credential Boundary And Secret Hygiene
 
-Goal: make workflow execution policy behavior easier to trust by turning retry, timeout, checkpoint, and failure recovery semantics into tested runtime behavior.
+Goal: prevent unsafe connector adoption by defining how credentials, redaction, and non-secret example data are represented before expanding connector coverage.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Start from existing Workflow DSL policy fields and local executor behavior.
+- Start from current HTTP connector metadata and example fixtures.
 - Keep Workflow DSL authoritative and published workflow artifacts immutable.
-- Prefer deterministic local tests over background workers or external services.
-- Do not add distributed scheduling, queues, RBAC, or connector credential management in this loop.
+- Prefer explicit credential boundary docs and validator/test guardrails before implementing any secret backend.
+- Do not store real secrets, add cloud secret managers, or introduce SaaS-specific credential flows in this loop.
 
 Scope:
 
-- Define which retry and timeout policy fields the local executor should honor first
-- Record policy decisions and retry attempts in run state and audit-friendly event logs
-- Make resume/recovery behavior deterministic when a run stops after a failed or waiting node
-- Document failure semantics for local pilots
+- Define what connector metadata may safely live in Workflow DSL fixtures
+- Add guardrails against obvious secret-like fields in committed examples where practical
+- Document supported placeholder and local-test credential patterns
+- Prepare extension points for future credential providers without implementing one
 
 Acceptance criteria:
 
-- A local pilot can see why a node retried, failed, waited, or recovered
-- Runtime policy behavior is covered by executor/control-plane tests
+- Examples and docs clearly say Workflow DSL must not contain secrets
+- Tests catch secret-like connector fixture regressions where practical
+- Contributor guidance explains safe local connector examples
 - Existing Workflow DSL `0.1.0` fixtures remain valid
-- No background service, external queue, or runtime dependency is introduced
+- No secret manager, external credential service, or runtime dependency is introduced
 
-Loop 21 implementation slices:
+Loop 22 implementation slices:
 
-1. Runtime policy inventory
-   - Identify existing retry, timeout, checkpoint, and failure metadata in compiled and example workflows.
-2. Retry and timeout semantics
-   - Implement the smallest deterministic executor behavior that honors already-documented policy fields.
-3. Recovery visibility
-   - Record enough run events for operators to understand retry, timeout, waiting, resume, and terminal failure paths.
-4. Pilot docs
-   - Document local failure/recovery semantics and their current limits.
+1. Credential boundary inventory
+   - Review connector docs, examples, and Workflow DSL fixtures for current credential assumptions.
+2. Secret hygiene guardrails
+   - Add tests or checks that prevent obvious secret-like values in committed connector examples.
+3. Extension-point documentation
+   - Document placeholder patterns and future credential provider boundaries.
+4. Contributor docs
+   - Update contributor and connector docs with safe example rules.
 5. Verification
-   - Run full tests, focused executor/control-plane tests, demo onboarding, and package smoke.
+   - Run full tests, fixture checks, demo onboarding, and package smoke.
 
-Loop 21 explicit non-goals:
+Loop 22 explicit non-goals:
 
-- Do not add distributed scheduling.
-- Do not add background workers or external queues.
-- Do not add enterprise credential management.
+- Do not add a secret manager.
+- Do not add token injection.
+- Do not add RBAC or IAM.
+- Do not add product-specific SaaS credential flows.
 - Do not introduce runtime dependencies.
 
-Loop 21 expected file changes:
+Loop 22 expected file changes:
 
-- `tests/test_executor.py` and possibly `tests/test_control_plane.py` for policy and recovery coverage.
-- `src/skill2workflow/executor.py` for local runtime semantics.
-- `src/skill2workflow/control_plane.py` only if published-run audit events need new policy details.
-- `docs/` and `HARNESS.md` for runtime policy and failure recovery guidance.
+- `tests/` for fixture or connector credential hygiene checks.
+- `docs/connectors.md`, `docs/runtime-policy.md`, or a focused credential boundary doc.
+- `CONTRIBUTING.md`, `README.md`, and `HARNESS.md` for safe example guidance.
+- Example fixtures only if current placeholders need clarification.
 
-Loop 21 verification commands:
+Loop 22 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
 - `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
-- focused executor/control-plane tests documented in the PR
+- focused credential/fixture hygiene tests documented in the PR
 - `git diff --check`
 
-Loop 21 done means:
+Loop 22 done means:
 
-- Runtime policy behavior is explicit, tested, and inspectable in run state.
-- Local pilots have a documented recovery model for failed and waiting workflows.
-- Workflow DSL remains authoritative and existing examples stay compatible.
+- Contributors know how to write connector examples without leaking secrets.
+- Committed fixtures have guardrails against obvious credential leaks.
+- Future credential provider work has a documented boundary without adding secret infrastructure yet.
 
 ## Near-Term Loop Queue
 
@@ -141,7 +145,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 21: Runtime Policy And Recovery | Next | Make local retry, timeout, failure, and recovery behavior explicit | executor policy tests, run event visibility, pilot docs |
+| Loop 22: Credential Boundary And Secret Hygiene | Next | Keep connector examples and future integrations secret-safe | fixture hygiene tests, credential boundary docs |
 
 Loop selection rules:
 

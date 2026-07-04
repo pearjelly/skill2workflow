@@ -92,6 +92,8 @@ PYTHONPATH=src python3 -m skill2workflow.cli control-run <run_id> --state-dir /t
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type run_completed
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type connector_completed
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --event-type node_retrying
+PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --event-type node_recovered
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
@@ -131,7 +133,9 @@ Implemented:
   - records human gate approvals and rejections
   - supports rejected human gate failure paths
   - executes connector-bound `tool_call` nodes through the built-in HTTP connector
+  - honors `retry.max_attempts` and `policies.default_retry.max_attempts` for connector nodes
   - records connector start, completion, and failure events in run state
+  - records `node_retrying`, `node_recovered`, and `node_failed` runtime policy events for local recovery inspection
   - exposes run summaries and full run details
 - LiteGraph visualization
   - converts Workflow DSL into LiteGraph-compatible graph JSON
@@ -156,6 +160,7 @@ Implemented:
   - records workflow publish, deprecate, and run events in JSONL or SQLite audit storage
   - filters audit events by workflow id, version, run id, and event type
   - records connector execution events in audit storage for published runs
+  - promotes runtime policy events such as retry and recovery into audit storage for published runs
   - imports existing JSON registry and audit files when opening SQLite control-plane storage
   - exposes built-in connector manifests
   - exports a read-only local operator snapshot through `control-snapshot`
@@ -176,6 +181,10 @@ Implemented:
   - executes HTTP requests with the Python standard library
   - covers HTTP connector success, HTTP error, invalid request metadata, JSON body, headers, and timeout behavior with deterministic local tests
   - documents retry, timeout, and credential boundaries in `docs/connectors.md`
+- Runtime policy and recovery
+  - documents retry and recovery semantics in `docs/runtime-policy.md`
+  - treats `retry.max_attempts` as retries after the first connector attempt
+  - keeps global deadlines, delayed backoff, compensation, queues, and credential management outside the current local runtime boundary
 - Open-source release readiness
   - documents contributor setup and PR expectations in `CONTRIBUTING.md`
   - provides GitHub issue templates for bugs, feature requests, and workflow examples

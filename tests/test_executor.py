@@ -173,6 +173,28 @@ class ExecutorTests(TestCase):
         self.assertIn(("connector_started", "call_api"), event_rows)
         self.assertIn(("connector_completed", "call_api"), event_rows)
 
+    def test_retry_policy_retries_failed_connector_and_records_recovery(self):
+        server = _FlakyConnectorTestServer()
+        workflow = _http_connector_workflow(server.url)
+        workflow["nodes"][1]["retry"] = {"max_attempts": 1}
+
+        try:
+            with TemporaryDirectory() as tmp:
+                state = LocalExecutor(Path(tmp), storage="sqlite").run(workflow)
+        finally:
+            server.close()
+
+        event_types = [event["type"] for event in state["events"]]
+        call_result = state["node_results"]["call_api"]
+        self.assertEqual(state["status"], "completed")
+        self.assertEqual(len(server.requests), 2)
+        self.assertEqual(call_result["status"], "completed")
+        self.assertEqual(call_result["attempts"], 2)
+        self.assertEqual(call_result["max_attempts"], 1)
+        self.assertIn("last_error", call_result)
+        self.assertIn("node_retrying", event_types)
+        self.assertIn("node_recovered", event_types)
+
 
 def _approval_workflow():
     return {
@@ -263,6 +285,28 @@ class _ConnectorRequestHandler(BaseHTTPRequestHandler):
         return
 
 
+class _FlakyConnectorRequestHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw_body = self.rfile.read(length).decode("utf-8")
+        body = json.loads(raw_body) if raw_body else None
+        self.server.requests.append({"path": self.path, "body": body})
+
+        if len(self.server.requests) == 1:
+            payload = json.dumps({"error": "temporary"}).encode("utf-8")
+            self.send_response(503)
+        else:
+            payload = json.dumps({"ok": True}).encode("utf-8")
+            self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format, *args):
+        return
+
+
 class _ConnectorTestServer:
     def __init__(self):
         self._server = HTTPServer(("127.0.0.1", 0), _ConnectorRequestHandler)
@@ -283,3 +327,11 @@ class _ConnectorTestServer:
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=2)
+
+
+class _FlakyConnectorTestServer(_ConnectorTestServer):
+    def __init__(self):
+        self._server = HTTPServer(("127.0.0.1", 0), _FlakyConnectorRequestHandler)
+        self._server.requests = []
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
