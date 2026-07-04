@@ -80,9 +80,11 @@ The editor must not change:
 
 Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on `tool_call` nodes. The current local runtime supports method, URL, headers, body, and per-request timeout metadata as documented in `docs/connectors.md`.
 
-`retry.max_attempts` and `policies.default_retry` remain policy metadata in the current local executor. They are preserved by readers and editable through the visual layer, but they do not imply automatic retry execution until that behavior is implemented with tests and compatibility notes.
+`retry.max_attempts` and `policies.default_retry` are policy metadata honored by the current local executor for connector nodes. They are preserved by readers, editable through the visual layer, and documented in `docs/runtime-policy.md`.
 
 Workflow DSL examples and fixtures must not store secrets. Credential storage, token injection, secret redaction, IAM, connector marketplaces, and product-specific SaaS connectors are outside the `0.1.x` built-in connector boundary.
+
+Committed Workflow DSL and LiteGraph example fixtures are checked by `python3 scripts/secret_hygiene.py examples/workflows` for obvious secret-like values. See `docs/credential-boundary.md` for allowed placeholder patterns and future credential provider boundaries.
 
 ## Consumer Guidance
 

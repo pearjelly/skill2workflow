@@ -96,6 +96,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Generate a deterministic first-run demo workspace for contributor onboarding
 - Verify editable install, package metadata, and the installed `skill2workflow` console script
+- Check committed Workflow DSL and LiteGraph examples for obvious secret-like connector values
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
@@ -131,6 +132,12 @@ Run the package install smoke:
 
 ```bash
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+```
+
+Run the committed-fixture secret hygiene check:
+
+```bash
+python3 scripts/secret_hygiene.py examples/workflows
 ```
 
 Or install the checkout in editable mode and use the console script directly:
@@ -346,6 +353,7 @@ src/skill2workflow/
   executor.py     # Durable local execution
   storage.py      # JSON and SQLite local persistence backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON
+  secret_hygiene.py # Fixture secret hygiene scanner
   release.py      # Read-only release preflight checks
   cli.py          # Command line interface
 scripts/          # Maintainer command helpers
@@ -357,6 +365,7 @@ tests/            # Unit tests
 docs/             # Product spec and implementation plans
 docs/assets/      # README screenshots and system design diagrams
 docs/connectors.md # Connector runtime behavior and boundary guide
+docs/credential-boundary.md # Safe credential and fixture hygiene boundary
 docs/examples.md  # Enterprise workflow example pack guide
 docs/releases/    # Release notes
 web/              # Static LiteGraph editor and control-plane inspector
@@ -389,8 +398,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Demo And Contributor Onboarding
 - Packaging And Installability
 - Runtime Policy And Recovery
+- Credential Boundary And Secret Hygiene
 
-Next priority is Loop 22 Credential Boundary And Secret Hygiene.
+Next priority is Loop 23 Trigger And Local Run API.
 
 See:
 
@@ -398,6 +408,7 @@ See:
 - `ROADMAP.md`
 - `docs/authoring.md`
 - `docs/connectors.md`
+- `docs/credential-boundary.md`
 - `docs/examples.md`
 - `docs/release-process.md`
 - `docs/releases/v0.1.0.md`

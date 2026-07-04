@@ -12,6 +12,7 @@ This repository is the `skill2workflow` open-source harness.
 - Contributor entry point: `CONTRIBUTING.md`.
 - Example pack guide: `docs/examples.md`.
 - Connector runtime guide: `docs/connectors.md`.
+- Credential boundary guide: `docs/credential-boundary.md`.
 - Runtime policy guide: `docs/runtime-policy.md`.
 - Compatibility notes: `docs/workflow-dsl-contract.md`, `docs/workflow-dsl-compatibility.md`, and `docs/stability.md`.
 - Release process: `docs/release-process.md`.
@@ -47,6 +48,7 @@ This repository is the `skill2workflow` open-source harness.
 - Control snapshot: `PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json`
 - First-run demo: `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
 - Package smoke: `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
+- Secret hygiene: `python3 scripts/secret_hygiene.py examples/workflows`
 - Editable install: `python3 -m venv /tmp/skill2workflow-venv && /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68" && /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .`
 - Installed CLI smoke: `/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json`
 - Release preflight dry-run: `PYTHONPATH=src python3 scripts/release_preflight.py --version 0.1.0 --notes docs/releases/v0.1.0.md --dry-run --skip-git`
@@ -59,3 +61,4 @@ This repository is the `skill2workflow` open-source harness.
 - Avoid adding runtime dependencies unless they directly support a spec-backed capability.
 - Preserve the approved design spec and update it only when product direction changes.
 - Keep `CONTRIBUTING.md`, issue templates, release notes, and compatibility docs aligned when public contributor workflows change.
+- Keep real secrets out of Workflow DSL and LiteGraph fixtures; use documented placeholders and run `python3 scripts/secret_hygiene.py examples/workflows` for connector/example changes.
