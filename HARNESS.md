@@ -12,6 +12,15 @@ python3 -m py_compile src/skill2workflow/*.py
 git diff --check
 ```
 
+Run the first-run contributor demo:
+
+```bash
+python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo
+python3 -m json.tool /tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json >/tmp/skill2workflow-demo-snapshot-check.json
+```
+
+Open the local control-plane inspector at `http://localhost:4173/web/control.html` after starting `python3 -m http.server 4173`, then load `/tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json`.
+
 Run the CLI closed loop:
 
 ```bash
@@ -137,6 +146,10 @@ Implemented:
   - exports a read-only local operator snapshot through `control-snapshot`
   - derives operator insights for attention items, recent events, connector events, and version changes
   - provides a static control-plane inspector for operator insights, workflows, runs, audit events, connectors, and version comparisons
+- Demo onboarding
+  - generates a resettable local demo workspace through `scripts/demo_bootstrap.py`
+  - writes Workflow DSL, LiteGraph, and control-plane snapshot artifacts under the demo work directory
+  - exercises parse, compile, validate, publish, run, resume, audit, and snapshot paths without network access or secrets
 - Connector runtime
   - provides active `manual` and `http` connector manifests
   - gives compiled `human_gate` nodes a default manual connector binding
