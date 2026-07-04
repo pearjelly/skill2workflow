@@ -70,10 +70,13 @@ Goal: make local package installation and console-script usage reliable for cont
 
 Status: next engineering loop.
 
+Execution plan: `docs/superpowers/plans/2026-07-04-packaging-installability.md`.
+
 Initial PR boundary:
 
 - Start from the existing `pyproject.toml` and `skill2workflow` console script.
-- Verify editable install and direct script usage from a clean environment path.
+- Verify package metadata, editable install, and direct console-script usage from a clean environment path.
+- Keep source-checkout commands available for contributors who do not want to install the package.
 - Keep runtime dependency policy unchanged.
 - Do not publish packages or add release automation in this loop.
 
@@ -93,14 +96,14 @@ Acceptance criteria:
 
 Loop 20 implementation slices:
 
-1. Install smoke design
-   - Decide whether tests should inspect `pyproject.toml`, invoke the console script, or both.
-2. Console script coverage
-   - Verify a representative command through the installed entry point or a close local equivalent.
+1. Package metadata guardrails
+   - Add tests that pin the expected package name, version, README, license, Python requirement, and `skill2workflow` console script.
+2. Editable install smoke
+   - Add a maintainer script that creates a temporary virtual environment, installs the checkout in editable mode, verifies installed metadata, and runs a representative console-script command.
 3. Contributor docs
-   - Add editable install commands and clarify when to use `PYTHONPATH=src`.
+   - Add editable install commands and clarify when to use `PYTHONPATH=src` versus the installed `skill2workflow` command.
 4. Verification
-   - Run full tests, package metadata checks, and demo onboarding path.
+   - Run full tests, package metadata checks, package smoke, and the demo onboarding path.
 
 Loop 20 explicit non-goals:
 
@@ -113,15 +116,16 @@ Loop 20 expected file changes:
 
 - `README.md`, `HARNESS.md`, and possibly `CONTRIBUTING.md` for editable install guidance.
 - `tests/` for package metadata or console script smoke coverage.
+- `docs/superpowers/plans/2026-07-04-packaging-installability.md` for execution handoff.
 - `pyproject.toml` only if tests expose missing packaging metadata.
-- `scripts/` only if install verification needs a small maintainer helper.
+- `scripts/package_smoke.py` if install verification needs a small maintainer helper.
 
 Loop 20 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
-- editable install or console-script smoke command documented in the PR
+- `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
 - `git diff --check`
 
 Loop 20 done means:
