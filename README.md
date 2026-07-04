@@ -79,6 +79,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Bind and validate `tool_call` connector metadata
 - Execute minimal HTTP connector calls from connector-bound `tool_call` nodes
 - Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
+- Honor connector-node `retry.max_attempts` and record retry/recovery events
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
 - Open a static LiteGraph visual editor for graph inspection and parameter edits
 - Write safe LiteGraph title and description edits back to Workflow DSL
@@ -89,6 +90,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Audit connector execution events through the control plane
+- Audit runtime policy events such as `node_retrying`, `node_recovered`, and `node_failed` through the control plane
 - Export a read-only control-plane snapshot with derived operator insights
 - Inspect operator attention items, recent events, connector events, workflows, runs, audit events, and version deltas in a static local control-plane UI
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
@@ -386,8 +388,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Control Plane Operator UX
 - Demo And Contributor Onboarding
 - Packaging And Installability
+- Runtime Policy And Recovery
 
-Next priority is Loop 21 Runtime Policy And Recovery.
+Next priority is Loop 22 Credential Boundary And Secret Hygiene.
 
 See:
 
@@ -398,6 +401,7 @@ See:
 - `docs/examples.md`
 - `docs/release-process.md`
 - `docs/releases/v0.1.0.md`
+- `docs/runtime-policy.md`
 - `docs/stability.md`
 - `docs/workflow-dsl-contract.md`
 - `docs/workflow-dsl-compatibility.md`

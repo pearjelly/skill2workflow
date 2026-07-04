@@ -129,7 +129,7 @@ class LocalControlPlane:
                 "timestamp": started_at,
             }
         )
-        self._append_connector_audit_events(state, workflow_id, version)
+        self._append_runtime_audit_events(state, workflow_id, version)
         self._append_audit(
             {
                 "type": f"run_{state['status']}",
@@ -158,7 +158,7 @@ class LocalControlPlane:
                 "timestamp": _now(),
             }
         )
-        self._append_connector_audit_events(state, workflow_id, workflow_version, start_index=previous_event_count)
+        self._append_runtime_audit_events(state, workflow_id, workflow_version, start_index=previous_event_count)
         self._append_audit(
             {
                 "type": f"run_{state['status']}",
@@ -220,7 +220,7 @@ class LocalControlPlane:
     def _append_audit(self, event: AuditEvent) -> None:
         self.store.append_audit(event)
 
-    def _append_connector_audit_events(
+    def _append_runtime_audit_events(
         self,
         state: RunState,
         workflow_id: str,
@@ -235,21 +235,28 @@ class LocalControlPlane:
             if not isinstance(event, dict):
                 continue
             event_type = str(event.get("type", ""))
-            if not event_type.startswith("connector_"):
+            if not _promote_runtime_event(event_type):
                 continue
-            self._append_audit(
-                {
-                    "type": event_type,
-                    "run_id": run_id,
-                    "workflow_id": workflow_id,
-                    "workflow_version": workflow_version,
-                    "node_id": event.get("node_id", ""),
-                    "connector_id": event.get("connector_id", ""),
-                    "connector_kind": event.get("connector_kind", ""),
-                    "connector_status": event.get("connector_status", ""),
-                    "timestamp": event.get("timestamp", _now()),
-                }
-            )
+            audit_event = {
+                "type": event_type,
+                "run_id": run_id,
+                "workflow_id": workflow_id,
+                "workflow_version": workflow_version,
+                "node_id": event.get("node_id", ""),
+                "timestamp": event.get("timestamp", _now()),
+            }
+            for key in (
+                "connector_id",
+                "connector_kind",
+                "connector_status",
+                "attempt",
+                "next_attempt",
+                "max_attempts",
+                "error",
+            ):
+                if key in event:
+                    audit_event[key] = event[key]
+            self._append_audit(audit_event)
 
 
 def _workflow_identity(workflow: Workflow) -> tuple:
@@ -285,3 +292,11 @@ def _safe_name(value: str) -> str:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _promote_runtime_event(event_type: str) -> bool:
+    return event_type.startswith("connector_") or event_type in {
+        "node_retrying",
+        "node_recovered",
+        "node_failed",
+    }

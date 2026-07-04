@@ -175,26 +175,68 @@ class LocalExecutor:
             self._save(state)
             return state
 
-        self._event(state, "node_started", current_id)
-        self._event(
-            state,
-            "connector_started",
-            current_id,
-            {
-                "connector_id": ref["id"],
-                "connector_kind": ref["kind"],
-                "connector_status": "running",
-            },
-        )
-        try:
-            connector_result = execute_connector(node)
-        except ConnectorExecutionError as error:
-            connector_result = {
-                "status": "failed",
-                "connector": ref,
-                "error": str(error),
-                "output": {},
-            }
+        max_attempts = _retry_max_attempts(node, state.get("workflow", {}))
+        self._event(state, "node_started", current_id, {"max_attempts": max_attempts})
+        last_error = ""
+        connector_result = {}
+        attempts = 0
+        recovered = False
+
+        for attempt in range(1, max_attempts + 2):
+            attempts = attempt
+            self._event(
+                state,
+                "connector_started",
+                current_id,
+                {
+                    "connector_id": ref["id"],
+                    "connector_kind": ref["kind"],
+                    "connector_status": "running",
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                },
+            )
+            try:
+                connector_result = execute_connector(node)
+            except ConnectorExecutionError as error:
+                connector_result = {
+                    "status": "failed",
+                    "connector": ref,
+                    "error": str(error),
+                    "output": {},
+                }
+
+            result_status = str(connector_result.get("status", "failed"))
+            if result_status == "completed":
+                recovered = attempt > 1
+                break
+
+            last_error = str(connector_result.get("error") or "connector failed")
+            self._event(
+                state,
+                "connector_failed",
+                current_id,
+                {
+                    "connector_id": ref["id"],
+                    "connector_kind": ref["kind"],
+                    "connector_status": "failed",
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                    "error": last_error,
+                },
+            )
+            if attempt <= max_attempts:
+                self._event(
+                    state,
+                    "node_retrying",
+                    current_id,
+                    {
+                        "attempt": attempt,
+                        "next_attempt": attempt + 1,
+                        "max_attempts": max_attempts,
+                        "error": last_error,
+                    },
+                )
 
         result_status = str(connector_result.get("status", "failed"))
         node_result = {
@@ -202,8 +244,12 @@ class LocalExecutor:
             "title": node.get("title", current_id),
             "connector": connector_result.get("connector", ref),
             "output": connector_result.get("output", {}),
+            "attempts": attempts,
+            "max_attempts": max_attempts,
             "timestamp": _now(),
         }
+        if last_error:
+            node_result["last_error"] = last_error
         if connector_result.get("error"):
             node_result["error"] = connector_result["error"]
         state["node_results"][current_id] = node_result
@@ -217,22 +263,25 @@ class LocalExecutor:
                     "connector_id": ref["id"],
                     "connector_kind": ref["kind"],
                     "connector_status": "completed",
+                    "attempt": attempts,
+                    "max_attempts": max_attempts,
                 },
             )
+            if recovered:
+                self._event(
+                    state,
+                    "node_recovered",
+                    current_id,
+                    {
+                        "attempt": attempts,
+                        "max_attempts": max_attempts,
+                        "error": last_error,
+                    },
+                )
             self._event(state, "node_completed", current_id)
             next_node = node.get("on_success")
         else:
-            self._event(
-                state,
-                "connector_failed",
-                current_id,
-                {
-                    "connector_id": ref["id"],
-                    "connector_kind": ref["kind"],
-                    "connector_status": "failed",
-                },
-            )
-            self._event(state, "node_failed", current_id)
+            self._event(state, "node_failed", current_id, {"attempt": attempts, "max_attempts": max_attempts, "error": last_error})
             next_node = node.get("on_failure")
 
         if not isinstance(next_node, str) or next_node not in node_map:
@@ -269,6 +318,28 @@ class LocalExecutor:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _retry_max_attempts(node: Dict[str, object], workflow: object) -> int:
+    retry = node.get("retry")
+    if isinstance(retry, dict) and retry.get("max_attempts") is not None:
+        return _non_negative_int(retry.get("max_attempts"))
+
+    if isinstance(workflow, dict):
+        policies = workflow.get("policies")
+        if isinstance(policies, dict):
+            default_retry = policies.get("default_retry")
+            if isinstance(default_retry, dict):
+                return _non_negative_int(default_retry.get("max_attempts"))
+    return 0
+
+
+def _non_negative_int(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int) and value > 0:
+        return value
+    return 0
 
 
 def _summarize_run(state: RunState) -> RunState:
