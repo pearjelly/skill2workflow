@@ -101,6 +101,7 @@ Before changing behavior, read:
 
 - `ROADMAP.md`
 - `HARNESS.md`
+- `docs/credential-boundary.md`
 - `docs/workflow-dsl-contract.md`
 - `docs/workflow-dsl-compatibility.md`
 - `docs/stability.md`
@@ -114,8 +115,21 @@ Before changing behavior, read:
 - Keep Workflow DSL as the execution truth source.
 - Do not make LiteGraph JSON authoritative for execution.
 - Preserve published workflow immutability.
+- Do not commit secrets, credentials, private keys, cookies, production authorization headers, or customer data in Workflow DSL or LiteGraph fixtures.
 - Avoid runtime dependencies unless they directly support a spec-backed capability.
 - Update docs and examples when user-facing behavior changes.
+
+## Connector Example Safety
+
+Connector examples should be deterministic and safe from a fresh checkout. Prefer local endpoints such as `http://127.0.0.1` or documented placeholders such as `<redacted>`, `REDACTED`, `placeholder`, `example-token`, and `token-placeholder`.
+
+Run the committed-fixture secret hygiene check before opening connector or example PRs:
+
+```bash
+python3 scripts/secret_hygiene.py examples/workflows
+```
+
+This check catches obvious secret-like keys and values in committed JSON fixtures. It is a guardrail, not a replacement for review.
 
 ## Pull Request Checklist
 
@@ -125,6 +139,7 @@ Before opening a PR:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+python3 scripts/secret_hygiene.py examples/workflows
 git diff --check
 ```
 

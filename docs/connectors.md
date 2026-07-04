@@ -109,4 +109,12 @@ Workflow DSL fixtures must not store secrets.
 
 The built-in HTTP connector accepts static request metadata so local examples and tests can run from a fresh checkout. Enterprise credential management, token injection, secret redaction, IAM, connector marketplaces, and product-specific SaaS connector packages are intentionally outside this MVP boundary.
 
-Until a credential layer exists, contributors should keep examples local and non-sensitive, such as `http://127.0.0.1` fixtures or placeholder URLs that are never executed in tests.
+Until a credential layer exists, contributors should keep examples local and non-sensitive, such as `http://127.0.0.1` fixtures or placeholder URLs that are never executed in tests. If an example needs to show credential-shaped metadata, use documented placeholders such as `<redacted>`, `REDACTED`, `placeholder`, `example-token`, or `token-placeholder`.
+
+Run the committed-fixture guardrail before opening connector example PRs:
+
+```bash
+python3 scripts/secret_hygiene.py examples/workflows
+```
+
+See `docs/credential-boundary.md` for allowed placeholder patterns, scanner behavior, and future credential provider boundaries.

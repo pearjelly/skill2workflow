@@ -92,4 +92,4 @@ The local runtime intentionally does not yet provide:
 - enterprise credential management
 - secret injection or redaction
 
-For local pilots, use deterministic test endpoints and non-sensitive example data. Keep secrets out of Workflow DSL until a credential boundary exists.
+For local pilots, use deterministic test endpoints and non-sensitive example data. Keep secrets out of Workflow DSL and follow `docs/credential-boundary.md` for allowed placeholder patterns and fixture hygiene checks.

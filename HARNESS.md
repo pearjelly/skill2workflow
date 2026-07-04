@@ -9,6 +9,7 @@ Run all tests:
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
+python3 scripts/secret_hygiene.py examples/workflows
 git diff --check
 ```
 
@@ -25,6 +26,12 @@ Run the editable install and console-script smoke:
 
 ```bash
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+```
+
+Run the committed-fixture secret hygiene check:
+
+```bash
+python3 scripts/secret_hygiene.py examples/workflows
 ```
 
 Manual editable install path:
@@ -181,6 +188,10 @@ Implemented:
   - executes HTTP requests with the Python standard library
   - covers HTTP connector success, HTTP error, invalid request metadata, JSON body, headers, and timeout behavior with deterministic local tests
   - documents retry, timeout, and credential boundaries in `docs/connectors.md`
+- Credential boundary and secret hygiene
+  - documents safe connector example patterns in `docs/credential-boundary.md`
+  - checks committed Workflow DSL and LiteGraph example fixtures for obvious secret-like values through `scripts/secret_hygiene.py`
+  - keeps real secrets, token injection, redaction, IAM, and SaaS credential flows outside immutable Workflow DSL artifacts
 - Runtime policy and recovery
   - documents retry and recovery semantics in `docs/runtime-policy.md`
   - treats `retry.max_attempts` as retries after the first connector attempt
@@ -198,5 +209,5 @@ Implemented:
 Not implemented yet:
 
 - Production-grade enterprise control plane UI
-- Enterprise connector credential management
+- Enterprise connector credential management, secret injection, and runtime redaction
 - GitHub release automation

@@ -17,6 +17,7 @@ Current capability snapshot:
 - Control plane: immutable workflow publish, version lifecycle, published-version runs, resume, audit log, filtered audit queries, and promoted runtime policy events
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
+- Credential boundary and secret hygiene: documented placeholder rules, committed-fixture scanner, and CI guardrail for obvious secret-like values
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
@@ -30,7 +31,7 @@ Important boundaries:
 
 - Published workflow artifacts remain immutable JSON documents in both storage modes.
 - The visual graph is an editor/view. Workflow DSL remains the execution truth source.
-- Connector runtime is an MVP boundary. Automatic retry execution, enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
+- Connector runtime is an MVP boundary. Enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
 - Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
 - `0.1.x` compatibility is documented for Workflow DSL `0.1.0`; undocumented internals remain experimental.
 
@@ -59,85 +60,87 @@ Important boundaries:
 | Loop 19: Demo And Contributor Onboarding | Complete | Resettable local demo helper, generated onboarding artifacts, README/HARNESS entry path, tests |
 | Loop 20: Packaging And Installability | Complete | Package metadata guards, editable install smoke helper, installed console-script verification, contributor docs |
 | Loop 21: Runtime Policy And Recovery | Complete | Connector retry policy execution, retry/recovery events, audit promotion, runtime policy docs |
+| Loop 22: Credential Boundary And Secret Hygiene | Complete | Credential boundary docs, committed-fixture secret hygiene scanner, CI guardrail, contributor guidance |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 21 made runtime retry and recovery behavior visible:
+Post-`v0.1.0` work now has one active priority after Loop 22 made connector examples safer:
 
-1. keep connector integration safer by defining credential and secret-handling boundaries before adding more real integrations.
+1. expose a controlled local trigger surface so external tools can start published workflow runs without bypassing Workflow DSL validation, version binding, or audit.
 
-### Loop 22: Credential Boundary And Secret Hygiene
+### Loop 23: Trigger And Local Run API
 
-Goal: prevent unsafe connector adoption by defining how credentials, redaction, and non-secret example data are represented before expanding connector coverage.
+Goal: let local systems trigger published workflow runs through a small, testable API boundary instead of requiring every integration to shell out directly to `run-published`.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Start from current HTTP connector metadata and example fixtures.
+- Start from the existing `run-published` control-plane path.
 - Keep Workflow DSL authoritative and published workflow artifacts immutable.
-- Prefer explicit credential boundary docs and validator/test guardrails before implementing any secret backend.
-- Do not store real secrets, add cloud secret managers, or introduce SaaS-specific credential flows in this loop.
+- Prefer a local, dependency-free trigger envelope and deterministic tests before adding background workers.
+- Do not add hosted webhooks, SaaS callbacks, RBAC, queues, or distributed scheduling in this loop.
 
 Scope:
 
-- Define what connector metadata may safely live in Workflow DSL fixtures
-- Add guardrails against obvious secret-like fields in committed examples where practical
-- Document supported placeholder and local-test credential patterns
-- Prepare extension points for future credential providers without implementing one
+- Define a trigger request envelope for workflow id, version, input metadata, and idempotency placeholder fields
+- Add a local API/helper path that starts published runs through the existing control plane
+- Return structured run identity and status output
+- Document local trigger boundaries and future webhook/server responsibilities
 
 Acceptance criteria:
 
-- Examples and docs clearly say Workflow DSL must not contain secrets
-- Tests catch secret-like connector fixture regressions where practical
-- Contributor guidance explains safe local connector examples
-- Existing Workflow DSL `0.1.0` fixtures remain valid
-- No secret manager, external credential service, or runtime dependency is introduced
+- Triggered runs use immutable published workflow artifacts
+- Triggered runs write the same control-plane audit events as `run-published`
+- Invalid workflow id/version inputs return structured errors
+- Existing CLI and storage behavior remains compatible
+- No daemon, hosted service, queue, auth system, or runtime dependency is introduced
 
-Loop 22 implementation slices:
+Loop 23 implementation slices:
 
-1. Credential boundary inventory
-   - Review connector docs, examples, and Workflow DSL fixtures for current credential assumptions.
-2. Secret hygiene guardrails
-   - Add tests or checks that prevent obvious secret-like values in committed connector examples.
-3. Extension-point documentation
-   - Document placeholder patterns and future credential provider boundaries.
-4. Contributor docs
-   - Update contributor and connector docs with safe example rules.
+1. Trigger envelope contract
+   - Define the local request and response shape without changing Workflow DSL `0.1.0`.
+2. Control-plane trigger helper
+   - Add a small helper that delegates to the existing published-run path.
+3. CLI or script entry
+   - Provide a runnable local command for trigger smoke tests.
+4. Docs and examples
+   - Document how local tools can trigger runs safely.
 5. Verification
-   - Run full tests, fixture checks, demo onboarding, and package smoke.
+   - Run full tests, demo onboarding, package smoke, and secret hygiene.
 
-Loop 22 explicit non-goals:
+Loop 23 explicit non-goals:
 
-- Do not add a secret manager.
-- Do not add token injection.
-- Do not add RBAC or IAM.
-- Do not add product-specific SaaS credential flows.
+- Do not add hosted webhooks.
+- Do not add a long-running daemon.
+- Do not add queues or distributed scheduling.
+- Do not add RBAC, IAM, or secret injection.
 - Do not introduce runtime dependencies.
 
-Loop 22 expected file changes:
+Loop 23 expected file changes:
 
-- `tests/` for fixture or connector credential hygiene checks.
-- `docs/connectors.md`, `docs/runtime-policy.md`, or a focused credential boundary doc.
-- `CONTRIBUTING.md`, `README.md`, and `HARNESS.md` for safe example guidance.
-- Example fixtures only if current placeholders need clarification.
+- `tests/` for trigger envelope and published-run audit behavior.
+- `src/skill2workflow/control_plane.py` or a focused trigger module.
+- `src/skill2workflow/cli.py` or `scripts/` for a local trigger command.
+- `README.md`, `HARNESS.md`, and a focused trigger doc.
 
-Loop 22 verification commands:
+Loop 23 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
 - `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
-- focused credential/fixture hygiene tests documented in the PR
+- `python3 scripts/secret_hygiene.py examples/workflows`
+- focused trigger tests documented in the PR
 - `git diff --check`
 
-Loop 22 done means:
+Loop 23 done means:
 
-- Contributors know how to write connector examples without leaking secrets.
-- Committed fixtures have guardrails against obvious credential leaks.
-- Future credential provider work has a documented boundary without adding secret infrastructure yet.
+- Local tools have a documented way to start published workflow runs.
+- Triggered runs remain version-bound, auditable, and compatible with existing storage modes.
+- Future webhook or scheduler work has a tested local boundary to build on.
 
 ## Near-Term Loop Queue
 
@@ -145,7 +148,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 22: Credential Boundary And Secret Hygiene | Next | Keep connector examples and future integrations secret-safe | fixture hygiene tests, credential boundary docs |
+| Loop 23: Trigger And Local Run API | Next | Start published workflow runs through a controlled local trigger boundary | trigger envelope, local trigger command, audit tests |
 
 Loop selection rules:
 
@@ -193,14 +196,16 @@ Status: delivered by Loops 1-9.
 
 ### v0.2: Connector Runtime
 
-Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Future work should add explicit retry execution, credential boundaries, and product-specific extensions only when backed by tests and docs.
+Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Future work should add credential providers and product-specific extensions only when backed by tests and docs.
 
 - Connector manifests
 - Connector binding validation
 - Manual and HTTP connector implementations
 - Connector execution audit events
 - Connector test fixtures
-- Future: connector credentials, automatic retry execution, and product-specific connector packages
+- Connector-node retry execution
+- Committed-fixture secret hygiene guardrails
+- Future: credential providers, secret injection boundaries, and product-specific connector packages
 
 ### v0.3: Authoring Experience
 
@@ -257,6 +262,7 @@ Contributors can help in these areas:
 - LiteGraph node UI and expanded graph-to-DSL write-back
 - Executor policies such as retry, timeout, and checkpoint behavior
 - Connector manifests and example connectors
+- Credential provider boundaries and safe connector examples
 - Example workflows for sales, approval, customer service, risk review, and operations analysis
 - Documentation and enterprise deployment guides
 
