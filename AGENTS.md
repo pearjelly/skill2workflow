@@ -44,6 +44,9 @@ This repository is the `skill2workflow` open-source harness.
 - Connectors: `PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control`
 - Control snapshot: `PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json`
 - First-run demo: `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
+- Package smoke: `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
+- Editable install: `python3 -m venv /tmp/skill2workflow-venv && /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68" && /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .`
+- Installed CLI smoke: `/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json`
 - Release preflight dry-run: `PYTHONPATH=src python3 scripts/release_preflight.py --version 0.1.0 --notes docs/releases/v0.1.0.md --dry-run --skip-git`
 - Release notes: `docs/releases/v0.1.0.md`
 

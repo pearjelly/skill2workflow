@@ -93,6 +93,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Inspect operator attention items, recent events, connector events, workflows, runs, audit events, and version deltas in a static local control-plane UI
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Generate a deterministic first-run demo workspace for contributor onboarding
+- Verify editable install, package metadata, and the installed `skill2workflow` console script
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
@@ -123,6 +124,24 @@ http://localhost:4173/web/control.html
 ```
 
 Load `/tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json` to inspect the generated operator snapshot. Rerunning the demo resets the work directory by default; pass `--no-reset` to keep existing files.
+
+Run the package install smoke:
+
+```bash
+python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+```
+
+Or install the checkout in editable mode and use the console script directly:
+
+```bash
+python3 -m venv /tmp/skill2workflow-venv
+/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68"
+/tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
+/tmp/skill2workflow-venv/bin/skill2workflow --help
+/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json
+```
+
+The `PYTHONPATH=src python3 -m skill2workflow.cli ...` commands below remain the no-install source-checkout path.
 
 Run tests:
 
@@ -366,8 +385,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Connector Runtime Hardening
 - Control Plane Operator UX
 - Demo And Contributor Onboarding
+- Packaging And Installability
 
-Next priority is Loop 20 Packaging And Installability.
+Next priority is Loop 21 Runtime Policy And Recovery.
 
 See:
 

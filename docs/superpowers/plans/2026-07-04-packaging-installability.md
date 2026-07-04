@@ -16,7 +16,7 @@
 - Create: `tests/test_packaging.py`
 - Modify only if a guard fails: `pyproject.toml`
 
-- [ ] **Step 1: Write metadata tests**
+- [x] **Step 1: Write metadata tests**
 
 Add `tests/test_packaging.py` with tests that read `pyproject.toml` as text and assert the package contract that matters for installability:
 
@@ -45,7 +45,7 @@ class PackagingMetadataTests(TestCase):
         self.assertNotIn("dependencies = [", text)
 ```
 
-- [ ] **Step 2: Run focused tests**
+- [x] **Step 2: Run focused tests**
 
 Run:
 
@@ -60,7 +60,7 @@ Expected: pass against the current package metadata unless the metadata has drif
 **Files:**
 - Create: `scripts/package_smoke.py`
 
-- [ ] **Step 1: Add a checkout-local smoke helper**
+- [x] **Step 1: Add a checkout-local smoke helper**
 
 Create `scripts/package_smoke.py` that:
 
@@ -70,7 +70,7 @@ Create `scripts/package_smoke.py` that:
 - runs `skill2workflow --help`
 - runs `skill2workflow validate examples/workflows/approval-flow.workflow.json --format json`
 
-- [ ] **Step 2: Run the smoke helper**
+- [x] **Step 2: Run the smoke helper**
 
 Run:
 
@@ -88,21 +88,22 @@ Expected: exit `0` and print a JSON summary containing the virtual environment p
 - Modify: `CONTRIBUTING.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: Document editable install**
+- [x] **Step 1: Document editable install**
 
 Add the install path:
 
 ```bash
 python3 -m venv /tmp/skill2workflow-venv
+/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68"
 /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
 /tmp/skill2workflow-venv/bin/skill2workflow --help
 ```
 
-- [ ] **Step 2: Keep source-checkout commands**
+- [x] **Step 2: Keep source-checkout commands**
 
 Keep `PYTHONPATH=src python3 -m skill2workflow.cli ...` commands documented as the no-install path, and present the console script as the contributor install path.
 
-- [ ] **Step 3: Document package smoke verification**
+- [x] **Step 3: Document package smoke verification**
 
 Add:
 
@@ -115,11 +116,11 @@ python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 **Files:**
 - Modify: `ROADMAP.md`
 
-- [ ] **Step 1: Mark Loop 20 complete only after implementation**
+- [x] **Step 1: Mark Loop 20 complete only after implementation**
 
 Do not move Loop 20 to completed loops until package metadata guards, editable install smoke, and docs are merged.
 
-- [ ] **Step 2: Run final verification**
+- [x] **Step 2: Run final verification**
 
 Run:
 
