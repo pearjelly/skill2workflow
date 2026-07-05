@@ -128,6 +128,61 @@ Acceptance criteria:
 - JSON and SQLite storage behavior remains compatible
 - No hosted webhook service, queue, scheduler, auth system, or runtime dependency is introduced
 
+Loop 26 implementation slices:
+
+1. Local webhook request contract
+   - Define the minimal HTTP shape for local pilots, such as `POST /webhooks/<workflow_id>/<version>` with a JSON body containing `source`, `idempotency_key`, and `input`.
+   - Keep payload values under trigger `input`; expose only compact metadata and input keys in responses and audit events.
+   - Reject non-JSON bodies, non-object input, missing workflow id, missing version, and unsupported methods with deterministic errors.
+2. Adapter core
+   - Add a small dependency-free adapter that translates the local webhook request into the existing `LocalControlPlane.trigger_workflow` request.
+   - Keep the adapter as a thin boundary. It must not call the executor directly, mutate published workflow artifacts, or invent a second trigger path.
+   - Do not persist raw HTTP headers or raw request bodies by default.
+3. Local CLI surface
+   - Add a local-only CLI path, likely `webhook-server`, for integration testing with the Python standard library HTTP server stack.
+   - Support the existing `--state-dir`, `--storage`, and `--credential-file` control-plane options where they apply.
+   - Make the command clearly local development tooling, not a daemon supervisor, hosted webhook service, or production ingress.
+4. Tests and storage compatibility
+   - Unit test request normalization and error responses without opening a network socket.
+   - Test that webhook-triggered runs match CLI-triggered runs for response shape, run context, and audit metadata.
+   - Cover JSON and SQLite storage modes for the control-plane trigger path.
+5. Documentation and examples
+   - Extend `docs/triggers.md` with the webhook route, request body, response shape, local-only limits, and a `curl` example.
+   - Update `HARNESS.md` with a short local verification path.
+   - Add a tiny example payload only if it improves contributor onboarding and stays secret-free.
+
+Loop 26 explicit non-goals:
+
+- Do not add a hosted webhook endpoint, tunnel, queue, scheduler, retry worker, or background supervisor.
+- Do not add authentication, RBAC, IAM, TLS, signature validation, or SaaS-specific callback verification.
+- Do not store credentials, authorization headers, raw headers, cookies, or raw request bodies in Workflow DSL, run state, or audit events.
+- Do not make webhook payloads drive connector credential resolution.
+- Do not change Workflow DSL `0.1.0` or make the visual graph authoritative.
+
+Loop 26 expected file changes:
+
+- `src/skill2workflow/webhooks.py` for request normalization and adapter behavior.
+- `src/skill2workflow/cli.py` for the local webhook CLI surface.
+- `tests/test_webhooks.py`, plus focused coverage in `tests/test_cli.py` or `tests/test_control_plane.py` as needed.
+- `docs/triggers.md` and `HARNESS.md` for local usage and verification.
+- Optional: `examples/webhooks/` for secret-free sample payloads.
+
+Loop 26 verification commands:
+
+- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- `python3 -m py_compile src/skill2workflow/*.py`
+- `PYTHONPATH=src python3 -m unittest tests.test_triggers tests.test_control_plane tests.test_cli -v`
+- `PYTHONPATH=src python3 -m unittest tests.test_webhooks -v`
+- `python3 scripts/secret_hygiene.py examples/workflows`
+- `git diff --check`
+
+Loop 26 done means:
+
+- A local HTTP POST can trigger a published workflow version through the existing control-plane trigger boundary.
+- Webhook payload input is durable in run context, while responses and audit events stay compact.
+- JSON and SQLite storage produce compatible run and audit behavior.
+- The local webhook adapter is documented as pilot integration tooling, not a production ingress layer.
+
 ## Near-Term Loop Queue
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
