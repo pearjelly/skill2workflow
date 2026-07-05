@@ -88,6 +88,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Publish immutable workflow versions into a local control plane
 - Run published workflow versions and write audit events
 - Trigger published workflow versions through a compact local API envelope
+- Persist trigger input values in durable run context without logging full input values to audit by default
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Audit connector execution events through the control plane
@@ -278,6 +279,8 @@ printf '{"customer_id":"customer_123"}' >/tmp/skill2workflow-trigger-input.json
 PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001 --input /tmp/skill2workflow-trigger-input.json
 ```
 
+Triggered runs store input values under `context.input` and compact trigger metadata under `context.trigger`. Audit events and trigger responses expose `input_keys`, not full input values.
+
 Use SQLite run storage for published runs:
 
 ```bash
@@ -410,8 +413,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Runtime Policy And Recovery
 - Credential Boundary And Secret Hygiene
 - Trigger And Local Run API
+- Workflow Inputs And Run Context
 
-Next priority is Loop 24 Workflow Inputs And Run Context.
+Next priority is Loop 25 Credential Provider Interface.
 
 See:
 

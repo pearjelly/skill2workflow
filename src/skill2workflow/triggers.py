@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import json
 import uuid
 from typing import Dict
 
@@ -22,6 +24,7 @@ def normalize_trigger_request(request: object) -> Trigger:
         trigger_input = {}
     if not isinstance(trigger_input, dict):
         raise ValueError("trigger input must be a JSON object")
+    normalized_input = _json_object_copy(trigger_input)
 
     return {
         "trigger_id": _optional_text(request, "trigger_id") or f"trigger_{uuid.uuid4().hex[:12]}",
@@ -29,7 +32,8 @@ def normalize_trigger_request(request: object) -> Trigger:
         "version": version,
         "source": _optional_text(request, "source") or "local",
         "idempotency_key": _optional_text(request, "idempotency_key"),
-        "input_keys": sorted(str(key) for key in trigger_input.keys()),
+        "input": normalized_input,
+        "input_keys": sorted(normalized_input.keys()),
     }
 
 
@@ -59,6 +63,20 @@ def trigger_response(trigger: Trigger, state: Dict[str, object]) -> Dict[str, ob
     }
 
 
+def trigger_run_context(trigger: Trigger) -> Dict[str, object]:
+    """Return durable run context derived from a normalized trigger."""
+
+    return {
+        "trigger": {
+            "trigger_id": str(trigger.get("trigger_id", "")),
+            "source": str(trigger.get("source", "local")),
+            "idempotency_key": str(trigger.get("idempotency_key", "")),
+            "input_keys": list(trigger.get("input_keys", [])) if isinstance(trigger.get("input_keys"), list) else [],
+        },
+        "input": copy.deepcopy(trigger.get("input", {})) if isinstance(trigger.get("input"), dict) else {},
+    }
+
+
 def _required_text(request: Dict[str, object], key: str) -> str:
     value = request.get(key)
     if value is None or str(value).strip() == "":
@@ -71,3 +89,13 @@ def _optional_text(request: Dict[str, object], key: str) -> str:
     if value is None:
         return ""
     return str(value)
+
+
+def _json_object_copy(value: Dict[str, object]) -> Dict[str, object]:
+    try:
+        copied = json.loads(json.dumps(value, ensure_ascii=False))
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"trigger input must be JSON serializable: {error}")
+    if not isinstance(copied, dict):
+        raise ValueError("trigger input must be a JSON object")
+    return copied
