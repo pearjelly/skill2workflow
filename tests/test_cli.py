@@ -6,6 +6,7 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.cli import main
 
@@ -158,6 +159,40 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn("trigger input must be a JSON object", stderr.getvalue())
+
+    def test_webhook_server_command_wires_local_control_plane(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            captured = {}
+
+            def fake_server(host, port, control_plane, once=False):
+                captured["host"] = host
+                captured["port"] = port
+                captured["state_dir"] = control_plane.state_dir
+                captured["once"] = once
+
+            with patch("skill2workflow.cli.serve_webhook_requests", side_effect=fake_server):
+                with redirect_stdout(StringIO()):
+                    exit_code = main(
+                        [
+                            "webhook-server",
+                            "--host",
+                            "127.0.0.1",
+                            "--port",
+                            "0",
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                            "--once",
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(captured["host"], "127.0.0.1")
+        self.assertEqual(captured["port"], 0)
+        self.assertEqual(captured["state_dir"], state_dir)
+        self.assertEqual(captured["once"], True)
 
     def test_run_published_command_can_use_sqlite_storage(self):
         with TemporaryDirectory() as tmp:

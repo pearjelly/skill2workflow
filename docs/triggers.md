@@ -100,6 +100,80 @@ Triggered run details include:
 }
 ```
 
+## Local Webhook Adapter
+
+The local webhook adapter exposes the same trigger boundary over a dependency-free local HTTP server. It is intended for local pilot integration testing, not hosted ingress.
+
+Start the local server:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli webhook-server \
+  --state-dir /tmp/skill2workflow-control \
+  --host 127.0.0.1 \
+  --port 8080
+```
+
+Send a local webhook request:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/webhooks/workflow_approval_flow/0.1.0 \
+  -H 'Content-Type: application/json' \
+  -d '{"source":"local-webhook","idempotency_key":"example-001","input":{"customer_id":"customer_123"}}'
+```
+
+For deterministic local smoke tests, add `--once` so the server handles one request and exits:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli webhook-server \
+  --state-dir /tmp/skill2workflow-control \
+  --host 127.0.0.1 \
+  --port 8080 \
+  --once
+```
+
+Webhook route:
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| `POST` | `/webhooks/<workflow_id>/<version>` | Triggers the published workflow version through `LocalControlPlane.trigger_workflow`. |
+
+Request body:
+
+```json
+{
+  "source": "local-webhook",
+  "idempotency_key": "example-001",
+  "input": {
+    "customer_id": "customer_123"
+  }
+}
+```
+
+Supported fields:
+
+| Field | Required | Behavior |
+| --- | --- | --- |
+| `source` | No | Local webhook source label. Defaults to `local-webhook`. |
+| `idempotency_key` | No | Recorded as trigger metadata only. It is not enforced. |
+| `input` | No | JSON object copied into durable run context. Responses and audit events expose only keys. |
+
+The response shape matches the CLI trigger response:
+
+```json
+{
+  "trigger_id": "trigger_abc123def456",
+  "workflow_id": "workflow_approval_flow",
+  "workflow_version": "0.1.0",
+  "run_id": "run_abc123def456",
+  "run_status": "waiting",
+  "source": "local-webhook",
+  "idempotency_key": "example-001",
+  "input_keys": ["customer_id"]
+}
+```
+
+The adapter rejects unsupported methods, malformed webhook paths, invalid JSON bodies, non-object bodies, and non-object `input` fields with JSON error responses. It does not persist raw HTTP headers or raw request bodies by default.
+
 ## Run Context Semantics
 
 Triggered runs use the same published-run execution path as `run-published`, plus an initial run context.
@@ -140,8 +214,8 @@ Audit events intentionally do not include full `context.input` values by default
 
 The local trigger API intentionally does not provide:
 
-- hosted webhooks
-- a long-running daemon
+- hosted webhooks or public ingress
+- a supervised production daemon
 - queues or distributed scheduling
 - authentication, RBAC, or IAM
 - secret injection
@@ -150,4 +224,4 @@ The local trigger API intentionally does not provide:
 - schema-based input mapping
 - product-specific SaaS callbacks
 
-Future webhook, scheduler, and integration adapters should call this trigger boundary instead of bypassing the control plane.
+Future scheduler and integration adapters should call this trigger boundary instead of bypassing the control plane.

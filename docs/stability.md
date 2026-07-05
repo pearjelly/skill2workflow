@@ -19,6 +19,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Local credential handle boundary documented in `docs/credential-boundary.md`
 - Local trigger command and envelope documented in `docs/triggers.md`
 - Local trigger run-context shape documented in `docs/triggers.md`
+- Local webhook route and response shape documented in `docs/triggers.md`
 
 ## Experimental
 
@@ -35,6 +36,7 @@ These surfaces may change while the project learns from real workflows:
 - Advanced retry behavior beyond documented connector-node retry execution
 - Enterprise credential storage, secret redaction, and IAM
 - Advanced trigger input mapping, templating, and connector request interpolation
+- Hosted webhook ingress, callback verification, queues, and schedulers
 - Local control-plane storage file layout
 - Executor event taxonomy beyond documented audit examples
 - Future UI/API boundaries
