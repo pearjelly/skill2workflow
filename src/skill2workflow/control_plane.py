@@ -24,11 +24,11 @@ AuditEvent = Dict[str, object]
 class LocalControlPlane:
     """Manage local workflow versions, published runs, and audit events."""
 
-    def __init__(self, state_dir: Path, storage: str = "json"):
+    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None):
         self.state_dir = Path(state_dir)
         self.workflows_dir = self.state_dir / "workflows"
         self.connectors_path = self.state_dir / "connectors.json"
-        self.executor = LocalExecutor(self.state_dir, storage=storage)
+        self.executor = LocalExecutor(self.state_dir, storage=storage, credential_provider=credential_provider)
         self.store = create_control_store(self.state_dir, storage=storage)
         self.workflows_dir.mkdir(parents=True, exist_ok=True)
         self.state_dir.mkdir(parents=True, exist_ok=True)

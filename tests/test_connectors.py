@@ -5,6 +5,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import TestCase
 
 from skill2workflow.connectors import ConnectorExecutionError, _timeout_seconds, execute_connector
+from skill2workflow.credentials import StaticCredentialProvider
 
 
 class ConnectorTests(TestCase):
@@ -79,6 +80,25 @@ class ConnectorTests(TestCase):
                 )
             )
 
+    def test_http_connector_resolves_header_credentials_without_returning_secret(self):
+        server = _ConnectorTestServer()
+
+        try:
+            result = execute_connector(
+                _credential_http_node(server.url("/success")),
+                credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+            )
+        finally:
+            server.close()
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(server.requests[0]["headers"]["Authorization"], "Bearer secret-token")
+        self.assertNotIn("secret-token", json.dumps(result))
+
+    def test_http_connector_missing_credential_fails_before_network_call(self):
+        with self.assertRaisesRegex(ConnectorExecutionError, "credential handle not found: missing_token"):
+            execute_connector(_credential_http_node("http://127.0.0.1:1/not-called", handle="missing_token"))
+
     def test_http_connector_timeout_becomes_connector_execution_error(self):
         server = _ConnectorTestServer()
 
@@ -110,6 +130,19 @@ def _http_node(url, method="GET", headers=None, body=None, timeout_ms=500):
         "type": "tool_call",
         "connector": {"id": "http", "kind": "http", "request": request},
     }
+
+
+def _credential_http_node(url, handle="demo_api_token"):
+    node = _http_node(url)
+    node["connector"]["credentials"] = [
+        {
+            "target": "header",
+            "name": "Authorization",
+            "handle": handle,
+            "prefix": "Bearer ",
+        }
+    ]
+    return node
 
 
 class _ConnectorRequestHandler(BaseHTTPRequestHandler):

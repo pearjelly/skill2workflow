@@ -18,9 +18,10 @@ RunState = Dict[str, object]
 class LocalExecutor:
     """Execute Workflow DSL with pluggable local run-state storage."""
 
-    def __init__(self, state_dir: Path, storage: str = "json"):
+    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None):
         self.state_dir = Path(state_dir)
         self.store = create_run_store(self.state_dir, storage)
+        self.credential_provider = credential_provider
 
     def run(self, workflow: Dict[str, object], context: Dict[str, object] = None) -> RunState:
         workflow_meta = workflow.get("workflow", {})
@@ -204,7 +205,7 @@ class LocalExecutor:
                 },
             )
             try:
-                connector_result = execute_connector(node)
+                connector_result = execute_connector(node, credential_provider=self.credential_provider)
             except ConnectorExecutionError as error:
                 connector_result = {
                     "status": "failed",

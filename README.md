@@ -78,6 +78,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Bind `human_gate` nodes to the built-in manual connector
 - Bind and validate `tool_call` connector metadata
 - Execute minimal HTTP connector calls from connector-bound `tool_call` nodes
+- Resolve local credential handles for HTTP connector request headers without storing secret values in Workflow DSL or audit output
 - Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
 - Honor connector-node `retry.max_attempts` and record retry/recovery events
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
@@ -281,6 +282,15 @@ PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --ve
 
 Triggered runs store input values under `context.input` and compact trigger metadata under `context.trigger`. Audit events and trigger responses expose `input_keys`, not full input values.
 
+Run with a local credential file when a connector references credential handles:
+
+```bash
+printf '{"credentials":{"demo_api_token":"local-secret-value"}}' >/tmp/skill2workflow-credentials.json
+PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state --credential-file /tmp/skill2workflow-credentials.json
+```
+
+Credential files are local-only and must not be committed. Workflow DSL stores handles, not resolved secret values.
+
 Use SQLite run storage for published runs:
 
 ```bash
@@ -365,6 +375,7 @@ src/skill2workflow/
   storage.py      # JSON and SQLite local persistence backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON
   secret_hygiene.py # Fixture secret hygiene scanner
+  credentials.py  # Local credential provider boundary
   triggers.py     # Local trigger envelope helpers
   release.py      # Read-only release preflight checks
   cli.py          # Command line interface
@@ -414,8 +425,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Credential Boundary And Secret Hygiene
 - Trigger And Local Run API
 - Workflow Inputs And Run Context
+- Credential Provider Interface
 
-Next priority is Loop 25 Credential Provider Interface.
+Next priority is Loop 26 Local Webhook Adapter.
 
 See:
 

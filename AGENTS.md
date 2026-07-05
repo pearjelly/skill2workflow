@@ -33,6 +33,7 @@ This repository is the `skill2workflow` open-source harness.
 - Web preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/`
 - Control UI preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/control.html`
 - Run with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite`
+- Run with local credential file: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state --credential-file /tmp/skill2workflow-credentials.json`
 - Publish: `PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control`
 - Publish with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite`
 - Run published: `PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control`

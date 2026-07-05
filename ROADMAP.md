@@ -16,8 +16,8 @@ Current capability snapshot:
 - Runtime: local executor supports run state, initial run context, human-gate pause/resume, connector retry policy, recovery events, run listing, and run detail
 - Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API with durable input context, resume, audit log, filtered audit queries, and promoted runtime policy events
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
-- Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
-- Credential boundary and secret hygiene: documented placeholder rules, committed-fixture scanner, and CI guardrail for obvious secret-like values
+- Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, local credential handles, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
+- Credential boundary and secret hygiene: documented placeholder and handle rules, local credential-file provider, committed-fixture scanner, and CI guardrail for obvious secret-like values
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
@@ -50,15 +50,15 @@ Ready now:
 - Verify package installability and fixture secret hygiene in CI.
 - Trigger published workflows through a controlled local API envelope.
 - Pass local trigger input values into durable run context while keeping audit output compact.
+- Reference connector credentials through local handles without storing resolved values in Workflow DSL, run state, or audit events.
 
 Still needed before serious pilots:
 
-- Credential provider interfaces so connector examples can reference handles without putting secrets in Workflow DSL, trigger input, run state, or audit events.
 - Optional local webhook or adapter surfaces for integration testing.
 - Better run/audit overlays in the visual authoring experience.
 - Clear pilot playbooks that define what is supported, what is experimental, and what must stay outside the bootstrap runtime.
 
-Pilot sequencing rule: do not add product-specific SaaS connectors before credential-provider boundaries are tested and documented. Trigger input is now durable, but credential material must stay outside trigger input and immutable workflow artifacts.
+Pilot sequencing rule: do not add product-specific SaaS connectors before local webhook/adapters and pilot playbooks are tested and documented. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
 ## Completed Loops
 
@@ -88,90 +88,45 @@ Pilot sequencing rule: do not add product-specific SaaS connectors before creden
 | Loop 22: Credential Boundary And Secret Hygiene | Complete | Credential boundary docs, committed-fixture secret hygiene scanner, CI guardrail, contributor guidance |
 | Loop 23: Trigger And Local Run API | Complete | Trigger envelope, local trigger command, run-start audit metadata, trigger docs |
 | Loop 24: Workflow Inputs And Run Context | Complete | Trigger input persistence, durable run context, compact audit boundary, executor context tests |
+| Loop 25: Credential Provider Interface | Complete | Local credential provider, connector handle metadata, credential-file CLI path, leakage tests |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 24 made trigger input durable:
+Post-`v0.1.0` work now has one active priority after Loop 25 added local credential handles:
 
-1. define a credential provider interface so connectors can reference secret handles without storing secret values in Workflow DSL, LiteGraph fixtures, trigger input, or audit events.
+1. add a local webhook adapter that can receive HTTP events and invoke the existing trigger boundary without adding a hosted service or queue.
 
-### Loop 25: Credential Provider Interface
+### Loop 26: Local Webhook Adapter
 
-Goal: add a local credential-provider boundary that lets connector examples reference credential handles without embedding secret values in Workflow DSL artifacts or trigger input.
+Goal: let local HTTP events trigger published workflow runs through the existing trigger envelope.
 
-Why this is next: Loop 22 documented the credential boundary and Loop 24 made business input durable. Real integration pilots now need a tested way to distinguish business input from credential material before product-specific connectors are added.
+Why this is next: Loop 23 created the trigger boundary, Loop 24 made trigger input durable, and Loop 25 separated credentials from workflow artifacts. The next useful pilot integration surface is a local adapter that proves external events can enter the control plane without bypassing versioning, audit, or input context.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
 - Keep Workflow DSL authoritative and published workflow artifacts immutable.
-- Reuse the existing connector manifest and secret hygiene boundaries.
-- Prefer local handle resolution and explicit failure behavior over implicit environment magic.
-- Do not add SaaS-specific connectors, hosted secret stores, RBAC, IAM, webhook hosting, queues, or runtime dependencies in this loop.
+- Reuse the Loop 23 trigger envelope and Loop 24 input context.
+- Prefer a dependency-free local HTTP adapter for integration testing.
+- Do not add hosted webhooks, SaaS-specific callbacks, RBAC, IAM, queues, or runtime dependencies in this loop.
 
 Scope:
 
-- Define a minimal credential reference shape for connector bindings or runtime configuration
-- Provide a local provider interface with deterministic tests
-- Ensure audit events and run state do not log resolved secret values
-- Update docs so examples use handles/placeholders consistently
+- Define a small local webhook request shape that maps to `trigger_workflow`
+- Provide a deterministic stdlib adapter or handler that tests can call locally
+- Keep trigger response, run context, and audit behavior consistent with CLI trigger runs
+- Document local-only usage and deployment limits
 
 Acceptance criteria:
 
-- Connector code can request a credential by handle through a documented provider boundary
-- Missing credentials fail with clear local errors
-- Workflow DSL examples still contain no secret-like values
-- Audit output and run detail avoid resolved secret values
+- Local webhook requests can start published workflow versions through the same control-plane trigger path
+- Trigger input from webhook payloads is persisted under run context
+- Audit events match triggered CLI runs and do not bypass version binding
 - JSON and SQLite storage behavior remains compatible
-- No hosted credential manager, IAM system, or runtime dependency is introduced
-
-Loop 25 implementation slices:
-
-1. Credential reference contract
-   - Define the minimal handle shape supported by connector runtime metadata.
-2. Local provider boundary
-   - Add a deterministic local provider interface that can resolve handles in tests without storing secrets in Workflow DSL.
-3. Connector integration
-   - Let HTTP connector execution request credentials through the provider boundary while keeping resolved values out of node results, run context, and audit events.
-4. Failure and hygiene coverage
-   - Add missing-credential errors, redaction expectations, and fixture hygiene tests.
-5. Docs and examples
-   - Update credential docs, connector docs, and Roadmap with the supported boundary and remaining limits.
-
-Loop 25 explicit non-goals:
-
-- Do not add hosted secret stores.
-- Do not add RBAC, IAM, or user permission modeling.
-- Do not add product-specific SaaS connectors.
-- Do not store secret values in Workflow DSL, LiteGraph fixtures, trigger input, run state, or audit events.
-- Do not add webhook hosting, queues, distributed scheduling, or runtime dependencies.
-
-Loop 25 expected file changes:
-
-- `tests/` for provider contract, connector integration, missing-credential behavior, and hygiene coverage.
-- `src/skill2workflow/connectors.py` or a small provider module under `src/skill2workflow/`.
-- `docs/credential-boundary.md`, `docs/connectors.md`, `docs/stability.md`, `README.md`, and `HARNESS.md`.
-- Example fixtures only if they can use documented handles without secret-like values.
-
-Loop 25 verification commands:
-
-- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- `python3 -m py_compile src/skill2workflow/*.py`
-- `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
-- `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
-- `python3 scripts/secret_hygiene.py examples/workflows`
-- focused credential provider and connector tests documented in the PR
-- `git diff --check`
-
-Loop 25 done means:
-
-- Connectors have a tested boundary for credential handles.
-- Missing credentials fail predictably without leaking secret values.
-- Future product-specific connector work can rely on a documented local credential-provider contract.
-- Workflow DSL `0.1.0` remains authoritative and secret-free.
+- No hosted webhook service, queue, scheduler, auth system, or runtime dependency is introduced
 
 ## Near-Term Loop Queue
 
@@ -180,8 +135,8 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
 | Loop 24: Workflow Inputs And Run Context | Complete | Carry trigger input metadata into run state and node execution context | input contract, run context persistence, executor tests |
-| Loop 25: Credential Provider Interface | Next | Reference credentials without storing secret values in Workflow DSL | provider protocol, placeholder-to-handle docs, local tests |
-| Loop 26: Local Webhook Adapter | Planned | Let local HTTP events trigger published runs through the trigger boundary | stdlib webhook adapter, trigger examples, audit tests |
+| Loop 25: Credential Provider Interface | Complete | Reference credentials without storing secret values in Workflow DSL | provider protocol, placeholder-to-handle docs, local tests |
+| Loop 26: Local Webhook Adapter | Next | Let local HTTP events trigger published runs through the trigger boundary | stdlib webhook adapter, trigger examples, audit tests |
 | Loop 27: Run Overlay In Visual Editor | Planned | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
 | Loop 28: Pilot Playbook And Example | Planned | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
 
@@ -190,7 +145,7 @@ Loop selection rules:
 - Pick the next loop only after the previous loop is merged or explicitly deferred.
 - Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
 - Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
-- Do not add product-specific SaaS connectors until credential-provider boundaries are in place.
+- Do not add product-specific SaaS connectors until local webhook/adapters and pilot playbooks are in place.
 
 ## Release Tag Plan
 
@@ -232,7 +187,7 @@ Status: delivered by Loops 1-9.
 
 ### v0.2: Connector Runtime
 
-Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Future work should add credential providers and product-specific extensions only when backed by tests and docs.
+Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Future work should add product-specific extensions only when backed by tests and docs.
 
 - Connector manifests
 - Connector binding validation
@@ -241,7 +196,8 @@ Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retr
 - Connector test fixtures
 - Connector-node retry execution
 - Committed-fixture secret hygiene guardrails
-- Future: credential providers, secret injection boundaries, and product-specific connector packages
+- Local credential-provider boundary for handle-based HTTP headers
+- Future: product-specific connector packages
 
 ### v0.3: Authoring Experience
 
@@ -293,7 +249,7 @@ Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24.
 
 ### v0.7: Pilot Integration Boundary
 
-Status: planned after local trigger and input semantics are stable. Credential provider work is the next pilot boundary in Loop 25.
+Status: planned after local trigger, input, and credential semantics are stable. Local webhook adapter work starts in Loop 26.
 
 - Credential provider interface
 - Secret-handle documentation without secret storage in Workflow DSL

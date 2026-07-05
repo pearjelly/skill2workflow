@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
+from skill2workflow.credentials import StaticCredentialProvider
 from skill2workflow.executor import LocalExecutor
 
 
@@ -197,6 +198,25 @@ class ExecutorTests(TestCase):
         self.assertIn(("connector_started", "call_api"), event_rows)
         self.assertIn(("connector_completed", "call_api"), event_rows)
 
+    def test_http_connector_credentials_do_not_persist_resolved_values(self):
+        server = _ConnectorTestServer()
+        workflow = _credential_connector_workflow(server.url)
+
+        try:
+            with TemporaryDirectory() as tmp:
+                state = LocalExecutor(
+                    Path(tmp),
+                    credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+                ).run(workflow)
+        finally:
+            server.close()
+
+        self.assertEqual(state["status"], "completed")
+        self.assertEqual(server.requests[0]["headers"]["Authorization"], "Bearer secret-token")
+        self.assertNotIn("secret-token", json.dumps(state["node_results"]))
+        self.assertNotIn("secret-token", json.dumps(state["events"]))
+        self.assertNotIn("secret-token", json.dumps(state["context"]))
+
     def test_retry_policy_retries_failed_connector_and_records_recovery(self):
         server = _FlakyConnectorTestServer()
         workflow = _http_connector_workflow(server.url)
@@ -292,12 +312,25 @@ def _http_connector_workflow(url: str):
     }
 
 
+def _credential_connector_workflow(url: str):
+    workflow = _http_connector_workflow(url)
+    workflow["nodes"][1]["connector"]["credentials"] = [
+        {
+            "target": "header",
+            "name": "Authorization",
+            "handle": "demo_api_token",
+            "prefix": "Bearer ",
+        }
+    ]
+    return workflow
+
+
 class _ConnectorRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
         raw_body = self.rfile.read(length).decode("utf-8")
         body = json.loads(raw_body) if raw_body else None
-        self.server.requests.append({"path": self.path, "body": body})
+        self.server.requests.append({"path": self.path, "headers": dict(self.headers.items()), "body": body})
         payload = json.dumps({"ok": True}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -314,7 +347,7 @@ class _FlakyConnectorRequestHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         raw_body = self.rfile.read(length).decode("utf-8")
         body = json.loads(raw_body) if raw_body else None
-        self.server.requests.append({"path": self.path, "body": body})
+        self.server.requests.append({"path": self.path, "headers": dict(self.headers.items()), "body": body})
 
         if len(self.server.requests) == 1:
             payload = json.dumps({"error": "temporary"}).encode("utf-8")

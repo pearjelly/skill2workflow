@@ -151,6 +151,10 @@
         "request": {
           "type": "object",
           "description": "Optional connector request metadata. The built-in HTTP connector uses this object."
+        },
+        "credentials": {
+          "type": "array",
+          "description": "Optional credential handle metadata. The built-in HTTP connector supports header credentials resolved by the local credential provider."
         }
       }
     },
