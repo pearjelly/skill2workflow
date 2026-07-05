@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
+from .credentials import load_credential_file
 from .dashboard import build_control_snapshot
 from .executor import LocalExecutor
 from .parser import parse_skill_file
@@ -44,11 +45,13 @@ def main(argv=None) -> int:
     run_cmd.add_argument("workflow", type=Path)
     run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    run_cmd.add_argument("--credential-file", type=Path)
 
     resume_cmd = subparsers.add_parser("resume", help="Resume a waiting run")
     resume_cmd.add_argument("run_id")
     resume_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     resume_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_cmd.add_argument("--credential-file", type=Path)
     resume_cmd.add_argument("--reject", action="store_true")
 
     runs_cmd = subparsers.add_parser("runs", help="List local runs")
@@ -86,6 +89,7 @@ def main(argv=None) -> int:
     run_published_cmd.add_argument("--version", required=True)
     run_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    run_published_cmd.add_argument("--credential-file", type=Path)
 
     trigger_cmd = subparsers.add_parser("trigger", help="Trigger a published workflow through the local API")
     trigger_cmd.add_argument("workflow_id")
@@ -95,11 +99,13 @@ def main(argv=None) -> int:
     trigger_cmd.add_argument("--source", default="local-cli")
     trigger_cmd.add_argument("--idempotency-key", default="")
     trigger_cmd.add_argument("--input", type=Path, help="JSON object with trigger input metadata")
+    trigger_cmd.add_argument("--credential-file", type=Path)
 
     resume_published_cmd = subparsers.add_parser("resume-published", help="Resume a waiting published run")
     resume_published_cmd.add_argument("run_id")
     resume_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     resume_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_published_cmd.add_argument("--credential-file", type=Path)
     resume_published_cmd.add_argument("--reject", action="store_true")
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
@@ -198,11 +204,21 @@ def main(argv=None) -> int:
             for error in errors:
                 print(error, file=sys.stderr)
             return 1
-        _print_json(LocalExecutor(args.state_dir, storage=args.storage).run(workflow))
+        _print_json(
+            LocalExecutor(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).run(workflow)
+        )
         return 0
 
     if args.command == "resume":
-        state = LocalExecutor(args.state_dir, storage=args.storage).resume(args.run_id, approved=not args.reject)
+        state = LocalExecutor(
+            args.state_dir,
+            storage=args.storage,
+            credential_provider=_credential_provider(args),
+        ).resume(args.run_id, approved=not args.reject)
         _print_json(state)
         return 0
 
@@ -241,7 +257,11 @@ def main(argv=None) -> int:
 
     if args.command == "run-published":
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).run_published_workflow(
+            lambda: LocalControlPlane(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).run_published_workflow(
                 args.workflow_id, args.version
             )
         )
@@ -251,7 +271,11 @@ def main(argv=None) -> int:
 
     if args.command == "resume-published":
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).resume_published_run(
+            lambda: LocalControlPlane(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).resume_published_run(
                 args.run_id, approved=not args.reject
             )
         )
@@ -310,7 +334,11 @@ def _control_action(callback) -> int:
 
 def _trigger_workflow(args):
     trigger_input = _load_trigger_input(args.input)
-    return LocalControlPlane(args.state_dir, storage=args.storage).trigger_workflow(
+    return LocalControlPlane(
+        args.state_dir,
+        storage=args.storage,
+        credential_provider=_credential_provider(args),
+    ).trigger_workflow(
         {
             "workflow_id": args.workflow_id,
             "version": args.version,
@@ -319,6 +347,13 @@ def _trigger_workflow(args):
             "input": trigger_input,
         }
     )
+
+
+def _credential_provider(args):
+    path = getattr(args, "credential_file", None)
+    if path is None:
+        return None
+    return load_credential_file(path)
 
 
 def _load_trigger_input(path: Path):

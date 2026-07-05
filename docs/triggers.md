@@ -32,7 +32,7 @@ Supported fields:
 
 `input` must be a JSON object when supplied. Trigger input keys are normalized as strings. The input payload is copied into durable run state and should contain local-pilot business metadata, identifiers, and other non-secret values.
 
-Do not put secrets, credentials, access tokens, private keys, or long confidential documents in trigger input. The current runtime does not provide secret redaction, encryption, IAM, or credential-provider semantics.
+Do not put secrets, credentials, access tokens, private keys, or long confidential documents in trigger input. Connector credentials should use the separate local credential-provider boundary documented in `docs/credential-boundary.md`. The current runtime does not provide secret redaction, encryption, or IAM.
 
 ## CLI Usage
 
@@ -113,7 +113,7 @@ The durable run context has two top-level fields:
 
 The context is stored with the run state in both JSON and SQLite storage modes. It does not mutate the published workflow artifact and does not change Workflow DSL `0.1.0`.
 
-Node execution code can inspect `state["context"]` while running. This loop does not add input templating, connector request interpolation, credential injection, or schema-based input mapping.
+Node execution code can inspect `state["context"]` while running. Trigger input is not used for connector credential resolution. The current runtime does not add input templating, connector request interpolation, or schema-based input mapping.
 
 ## Audit Semantics
 

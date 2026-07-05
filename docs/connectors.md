@@ -50,6 +50,57 @@ Supported request metadata:
 
 If `body` is present and no case-insensitive `Content-Type` header is supplied, the connector adds `Content-Type: application/json`.
 
+HTTP connector bindings may also reference local credential handles:
+
+```json
+{
+  "connector": {
+    "id": "http",
+    "kind": "http",
+    "request": {
+      "url": "http://127.0.0.1:8080/example"
+    },
+    "credentials": [
+      {
+        "target": "header",
+        "name": "Authorization",
+        "handle": "demo_api_token",
+        "prefix": "Bearer "
+      }
+    ]
+  }
+}
+```
+
+Supported credential metadata:
+
+| Field | Behavior |
+| --- | --- |
+| `target` | Required. Only `header` is supported in the current built-in HTTP connector. |
+| `name` | Required HTTP header name. |
+| `handle` | Required credential handle resolved by the local credential provider. |
+| `prefix` | Optional string prepended to the resolved value. |
+
+Provide values at runtime with a local credential file:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json \
+  --state-dir /tmp/skill2workflow-state \
+  --credential-file /tmp/skill2workflow-credentials.json
+```
+
+The credential file has this shape:
+
+```json
+{
+  "credentials": {
+    "demo_api_token": "local-secret-value"
+  }
+}
+```
+
+The resolved value is used only for the outbound request. Connector results, run context, and audit events do not include the resolved credential value by default.
+
 ## Result Semantics
 
 Successful HTTP responses produce a completed connector result:
@@ -107,9 +158,9 @@ See `docs/runtime-policy.md` for current policy semantics and limits.
 
 Workflow DSL fixtures must not store secrets.
 
-The built-in HTTP connector accepts static request metadata so local examples and tests can run from a fresh checkout. Enterprise credential management, token injection, secret redaction, IAM, connector marketplaces, and product-specific SaaS connector packages are intentionally outside this MVP boundary.
+The built-in HTTP connector accepts static request metadata and optional credential handles so local examples and tests can run from a fresh checkout. Hosted secret stores, credential encryption, IAM, connector marketplaces, and product-specific SaaS connector packages are intentionally outside this MVP boundary.
 
-Until a credential layer exists, contributors should keep examples local and non-sensitive, such as `http://127.0.0.1` fixtures or placeholder URLs that are never executed in tests. If an example needs to show credential-shaped metadata, use documented placeholders such as `<redacted>`, `REDACTED`, `placeholder`, `example-token`, or `token-placeholder`.
+Contributors should keep examples local and non-sensitive, such as `http://127.0.0.1` fixtures or placeholder URLs that are never executed in tests. If an example needs to show credential-shaped metadata, use credential handles or documented placeholders such as `<redacted>`, `REDACTED`, `placeholder`, `example-token`, or `token-placeholder`.
 
 Run the committed-fixture guardrail before opening connector example PRs:
 
@@ -117,4 +168,4 @@ Run the committed-fixture guardrail before opening connector example PRs:
 python3 scripts/secret_hygiene.py examples/workflows
 ```
 
-See `docs/credential-boundary.md` for allowed placeholder patterns, scanner behavior, and future credential provider boundaries.
+See `docs/credential-boundary.md` for allowed placeholder patterns, scanner behavior, and the local credential-provider boundary.

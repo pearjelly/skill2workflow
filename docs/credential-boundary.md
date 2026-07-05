@@ -43,21 +43,67 @@ When a finding exists, the command exits with status `1` and reports the file, J
 
 The scanner is intentionally conservative and dependency-free. It catches obvious secret-like keys and values in committed JSON fixtures; it is not a replacement for repository secret scanning or human review.
 
-## Runtime Boundary
+## Local Credential Provider
 
-The built-in HTTP connector accepts static request metadata so examples can run from a fresh checkout. It does not provide secret storage or runtime secret injection.
+The local runtime supports a minimal credential-provider boundary for connector execution. Workflow DSL may reference a credential handle, while the resolved value lives outside the workflow artifact.
+
+Local credential files use this format:
+
+```json
+{
+  "credentials": {
+    "demo_api_token": "local-secret-value"
+  }
+}
+```
+
+Use the file at runtime:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json \
+  --state-dir /tmp/skill2workflow-state \
+  --credential-file /tmp/skill2workflow-credentials.json
+```
+
+The credential file is local-only. Do not commit it.
+
+Workflow DSL connector bindings may reference handles:
+
+```json
+{
+  "connector": {
+    "id": "http",
+    "kind": "http",
+    "request": {
+      "url": "http://127.0.0.1:8080/example"
+    },
+    "credentials": [
+      {
+        "target": "header",
+        "name": "Authorization",
+        "handle": "demo_api_token",
+        "prefix": "Bearer "
+      }
+    ]
+  }
+}
+```
+
+Only the handle belongs in Workflow DSL. The resolved value is used for the outbound connector request and is not written to node results, run context, or audit events by the built-in runtime.
+
+## Runtime Boundary
 
 The current local runtime does not implement:
 
 - secret managers
-- token injection
-- credential provider resolution
+- hosted credential stores
+- credential encryption at rest
 - runtime redaction
 - RBAC or IAM
 - product-specific SaaS credential flows
 - connector marketplace credentials
 
-Future credential provider work should keep secret material outside immutable Workflow DSL artifacts. Workflow DSL may reference credential handles later, but the referenced secret values should live in a separate provider boundary with its own audit, validation, and redaction rules.
+The provider boundary is intentionally local and dependency-free. It is not a production secret manager.
 
 ## Contributor Guidance
 
@@ -65,6 +111,6 @@ When adding connector examples:
 
 1. Prefer local deterministic endpoints and local test servers.
 2. Use placeholders when a header or body field needs to show shape.
-3. Keep real secrets in your local shell or test environment, never in committed fixtures.
+3. Keep real secrets in a local credential file or test process memory, never in committed fixtures.
 4. Run `python3 scripts/secret_hygiene.py examples/workflows` before opening the PR.
 5. Document any new placeholder convention in this file before using it in examples.

@@ -92,6 +92,8 @@ PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2wo
 PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
+printf '{"credentials":{"demo_api_token":"local-secret-value"}}' >/tmp/skill2workflow-credentials.json
+PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state --credential-file /tmp/skill2workflow-credentials.json
 printf '{"customer_id":"customer_123"}' >/tmp/skill2workflow-trigger-input.json
 PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001 --input /tmp/skill2workflow-trigger-input.json
 PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control
@@ -190,12 +192,14 @@ Implemented:
   - gives compiled `human_gate` nodes a default manual connector binding
   - gives compiled `tool_call` nodes a default HTTP connector binding
   - executes HTTP requests with the Python standard library
+  - resolves local credential handles for HTTP connector request headers through `--credential-file`
   - covers HTTP connector success, HTTP error, invalid request metadata, JSON body, headers, and timeout behavior with deterministic local tests
   - documents retry, timeout, and credential boundaries in `docs/connectors.md`
 - Credential boundary and secret hygiene
   - documents safe connector example patterns in `docs/credential-boundary.md`
   - checks committed Workflow DSL and LiteGraph example fixtures for obvious secret-like values through `scripts/secret_hygiene.py`
-  - keeps real secrets, token injection, redaction, IAM, and SaaS credential flows outside immutable Workflow DSL artifacts
+  - keeps real secrets, redaction, IAM, and SaaS credential flows outside immutable Workflow DSL artifacts
+  - keeps resolved credential values out of run state and audit events in the built-in runtime
 - Local trigger API
   - documents the trigger request and response envelope in `docs/triggers.md`
   - exposes `trigger` as a CLI path for starting published workflow runs
@@ -220,5 +224,5 @@ Not implemented yet:
 
 - Production-grade enterprise control plane UI
 - Input templating, connector request interpolation, and schema-based input mapping
-- Enterprise connector credential management, secret injection, and runtime redaction
+- Hosted credential stores, credential encryption, IAM, and runtime redaction
 - GitHub release automation

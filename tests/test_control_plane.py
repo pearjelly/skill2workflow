@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.credentials import StaticCredentialProvider
 
 
 class ControlPlaneTests(TestCase):
@@ -231,6 +232,28 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(completed_events[0]["connector_status"], "completed")
         self.assertEqual(completed_events[0]["node_id"], "call_api")
 
+    def test_published_connector_run_resolves_credentials_without_audit_leakage(self):
+        server = _ConnectorTestServer()
+
+        try:
+            with TemporaryDirectory() as tmp:
+                control = LocalControlPlane(
+                    Path(tmp),
+                    storage="sqlite",
+                    credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+                )
+                control.publish_workflow(_credential_connector_workflow("11.0.0", server.url))
+
+                run_state = control.run_published_workflow("workflow_connector", "11.0.0")
+                audit_events = control.list_audit_events(run_id=run_state["run_id"])
+        finally:
+            server.close()
+
+        self.assertEqual(run_state["status"], "completed")
+        self.assertEqual(server.requests[0]["headers"]["Authorization"], "Bearer secret-token")
+        self.assertNotIn("secret-token", json.dumps(run_state["node_results"]))
+        self.assertNotIn("secret-token", json.dumps(audit_events))
+
     def test_published_retry_policy_promotes_policy_events_to_audit(self):
         server = _FlakyConnectorTestServer()
 
@@ -351,12 +374,25 @@ def _connector_workflow(version: str, url: str):
     }
 
 
+def _credential_connector_workflow(version: str, url: str):
+    workflow = _connector_workflow(version, url)
+    workflow["nodes"][1]["connector"]["credentials"] = [
+        {
+            "target": "header",
+            "name": "Authorization",
+            "handle": "demo_api_token",
+            "prefix": "Bearer ",
+        }
+    ]
+    return workflow
+
+
 class _ConnectorRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
         raw_body = self.rfile.read(length).decode("utf-8")
         body = json.loads(raw_body) if raw_body else None
-        self.server.requests.append({"path": self.path, "body": body})
+        self.server.requests.append({"path": self.path, "headers": dict(self.headers.items()), "body": body})
         payload = json.dumps({"ok": True}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -373,7 +409,7 @@ class _FlakyConnectorRequestHandler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         raw_body = self.rfile.read(length).decode("utf-8")
         body = json.loads(raw_body) if raw_body else None
-        self.server.requests.append({"path": self.path, "body": body})
+        self.server.requests.append({"path": self.path, "headers": dict(self.headers.items()), "body": body})
 
         if len(self.server.requests) == 1:
             payload = json.dumps({"error": "temporary"}).encode("utf-8")
@@ -401,6 +437,10 @@ class _ConnectorTestServer:
     def url(self) -> str:
         host, port = self._server.server_address
         return f"http://{host}:{port}/connector"
+
+    @property
+    def requests(self):
+        return self._server.requests
 
     def close(self):
         self._server.shutdown()

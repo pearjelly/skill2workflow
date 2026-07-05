@@ -9,6 +9,8 @@ import urllib.error
 import urllib.request
 from typing import Dict, List
 
+from .credentials import CredentialResolutionError
+
 
 ConnectorBinding = Dict[str, object]
 ConnectorResult = Dict[str, object]
@@ -78,20 +80,20 @@ def connector_ref(binding: object) -> Dict[str, str]:
     return {"id": connector_id, "kind": connector_kind}
 
 
-def execute_connector(node: Dict[str, object]) -> ConnectorResult:
+def execute_connector(node: Dict[str, object], credential_provider=None) -> ConnectorResult:
     """Execute a node's connector binding and return a normalized result."""
     binding = node.get("connector")
     ref = connector_ref(binding)
     if not ref["id"]:
         raise ConnectorExecutionError(f"{node.get('id', '<node>')} has no connector binding")
     if ref["id"] == "http":
-        return _execute_http_connector(binding)
+        return _execute_http_connector(binding, credential_provider=credential_provider)
     if ref["id"] == "manual":
         raise ConnectorExecutionError("manual connector is resumed through human gate state")
     raise ConnectorExecutionError(f"unsupported connector: {ref['id']}")
 
 
-def _execute_http_connector(binding: object) -> ConnectorResult:
+def _execute_http_connector(binding: object, credential_provider=None) -> ConnectorResult:
     if not isinstance(binding, dict):
         raise ConnectorExecutionError("http connector binding must be an object")
     request_spec = binding.get("request")
@@ -104,6 +106,7 @@ def _execute_http_connector(binding: object) -> ConnectorResult:
 
     method = str(request_spec.get("method") or "GET").upper()
     headers = _string_map(request_spec.get("headers"))
+    _apply_http_credentials(binding.get("credentials", []), headers, credential_provider)
     body = request_spec.get("body")
     data = None
     if body is not None:
@@ -154,6 +157,33 @@ def _string_map(value: object) -> Dict[str, str]:
     if not isinstance(value, dict):
         return {}
     return {str(key): str(item) for key, item in value.items()}
+
+
+def _apply_http_credentials(credentials: object, headers: Dict[str, str], credential_provider) -> None:
+    if credentials in (None, []):
+        return
+    if not isinstance(credentials, list):
+        raise ConnectorExecutionError("connector.credentials must be a list")
+
+    for index, credential in enumerate(credentials):
+        if not isinstance(credential, dict):
+            raise ConnectorExecutionError(f"connector.credentials[{index}] must be an object")
+        target = str(credential.get("target") or "")
+        if target != "header":
+            raise ConnectorExecutionError(f"connector.credentials[{index}].target must be header")
+        name = str(credential.get("name") or "")
+        if not name:
+            raise ConnectorExecutionError(f"connector.credentials[{index}].name is required")
+        handle = str(credential.get("handle") or "")
+        if not handle:
+            raise ConnectorExecutionError(f"connector.credentials[{index}].handle is required")
+        if credential_provider is None:
+            raise ConnectorExecutionError(f"credential handle not found: {handle}")
+        try:
+            value = credential_provider.resolve(handle)
+        except CredentialResolutionError as error:
+            raise ConnectorExecutionError(str(error))
+        headers[name] = f"{credential.get('prefix', '') or ''}{value}"
 
 
 def _timeout_seconds(value: object) -> float:

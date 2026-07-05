@@ -1,5 +1,7 @@
 import json
+import threading
 from contextlib import redirect_stderr, redirect_stdout
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -407,6 +409,43 @@ class CliTests(TestCase):
         self.assertEqual(run_summaries[0]["status"], "completed")
         self.assertTrue(db_exists)
 
+    def test_run_command_uses_local_credential_file_without_printing_secret(self):
+        server = _CliConnectorTestServer()
+
+        try:
+            with TemporaryDirectory() as tmp:
+                tmp_path = Path(tmp)
+                workflow_path = tmp_path / "credential-workflow.json"
+                credentials_path = tmp_path / "credentials.json"
+                state_dir = tmp_path / "state"
+                workflow_path.write_text(json.dumps(_credential_workflow(server.url)), encoding="utf-8")
+                credentials_path.write_text(
+                    json.dumps({"credentials": {"demo_api_token": "secret-token"}}),
+                    encoding="utf-8",
+                )
+                stdout = StringIO()
+
+                with redirect_stdout(stdout):
+                    exit_code = main(
+                        [
+                            "run",
+                            str(workflow_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--credential-file",
+                            str(credentials_path),
+                        ]
+                    )
+
+                run_state = json.loads(stdout.getvalue())
+        finally:
+            server.close()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(run_state["status"], "completed")
+        self.assertEqual(server.requests[0]["headers"]["Authorization"], "Bearer secret-token")
+        self.assertNotIn("secret-token", stdout.getvalue())
+
     def test_validate_command_can_emit_structured_json_errors(self):
         with TemporaryDirectory() as tmp:
             workflow_path = Path(tmp) / "workflow.json"
@@ -501,3 +540,81 @@ def _approval_workflow():
             {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "failure"},
         ],
     }
+
+
+def _credential_workflow(url: str):
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {"id": "workflow_credential", "name": "credential", "version": "0.1.0", "status": "draft"},
+        "entry": "start",
+        "nodes": [
+            {"id": "start", "type": "start", "title": "Start", "on_success": "call_api"},
+            {
+                "id": "call_api",
+                "type": "tool_call",
+                "title": "Call API",
+                "connector": {
+                    "id": "http",
+                    "kind": "http",
+                    "request": {
+                        "method": "GET",
+                        "url": url,
+                        "timeout_ms": 2000,
+                    },
+                    "credentials": [
+                        {
+                            "target": "header",
+                            "name": "Authorization",
+                            "handle": "demo_api_token",
+                            "prefix": "Bearer ",
+                        }
+                    ],
+                },
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+            {"id": "failure", "type": "failure", "title": "Failure"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_call", "from": "start", "to": "call_api", "label": "next"},
+            {"id": "edge_call_end", "from": "call_api", "to": "end", "label": "next"},
+            {"id": "edge_call_failure", "from": "call_api", "to": "failure", "label": "failure"},
+        ],
+    }
+
+
+class _CliConnectorRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.server.requests.append({"headers": dict(self.headers.items())})
+        payload = json.dumps({"ok": True}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format, *args):
+        return
+
+
+class _CliConnectorTestServer:
+    def __init__(self):
+        self._server = HTTPServer(("127.0.0.1", 0), _CliConnectorRequestHandler)
+        self._server.requests = []
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    @property
+    def url(self) -> str:
+        host, port = self._server.server_address
+        return f"http://{host}:{port}/credential"
+
+    @property
+    def requests(self):
+        return self._server.requests
+
+    def close(self):
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=2)
