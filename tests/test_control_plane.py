@@ -63,6 +63,36 @@ class ControlPlaneTests(TestCase):
         self.assertIn("run_completed", audit_types)
         self.assertEqual(audit_events[1]["run_id"], run_state["run_id"])
 
+    def test_trigger_workflow_starts_published_run_with_trigger_metadata(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="10.0.0"))
+
+            result = control.trigger_workflow(
+                {
+                    "workflow_id": "workflow_control",
+                    "version": "10.0.0",
+                    "source": "local-test",
+                    "idempotency_key": "demo-1",
+                    "input": {"customer_id": "customer_123"},
+                }
+            )
+            audit_events = control.list_audit_events(run_id=result["run_id"])
+            started_events = control.list_audit_events(run_id=result["run_id"], event_type="run_started")
+
+        self.assertTrue(result["trigger_id"].startswith("trigger_"))
+        self.assertEqual(result["workflow_id"], "workflow_control")
+        self.assertEqual(result["workflow_version"], "10.0.0")
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(result["source"], "local-test")
+        self.assertEqual(result["idempotency_key"], "demo-1")
+        self.assertEqual(result["input_keys"], ["customer_id"])
+        self.assertEqual([event["type"] for event in audit_events], ["run_started", "run_completed"])
+        self.assertEqual(started_events[0]["trigger_id"], result["trigger_id"])
+        self.assertEqual(started_events[0]["trigger_source"], "local-test")
+        self.assertEqual(started_events[0]["idempotency_key"], "demo-1")
+        self.assertEqual(started_events[0]["input_keys"], ["customer_id"])
+
     def test_run_published_workflow_can_use_sqlite_run_storage(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

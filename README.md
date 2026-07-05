@@ -87,6 +87,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Load example workflows from the editor gallery
 - Publish immutable workflow versions into a local control plane
 - Run published workflow versions and write audit events
+- Trigger published workflow versions through a compact local API envelope
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Audit connector execution events through the control plane
@@ -270,6 +271,13 @@ PYTHONPATH=src python3 -m skill2workflow.cli control-run <run_id> --state-dir /t
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control
 ```
 
+Trigger a published version through the local trigger boundary:
+
+```bash
+printf '{"customer_id":"customer_123"}' >/tmp/skill2workflow-trigger-input.json
+PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001 --input /tmp/skill2workflow-trigger-input.json
+```
+
 Use SQLite run storage for published runs:
 
 ```bash
@@ -354,6 +362,7 @@ src/skill2workflow/
   storage.py      # JSON and SQLite local persistence backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON
   secret_hygiene.py # Fixture secret hygiene scanner
+  triggers.py     # Local trigger envelope helpers
   release.py      # Read-only release preflight checks
   cli.py          # Command line interface
 scripts/          # Maintainer command helpers
@@ -367,6 +376,7 @@ docs/assets/      # README screenshots and system design diagrams
 docs/connectors.md # Connector runtime behavior and boundary guide
 docs/credential-boundary.md # Safe credential and fixture hygiene boundary
 docs/examples.md  # Enterprise workflow example pack guide
+docs/triggers.md  # Local trigger API boundary guide
 docs/releases/    # Release notes
 web/              # Static LiteGraph editor and control-plane inspector
 .github/          # CI and issue templates
@@ -399,8 +409,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Packaging And Installability
 - Runtime Policy And Recovery
 - Credential Boundary And Secret Hygiene
+- Trigger And Local Run API
 
-Next priority is Loop 23 Trigger And Local Run API.
+Next priority is Loop 24 Workflow Inputs And Run Context.
 
 See:
 
@@ -414,6 +425,7 @@ See:
 - `docs/releases/v0.1.0.md`
 - `docs/runtime-policy.md`
 - `docs/stability.md`
+- `docs/triggers.md`
 - `docs/workflow-dsl-contract.md`
 - `docs/workflow-dsl-compatibility.md`
 - `docs/superpowers/specs/2026-07-01-skill2workflow-design.md`

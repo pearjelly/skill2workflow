@@ -92,6 +92,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2wo
 PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001
 PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill2workflow-control
@@ -161,10 +162,12 @@ Implemented:
   - publishes immutable workflow artifacts
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions
+  - triggers published workflow versions through a compact local API envelope
   - resumes waiting published runs
   - lists and shows run state through control-plane commands
   - keeps run state bound to workflow id and version
   - records workflow publish, deprecate, and run events in JSONL or SQLite audit storage
+  - adds trigger metadata to `run_started` audit events for triggered runs
   - filters audit events by workflow id, version, run id, and event type
   - records connector execution events in audit storage for published runs
   - promotes runtime policy events such as retry and recovery into audit storage for published runs
@@ -192,6 +195,10 @@ Implemented:
   - documents safe connector example patterns in `docs/credential-boundary.md`
   - checks committed Workflow DSL and LiteGraph example fixtures for obvious secret-like values through `scripts/secret_hygiene.py`
   - keeps real secrets, token injection, redaction, IAM, and SaaS credential flows outside immutable Workflow DSL artifacts
+- Local trigger API
+  - documents the trigger request and response envelope in `docs/triggers.md`
+  - exposes `trigger` as a CLI path for starting published workflow runs
+  - records trigger id, source, idempotency key, and input keys without injecting input values into node context
 - Runtime policy and recovery
   - documents retry and recovery semantics in `docs/runtime-policy.md`
   - treats `retry.max_attempts` as retries after the first connector attempt
@@ -209,5 +216,6 @@ Implemented:
 Not implemented yet:
 
 - Production-grade enterprise control plane UI
+- Trigger input value injection into run state or node execution context
 - Enterprise connector credential management, secret injection, and runtime redaction
 - GitHub release automation

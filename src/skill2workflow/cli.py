@@ -87,6 +87,15 @@ def main(argv=None) -> int:
     run_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
+    trigger_cmd = subparsers.add_parser("trigger", help="Trigger a published workflow through the local API")
+    trigger_cmd.add_argument("workflow_id")
+    trigger_cmd.add_argument("--version", required=True)
+    trigger_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    trigger_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    trigger_cmd.add_argument("--source", default="local-cli")
+    trigger_cmd.add_argument("--idempotency-key", default="")
+    trigger_cmd.add_argument("--input", type=Path, help="JSON object with trigger input metadata")
+
     resume_published_cmd = subparsers.add_parser("resume-published", help="Resume a waiting published run")
     resume_published_cmd.add_argument("run_id")
     resume_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -237,6 +246,9 @@ def main(argv=None) -> int:
             )
         )
 
+    if args.command == "trigger":
+        return _control_action(lambda: _trigger_workflow(args))
+
     if args.command == "resume-published":
         return _control_action(
             lambda: LocalControlPlane(args.state_dir, storage=args.storage).resume_published_run(
@@ -294,6 +306,28 @@ def _control_action(callback) -> int:
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1
+
+
+def _trigger_workflow(args):
+    trigger_input = _load_trigger_input(args.input)
+    return LocalControlPlane(args.state_dir, storage=args.storage).trigger_workflow(
+        {
+            "workflow_id": args.workflow_id,
+            "version": args.version,
+            "source": args.source,
+            "idempotency_key": args.idempotency_key,
+            "input": trigger_input,
+        }
+    )
+
+
+def _load_trigger_input(path: Path):
+    if path is None:
+        return {}
+    value = _load_json(path)
+    if not isinstance(value, dict):
+        raise ValueError("trigger input must be a JSON object")
+    return value
 
 
 def _write_back_workflow(workflow, graph):

@@ -14,7 +14,7 @@ Current capability snapshot:
 - DSL authority: Skill IR compiles to Workflow DSL, with JSON Schema and structured validation errors
 - Visual layer: Workflow DSL renders to LiteGraph JSON, and safe visual edits can write back to DSL
 - Runtime: local executor supports run state, human-gate pause/resume, connector retry policy, recovery events, run listing, and run detail
-- Control plane: immutable workflow publish, version lifecycle, published-version runs, resume, audit log, filtered audit queries, and promoted runtime policy events
+- Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API, resume, audit log, filtered audit queries, and promoted runtime policy events
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
 - Credential boundary and secret hygiene: documented placeholder rules, committed-fixture scanner, and CI guardrail for obvious secret-like values
@@ -48,10 +48,10 @@ Ready now:
 - Audit run lifecycle, connector events, retry/recovery events, and control-plane operations.
 - Demonstrate the complete local bootstrap from a fresh checkout.
 - Verify package installability and fixture secret hygiene in CI.
+- Trigger published workflows through a controlled local API envelope.
 
 Still needed before serious pilots:
 
-- A local trigger boundary so external tools can start published runs without shelling out ad hoc.
 - Trigger input and run context semantics so workflows can receive business data safely.
 - Credential provider interfaces so connector examples can evolve beyond placeholders without putting secrets in Workflow DSL.
 - Optional local webhook or adapter surfaces for integration testing.
@@ -86,88 +86,90 @@ Pilot sequencing rule: do not add product-specific SaaS connectors before local 
 | Loop 20: Packaging And Installability | Complete | Package metadata guards, editable install smoke helper, installed console-script verification, contributor docs |
 | Loop 21: Runtime Policy And Recovery | Complete | Connector retry policy execution, retry/recovery events, audit promotion, runtime policy docs |
 | Loop 22: Credential Boundary And Secret Hygiene | Complete | Credential boundary docs, committed-fixture secret hygiene scanner, CI guardrail, contributor guidance |
+| Loop 23: Trigger And Local Run API | Complete | Trigger envelope, local trigger command, run-start audit metadata, trigger docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 22 made connector examples safer:
+Post-`v0.1.0` work now has one active priority after Loop 23 created the local trigger boundary:
 
-1. expose a controlled local trigger surface so external tools can start published workflow runs without bypassing Workflow DSL validation, version binding, or audit.
+1. carry trigger input metadata into durable run state and node execution context without weakening Workflow DSL authority or auditability.
 
-### Loop 23: Trigger And Local Run API
+### Loop 24: Workflow Inputs And Run Context
 
-Goal: let local systems trigger published workflow runs through a small, testable API boundary instead of requiring every integration to shell out directly to `run-published`.
+Goal: make trigger input metadata available to runs and node execution in a documented, testable way.
 
-Why this is next: current runs are already durable and auditable, but external systems still need a stable entry point. Loop 23 should create that entry point while keeping all existing control-plane guarantees.
+Why this is next: Loop 23 lets local systems start published runs, but trigger input is currently recorded only as compact metadata. Loop 24 should define how input values enter run state and node context without turning Workflow DSL into a data store.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Start from the existing `run-published` control-plane path.
+- Start from the Loop 23 trigger envelope and local trigger command.
 - Keep Workflow DSL authoritative and published workflow artifacts immutable.
-- Prefer a local, dependency-free trigger envelope and deterministic tests before adding background workers.
-- Do not add hosted webhooks, SaaS callbacks, RBAC, queues, or distributed scheduling in this loop.
+- Prefer explicit run-context storage and executor access semantics before adding webhook adapters.
+- Do not add hosted webhooks, SaaS callbacks, RBAC, queues, distributed scheduling, or credential providers in this loop.
 
 Scope:
 
-- Define a trigger request envelope for workflow id, version, input metadata, and idempotency placeholder fields
-- Add a local API/helper path that starts published runs through the existing control plane
-- Return structured run identity and status output
-- Document local trigger boundaries and future webhook/server responsibilities
+- Define how trigger input values are stored in run state
+- Expose input metadata to node execution context in a constrained form
+- Keep audit output compact and avoid logging full input values by default
+- Document what input data is safe for local pilots
 
 Acceptance criteria:
 
-- Triggered runs use immutable published workflow artifacts
-- Triggered runs write the same control-plane audit events as `run-published`
-- Invalid workflow id/version inputs return structured errors
+- Triggered run state contains a documented input/context structure
+- Existing triggered runs remain version-bound and auditable
+- Node execution can inspect input metadata without changing Workflow DSL schema
+- Audit events do not dump full input values by default
 - Existing CLI and storage behavior remains compatible
-- No daemon, hosted service, queue, auth system, or runtime dependency is introduced
+- No daemon, hosted service, queue, auth system, credential provider, or runtime dependency is introduced
 
-Loop 23 implementation slices:
+Loop 24 implementation slices:
 
-1. Trigger envelope contract
-   - Define the local request and response shape without changing Workflow DSL `0.1.0`.
-2. Control-plane trigger helper
-   - Add a small helper that delegates to the existing published-run path.
-3. CLI or script entry
-   - Provide a runnable local command for trigger smoke tests.
+1. Run input contract
+   - Define how trigger input is normalized and persisted.
+2. Executor context bridge
+   - Make input metadata available during node execution without changing Workflow DSL topology.
+3. CLI and control-plane coverage
+   - Extend trigger tests to prove run state carries input.
 4. Docs and examples
-   - Document how local tools can trigger runs safely.
+   - Document safe local input handling and limits.
 5. Verification
    - Run full tests, demo onboarding, package smoke, and secret hygiene.
 
-Loop 23 explicit non-goals:
+Loop 24 explicit non-goals:
 
 - Do not add hosted webhooks.
 - Do not add a long-running daemon.
 - Do not add queues or distributed scheduling.
 - Do not add RBAC, IAM, or secret injection.
+- Do not add credential providers.
 - Do not introduce runtime dependencies.
 
-Loop 23 expected file changes:
+Loop 24 expected file changes:
 
-- `tests/` for trigger envelope and published-run audit behavior.
-- `src/skill2workflow/control_plane.py` or a focused trigger module.
-- `src/skill2workflow/cli.py` or `scripts/` for a local trigger command.
-- `README.md`, `HARNESS.md`, and a focused trigger doc.
+- `tests/` for trigger input persistence and executor context behavior.
+- `src/skill2workflow/triggers.py`, `src/skill2workflow/control_plane.py`, or `src/skill2workflow/executor.py`.
+- `docs/triggers.md`, `README.md`, and `HARNESS.md`.
 
-Loop 23 verification commands:
+Loop 24 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
 - `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
 - `python3 scripts/secret_hygiene.py examples/workflows`
-- focused trigger tests documented in the PR
+- focused trigger input/context tests documented in the PR
 - `git diff --check`
 
-Loop 23 done means:
+Loop 24 done means:
 
-- Local tools have a documented way to start published workflow runs.
-- Triggered runs remain version-bound, auditable, and compatible with existing storage modes.
-- Future webhook or scheduler work has a tested local boundary to build on.
+- Triggered run inputs have durable, documented semantics.
+- Future webhook adapters can pass business data through the trigger boundary.
+- Node execution has a clear path to read input context without changing Workflow DSL `0.1.0`.
 
 ## Near-Term Loop Queue
 
@@ -175,8 +177,7 @@ This queue is ordered by what most improves open-source adoption after the first
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 23: Trigger And Local Run API | Next | Start published workflow runs through a controlled local trigger boundary | trigger envelope, local trigger command, audit tests |
-| Loop 24: Workflow Inputs And Run Context | Planned | Carry trigger input metadata into run state and node execution context | input contract, run context persistence, executor tests |
+| Loop 24: Workflow Inputs And Run Context | Next | Carry trigger input metadata into run state and node execution context | input contract, run context persistence, executor tests |
 | Loop 25: Credential Provider Interface | Planned | Reference credentials without storing secret values in Workflow DSL | provider protocol, placeholder-to-handle docs, local tests |
 | Loop 26: Local Webhook Adapter | Planned | Let local HTTP events trigger published runs through the Loop 23 boundary | stdlib webhook adapter, trigger examples, audit tests |
 | Loop 27: Run Overlay In Visual Editor | Planned | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
@@ -277,13 +278,14 @@ Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Futu
 
 ### v0.6: Local Trigger And Input Runtime
 
-Status: planned for Loops 23-24.
+Status: trigger API shipped in Loop 23; input runtime planned for Loop 24.
 
 - Controlled local trigger envelope
 - Published-run API/helper path
 - Structured trigger response
-- Run input metadata and execution context
+- Trigger metadata on `run_started` audit events
 - Audit coverage for triggered runs
+- Future: run input metadata and execution context
 - Future: local webhook adapter and scheduled triggers
 
 ### v0.7: Pilot Integration Boundary
