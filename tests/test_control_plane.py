@@ -77,6 +77,7 @@ class ControlPlaneTests(TestCase):
                     "input": {"customer_id": "customer_123"},
                 }
             )
+            detail = control.get_run(result["run_id"])
             audit_events = control.list_audit_events(run_id=result["run_id"])
             started_events = control.list_audit_events(run_id=result["run_id"], event_type="run_started")
 
@@ -87,11 +88,22 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(result["source"], "local-test")
         self.assertEqual(result["idempotency_key"], "demo-1")
         self.assertEqual(result["input_keys"], ["customer_id"])
+        self.assertEqual(detail["context"]["input"], {"customer_id": "customer_123"})
+        self.assertEqual(
+            detail["context"]["trigger"],
+            {
+                "trigger_id": result["trigger_id"],
+                "source": "local-test",
+                "idempotency_key": "demo-1",
+                "input_keys": ["customer_id"],
+            },
+        )
         self.assertEqual([event["type"] for event in audit_events], ["run_started", "run_completed"])
         self.assertEqual(started_events[0]["trigger_id"], result["trigger_id"])
         self.assertEqual(started_events[0]["trigger_source"], "local-test")
         self.assertEqual(started_events[0]["idempotency_key"], "demo-1")
         self.assertEqual(started_events[0]["input_keys"], ["customer_id"])
+        self.assertNotIn("input", started_events[0])
 
     def test_run_published_workflow_can_use_sqlite_run_storage(self):
         with TemporaryDirectory() as tmp:

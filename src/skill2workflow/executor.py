@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -21,10 +22,16 @@ class LocalExecutor:
         self.state_dir = Path(state_dir)
         self.store = create_run_store(self.state_dir, storage)
 
-    def run(self, workflow: Dict[str, object]) -> RunState:
+    def run(self, workflow: Dict[str, object], context: Dict[str, object] = None) -> RunState:
         workflow_meta = workflow.get("workflow", {})
         if not isinstance(workflow_meta, dict):
             workflow_meta = {}
+        if context is None:
+            run_context = {}
+        elif isinstance(context, dict):
+            run_context = copy.deepcopy(context)
+        else:
+            raise ValueError("run context must be a JSON object")
 
         state: RunState = {
             "run_id": f"run_{uuid.uuid4().hex[:12]}",
@@ -32,7 +39,7 @@ class LocalExecutor:
             "workflow_version": workflow_meta.get("version", "0.1.0"),
             "status": "created",
             "current_node": workflow.get("entry", "start"),
-            "context": {},
+            "context": run_context,
             "node_results": {},
             "events": [],
             "workflow": workflow,

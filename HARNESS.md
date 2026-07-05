@@ -92,7 +92,8 @@ PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2wo
 PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
-PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001
+printf '{"customer_id":"customer_123"}' >/tmp/skill2workflow-trigger-input.json
+PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001 --input /tmp/skill2workflow-trigger-input.json
 PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill2workflow-control
@@ -198,7 +199,9 @@ Implemented:
 - Local trigger API
   - documents the trigger request and response envelope in `docs/triggers.md`
   - exposes `trigger` as a CLI path for starting published workflow runs
-  - records trigger id, source, idempotency key, and input keys without injecting input values into node context
+  - records trigger id, source, idempotency key, and input keys in compact responses and audit events
+  - persists trigger input values under `run_state.context.input`
+  - exposes compact trigger metadata under `run_state.context.trigger`
 - Runtime policy and recovery
   - documents retry and recovery semantics in `docs/runtime-policy.md`
   - treats `retry.max_attempts` as retries after the first connector attempt
@@ -216,6 +219,6 @@ Implemented:
 Not implemented yet:
 
 - Production-grade enterprise control plane UI
-- Trigger input value injection into run state or node execution context
+- Input templating, connector request interpolation, and schema-based input mapping
 - Enterprise connector credential management, secret injection, and runtime redaction
 - GitHub release automation

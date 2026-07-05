@@ -17,6 +17,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
 - Credential placeholder and fixture hygiene boundary documented in `docs/credential-boundary.md`
 - Local trigger command and envelope documented in `docs/triggers.md`
+- Local trigger run-context shape documented in `docs/triggers.md`
 
 ## Experimental
 
@@ -31,7 +32,7 @@ These surfaces may change while the project learns from real workflows:
 - HTTP connector request metadata shape
 - Advanced retry behavior beyond documented connector-node retry execution
 - Enterprise credential storage, token injection, secret redaction, and IAM
-- Trigger input value injection into node execution context
+- Advanced trigger input mapping, templating, and connector request interpolation
 - Local control-plane storage file layout
 - Executor event taxonomy beyond documented audit examples
 - Future UI/API boundaries

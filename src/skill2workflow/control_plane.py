@@ -13,7 +13,7 @@ from .connectors import default_connectors
 from .compiler import validate_workflow
 from .executor import LocalExecutor, RunState
 from .storage import create_control_store
-from .triggers import normalize_trigger_request, trigger_audit_fields, trigger_response
+from .triggers import normalize_trigger_request, trigger_audit_fields, trigger_response, trigger_run_context
 
 
 Workflow = Dict[str, object]
@@ -120,7 +120,8 @@ class LocalControlPlane:
             raise ValueError(f"workflow version is not published: {workflow_id}@{version}")
 
         started_at = _now()
-        state = self.executor.run(self.get_workflow(workflow_id, version))
+        context = trigger_run_context(trigger) if trigger else None
+        state = self.executor.run(self.get_workflow(workflow_id, version), context=context)
         started_event = {
             "type": "run_started",
             "run_id": state["run_id"],

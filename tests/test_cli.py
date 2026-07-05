@@ -87,6 +87,7 @@ class CliTests(TestCase):
             workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
             input_path.write_text(json.dumps({"customer_id": "customer_123"}), encoding="utf-8")
             trigger_stdout = StringIO()
+            detail_stdout = StringIO()
 
             with redirect_stdout(StringIO()):
                 publish_exit = main(["publish", str(workflow_path), "--state-dir", str(state_dir)])
@@ -107,14 +108,18 @@ class CliTests(TestCase):
                         str(input_path),
                     ]
                 )
+            result = json.loads(trigger_stdout.getvalue())
+            with redirect_stdout(detail_stdout):
+                detail_exit = main(["control-run", result["run_id"], "--state-dir", str(state_dir)])
 
             from skill2workflow.control_plane import LocalControlPlane
 
-            result = json.loads(trigger_stdout.getvalue())
+            detail = json.loads(detail_stdout.getvalue())
             audit_events = LocalControlPlane(state_dir).list_audit_events(run_id=result["run_id"])
 
         self.assertEqual(publish_exit, 0)
         self.assertEqual(trigger_exit, 0)
+        self.assertEqual(detail_exit, 0)
         self.assertTrue(result["trigger_id"].startswith("trigger_"))
         self.assertEqual(result["workflow_id"], "workflow_demo")
         self.assertEqual(result["workflow_version"], "0.1.0")
@@ -122,8 +127,12 @@ class CliTests(TestCase):
         self.assertEqual(result["source"], "local-cli")
         self.assertEqual(result["idempotency_key"], "demo-1")
         self.assertEqual(result["input_keys"], ["customer_id"])
+        self.assertEqual(detail["context"]["input"], {"customer_id": "customer_123"})
+        self.assertEqual(detail["context"]["trigger"]["trigger_id"], result["trigger_id"])
+        self.assertEqual(detail["context"]["trigger"]["source"], "local-cli")
         self.assertEqual([event["type"] for event in audit_events], ["run_started", "run_completed"])
         self.assertEqual(audit_events[0]["trigger_id"], result["trigger_id"])
+        self.assertNotIn("input", audit_events[0])
 
     def test_trigger_command_rejects_non_object_input_json(self):
         with TemporaryDirectory() as tmp:

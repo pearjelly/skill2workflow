@@ -110,6 +110,30 @@ class ExecutorTests(TestCase):
         self.assertIn("events", detail)
         self.assertIn("node_results", detail)
 
+    def test_run_persists_initial_context(self):
+        workflow = _approval_workflow()
+
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp))
+            state = executor.run(
+                workflow,
+                context={
+                    "trigger": {
+                        "trigger_id": "trigger_demo",
+                        "source": "local-test",
+                        "idempotency_key": "demo-1",
+                        "input_keys": ["customer_id"],
+                    },
+                    "input": {"customer_id": "customer_123"},
+                },
+            )
+            detail = executor.get_run(state["run_id"])
+
+        self.assertEqual(state["context"]["input"]["customer_id"], "customer_123")
+        self.assertEqual(state["context"]["trigger"]["trigger_id"], "trigger_demo")
+        self.assertEqual(detail["context"]["input"]["customer_id"], "customer_123")
+        self.assertEqual(detail["context"]["trigger"]["input_keys"], ["customer_id"])
+
     def test_sqlite_storage_persists_run_state_and_event_rows_across_instances(self):
         workflow = _approval_workflow()
 
