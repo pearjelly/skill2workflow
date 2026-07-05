@@ -35,6 +35,31 @@ Important boundaries:
 - Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
 - `0.1.x` compatibility is documented for Workflow DSL `0.1.0`; undocumented internals remain experimental.
 
+## Real Team Pilot Readiness
+
+The project is now useful for local evaluation and contributor onboarding. A real team pilot still needs a few controlled loops before the runtime should be positioned as an operational workflow system.
+
+Ready now:
+
+- Convert structured `SKILL.md` examples into validated Workflow DSL.
+- Inspect and safely edit workflows through the LiteGraph-style view.
+- Publish immutable workflow versions locally.
+- Run and resume published workflows with JSON or SQLite state.
+- Audit run lifecycle, connector events, retry/recovery events, and control-plane operations.
+- Demonstrate the complete local bootstrap from a fresh checkout.
+- Verify package installability and fixture secret hygiene in CI.
+
+Still needed before serious pilots:
+
+- A local trigger boundary so external tools can start published runs without shelling out ad hoc.
+- Trigger input and run context semantics so workflows can receive business data safely.
+- Credential provider interfaces so connector examples can evolve beyond placeholders without putting secrets in Workflow DSL.
+- Optional local webhook or adapter surfaces for integration testing.
+- Better run/audit overlays in the visual authoring experience.
+- Clear pilot playbooks that define what is supported, what is experimental, and what must stay outside the bootstrap runtime.
+
+Pilot sequencing rule: do not add product-specific SaaS connectors before local trigger, run input, and credential-provider boundaries are tested and documented.
+
 ## Completed Loops
 
 | Loop | Status | Delivered |
@@ -73,6 +98,8 @@ Post-`v0.1.0` work now has one active priority after Loop 22 made connector exam
 ### Loop 23: Trigger And Local Run API
 
 Goal: let local systems trigger published workflow runs through a small, testable API boundary instead of requiring every integration to shell out directly to `run-published`.
+
+Why this is next: current runs are already durable and auditable, but external systems still need a stable entry point. Loop 23 should create that entry point while keeping all existing control-plane guarantees.
 
 Status: next engineering loop.
 
@@ -149,12 +176,18 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
 | Loop 23: Trigger And Local Run API | Next | Start published workflow runs through a controlled local trigger boundary | trigger envelope, local trigger command, audit tests |
+| Loop 24: Workflow Inputs And Run Context | Planned | Carry trigger input metadata into run state and node execution context | input contract, run context persistence, executor tests |
+| Loop 25: Credential Provider Interface | Planned | Reference credentials without storing secret values in Workflow DSL | provider protocol, placeholder-to-handle docs, local tests |
+| Loop 26: Local Webhook Adapter | Planned | Let local HTTP events trigger published runs through the Loop 23 boundary | stdlib webhook adapter, trigger examples, audit tests |
+| Loop 27: Run Overlay In Visual Editor | Planned | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
+| Loop 28: Pilot Playbook And Example | Planned | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
 
 Loop selection rules:
 
 - Pick the next loop only after the previous loop is merged or explicitly deferred.
 - Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
 - Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
+- Do not add product-specific SaaS connectors until trigger inputs and credential-provider boundaries are in place.
 
 ## Release Tag Plan
 
@@ -241,6 +274,28 @@ Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Futu
 - Published workflow version comparison
 - Operator attention, recent event, connector event, and version change summaries
 - Future: live local server mode, graph overlays, and workflow artifact diff views
+
+### v0.6: Local Trigger And Input Runtime
+
+Status: planned for Loops 23-24.
+
+- Controlled local trigger envelope
+- Published-run API/helper path
+- Structured trigger response
+- Run input metadata and execution context
+- Audit coverage for triggered runs
+- Future: local webhook adapter and scheduled triggers
+
+### v0.7: Pilot Integration Boundary
+
+Status: planned after local trigger and input semantics are stable.
+
+- Credential provider interface
+- Secret-handle documentation without secret storage in Workflow DSL
+- Optional local webhook adapter
+- Visual run/audit overlays
+- Pilot playbook and runnable scenario
+- Future: product-specific connector packages and hosted control-plane integrations
 
 ### v1.0: Production Baseline
 
