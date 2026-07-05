@@ -130,6 +130,62 @@ Acceptance criteria:
 - Documentation explains the publish, trigger/webhook, run, audit, snapshot, and visual inspection flow
 - No hosted UI, auth layer, live server mode, or runtime dependency is introduced
 
+Loop 27 implementation slices:
+
+1. Overlay data contract
+   - Define a small read-only overlay shape that maps `node_id` to run status, attempt count, connector outcome, retry/recovery evidence, and selected audit references.
+   - Derive overlay data from existing run state and audit events. Do not duplicate Workflow DSL topology or mutate workflow artifacts.
+   - Preserve the existing `workflow_to_litegraph(..., run_state=...)` path where possible, and add only the minimum fields needed for operator inspection.
+2. Snapshot and CLI export path
+   - Decide whether overlay data belongs in `control-snapshot`, `visualize --run-state`, or both. Prefer reusing existing snapshot and visualization commands before adding a new command.
+   - Keep JSON and SQLite behavior equivalent for any exported run/audit evidence.
+   - Ensure exported data remains compact: include identifiers, statuses, event types, node ids, connector ids, attempts, timestamps, and summaries rather than raw connector payloads or trigger input values.
+3. Static UI overlay
+   - Render node-level status on the LiteGraph editor or control-plane inspector using the overlay data.
+   - Make connector failures, retry/recovery events, waiting gates, current node, and terminal status easy to scan.
+   - Keep overlay controls read-only. Do not add workflow mutation, graph topology editing, or run control actions in this loop.
+4. Tests and fixtures
+   - Add unit coverage for overlay derivation from completed, waiting, failed, connector, and retry/recovery runs.
+   - Update snapshot or LiteGraph fixture tests only when the committed fixture shape changes.
+   - Add focused UI fixture coverage if static assets need deterministic sample data.
+5. Documentation and operator flow
+   - Document how to publish, trigger or webhook a run, export the relevant artifact, and inspect run/audit evidence visually.
+   - Keep the docs explicit that overlay data is view state, not workflow source.
+   - Update README/HARNESS only for commands a contributor should actually run from a fresh checkout.
+
+Loop 27 explicit non-goals:
+
+- Do not add a hosted control plane, live multi-user UI, auth, RBAC, IAM, or websocket transport.
+- Do not let graph overlay data mutate Workflow DSL, published artifacts, connector identity, edges, transitions, or node ids.
+- Do not add workflow run control actions from the static UI.
+- Do not store or display resolved credential values, raw authorization headers, raw webhook bodies, or full trigger input payloads in overlay data.
+- Do not introduce frontend build tooling or runtime dependencies.
+
+Loop 27 expected file changes:
+
+- `src/skill2workflow/visualizer.py` if overlay data is attached to LiteGraph nodes.
+- `src/skill2workflow/dashboard.py` if overlay data is exported through control snapshots.
+- `tests/test_visualizer.py` and/or `tests/test_dashboard.py` for overlay shape and fixture coverage.
+- `web/` static assets, likely `web/index.html` or `web/control.html`, for read-only overlay rendering.
+- `examples/control-plane-snapshot.json` only if the snapshot fixture changes.
+- `README.md`, `HARNESS.md`, `docs/authoring.md`, or a focused docs page for the operator inspection flow.
+
+Loop 27 verification commands:
+
+- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- `python3 -m py_compile src/skill2workflow/*.py`
+- `PYTHONPATH=src python3 -m unittest tests.test_visualizer tests.test_dashboard tests.test_cli -v`
+- `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo-loop27`
+- `python3 scripts/secret_hygiene.py examples/workflows`
+- `git diff --check`
+
+Loop 27 done means:
+
+- Operators can visually inspect run and audit evidence on top of workflow structure without leaving the local artifact workflow.
+- Overlay data is deterministic, compact, and read-only.
+- Workflow DSL remains the execution source of truth.
+- No hosted UI, auth layer, live server mode, or dependency expansion is added.
+
 ## Near-Term Loop Queue
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
