@@ -78,6 +78,76 @@ class CliTests(TestCase):
         self.assertEqual(workflow_records[0]["status"], "published")
         self.assertEqual(run_summary["workflow_version"], "0.1.0")
 
+    def test_trigger_command_starts_published_workflow_with_input_metadata(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "workflow.json"
+            input_path = tmp_path / "trigger-input.json"
+            state_dir = tmp_path / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            input_path.write_text(json.dumps({"customer_id": "customer_123"}), encoding="utf-8")
+            trigger_stdout = StringIO()
+
+            with redirect_stdout(StringIO()):
+                publish_exit = main(["publish", str(workflow_path), "--state-dir", str(state_dir)])
+            with redirect_stdout(trigger_stdout):
+                trigger_exit = main(
+                    [
+                        "trigger",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--source",
+                        "local-cli",
+                        "--idempotency-key",
+                        "demo-1",
+                        "--input",
+                        str(input_path),
+                    ]
+                )
+
+            from skill2workflow.control_plane import LocalControlPlane
+
+            result = json.loads(trigger_stdout.getvalue())
+            audit_events = LocalControlPlane(state_dir).list_audit_events(run_id=result["run_id"])
+
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(trigger_exit, 0)
+        self.assertTrue(result["trigger_id"].startswith("trigger_"))
+        self.assertEqual(result["workflow_id"], "workflow_demo")
+        self.assertEqual(result["workflow_version"], "0.1.0")
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(result["source"], "local-cli")
+        self.assertEqual(result["idempotency_key"], "demo-1")
+        self.assertEqual(result["input_keys"], ["customer_id"])
+        self.assertEqual([event["type"] for event in audit_events], ["run_started", "run_completed"])
+        self.assertEqual(audit_events[0]["trigger_id"], result["trigger_id"])
+
+    def test_trigger_command_rejects_non_object_input_json(self):
+        with TemporaryDirectory() as tmp:
+            input_path = Path(tmp) / "trigger-input.json"
+            input_path.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "trigger",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--input",
+                        str(input_path),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("trigger input must be a JSON object", stderr.getvalue())
+
     def test_run_published_command_can_use_sqlite_storage(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

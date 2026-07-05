@@ -13,6 +13,7 @@ from .connectors import default_connectors
 from .compiler import validate_workflow
 from .executor import LocalExecutor, RunState
 from .storage import create_control_store
+from .triggers import normalize_trigger_request, trigger_audit_fields, trigger_response
 
 
 Workflow = Dict[str, object]
@@ -113,22 +114,23 @@ class LocalControlPlane:
         record = self._workflow_record(workflow_id, version)
         return _load_json(self.state_dir / str(record["artifact"]))
 
-    def run_published_workflow(self, workflow_id: str, version: str) -> RunState:
+    def run_published_workflow(self, workflow_id: str, version: str, trigger: Dict[str, object] = None) -> RunState:
         record = self._workflow_record(workflow_id, version)
         if record.get("status") != "published":
             raise ValueError(f"workflow version is not published: {workflow_id}@{version}")
 
         started_at = _now()
         state = self.executor.run(self.get_workflow(workflow_id, version))
-        self._append_audit(
-            {
-                "type": "run_started",
-                "run_id": state["run_id"],
-                "workflow_id": workflow_id,
-                "workflow_version": version,
-                "timestamp": started_at,
-            }
-        )
+        started_event = {
+            "type": "run_started",
+            "run_id": state["run_id"],
+            "workflow_id": workflow_id,
+            "workflow_version": version,
+            "timestamp": started_at,
+        }
+        if trigger:
+            started_event.update(trigger_audit_fields(trigger))
+        self._append_audit(started_event)
         self._append_runtime_audit_events(state, workflow_id, version)
         self._append_audit(
             {
@@ -140,6 +142,17 @@ class LocalControlPlane:
             }
         )
         return state
+
+    def trigger_workflow(self, request: Dict[str, object]) -> Dict[str, object]:
+        """Trigger a published workflow through the local control-plane boundary."""
+
+        trigger = normalize_trigger_request(request)
+        state = self.run_published_workflow(
+            str(trigger["workflow_id"]),
+            str(trigger["version"]),
+            trigger=trigger,
+        )
+        return trigger_response(trigger, state)
 
     def resume_published_run(self, run_id: str, approved: bool = True) -> RunState:
         current = self.executor.get_run(run_id)
