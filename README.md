@@ -90,6 +90,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Run published workflow versions and write audit events
 - Trigger published workflow versions through a compact local API envelope
 - Persist trigger input values in durable run context without logging full input values to audit by default
+- Trigger published workflow versions from local HTTP webhook POST requests
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Audit connector execution events through the control plane
@@ -282,6 +283,20 @@ PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --ve
 
 Triggered runs store input values under `context.input` and compact trigger metadata under `context.trigger`. Audit events and trigger responses expose `input_keys`, not full input values.
 
+Start a local webhook adapter for pilot integration testing:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli webhook-server --state-dir /tmp/skill2workflow-control --host 127.0.0.1 --port 8080
+```
+
+Then send a local webhook request:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/webhooks/workflow_approval_flow/0.1.0 -H 'Content-Type: application/json' -d '{"source":"local-webhook","idempotency_key":"example-001","input":{"customer_id":"customer_123"}}'
+```
+
+Webhook requests use the same published trigger boundary as the CLI command. The local adapter is not a hosted ingress, auth layer, queue, or production daemon.
+
 Run with a local credential file when a connector references credential handles:
 
 ```bash
@@ -377,6 +392,7 @@ src/skill2workflow/
   secret_hygiene.py # Fixture secret hygiene scanner
   credentials.py  # Local credential provider boundary
   triggers.py     # Local trigger envelope helpers
+  webhooks.py     # Local webhook adapter for published triggers
   release.py      # Read-only release preflight checks
   cli.py          # Command line interface
 scripts/          # Maintainer command helpers

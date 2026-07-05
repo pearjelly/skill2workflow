@@ -112,6 +112,20 @@ PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/s
 
 Open the local control-plane inspector at `http://localhost:4173/web/control.html` after starting `python3 -m http.server 4173`.
 
+Run a local webhook adapter smoke after publishing the workflow.
+
+Terminal 1:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli webhook-server --state-dir /tmp/skill2workflow-control --host 127.0.0.1 --port 8080
+```
+
+Terminal 2:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8080/webhooks/workflow_approval_flow/0.1.0 -H 'Content-Type: application/json' -d '{"source":"local-webhook","idempotency_key":"example-001","input":{"customer_id":"customer_123"}}'
+```
+
 ## Current Scope
 
 Implemented:
@@ -166,6 +180,7 @@ Implemented:
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions
   - triggers published workflow versions through a compact local API envelope
+  - serves local webhook POST requests through the same published trigger boundary
   - resumes waiting published runs
   - lists and shows run state through control-plane commands
   - keeps run state bound to workflow id and version

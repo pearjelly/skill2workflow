@@ -14,6 +14,7 @@ from .dashboard import build_control_snapshot
 from .executor import LocalExecutor
 from .parser import parse_skill_file
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
+from .webhooks import serve_webhook_requests
 
 
 def main(argv=None) -> int:
@@ -100,6 +101,17 @@ def main(argv=None) -> int:
     trigger_cmd.add_argument("--idempotency-key", default="")
     trigger_cmd.add_argument("--input", type=Path, help="JSON object with trigger input metadata")
     trigger_cmd.add_argument("--credential-file", type=Path)
+
+    webhook_server_cmd = subparsers.add_parser(
+        "webhook-server",
+        help="Serve local webhook requests for published workflow triggers",
+    )
+    webhook_server_cmd.add_argument("--host", default="127.0.0.1")
+    webhook_server_cmd.add_argument("--port", type=int, default=8080)
+    webhook_server_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    webhook_server_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    webhook_server_cmd.add_argument("--credential-file", type=Path)
+    webhook_server_cmd.add_argument("--once", action="store_true", help="Handle one request and then exit")
 
     resume_published_cmd = subparsers.add_parser("resume-published", help="Resume a waiting published run")
     resume_published_cmd.add_argument("run_id")
@@ -269,6 +281,9 @@ def main(argv=None) -> int:
     if args.command == "trigger":
         return _control_action(lambda: _trigger_workflow(args))
 
+    if args.command == "webhook-server":
+        return _serve_webhook_server(args)
+
     if args.command == "resume-published":
         return _control_action(
             lambda: LocalControlPlane(
@@ -347,6 +362,26 @@ def _trigger_workflow(args):
             "input": trigger_input,
         }
     )
+
+
+def _serve_webhook_server(args) -> int:
+    try:
+        serve_webhook_requests(
+            host=args.host,
+            port=args.port,
+            control_plane=LocalControlPlane(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ),
+            once=args.once,
+        )
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
 
 
 def _credential_provider(args):

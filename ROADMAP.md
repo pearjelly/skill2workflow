@@ -25,6 +25,7 @@ Current capability snapshot:
 - Demo onboarding: one-command local demo workspace generation with Workflow DSL, LiteGraph, run state, audit, and control-plane snapshot artifacts
 - Packaging and installability: package metadata guardrails, editable install smoke, and installed `skill2workflow` console-script verification
 - Runtime policy and recovery: connector-node retry execution, retry/recovery run events, and published-run policy audit promotion
+- Local webhook adapter: dependency-free local `POST /webhooks/<workflow_id>/<version>` path that invokes the existing trigger boundary without hosted ingress
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
 
 Important boundaries:
@@ -51,10 +52,10 @@ Ready now:
 - Trigger published workflows through a controlled local API envelope.
 - Pass local trigger input values into durable run context while keeping audit output compact.
 - Reference connector credentials through local handles without storing resolved values in Workflow DSL, run state, or audit events.
+- Receive local HTTP webhook events and route them through the same published trigger boundary.
 
 Still needed before serious pilots:
 
-- Optional local webhook or adapter surfaces for integration testing.
 - Better run/audit overlays in the visual authoring experience.
 - Clear pilot playbooks that define what is supported, what is experimental, and what must stay outside the bootstrap runtime.
 
@@ -89,99 +90,45 @@ Pilot sequencing rule: do not add product-specific SaaS connectors before local 
 | Loop 23: Trigger And Local Run API | Complete | Trigger envelope, local trigger command, run-start audit metadata, trigger docs |
 | Loop 24: Workflow Inputs And Run Context | Complete | Trigger input persistence, durable run context, compact audit boundary, executor context tests |
 | Loop 25: Credential Provider Interface | Complete | Local credential provider, connector handle metadata, credential-file CLI path, leakage tests |
+| Loop 26: Local Webhook Adapter | Complete | Local webhook request contract, stdlib webhook server, trigger-boundary adapter, JSON/SQLite tests, docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 25 added local credential handles:
+Post-`v0.1.0` work now has one active priority after Loop 26 added a local webhook adapter:
 
-1. add a local webhook adapter that can receive HTTP events and invoke the existing trigger boundary without adding a hosted service or queue.
+1. connect run state and audit evidence back into the visual workflow editor without making the graph the execution authority.
 
-### Loop 26: Local Webhook Adapter
+### Loop 27: Run Overlay In Visual Editor
 
-Goal: let local HTTP events trigger published workflow runs through the existing trigger envelope.
+Goal: let local operators inspect run status, node outcomes, connector events, and audit evidence directly on top of the workflow graph.
 
-Why this is next: Loop 23 created the trigger boundary, Loop 24 made trigger input durable, and Loop 25 separated credentials from workflow artifacts. The next useful pilot integration surface is a local adapter that proves external events can enter the control plane without bypassing versioning, audit, or input context.
+Why this is next: Loops 23-26 created controlled trigger, input, credential, and webhook ingress boundaries. The next pilot-readiness gap is operator visibility: users need to understand what happened in a run without stitching together CLI JSON, audit output, and the static graph manually.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
 - Keep Workflow DSL authoritative and published workflow artifacts immutable.
-- Reuse the Loop 23 trigger envelope and Loop 24 input context.
-- Prefer a dependency-free local HTTP adapter for integration testing.
-- Do not add hosted webhooks, SaaS-specific callbacks, RBAC, IAM, queues, or runtime dependencies in this loop.
+- Treat run and audit overlays as read-only view data.
+- Reuse existing run state, audit events, and control snapshot exports where possible.
+- Do not add live collaboration, hosted dashboards, mutation from the graph, or runtime dependencies.
 
 Scope:
 
-- Define a small local webhook request shape that maps to `trigger_workflow`
-- Provide a deterministic stdlib adapter or handler that tests can call locally
-- Keep trigger response, run context, and audit behavior consistent with CLI trigger runs
-- Document local-only usage and deployment limits
+- Define a small graph overlay data shape derived from run state and audit events
+- Render node status, current node, connector outcomes, retry/recovery evidence, and trigger metadata in the static editor or control-plane UI
+- Keep visual overlay data separate from Workflow DSL source data
+- Document how to generate and load overlay inputs from a fresh checkout
 
 Acceptance criteria:
 
-- Local webhook requests can start published workflow versions through the same control-plane trigger path
-- Trigger input from webhook payloads is persisted under run context
-- Audit events match triggered CLI runs and do not bypass version binding
-- JSON and SQLite storage behavior remains compatible
-- No hosted webhook service, queue, scheduler, auth system, or runtime dependency is introduced
-
-Loop 26 implementation slices:
-
-1. Local webhook request contract
-   - Define the minimal HTTP shape for local pilots, such as `POST /webhooks/<workflow_id>/<version>` with a JSON body containing `source`, `idempotency_key`, and `input`.
-   - Keep payload values under trigger `input`; expose only compact metadata and input keys in responses and audit events.
-   - Reject non-JSON bodies, non-object input, missing workflow id, missing version, and unsupported methods with deterministic errors.
-2. Adapter core
-   - Add a small dependency-free adapter that translates the local webhook request into the existing `LocalControlPlane.trigger_workflow` request.
-   - Keep the adapter as a thin boundary. It must not call the executor directly, mutate published workflow artifacts, or invent a second trigger path.
-   - Do not persist raw HTTP headers or raw request bodies by default.
-3. Local CLI surface
-   - Add a local-only CLI path, likely `webhook-server`, for integration testing with the Python standard library HTTP server stack.
-   - Support the existing `--state-dir`, `--storage`, and `--credential-file` control-plane options where they apply.
-   - Make the command clearly local development tooling, not a daemon supervisor, hosted webhook service, or production ingress.
-4. Tests and storage compatibility
-   - Unit test request normalization and error responses without opening a network socket.
-   - Test that webhook-triggered runs match CLI-triggered runs for response shape, run context, and audit metadata.
-   - Cover JSON and SQLite storage modes for the control-plane trigger path.
-5. Documentation and examples
-   - Extend `docs/triggers.md` with the webhook route, request body, response shape, local-only limits, and a `curl` example.
-   - Update `HARNESS.md` with a short local verification path.
-   - Add a tiny example payload only if it improves contributor onboarding and stays secret-free.
-
-Loop 26 explicit non-goals:
-
-- Do not add a hosted webhook endpoint, tunnel, queue, scheduler, retry worker, or background supervisor.
-- Do not add authentication, RBAC, IAM, TLS, signature validation, or SaaS-specific callback verification.
-- Do not store credentials, authorization headers, raw headers, cookies, or raw request bodies in Workflow DSL, run state, or audit events.
-- Do not make webhook payloads drive connector credential resolution.
-- Do not change Workflow DSL `0.1.0` or make the visual graph authoritative.
-
-Loop 26 expected file changes:
-
-- `src/skill2workflow/webhooks.py` for request normalization and adapter behavior.
-- `src/skill2workflow/cli.py` for the local webhook CLI surface.
-- `tests/test_webhooks.py`, plus focused coverage in `tests/test_cli.py` or `tests/test_control_plane.py` as needed.
-- `docs/triggers.md` and `HARNESS.md` for local usage and verification.
-- Optional: `examples/webhooks/` for secret-free sample payloads.
-
-Loop 26 verification commands:
-
-- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- `python3 -m py_compile src/skill2workflow/*.py`
-- `PYTHONPATH=src python3 -m unittest tests.test_triggers tests.test_control_plane tests.test_cli -v`
-- `PYTHONPATH=src python3 -m unittest tests.test_webhooks -v`
-- `python3 scripts/secret_hygiene.py examples/workflows`
-- `git diff --check`
-
-Loop 26 done means:
-
-- A local HTTP POST can trigger a published workflow version through the existing control-plane trigger boundary.
-- Webhook payload input is durable in run context, while responses and audit events stay compact.
-- JSON and SQLite storage produce compatible run and audit behavior.
-- The local webhook adapter is documented as pilot integration tooling, not a production ingress layer.
+- A local operator can load a workflow plus run/audit evidence and see node-level execution state on the graph
+- Overlay data is read-only and cannot mutate Workflow DSL
+- Existing control snapshot or visualization commands have tests for any new exported fields
+- Documentation explains the publish, trigger/webhook, run, audit, snapshot, and visual inspection flow
+- No hosted UI, auth layer, live server mode, or runtime dependency is introduced
 
 ## Near-Term Loop Queue
 
@@ -191,8 +138,8 @@ This queue is ordered by what most improves open-source adoption after the first
 | --- | --- | --- | --- |
 | Loop 24: Workflow Inputs And Run Context | Complete | Carry trigger input metadata into run state and node execution context | input contract, run context persistence, executor tests |
 | Loop 25: Credential Provider Interface | Complete | Reference credentials without storing secret values in Workflow DSL | provider protocol, placeholder-to-handle docs, local tests |
-| Loop 26: Local Webhook Adapter | Next | Let local HTTP events trigger published runs through the trigger boundary | stdlib webhook adapter, trigger examples, audit tests |
-| Loop 27: Run Overlay In Visual Editor | Planned | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
+| Loop 26: Local Webhook Adapter | Complete | Let local HTTP events trigger published runs through the trigger boundary | stdlib webhook adapter, trigger examples, audit tests |
+| Loop 27: Run Overlay In Visual Editor | Next | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
 | Loop 28: Pilot Playbook And Example | Planned | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
 
 Loop selection rules:
@@ -291,24 +238,25 @@ Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Futu
 
 ### v0.6: Local Trigger And Input Runtime
 
-Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24.
+Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local webhook adapter shipped in Loop 26.
 
 - Controlled local trigger envelope
 - Published-run API/helper path
+- Dependency-free local webhook adapter for published workflow triggers
 - Structured trigger response
 - Trigger metadata on `run_started` audit events
 - Audit coverage for triggered runs
 - Durable trigger input values under run context
 - Compact audit boundary for trigger input keys
-- Future: local webhook adapter and scheduled triggers
+- Future: scheduled triggers
 
 ### v0.7: Pilot Integration Boundary
 
-Status: planned after local trigger, input, and credential semantics are stable. Local webhook adapter work starts in Loop 26.
+Status: planned after local trigger, input, credential, and webhook semantics are stable. Visual run/audit overlay work starts in Loop 27.
 
 - Credential provider interface
 - Secret-handle documentation without secret storage in Workflow DSL
-- Optional local webhook adapter
+- Local webhook adapter for pilot integration tests
 - Visual run/audit overlays
 - Pilot playbook and runnable scenario
 - Future: product-specific connector packages and hosted control-plane integrations
