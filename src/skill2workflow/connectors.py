@@ -15,9 +15,13 @@ from .credentials import CredentialResolutionError
 ConnectorBinding = Dict[str, object]
 ConnectorResult = Dict[str, object]
 
+CONNECTOR_MANIFEST_VERSION = "skill2workflow-connector-0.1.0"
+CONNECTOR_EXECUTION_CONTRACT_VERSION = "skill2workflow-connector-execution-0.1.0"
+
 
 DEFAULT_CONNECTORS: List[Dict[str, object]] = [
     {
+        "manifest_version": CONNECTOR_MANIFEST_VERSION,
         "id": "manual",
         "name": "Manual Human Gate",
         "kind": "manual",
@@ -25,8 +29,25 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
         "node_types": ["human_gate"],
         "description": "Built-in connector for local human approval and manual review gates.",
         "config_schema": {"type": "object", "additionalProperties": True},
+        "execution_contract": {
+            "contract_version": CONNECTOR_EXECUTION_CONTRACT_VERSION,
+            "mode": "built_in",
+            "entrypoint": "human_gate_run_state",
+            "receives": ["node.connector", "run_state"],
+            "returns": ["run_event", "node_result"],
+        },
+        "credential_contract": {
+            "supports_handles": False,
+            "targets": [],
+            "resolved_value_policy": "never_in_workflow_run_state_or_audit",
+        },
+        "audit_contract": {
+            "value_policy": "compact_no_payload_values",
+            "events": ["human_gate_waiting", "human_gate_resumed"],
+        },
     },
     {
+        "manifest_version": CONNECTOR_MANIFEST_VERSION,
         "id": "http",
         "name": "HTTP Connector",
         "kind": "http",
@@ -50,6 +71,22 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
                 }
             },
         },
+        "execution_contract": {
+            "contract_version": CONNECTOR_EXECUTION_CONTRACT_VERSION,
+            "mode": "built_in",
+            "entrypoint": "skill2workflow.connectors:execute_connector",
+            "receives": ["node.connector", "run_context", "credential_provider"],
+            "returns": ["status", "connector", "output", "error", "input_mapping"],
+        },
+        "credential_contract": {
+            "supports_handles": True,
+            "targets": ["header"],
+            "resolved_value_policy": "never_in_workflow_run_state_or_audit",
+        },
+        "audit_contract": {
+            "value_policy": "compact_no_payload_values",
+            "events": ["connector_started", "connector_completed", "connector_failed"],
+        },
     },
 ]
 
@@ -61,6 +98,69 @@ class ConnectorExecutionError(Exception):
 def default_connectors() -> List[Dict[str, object]]:
     """Return built-in connector manifests."""
     return copy.deepcopy(DEFAULT_CONNECTORS)
+
+
+def validate_connector_manifest(manifest: object) -> List[str]:
+    """Return connector manifest contract errors without loading external code."""
+    if not isinstance(manifest, dict):
+        return ["connector manifest must be an object"]
+
+    errors = []
+    if manifest.get("manifest_version") != CONNECTOR_MANIFEST_VERSION:
+        errors.append(f"manifest_version must be {CONNECTOR_MANIFEST_VERSION}")
+    if not str(manifest.get("id") or ""):
+        errors.append("id is required")
+    if not str(manifest.get("kind") or ""):
+        errors.append("kind is required")
+    if not str(manifest.get("status") or ""):
+        errors.append("status is required")
+
+    node_types = manifest.get("node_types")
+    if not isinstance(node_types, list) or not node_types or not all(isinstance(item, str) and item for item in node_types):
+        errors.append("node_types must be a non-empty list")
+    if not isinstance(manifest.get("config_schema"), dict):
+        errors.append("config_schema must be an object")
+
+    execution_contract = manifest.get("execution_contract")
+    if not isinstance(execution_contract, dict):
+        errors.append("execution_contract must be an object")
+    else:
+        if execution_contract.get("contract_version") != CONNECTOR_EXECUTION_CONTRACT_VERSION:
+            errors.append(f"execution_contract.contract_version must be {CONNECTOR_EXECUTION_CONTRACT_VERSION}")
+        if execution_contract.get("mode") not in ("built_in", "external"):
+            errors.append("execution_contract.mode must be built_in or external")
+        if not str(execution_contract.get("entrypoint") or ""):
+            errors.append("execution_contract.entrypoint is required")
+        receives = execution_contract.get("receives")
+        if not isinstance(receives, list) or not receives:
+            errors.append("execution_contract.receives must be a non-empty list")
+        returns = execution_contract.get("returns")
+        if not isinstance(returns, list) or not returns:
+            errors.append("execution_contract.returns must be a non-empty list")
+
+    credential_contract = manifest.get("credential_contract")
+    if not isinstance(credential_contract, dict):
+        errors.append("credential_contract must be an object")
+    else:
+        if not isinstance(credential_contract.get("supports_handles"), bool):
+            errors.append("credential_contract.supports_handles must be a boolean")
+        targets = credential_contract.get("targets")
+        if not isinstance(targets, list):
+            errors.append("credential_contract.targets must be a list")
+        if not str(credential_contract.get("resolved_value_policy") or ""):
+            errors.append("credential_contract.resolved_value_policy is required")
+
+    audit_contract = manifest.get("audit_contract")
+    if not isinstance(audit_contract, dict):
+        errors.append("audit_contract must be an object")
+    else:
+        if not str(audit_contract.get("value_policy") or ""):
+            errors.append("audit_contract.value_policy is required")
+        events = audit_contract.get("events")
+        if not isinstance(events, list) or not events:
+            errors.append("audit_contract.events must be a non-empty list")
+
+    return errors
 
 
 def default_connector_binding(node_type: str) -> ConnectorBinding:

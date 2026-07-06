@@ -249,6 +249,7 @@ Implemented:
   - executes HTTP requests with the Python standard library
   - resolves local credential handles for HTTP connector request headers through `--credential-file`
   - maps non-secret trigger input into HTTP request body fields through `connector.request.input_mapping`
+  - exposes a documented connector manifest contract for future extension packages
   - covers HTTP connector success, HTTP error, invalid request metadata, JSON body, headers, and timeout behavior with deterministic local tests
   - documents retry, timeout, and credential boundaries in `docs/connectors.md`
 - Credential boundary and secret hygiene

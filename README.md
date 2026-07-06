@@ -98,6 +98,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Trigger published workflow versions from deterministic one-shot local schedules
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
+- Validate and inspect the minimum connector manifest contract for future extensions
 - Audit connector execution events through the control plane
 - Audit runtime policy events such as `node_retrying`, `node_recovered`, and `node_failed` through the control plane
 - Export a read-only control-plane snapshot with derived operator insights
@@ -506,8 +507,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Pilot Playbook And Example
 - Scheduled Trigger Boundary
 - Trigger Input Mapping
+- Connector Extension Contract
 
-Next priority is the connector extension contract for future product-specific connectors.
+Next priority is a broader local pilot scenario pack.
 
 See:
 

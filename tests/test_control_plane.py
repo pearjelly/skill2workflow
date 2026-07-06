@@ -205,6 +205,10 @@ class ControlPlaneTests(TestCase):
         self.assertTrue(all(connector["status"] == "active" for connector in connectors))
         self.assertTrue(all("node_types" in connector for connector in connectors))
         self.assertIn("input_mapping", http_connector["config_schema"]["properties"]["request"]["properties"])
+        self.assertEqual(http_connector["manifest_version"], "skill2workflow-connector-0.1.0")
+        self.assertEqual(http_connector["execution_contract"]["mode"], "built_in")
+        self.assertEqual(http_connector["credential_contract"]["supports_handles"], True)
+        self.assertEqual(http_connector["audit_contract"]["value_policy"], "compact_no_payload_values")
 
     def test_published_connector_run_records_connector_audit_events(self):
         server = _ConnectorTestServer()

@@ -129,6 +129,8 @@ Before changing behavior, read:
 
 Connector examples should be deterministic and safe from a fresh checkout. Prefer local endpoints such as `http://127.0.0.1` or documented placeholders such as `<redacted>`, `REDACTED`, `placeholder`, `example-token`, and `token-placeholder`.
 
+Connector manifest changes must follow the extension contract in `docs/connectors.md`. Add or update manifest contract tests when changing connector registry metadata. Do not add product-specific SaaS connector packages, dynamic plugin loading, OAuth flows, hosted credential stores, or connector marketplaces without a dedicated roadmap loop.
+
 Run the committed-fixture secret hygiene check before opening connector or example PRs:
 
 ```bash
