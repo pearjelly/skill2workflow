@@ -55,6 +55,7 @@ Ready now:
 - Pass local trigger input values into durable run context while keeping audit output compact.
 - Reference connector credentials through local handles without storing resolved values in Workflow DSL, run state, or audit events.
 - Receive local HTTP webhook events and route them through the same published trigger boundary.
+- Trigger published workflows from deterministic one-shot local schedules.
 - Inspect read-only node-level run and audit overlays in the LiteGraph editor and local control-plane UI.
 - Follow a documented local pilot playbook with a runnable customer-support escalation scenario.
 
@@ -63,7 +64,7 @@ Still needed before serious pilots:
 - Input mapping from trigger context into connector request bodies.
 - Production-grade recurring schedulers remain out of scope until the local trigger and mapping contracts are stable.
 
-Pilot sequencing rule: do not add product-specific SaaS connectors before local webhook/adapters and pilot playbooks are tested and documented. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
+Pilot sequencing rule: do not add product-specific SaaS connectors before local webhook adapters, deterministic schedules, pilot playbooks, and trigger input mapping are tested and documented. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
 ## Completed Loops
 
@@ -130,11 +131,20 @@ Acceptance criteria:
 - CLI, webhook, and scheduled-trigger runs all use the same mapping behavior.
 - Documentation states mapping limits and keeps arbitrary templating out of scope.
 
+Loop 30 target contract baseline:
+
+- Source scope: read only from durable run context, starting with `/input/...` paths.
+- Target scope: write only into HTTP connector request body fields first.
+- Value policy: allow JSON scalar and JSON object/array values that are already present in trigger input; do not resolve credentials, environment variables, or external files.
+- Missing value policy: support explicit `required` behavior; required missing values fail the connector node clearly, optional missing values leave the static request unchanged.
+- Audit policy: audit events expose mapping status and input keys only, not mapped values.
+- Compatibility policy: workflows without mappings keep the existing static connector request behavior.
+
 Loop 30 implementation slices:
 
 1. Mapping contract
    - Define a small allowlisted mapping shape under connector request metadata.
-   - Support copying scalar/string/number/boolean values from `context.input` into HTTP request body fields first.
+   - Support copying values from `context.input` into HTTP request body fields first.
    - Keep source paths explicit and reject missing or unsupported paths with readable errors.
 2. Runtime boundary
    - Apply mapping during connector execution, after credential-handle resolution boundaries are established and without mutating the published workflow artifact.
@@ -172,6 +182,8 @@ Loop 30 verification commands:
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `PYTHONPATH=src python3 -m unittest tests.test_connectors tests.test_executor tests.test_triggers tests.test_webhooks tests.test_schedules tests.test_cli -v`
+- `PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json`
+- `PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-connector.workflow.json -o /tmp/http-connector.litegraph.json`
 - `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
 - `python3 scripts/secret_hygiene.py examples/workflows`
 - `git diff --check`
@@ -196,13 +208,15 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop 28: Pilot Playbook And Example | Complete | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
 | Loop 29: Scheduled Trigger Boundary | Complete | Trigger published workflows from deterministic local schedules | schedule contract, CLI/helper path, audit tests |
 | Loop 30: Trigger Input Mapping | Next | Map trigger context into connector request bodies without leaking secrets | input mapping contract, validator tests, connector examples |
+| Loop 31: Connector Extension Contract | Planned | Define stable boundaries for product-specific connectors after input mapping | connector protocol docs, manifest contract, local test harness |
+| Loop 32: Pilot Scenario Pack | Planned | Add more end-to-end pilot scenarios using triggers, schedules, credentials, and mapped connector input | scenario fixtures, smoke helpers, operator checklist |
 
 Loop selection rules:
 
 - Pick the next loop only after the previous loop is merged or explicitly deferred.
 - Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
 - Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
-- Do not add product-specific SaaS connectors until local webhook/adapters and pilot playbooks are in place.
+- Do not add product-specific SaaS connectors until local webhook/adapters, schedules, pilot playbooks, and trigger input mapping are in place.
 
 ## Release Tag Plan
 
@@ -244,7 +258,7 @@ Status: delivered by Loops 1-9.
 
 ### v0.2: Connector Runtime
 
-Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Future work should add product-specific extensions only when backed by tests and docs.
+Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Future work should add product-specific extensions only after the trigger input mapping and connector extension contracts are documented, tested, and dependency-aware.
 
 - Connector manifests
 - Connector binding validation
@@ -254,7 +268,7 @@ Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retr
 - Connector-node retry execution
 - Committed-fixture secret hygiene guardrails
 - Local credential-provider boundary for handle-based HTTP headers
-- Future: product-specific connector packages
+- Future: connector extension contract and product-specific connector packages
 
 ### v0.3: Authoring Experience
 
@@ -319,7 +333,7 @@ Status: local trigger, input, credential, webhook, scheduled trigger, visual ins
 - Visual run/audit overlays
 - Pilot playbook and runnable scenario
 - Next: trigger input mapping
-- Future: product-specific connector packages and hosted control-plane integrations
+- Future: connector extension contract, product-specific connector packages, and hosted control-plane integrations
 
 ### v1.0: Production Baseline
 
