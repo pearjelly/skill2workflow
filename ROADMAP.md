@@ -12,16 +12,16 @@ Current capability snapshot:
 
 - Skill ingestion: `SKILL.md` frontmatter, hard gates, and ordered checklist steps become Skill IR
 - DSL authority: Skill IR compiles to Workflow DSL, with JSON Schema and structured validation errors
-- Visual layer: Workflow DSL renders to LiteGraph JSON, and safe visual edits can write back to DSL
+- Visual layer: Workflow DSL renders to LiteGraph JSON, read-only run overlays can be attached to nodes, and safe visual edits can write back to DSL
 - Runtime: local executor supports run state, initial run context, human-gate pause/resume, connector retry policy, recovery events, run listing, and run detail
-- Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API with durable input context, resume, audit log, filtered audit queries, and promoted runtime policy events
+- Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API with durable input context, resume, audit log, filtered audit queries, promoted runtime policy events, and compact node overlay export
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, local credential handles, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
 - Credential boundary and secret hygiene: documented placeholder and handle rules, local credential-file provider, committed-fixture scanner, and CI guardrail for obvious secret-like values
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
-- Local control-plane UI: read-only snapshot export, derived operator insights, and static inspector for attention items, recent events, connector events, workflows, runs, audit events, connectors, and version comparisons
+- Local control-plane UI: read-only snapshot export, derived operator insights, and static inspector for attention items, recent events, connector events, node overlays, workflows, runs, audit events, connectors, and version comparisons
 - Demo onboarding: one-command local demo workspace generation with Workflow DSL, LiteGraph, run state, audit, and control-plane snapshot artifacts
 - Packaging and installability: package metadata guardrails, editable install smoke, and installed `skill2workflow` console-script verification
 - Runtime policy and recovery: connector-node retry execution, retry/recovery run events, and published-run policy audit promotion
@@ -53,10 +53,10 @@ Ready now:
 - Pass local trigger input values into durable run context while keeping audit output compact.
 - Reference connector credentials through local handles without storing resolved values in Workflow DSL, run state, or audit events.
 - Receive local HTTP webhook events and route them through the same published trigger boundary.
+- Inspect read-only node-level run and audit overlays in the LiteGraph editor and local control-plane UI.
 
 Still needed before serious pilots:
 
-- Better run/audit overlays in the visual authoring experience.
 - Clear pilot playbooks that define what is supported, what is experimental, and what must stay outside the bootstrap runtime.
 
 Pilot sequencing rule: do not add product-specific SaaS connectors before local webhook/adapters and pilot playbooks are tested and documented. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
@@ -91,100 +91,37 @@ Pilot sequencing rule: do not add product-specific SaaS connectors before local 
 | Loop 24: Workflow Inputs And Run Context | Complete | Trigger input persistence, durable run context, compact audit boundary, executor context tests |
 | Loop 25: Credential Provider Interface | Complete | Local credential provider, connector handle metadata, credential-file CLI path, leakage tests |
 | Loop 26: Local Webhook Adapter | Complete | Local webhook request contract, stdlib webhook server, trigger-boundary adapter, JSON/SQLite tests, docs |
+| Loop 27: Run Overlay In Visual Editor | Complete | Read-only run overlay contract, LiteGraph node overlays, control snapshot `node_overlays`, static Nodes view, docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 26 added a local webhook adapter:
+Post-`v0.1.0` work now has one active priority after Loop 27 added visual run/audit overlays:
 
-1. connect run state and audit evidence back into the visual workflow editor without making the graph the execution authority.
+1. turn the local runtime into a documented pilot path that a real team can try without guessing the support boundary.
 
-### Loop 27: Run Overlay In Visual Editor
+### Loop 28: Pilot Playbook And Example
 
-Goal: let local operators inspect run status, node outcomes, connector events, and audit evidence directly on top of the workflow graph.
+Goal: document and ship a concrete enterprise pilot path that uses the current local-first runtime end to end.
 
-Why this is next: Loops 23-26 created controlled trigger, input, credential, and webhook ingress boundaries. The next pilot-readiness gap is operator visibility: users need to understand what happened in a run without stitching together CLI JSON, audit output, and the static graph manually.
+Why this is next: Loops 23-27 now cover trigger input, credential handles, local webhook ingress, durable run context, audit promotion, and visual run inspection. The remaining pilot-readiness gap is operational clarity: teams need a supported scenario, setup path, verification checklist, and explicit limits before treating the bootstrap as a real evaluation harness.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Keep Workflow DSL authoritative and published workflow artifacts immutable.
-- Treat run and audit overlays as read-only view data.
-- Reuse existing run state, audit events, and control snapshot exports where possible.
-- Do not add live collaboration, hosted dashboards, mutation from the graph, or runtime dependencies.
-
-Scope:
-
-- Define a small graph overlay data shape derived from run state and audit events
-- Render node status, current node, connector outcomes, retry/recovery evidence, and trigger metadata in the static editor or control-plane UI
-- Keep visual overlay data separate from Workflow DSL source data
-- Document how to generate and load overlay inputs from a fresh checkout
+- Keep the playbook honest about local-first scope and experimental surfaces.
+- Use existing parser, compiler, publish, trigger/webhook, run, audit, snapshot, and visual overlay paths.
+- Prefer one runnable scenario over broad enterprise claims.
+- Do not add hosted auth, SaaS-specific connectors, scheduling, queues, or production deployment guidance in this loop.
 
 Acceptance criteria:
 
-- A local operator can load a workflow plus run/audit evidence and see node-level execution state on the graph
-- Overlay data is read-only and cannot mutate Workflow DSL
-- Existing control snapshot or visualization commands have tests for any new exported fields
-- Documentation explains the publish, trigger/webhook, run, audit, snapshot, and visual inspection flow
-- No hosted UI, auth layer, live server mode, or runtime dependency is introduced
-
-Loop 27 implementation slices:
-
-1. Overlay data contract
-   - Define a small read-only overlay shape that maps `node_id` to run status, attempt count, connector outcome, retry/recovery evidence, and selected audit references.
-   - Derive overlay data from existing run state and audit events. Do not duplicate Workflow DSL topology or mutate workflow artifacts.
-   - Preserve the existing `workflow_to_litegraph(..., run_state=...)` path where possible, and add only the minimum fields needed for operator inspection.
-2. Snapshot and CLI export path
-   - Decide whether overlay data belongs in `control-snapshot`, `visualize --run-state`, or both. Prefer reusing existing snapshot and visualization commands before adding a new command.
-   - Keep JSON and SQLite behavior equivalent for any exported run/audit evidence.
-   - Ensure exported data remains compact: include identifiers, statuses, event types, node ids, connector ids, attempts, timestamps, and summaries rather than raw connector payloads or trigger input values.
-3. Static UI overlay
-   - Render node-level status on the LiteGraph editor or control-plane inspector using the overlay data.
-   - Make connector failures, retry/recovery events, waiting gates, current node, and terminal status easy to scan.
-   - Keep overlay controls read-only. Do not add workflow mutation, graph topology editing, or run control actions in this loop.
-4. Tests and fixtures
-   - Add unit coverage for overlay derivation from completed, waiting, failed, connector, and retry/recovery runs.
-   - Update snapshot or LiteGraph fixture tests only when the committed fixture shape changes.
-   - Add focused UI fixture coverage if static assets need deterministic sample data.
-5. Documentation and operator flow
-   - Document how to publish, trigger or webhook a run, export the relevant artifact, and inspect run/audit evidence visually.
-   - Keep the docs explicit that overlay data is view state, not workflow source.
-   - Update README/HARNESS only for commands a contributor should actually run from a fresh checkout.
-
-Loop 27 explicit non-goals:
-
-- Do not add a hosted control plane, live multi-user UI, auth, RBAC, IAM, or websocket transport.
-- Do not let graph overlay data mutate Workflow DSL, published artifacts, connector identity, edges, transitions, or node ids.
-- Do not add workflow run control actions from the static UI.
-- Do not store or display resolved credential values, raw authorization headers, raw webhook bodies, or full trigger input payloads in overlay data.
-- Do not introduce frontend build tooling or runtime dependencies.
-
-Loop 27 expected file changes:
-
-- `src/skill2workflow/visualizer.py` if overlay data is attached to LiteGraph nodes.
-- `src/skill2workflow/dashboard.py` if overlay data is exported through control snapshots.
-- `tests/test_visualizer.py` and/or `tests/test_dashboard.py` for overlay shape and fixture coverage.
-- `web/` static assets, likely `web/index.html` or `web/control.html`, for read-only overlay rendering.
-- `examples/control-plane-snapshot.json` only if the snapshot fixture changes.
-- `README.md`, `HARNESS.md`, `docs/authoring.md`, or a focused docs page for the operator inspection flow.
-
-Loop 27 verification commands:
-
-- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- `python3 -m py_compile src/skill2workflow/*.py`
-- `PYTHONPATH=src python3 -m unittest tests.test_visualizer tests.test_dashboard tests.test_cli -v`
-- `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo-loop27`
-- `python3 scripts/secret_hygiene.py examples/workflows`
-- `git diff --check`
-
-Loop 27 done means:
-
-- Operators can visually inspect run and audit evidence on top of workflow structure without leaving the local artifact workflow.
-- Overlay data is deterministic, compact, and read-only.
-- Workflow DSL remains the execution source of truth.
-- No hosted UI, auth layer, live server mode, or dependency expansion is added.
+- A contributor can follow the playbook from a fresh checkout and run one realistic pilot scenario.
+- The scenario demonstrates publish, trigger or webhook, durable input context, credential-handle boundary, audit inspection, and node overlay inspection.
+- The playbook states what is supported, what is experimental, and what must stay outside the bootstrap runtime.
+- Verification commands are documented and covered by existing tests or a focused smoke helper.
 
 ## Near-Term Loop Queue
 
@@ -195,8 +132,8 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop 24: Workflow Inputs And Run Context | Complete | Carry trigger input metadata into run state and node execution context | input contract, run context persistence, executor tests |
 | Loop 25: Credential Provider Interface | Complete | Reference credentials without storing secret values in Workflow DSL | provider protocol, placeholder-to-handle docs, local tests |
 | Loop 26: Local Webhook Adapter | Complete | Let local HTTP events trigger published runs through the trigger boundary | stdlib webhook adapter, trigger examples, audit tests |
-| Loop 27: Run Overlay In Visual Editor | Next | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
-| Loop 28: Pilot Playbook And Example | Planned | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
+| Loop 27: Run Overlay In Visual Editor | Complete | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
+| Loop 28: Pilot Playbook And Example | Next | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
 
 Loop selection rules:
 
@@ -259,14 +196,15 @@ Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retr
 
 ### v0.3: Authoring Experience
 
-Status: first MVP shipped in Loop 11. Enterprise example pack shipped in Loop 16. Future work should improve editor ergonomics and broaden safe write-back only where semantics are explicit.
+Status: first MVP shipped in Loop 11. Enterprise example pack shipped in Loop 16. Read-only run overlays shipped in Loop 27. Future work should improve editor ergonomics and broaden safe write-back only where semantics are explicit.
 
 - Better LiteGraph parameter forms
 - Example workflow gallery
 - Enterprise example pack for sales, customer service, risk review, and operations analysis
 - Expanded safe write-back beyond title and description
+- Read-only run/audit overlays in the editor
 - Contributor docs for node types and compiler rules
-- Future: node creation flows, schema-backed forms, and run/audit overlays in the editor
+- Future: node creation flows and schema-backed forms
 
 ### v0.4: Open Source Release Baseline
 
@@ -282,7 +220,7 @@ Status: first MVP shipped in Loop 12. Release guardrails shipped in Loop 15.
 
 ### v0.5: Local Control Plane UI
 
-Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Future work should connect run/audit overlays back into the graph view.
+Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Node-level run overlays shipped in Loop 27. Future work should keep the local UI read-only until runtime control actions have explicit safety rules.
 
 - Workflow registry view
 - Run list and run detail view
@@ -290,7 +228,8 @@ Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Futu
 - Connector manifest view
 - Published workflow version comparison
 - Operator attention, recent event, connector event, and version change summaries
-- Future: live local server mode, graph overlays, and workflow artifact diff views
+- Per-node run overlay table for status, event counts, connector outcomes, attempts, and retry/recovery evidence
+- Future: live local server mode and workflow artifact diff views
 
 ### v0.6: Local Trigger And Input Runtime
 
@@ -308,13 +247,13 @@ Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local 
 
 ### v0.7: Pilot Integration Boundary
 
-Status: planned after local trigger, input, credential, and webhook semantics are stable. Visual run/audit overlay work starts in Loop 27.
+Status: planned after local trigger, input, credential, webhook, and visual inspection semantics are stable. Pilot playbook work starts in Loop 28.
 
 - Credential provider interface
 - Secret-handle documentation without secret storage in Workflow DSL
 - Local webhook adapter for pilot integration tests
 - Visual run/audit overlays
-- Pilot playbook and runnable scenario
+- Next: pilot playbook and runnable scenario
 - Future: product-specific connector packages and hosted control-plane integrations
 
 ### v1.0: Production Baseline

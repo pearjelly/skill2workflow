@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from skill2workflow.visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
+from skill2workflow.visualizer import apply_litegraph_edits_to_workflow, run_overlay_for_nodes, workflow_to_litegraph
 
 
 class VisualizerTests(TestCase):
@@ -45,6 +45,83 @@ class VisualizerTests(TestCase):
         self.assertEqual(nodes["start"]["properties"]["run_status"], "completed")
         self.assertEqual(nodes["review"]["properties"]["run_status"], "waiting")
         self.assertEqual(nodes["end"]["properties"]["run_status"], "not_started")
+
+    def test_workflow_to_litegraph_attaches_read_only_run_overlay(self):
+        run_state = _run_state_with_overlay_evidence()
+
+        graph = workflow_to_litegraph(
+            _authoring_workflow(),
+            run_state=run_state,
+            audit_events=[
+                {
+                    "type": "connector_completed",
+                    "run_id": "run_overlay",
+                    "node_id": "call_api",
+                    "timestamp": "2026-07-06T00:00:03Z",
+                }
+            ],
+        )
+        nodes = {node["properties"]["workflow_node_id"]: node for node in graph["nodes"]}
+        overlay = graph["extra"]["run_overlay"]
+
+        self.assertEqual(overlay["run_id"], "run_overlay")
+        self.assertEqual(overlay["status"], "completed")
+        self.assertEqual(overlay["current_node"], "end")
+        self.assertEqual(
+            overlay["trigger"],
+            {
+                "trigger_id": "trigger_123",
+                "source": "local-webhook",
+                "idempotency_key": "event-001",
+                "input_keys": ["customer_id"],
+            },
+        )
+        self.assertNotIn("input", overlay["trigger"])
+        self.assertEqual(nodes["call_api"]["properties"]["run_status"], "completed")
+        self.assertEqual(
+            nodes["call_api"]["properties"]["run_overlay"],
+            {
+                "node_id": "call_api",
+                "status": "completed",
+                "current": False,
+                "event_count": 8,
+                "latest_event_type": "node_completed",
+                "result_status": "completed",
+                "attempts": 2,
+                "max_attempts": 1,
+                "retry_count": 1,
+                "recovered": True,
+                "connector_id": "http",
+                "connector_kind": "http",
+                "connector_status": "completed",
+                "error": "HTTP 503",
+                "audit_event_count": 1,
+            },
+        )
+        self.assertNotIn("output", nodes["call_api"]["properties"]["run_overlay"])
+        self.assertNotIn("customer_123", str(nodes["call_api"]["properties"]["run_overlay"]))
+
+    def test_run_overlay_for_nodes_marks_waiting_current_node(self):
+        run_state = {
+            "run_id": "run_waiting",
+            "status": "waiting",
+            "current_node": "review",
+            "node_results": {"start": {"status": "completed", "timestamp": "2026-07-06T00:00:00Z"}},
+            "events": [
+                {"type": "node_started", "node_id": "start", "timestamp": "2026-07-06T00:00:00Z"},
+                {"type": "node_completed", "node_id": "start", "timestamp": "2026-07-06T00:00:01Z"},
+                {"type": "human_gate_waiting", "node_id": "review", "timestamp": "2026-07-06T00:00:02Z"},
+            ],
+        }
+
+        overlay = run_overlay_for_nodes(["start", "review", "end"], run_state)
+
+        self.assertEqual(overlay["start"]["status"], "completed")
+        self.assertEqual(overlay["start"]["latest_event_type"], "node_completed")
+        self.assertEqual(overlay["review"]["status"], "waiting")
+        self.assertEqual(overlay["review"]["current"], True)
+        self.assertEqual(overlay["review"]["latest_event_type"], "human_gate_waiting")
+        self.assertEqual(overlay["end"]["status"], "not_started")
 
     def test_workflow_to_litegraph_derives_transition_edges_when_edges_are_absent(self):
         workflow = _approval_workflow()
@@ -260,5 +337,99 @@ def _authoring_workflow():
             {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "failure"},
             {"id": "edge_api_end", "from": "call_api", "to": "end", "label": "next"},
             {"id": "edge_api_failure", "from": "call_api", "to": "failure", "label": "failure"},
+        ],
+    }
+
+
+def _run_state_with_overlay_evidence():
+    return {
+        "run_id": "run_overlay",
+        "status": "completed",
+        "current_node": "end",
+        "context": {
+            "trigger": {
+                "trigger_id": "trigger_123",
+                "source": "local-webhook",
+                "idempotency_key": "event-001",
+                "input_keys": ["customer_id"],
+            },
+            "input": {"customer_id": "customer_123"},
+        },
+        "node_results": {
+            "start": {"status": "completed", "title": "Start", "timestamp": "2026-07-06T00:00:00Z"},
+            "review": {"status": "approved", "approved": True, "timestamp": "2026-07-06T00:00:01Z"},
+            "call_api": {
+                "status": "completed",
+                "title": "Call API",
+                "connector": {"id": "http", "kind": "http"},
+                "output": {"secret_like_payload": "do-not-copy"},
+                "attempts": 2,
+                "max_attempts": 1,
+                "last_error": "HTTP 503",
+                "timestamp": "2026-07-06T00:00:03Z",
+            },
+            "end": {"status": "completed", "title": "End", "timestamp": "2026-07-06T00:00:04Z"},
+        },
+        "events": [
+            {"type": "node_started", "node_id": "call_api", "timestamp": "2026-07-06T00:00:01Z"},
+            {
+                "type": "connector_started",
+                "node_id": "call_api",
+                "connector_id": "http",
+                "connector_kind": "http",
+                "connector_status": "running",
+                "attempt": 1,
+                "max_attempts": 1,
+                "timestamp": "2026-07-06T00:00:01Z",
+            },
+            {
+                "type": "connector_failed",
+                "node_id": "call_api",
+                "connector_id": "http",
+                "connector_kind": "http",
+                "connector_status": "failed",
+                "attempt": 1,
+                "max_attempts": 1,
+                "error": "HTTP 503",
+                "timestamp": "2026-07-06T00:00:02Z",
+            },
+            {
+                "type": "node_retrying",
+                "node_id": "call_api",
+                "attempt": 1,
+                "next_attempt": 2,
+                "max_attempts": 1,
+                "error": "HTTP 503",
+                "timestamp": "2026-07-06T00:00:02Z",
+            },
+            {
+                "type": "connector_started",
+                "node_id": "call_api",
+                "connector_id": "http",
+                "connector_kind": "http",
+                "connector_status": "running",
+                "attempt": 2,
+                "max_attempts": 1,
+                "timestamp": "2026-07-06T00:00:03Z",
+            },
+            {
+                "type": "connector_completed",
+                "node_id": "call_api",
+                "connector_id": "http",
+                "connector_kind": "http",
+                "connector_status": "completed",
+                "attempt": 2,
+                "max_attempts": 1,
+                "timestamp": "2026-07-06T00:00:03Z",
+            },
+            {
+                "type": "node_recovered",
+                "node_id": "call_api",
+                "attempt": 2,
+                "max_attempts": 1,
+                "error": "HTTP 503",
+                "timestamp": "2026-07-06T00:00:03Z",
+            },
+            {"type": "node_completed", "node_id": "call_api", "timestamp": "2026-07-06T00:00:04Z"},
         ],
     }

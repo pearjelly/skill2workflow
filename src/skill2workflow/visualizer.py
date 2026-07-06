@@ -11,7 +11,11 @@ Workflow = Dict[str, object]
 RunState = Dict[str, object]
 
 
-def workflow_to_litegraph(workflow: Workflow, run_state: Optional[RunState] = None) -> LiteGraph:
+def workflow_to_litegraph(
+    workflow: Workflow,
+    run_state: Optional[RunState] = None,
+    audit_events: Optional[List[Dict[str, object]]] = None,
+) -> LiteGraph:
     """Return a LiteGraph graph representation for a Workflow DSL document.
 
     The Workflow DSL remains the execution source of truth. This function only
@@ -20,7 +24,12 @@ def workflow_to_litegraph(workflow: Workflow, run_state: Optional[RunState] = No
     nodes = _workflow_nodes(workflow)
     edges = _workflow_edges(workflow, nodes)
     node_id_map = {str(node["id"]): index for index, node in enumerate(nodes, start=1)}
-    graph_nodes = [_litegraph_node(node, node_id_map[str(node["id"])], run_state) for node in nodes]
+    node_ids = [str(node["id"]) for node in nodes]
+    overlay_by_node = run_overlay_for_nodes(node_ids, run_state, audit_events) if isinstance(run_state, dict) else {}
+    graph_nodes = [
+        _litegraph_node(node, node_id_map[str(node["id"])], run_state, overlay_by_node.get(str(node["id"])))
+        for node in nodes
+    ]
 
     links = []
     last_link_id = 0
@@ -42,6 +51,13 @@ def workflow_to_litegraph(workflow: Workflow, run_state: Optional[RunState] = No
     workflow_meta = workflow.get("workflow", {})
     if not isinstance(workflow_meta, dict):
         workflow_meta = {}
+    extra = {
+        "source_schema_version": workflow.get("schema_version"),
+        "truth_source": "workflow_dsl",
+        "source_workflow": copy.deepcopy(workflow),
+    }
+    if isinstance(run_state, dict):
+        extra["run_overlay"] = _run_overlay_summary(run_state, overlay_by_node)
 
     return {
         "version": "skill2workflow-litegraph-0.1.0",
@@ -59,11 +75,138 @@ def workflow_to_litegraph(workflow: Workflow, run_state: Optional[RunState] = No
         "links": links,
         "groups": [],
         "config": {},
-        "extra": {
-            "source_schema_version": workflow.get("schema_version"),
-            "truth_source": "workflow_dsl",
-            "source_workflow": copy.deepcopy(workflow),
-        },
+        "extra": extra,
+    }
+
+
+def run_overlay_for_nodes(
+    node_ids: Iterable[str],
+    run_state: Optional[RunState],
+    audit_events: Optional[List[Dict[str, object]]] = None,
+) -> Dict[str, Dict[str, object]]:
+    """Return compact read-only run evidence keyed by workflow node id."""
+
+    normalized_node_ids = [str(node_id) for node_id in node_ids]
+    events_by_node = _events_by_node(run_state.get("events", []) if isinstance(run_state, dict) else [])
+    audit_by_node = _events_by_node(audit_events or [])
+    overlays: Dict[str, Dict[str, object]] = {}
+    for node_id in normalized_node_ids:
+        node_events = events_by_node.get(node_id, [])
+        node_audit_events = audit_by_node.get(node_id, [])
+        result = _node_result(run_state, node_id)
+        latest_event = node_events[-1] if node_events else {}
+        overlay = {
+            "node_id": node_id,
+            "status": _run_status(node_id, run_state),
+            "current": bool(isinstance(run_state, dict) and run_state.get("current_node") == node_id),
+            "event_count": len(node_events),
+            "latest_event_type": str(latest_event.get("type", "")) if isinstance(latest_event, dict) else "",
+            "result_status": str(result.get("status", "")) if result else "",
+            "attempts": _overlay_int(result.get("attempts") if result else None, node_events, "attempt"),
+            "max_attempts": _overlay_int(result.get("max_attempts") if result else None, node_events, "max_attempts"),
+            "retry_count": sum(1 for event in node_events if event.get("type") == "node_retrying"),
+            "recovered": any(event.get("type") == "node_recovered" for event in node_events),
+            "connector_id": _overlay_text(result, node_events, "connector_id"),
+            "connector_kind": _overlay_text(result, node_events, "connector_kind"),
+            "connector_status": _overlay_text(result, node_events, "connector_status"),
+            "error": _overlay_error(result, node_events),
+            "audit_event_count": len(node_audit_events),
+        }
+        overlays[node_id] = overlay
+    return overlays
+
+
+def _events_by_node(events: object) -> Dict[str, List[Dict[str, object]]]:
+    grouped: Dict[str, List[Dict[str, object]]] = {}
+    if not isinstance(events, list):
+        return grouped
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        node_id = str(event.get("node_id", ""))
+        if not node_id:
+            continue
+        grouped.setdefault(node_id, []).append(event)
+    return grouped
+
+
+def _node_result(run_state: Optional[RunState], node_id: str) -> Dict[str, object]:
+    if not isinstance(run_state, dict):
+        return {}
+    node_results = run_state.get("node_results", {})
+    if not isinstance(node_results, dict):
+        return {}
+    result = node_results.get(node_id)
+    return result if isinstance(result, dict) else {}
+
+
+def _overlay_int(explicit: object, events: List[Dict[str, object]], key: str) -> int:
+    if explicit not in (None, ""):
+        try:
+            return int(explicit)
+        except (TypeError, ValueError):
+            return 0
+    for event in reversed(events):
+        if event.get(key) not in (None, ""):
+            try:
+                return int(event.get(key))
+            except (TypeError, ValueError):
+                return 0
+    return 0
+
+
+def _overlay_text(result: Dict[str, object], events: List[Dict[str, object]], key: str) -> str:
+    if key in {"connector_id", "connector_kind"}:
+        connector = result.get("connector", {})
+        if isinstance(connector, dict) and connector.get(key.replace("connector_", "")):
+            return str(connector.get(key.replace("connector_", "")))
+    for event in reversed(events):
+        if event.get(key) not in (None, ""):
+            return str(event.get(key))
+    return ""
+
+
+def _overlay_error(result: Dict[str, object], events: List[Dict[str, object]]) -> str:
+    for key in ("last_error", "error"):
+        if result.get(key):
+            return str(result.get(key))
+    for event in reversed(events):
+        if event.get("error"):
+            return str(event.get("error"))
+    return ""
+
+
+def _run_overlay_summary(
+    run_state: Optional[RunState],
+    overlay_by_node: Dict[str, Dict[str, object]],
+) -> Dict[str, object]:
+    if not isinstance(run_state, dict):
+        return {}
+    return {
+        "run_id": str(run_state.get("run_id", "")),
+        "status": str(run_state.get("status", "")),
+        "current_node": str(run_state.get("current_node", "")),
+        "trigger": _compact_trigger(run_state),
+        "node_count": len(overlay_by_node),
+        "nodes": copy.deepcopy(overlay_by_node),
+    }
+
+
+def _compact_trigger(run_state: RunState) -> Dict[str, object]:
+    context = run_state.get("context", {})
+    if not isinstance(context, dict):
+        return {}
+    trigger = context.get("trigger", {})
+    if not isinstance(trigger, dict):
+        return {}
+    input_keys = trigger.get("input_keys", [])
+    if not isinstance(input_keys, list):
+        input_keys = []
+    return {
+        "trigger_id": str(trigger.get("trigger_id", "")),
+        "source": str(trigger.get("source", "")),
+        "idempotency_key": str(trigger.get("idempotency_key", "")),
+        "input_keys": [str(key) for key in input_keys],
     }
 
 
@@ -305,12 +448,29 @@ def _litegraph_node(
     node: Dict[str, object],
     graph_id: int,
     run_state: Optional[RunState],
+    run_overlay: Optional[Dict[str, object]] = None,
 ) -> Dict[str, object]:
     node_id = str(node["id"])
     node_type = str(node.get("type") or "step")
     has_success = bool(node.get("on_success"))
     has_failure = bool(node.get("on_failure"))
     source = _source_metadata(node)
+
+    properties = {
+        "workflow_node_id": node_id,
+        "node_type": node_type,
+        "description": str(node.get("description") or ""),
+        "run_status": _run_status(node_id, run_state),
+        "source": source,
+        "requires": copy.deepcopy(node.get("requires", [])),
+        "produces": copy.deepcopy(node.get("produces", [])),
+        "guard": copy.deepcopy(node.get("guard")),
+        "action": copy.deepcopy(node.get("action")),
+        "retry": copy.deepcopy(node.get("retry")),
+        "connector": copy.deepcopy(node.get("connector")),
+    }
+    if run_overlay:
+        properties["run_overlay"] = copy.deepcopy(run_overlay)
 
     return {
         "id": graph_id,
@@ -323,19 +483,7 @@ def _litegraph_node(
         "title": str(node.get("title") or node_id),
         "inputs": [] if node_type == "start" else [{"name": "in", "type": "flow", "link": None}],
         "outputs": _outputs(has_success, has_failure),
-        "properties": {
-            "workflow_node_id": node_id,
-            "node_type": node_type,
-            "description": str(node.get("description") or ""),
-            "run_status": _run_status(node_id, run_state),
-            "source": source,
-            "requires": copy.deepcopy(node.get("requires", [])),
-            "produces": copy.deepcopy(node.get("produces", [])),
-            "guard": copy.deepcopy(node.get("guard")),
-            "action": copy.deepcopy(node.get("action")),
-            "retry": copy.deepcopy(node.get("retry")),
-            "connector": copy.deepcopy(node.get("connector")),
-        },
+        "properties": properties,
     }
 
 

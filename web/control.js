@@ -35,6 +35,7 @@
     els.operatorVersionRows = document.getElementById("operator-version-rows");
     els.workflowRows = document.getElementById("workflow-rows");
     els.runRows = document.getElementById("run-rows");
+    els.nodeOverlayRows = document.getElementById("node-overlay-rows");
     els.auditRows = document.getElementById("audit-rows");
     els.connectorRows = document.getElementById("connector-rows");
     els.versionRows = document.getElementById("version-rows");
@@ -164,6 +165,20 @@
         ];
       },
       "run",
+    );
+    renderTable(
+      els.nodeOverlayRows,
+      filterRows(nodeOverlayRows(snapshot.runs)),
+      function (overlay) {
+        return [
+          linkCell(overlay.node_id || ""),
+          textCell(overlay.run_id || ""),
+          pillCell(overlay.status || ""),
+          textCell(String(overlay.event_count || 0)),
+          textCell(connectorLabel(overlay)),
+        ];
+      },
+      "node overlay",
     );
     renderTable(
       els.auditRows,
@@ -355,6 +370,9 @@
     if (value.kind && value.severity) {
       return [["Kind", value.kind || ""], ["Severity", value.severity || ""], ["Workflow", value.workflow_id || ""], ["Run", value.run_id || ""]];
     }
+    if (value.node_id && Object.prototype.hasOwnProperty.call(value, "event_count")) {
+      return [["Node", value.node_id], ["Status", value.status || ""], ["Events", String(value.event_count || 0)], ["Connector", connectorLabel(value)]];
+    }
     if (value.run_id) {
       return [["Run", value.run_id], ["Workflow", value.workflow_id || ""], ["Status", value.status || ""], ["Events", String(value.event_count || 0)]];
     }
@@ -374,6 +392,7 @@
     const value = selected.value || {};
     if (selected.kind === "workflow") return value.workflow_id + "@" + value.version;
     if (selected.kind === "run") return value.run_id || "Run";
+    if (selected.kind === "node overlay") return value.node_id || "Node";
     if (selected.kind === "audit") return value.type || "Audit";
     if (selected.kind === "connector") return value.name || value.id || "Connector";
     if (selected.kind === "version comparison") return value.workflow_id || "Comparison";
@@ -438,6 +457,29 @@
         scope: "audit events",
       };
     });
+  }
+
+  function nodeOverlayRows(runs) {
+    const rows = [];
+    (runs || []).forEach(function (run) {
+      const overlays = run.node_overlays || {};
+      Object.keys(overlays).sort().forEach(function (nodeId) {
+        const overlay = Object.assign({}, overlays[nodeId], {
+          run_id: run.run_id || "",
+          workflow_id: run.workflow_id || "",
+          workflow_version: run.workflow_version || "",
+        });
+        rows.push(overlay);
+      });
+    });
+    return rows;
+  }
+
+  function connectorLabel(overlay) {
+    if (!overlay.connector_id) return "";
+    const status = overlay.connector_status ? " " + overlay.connector_status : "";
+    const attempts = overlay.attempts ? " x" + overlay.attempts : "";
+    return overlay.connector_id + status + attempts;
   }
 
   function formatDate(value) {

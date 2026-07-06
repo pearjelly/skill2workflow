@@ -92,6 +92,7 @@
     els.nodeId = document.getElementById("node-id");
     els.nodeType = document.getElementById("node-type");
     els.nodeStatus = document.getElementById("node-status");
+    els.nodeOverlay = document.getElementById("node-overlay");
     els.nodeTitle = document.getElementById("node-title");
     els.nodeDescription = document.getElementById("node-description");
     els.nodeAction = document.getElementById("node-action");
@@ -586,6 +587,7 @@
     els.nodeId.value = hasNode ? props.workflow_node_id || "" : "";
     els.nodeType.value = hasNode ? props.node_type || "" : "";
     els.nodeStatus.value = hasNode ? props.run_status || "" : "";
+    els.nodeOverlay.value = hasNode ? JSON.stringify(props.run_overlay || {}, null, 2) : "";
     els.nodeTitle.value = hasNode ? node.title || "" : "";
     els.nodeDescription.value = hasNode ? props.description || "" : "";
     els.nodeAction.value = action ? action.prompt || action.instruction || "" : "";
