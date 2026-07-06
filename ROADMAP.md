@@ -26,6 +26,7 @@ Current capability snapshot:
 - Packaging and installability: package metadata guardrails, editable install smoke, and installed `skill2workflow` console-script verification
 - Runtime policy and recovery: connector-node retry execution, retry/recovery run events, and published-run policy audit promotion
 - Local webhook adapter: dependency-free local `POST /webhooks/<workflow_id>/<version>` path that invokes the existing trigger boundary without hosted ingress
+- Pilot playbook: one-command local customer-support pilot smoke with webhook trigger, durable input, manual gate resume, credential handle, HTTP connector execution, audit, snapshot, and LiteGraph overlay artifacts
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
 
 Important boundaries:
@@ -54,10 +55,12 @@ Ready now:
 - Reference connector credentials through local handles without storing resolved values in Workflow DSL, run state, or audit events.
 - Receive local HTTP webhook events and route them through the same published trigger boundary.
 - Inspect read-only node-level run and audit overlays in the LiteGraph editor and local control-plane UI.
+- Follow a documented local pilot playbook with a runnable customer-support escalation scenario.
 
 Still needed before serious pilots:
 
-- Clear pilot playbooks that define what is supported, what is experimental, and what must stay outside the bootstrap runtime.
+- Scheduled trigger boundary for recurring local runs.
+- Input mapping from trigger context into connector request bodies.
 
 Pilot sequencing rule: do not add product-specific SaaS connectors before local webhook/adapters and pilot playbooks are tested and documented. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
@@ -92,36 +95,37 @@ Pilot sequencing rule: do not add product-specific SaaS connectors before local 
 | Loop 25: Credential Provider Interface | Complete | Local credential provider, connector handle metadata, credential-file CLI path, leakage tests |
 | Loop 26: Local Webhook Adapter | Complete | Local webhook request contract, stdlib webhook server, trigger-boundary adapter, JSON/SQLite tests, docs |
 | Loop 27: Run Overlay In Visual Editor | Complete | Read-only run overlay contract, LiteGraph node overlays, control snapshot `node_overlays`, static Nodes view, docs |
+| Loop 28: Pilot Playbook And Example | Complete | Local customer-support pilot smoke, webhook-triggered scenario, credential handle proof, snapshot and LiteGraph overlay artifacts, pilot docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 27 added visual run/audit overlays:
+Post-`v0.1.0` work now has one active priority after Loop 28 added a runnable local pilot playbook:
 
-1. turn the local runtime into a documented pilot path that a real team can try without guessing the support boundary.
+1. add a scheduled trigger boundary for recurring local runs without introducing a production scheduler.
 
-### Loop 28: Pilot Playbook And Example
+### Loop 29: Scheduled Trigger Boundary
 
-Goal: document and ship a concrete enterprise pilot path that uses the current local-first runtime end to end.
+Goal: let local evaluators schedule published workflow runs through the existing trigger boundary.
 
-Why this is next: Loops 23-27 now cover trigger input, credential handles, local webhook ingress, durable run context, audit promotion, and visual run inspection. The remaining pilot-readiness gap is operational clarity: teams need a supported scenario, setup path, verification checklist, and explicit limits before treating the bootstrap as a real evaluation harness.
+Why this is next: Loop 28 provides an end-to-end pilot scenario. Many real enterprise workflows are recurring checks or reports, so the next controlled surface should prove time-triggered runs while reusing the same publish, trigger, audit, and snapshot semantics.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Keep the playbook honest about local-first scope and experimental surfaces.
-- Use existing parser, compiler, publish, trigger/webhook, run, audit, snapshot, and visual overlay paths.
-- Prefer one runnable scenario over broad enterprise claims.
-- Do not add hosted auth, SaaS-specific connectors, scheduling, queues, or production deployment guidance in this loop.
+- Keep scheduling local and dependency-free.
+- Reuse the existing trigger request envelope instead of bypassing the control plane.
+- Prefer one-shot and deterministic test helpers before recurring background loops.
+- Do not add hosted schedulers, distributed queues, cron daemon management, auth, or production deployment guidance in this loop.
 
 Acceptance criteria:
 
-- A contributor can follow the playbook from a fresh checkout and run one realistic pilot scenario.
-- The scenario demonstrates publish, trigger or webhook, durable input context, credential-handle boundary, audit inspection, and node overlay inspection.
-- The playbook states what is supported, what is experimental, and what must stay outside the bootstrap runtime.
-- Verification commands are documented and covered by existing tests or a focused smoke helper.
+- A contributor can define a local scheduled trigger for a published workflow.
+- The scheduled run enters the same trigger, audit, context, and snapshot paths as CLI/webhook triggers.
+- The feature has deterministic tests that do not depend on wall-clock waiting.
+- Documentation states scheduler limits and keeps production scheduling out of scope.
 
 ## Near-Term Loop Queue
 
@@ -133,7 +137,8 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop 25: Credential Provider Interface | Complete | Reference credentials without storing secret values in Workflow DSL | provider protocol, placeholder-to-handle docs, local tests |
 | Loop 26: Local Webhook Adapter | Complete | Let local HTTP events trigger published runs through the trigger boundary | stdlib webhook adapter, trigger examples, audit tests |
 | Loop 27: Run Overlay In Visual Editor | Complete | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
-| Loop 28: Pilot Playbook And Example | Next | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
+| Loop 28: Pilot Playbook And Example | Complete | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
+| Loop 29: Scheduled Trigger Boundary | Next | Trigger published workflows from deterministic local schedules | schedule contract, CLI/helper path, audit tests |
 
 Loop selection rules:
 
@@ -247,13 +252,14 @@ Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local 
 
 ### v0.7: Pilot Integration Boundary
 
-Status: planned after local trigger, input, credential, webhook, and visual inspection semantics are stable. Pilot playbook work starts in Loop 28.
+Status: local trigger, input, credential, webhook, visual inspection, and pilot playbook semantics are stable enough for local evaluation. Scheduled trigger boundary work starts in Loop 29.
 
 - Credential provider interface
 - Secret-handle documentation without secret storage in Workflow DSL
 - Local webhook adapter for pilot integration tests
 - Visual run/audit overlays
-- Next: pilot playbook and runnable scenario
+- Pilot playbook and runnable scenario
+- Next: scheduled trigger boundary
 - Future: product-specific connector packages and hosted control-plane integrations
 
 ### v1.0: Production Baseline

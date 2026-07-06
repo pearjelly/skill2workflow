@@ -102,6 +102,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Inspect operator attention items, recent events, connector events, per-node run overlays, workflows, runs, audit events, and version deltas in a static local control-plane UI
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Generate a deterministic first-run demo workspace for contributor onboarding
+- Run a deterministic local pilot playbook with webhook trigger, credential handle, audit, snapshot, and node overlay artifacts
 - Verify editable install, package metadata, and the installed `skill2workflow` console script
 - Check committed Workflow DSL and LiteGraph examples for obvious secret-like connector values
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
@@ -134,6 +135,15 @@ http://localhost:4173/web/control.html
 ```
 
 Load `/tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json` to inspect the generated operator snapshot, including the Nodes view for per-node run evidence. Rerunning the demo resets the work directory by default; pass `--no-reset` to keep existing files.
+
+Run the local pilot playbook smoke:
+
+```bash
+python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot
+```
+
+The pilot playbook publishes and triggers a customer-support escalation workflow through the local webhook boundary, resumes a manual gate, calls a local HTTP receiver with a credential handle, and writes inspection artifacts under `/tmp/skill2workflow-pilot/artifacts/`.
+See `docs/pilot-playbook.md` for the supported pilot boundary and checklist.
 
 Run the package install smoke:
 
@@ -416,6 +426,7 @@ docs/assets/      # README screenshots and system design diagrams
 docs/connectors.md # Connector runtime behavior and boundary guide
 docs/credential-boundary.md # Safe credential and fixture hygiene boundary
 docs/examples.md  # Enterprise workflow example pack guide
+docs/pilot-playbook.md # Supported local pilot path and checklist
 docs/triggers.md  # Local trigger API boundary guide
 docs/releases/    # Release notes
 web/              # Static LiteGraph editor and control-plane inspector
@@ -454,8 +465,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Credential Provider Interface
 - Local Webhook Adapter
 - Run Overlay In Visual Editor
+- Pilot Playbook And Example
 
-Next priority is Loop 28 Pilot Playbook And Example.
+Next priority is scheduled trigger boundary.
 
 See:
 
@@ -465,6 +477,7 @@ See:
 - `docs/connectors.md`
 - `docs/credential-boundary.md`
 - `docs/examples.md`
+- `docs/pilot-playbook.md`
 - `docs/release-process.md`
 - `docs/releases/v0.1.0.md`
 - `docs/runtime-policy.md`

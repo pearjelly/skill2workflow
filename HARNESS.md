@@ -23,6 +23,16 @@ python3 -m json.tool /tmp/skill2workflow-demo/artifacts/control-plane-snapshot.j
 Open the local control-plane inspector at `http://localhost:4173/web/control.html` after starting `python3 -m http.server 4173`, then load `/tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json`.
 Use the Nodes tab to inspect compact run/audit overlays for each workflow node.
 
+Run the local pilot playbook smoke:
+
+```bash
+python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot
+python3 -m json.tool /tmp/skill2workflow-pilot/artifacts/control-plane-snapshot.json >/tmp/skill2workflow-pilot-snapshot-check.json
+python3 -m json.tool /tmp/skill2workflow-pilot/artifacts/workflow.overlay.litegraph.json >/tmp/skill2workflow-pilot-overlay-check.json
+```
+
+The pilot smoke exercises webhook trigger, durable input context, manual gate resume, local HTTP connector execution, credential-handle resolution, audit export, snapshot node overlays, and LiteGraph run overlays without using external services.
+
 Run the editable install and console-script smoke:
 
 ```bash
@@ -204,6 +214,10 @@ Implemented:
   - generates a resettable local demo workspace through `scripts/demo_bootstrap.py`
   - writes Workflow DSL, LiteGraph, and control-plane snapshot artifacts under the demo work directory
   - exercises parse, compile, validate, publish, run, resume, audit, and snapshot paths without network access or secrets
+- Pilot playbook
+  - generates a resettable local pilot workspace through `scripts/pilot_playbook_smoke.py`
+  - exercises webhook trigger, manual gate resume, HTTP connector execution, credential handles, audit, snapshot, and LiteGraph overlay artifacts
+  - documents the supported local pilot boundary in `docs/pilot-playbook.md`
 - Packaging and installability
   - verifies package metadata and empty runtime dependency policy through `tests/test_packaging.py`
   - verifies editable install and the installed `skill2workflow` console script through `scripts/package_smoke.py`
