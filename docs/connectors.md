@@ -46,9 +46,54 @@ Supported request metadata:
 | `url` | Required `http://` or `https://` URL. Other schemes fail before a network call. |
 | `headers` | Optional object. Keys and values are stringified. |
 | `body` | Optional JSON-serializable value. When present, it is encoded as UTF-8 JSON. |
+| `input_mapping` | Optional body-only mapping from durable trigger input into request body fields. |
 | `timeout_ms` | Optional positive millisecond timeout. Missing or invalid values default to 5000 ms. |
 
 If `body` is present and no case-insensitive `Content-Type` header is supplied, the connector adds `Content-Type: application/json`.
+
+### HTTP Input Mapping
+
+The built-in HTTP connector can copy non-secret values from durable run context into request body fields at execution time:
+
+```json
+{
+  "connector": {
+    "id": "http",
+    "kind": "http",
+    "request": {
+      "method": "POST",
+      "url": "http://127.0.0.1:8080/example",
+      "body": {
+        "source": "skill2workflow"
+      },
+      "input_mapping": [
+        {
+          "from": "/input/customer_id",
+          "to": "/body/customer_id",
+          "required": true
+        }
+      ]
+    }
+  }
+}
+```
+
+Supported mapping fields:
+
+| Field | Behavior |
+| --- | --- |
+| `from` | Required JSON pointer under `/input/...`, resolved against `run_state.context.input`. |
+| `to` | Required JSON pointer under `/body/...`, applied to a runtime copy of `connector.request.body`. |
+| `required` | Optional boolean. Defaults to `true`; when `false`, missing input leaves the static body unchanged. |
+
+Input mapping never mutates the published Workflow DSL artifact. It applies only to the outbound request copy immediately before HTTP execution. Mapped values are not written to audit events; connector audit metadata may include compact mapping status and input keys only.
+
+Current input mapping limits:
+
+- only HTTP connector request body targets are supported
+- no header, URL, path, query string, credential, environment, or file mapping
+- no arbitrary string templates, expression language, or script evaluation
+- trigger input must remain non-secret business metadata
 
 HTTP connector bindings may also reference local credential handles:
 

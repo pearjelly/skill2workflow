@@ -205,7 +205,11 @@ class LocalExecutor:
                 },
             )
             try:
-                connector_result = execute_connector(node, credential_provider=self.credential_provider)
+                connector_result = execute_connector(
+                    node,
+                    credential_provider=self.credential_provider,
+                    context=state.get("context", {}),
+                )
             except ConnectorExecutionError as error:
                 connector_result = {
                     "status": "failed",
@@ -256,6 +260,9 @@ class LocalExecutor:
             "max_attempts": max_attempts,
             "timestamp": _now(),
         }
+        mapping_summary = connector_result.get("input_mapping")
+        if isinstance(mapping_summary, dict) and mapping_summary:
+            node_result["input_mapping"] = mapping_summary
         if last_error:
             node_result["last_error"] = last_error
         if connector_result.get("error"):
@@ -273,6 +280,7 @@ class LocalExecutor:
                     "connector_status": "completed",
                     "attempt": attempts,
                     "max_attempts": max_attempts,
+                    **_input_mapping_event_fields(mapping_summary),
                 },
             )
             if recovered:
@@ -289,7 +297,17 @@ class LocalExecutor:
             self._event(state, "node_completed", current_id)
             next_node = node.get("on_success")
         else:
-            self._event(state, "node_failed", current_id, {"attempt": attempts, "max_attempts": max_attempts, "error": last_error})
+            self._event(
+                state,
+                "node_failed",
+                current_id,
+                {
+                    "attempt": attempts,
+                    "max_attempts": max_attempts,
+                    "error": last_error,
+                    **_input_mapping_event_fields(mapping_summary),
+                },
+            )
             next_node = node.get("on_failure")
 
         if not isinstance(next_node, str) or next_node not in node_map:
@@ -348,6 +366,16 @@ def _non_negative_int(value: object) -> int:
     if isinstance(value, int) and value > 0:
         return value
     return 0
+
+
+def _input_mapping_event_fields(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    fields = {"input_mapping_status": str(summary.get("status", ""))}
+    keys = summary.get("input_keys", [])
+    if isinstance(keys, list):
+        fields["input_mapping_keys"] = [str(key) for key in keys]
+    return fields
 
 
 def _summarize_run(state: RunState) -> RunState:

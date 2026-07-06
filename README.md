@@ -93,6 +93,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Run published workflow versions and write audit events
 - Trigger published workflow versions through a compact local API envelope
 - Persist trigger input values in durable run context without logging full input values to audit by default
+- Map non-secret trigger input fields into HTTP connector request bodies through `connector.request.input_mapping`
 - Trigger published workflow versions from local HTTP webhook POST requests
 - Trigger published workflow versions from deterministic one-shot local schedules
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
@@ -504,8 +505,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Run Overlay In Visual Editor
 - Pilot Playbook And Example
 - Scheduled Trigger Boundary
+- Trigger Input Mapping
 
-Next priority is trigger input mapping.
+Next priority is the connector extension contract for future product-specific connectors.
 
 See:
 

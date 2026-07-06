@@ -379,6 +379,69 @@ def _validate_connector_binding(
                 ["nodes", index, "connector", "id"],
             )
         )
+    if connector.get("id") == "http":
+        _validate_http_connector_request(node, index, connector, errors)
+
+
+def _validate_http_connector_request(
+    node: Dict[str, object],
+    index: int,
+    connector: Dict[str, object],
+    errors: List[ValidationError],
+) -> None:
+    request = connector.get("request")
+    if not isinstance(request, dict):
+        return
+    if "input_mapping" not in request:
+        return
+    input_mapping = request.get("input_mapping")
+    path = ["nodes", index, "connector", "request", "input_mapping"]
+    if not isinstance(input_mapping, list):
+        errors.append(
+            _validation_error(
+                "input_mapping_invalid",
+                f"{node.get('id')} connector.request.input_mapping must be a list",
+                path,
+            )
+        )
+        return
+    for mapping_index, mapping in enumerate(input_mapping):
+        mapping_path = path + [mapping_index]
+        if not isinstance(mapping, dict):
+            errors.append(
+                _validation_error(
+                    "input_mapping_invalid",
+                    f"{node.get('id')} connector.request.input_mapping[{mapping_index}] must be an object",
+                    mapping_path,
+                )
+            )
+            continue
+        source = mapping.get("from")
+        target = mapping.get("to")
+        if not isinstance(source, str) or source == "/input/" or not source.startswith("/input/"):
+            errors.append(
+                _validation_error(
+                    "input_mapping_source_invalid",
+                    f"{node.get('id')} connector.request.input_mapping[{mapping_index}].from must start with /input/",
+                    mapping_path + ["from"],
+                )
+            )
+        if not isinstance(target, str) or target == "/body/" or not target.startswith("/body/"):
+            errors.append(
+                _validation_error(
+                    "input_mapping_target_invalid",
+                    f"{node.get('id')} connector.request.input_mapping[{mapping_index}].to must start with /body/",
+                    mapping_path + ["to"],
+                )
+            )
+        if "required" in mapping and not isinstance(mapping.get("required"), bool):
+            errors.append(
+                _validation_error(
+                    "input_mapping_required_invalid",
+                    f"{node.get('id')} connector.request.input_mapping[{mapping_index}].required must be a boolean",
+                    mapping_path + ["required"],
+                )
+            )
 
 
 def _validation_error(code: str, message: str, path: List[object]) -> ValidationError:

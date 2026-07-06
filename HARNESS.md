@@ -248,6 +248,7 @@ Implemented:
   - gives compiled `tool_call` nodes a default HTTP connector binding
   - executes HTTP requests with the Python standard library
   - resolves local credential handles for HTTP connector request headers through `--credential-file`
+  - maps non-secret trigger input into HTTP request body fields through `connector.request.input_mapping`
   - covers HTTP connector success, HTTP error, invalid request metadata, JSON body, headers, and timeout behavior with deterministic local tests
   - documents retry, timeout, and credential boundaries in `docs/connectors.md`
 - Credential boundary and secret hygiene
@@ -262,6 +263,7 @@ Implemented:
   - records trigger id, source, idempotency key, and input keys in compact responses and audit events
   - persists trigger input values under `run_state.context.input`
   - exposes compact trigger metadata under `run_state.context.trigger`
+  - shares one mapping behavior across CLI, webhook, and scheduled-trigger runs
 - Runtime policy and recovery
   - documents retry and recovery semantics in `docs/runtime-policy.md`
   - treats `retry.max_attempts` as retries after the first connector attempt
@@ -279,6 +281,6 @@ Implemented:
 Not implemented yet:
 
 - Production-grade enterprise control plane UI
-- Input templating, connector request interpolation, and schema-based input mapping
+- Header/URL connector mapping, arbitrary input templating, expression engines, and schema-driven input mapping beyond the explicit body-only contract
 - Hosted credential stores, credential encryption, IAM, and runtime redaction
 - GitHub release automation

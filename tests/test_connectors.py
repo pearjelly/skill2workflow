@@ -38,6 +38,86 @@ class ConnectorTests(TestCase):
         self.assertEqual(request["headers"]["X-Attempt"], "3")
         self.assertEqual(request["headers"]["Content-Type"], "application/json")
 
+    def test_http_connector_maps_context_input_into_body_without_mutating_binding(self):
+        server = _ConnectorTestServer()
+        node = _http_node(
+            server.url("/success"),
+            method="POST",
+            body={"source": "static"},
+            input_mapping=[
+                {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+                {"from": "/input/account/tier", "to": "/body/account/tier", "required": True},
+            ],
+        )
+
+        try:
+            result = execute_connector(
+                node,
+                context={
+                    "input": {
+                        "customer_id": "customer_123",
+                        "account": {"tier": "gold"},
+                    }
+                },
+            )
+        finally:
+            server.close()
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(
+            server.requests[0]["body"],
+            {
+                "source": "static",
+                "customer_id": "customer_123",
+                "account": {"tier": "gold"},
+            },
+        )
+        self.assertEqual(result["input_mapping"], {"status": "applied", "input_keys": ["account", "customer_id"]})
+        self.assertEqual(node["connector"]["request"]["body"], {"source": "static"})
+
+    def test_http_connector_missing_required_input_mapping_fails_before_network_call(self):
+        server = _ConnectorTestServer()
+
+        try:
+            with self.assertRaisesRegex(ConnectorExecutionError, "required input mapping value missing: /input/customer_id"):
+                execute_connector(
+                    _http_node(
+                        server.url("/success"),
+                        method="POST",
+                        body={"source": "static"},
+                        input_mapping=[
+                            {"from": "/input/customer_id", "to": "/body/customer_id", "required": True}
+                        ],
+                    ),
+                    context={"input": {}},
+                )
+        finally:
+            server.close()
+
+        self.assertEqual(server.requests, [])
+
+    def test_http_connector_optional_missing_input_mapping_keeps_static_body(self):
+        server = _ConnectorTestServer()
+
+        try:
+            result = execute_connector(
+                _http_node(
+                    server.url("/success"),
+                    method="POST",
+                    body={"source": "static"},
+                    input_mapping=[
+                        {"from": "/input/customer_id", "to": "/body/customer_id", "required": False}
+                    ],
+                ),
+                context={"input": {}},
+            )
+        finally:
+            server.close()
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["input_mapping"], {"status": "skipped", "input_keys": []})
+        self.assertEqual(server.requests[0]["body"], {"source": "static"})
+
     def test_http_connector_returns_failed_result_for_http_error_response(self):
         server = _ConnectorTestServer()
 
@@ -116,7 +196,7 @@ class ConnectorTests(TestCase):
         self.assertEqual(_timeout_seconds("2000"), 5.0)
 
 
-def _http_node(url, method="GET", headers=None, body=None, timeout_ms=500):
+def _http_node(url, method="GET", headers=None, body=None, timeout_ms=500, input_mapping=None):
     request = {
         "method": method,
         "url": url,
@@ -125,6 +205,8 @@ def _http_node(url, method="GET", headers=None, body=None, timeout_ms=500):
     }
     if body is not None:
         request["body"] = body
+    if input_mapping is not None:
+        request["input_mapping"] = input_mapping
     return {
         "id": "call_api",
         "type": "tool_call",

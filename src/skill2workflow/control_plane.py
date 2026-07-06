@@ -267,6 +267,8 @@ class LocalControlPlane:
                 "next_attempt",
                 "max_attempts",
                 "error",
+                "input_mapping_status",
+                "input_mapping_keys",
             ):
                 if key in event:
                     audit_event[key] = event[key]

@@ -11,7 +11,7 @@ The example pack shows how standard Agent `SKILL.md` files become controlled Wor
 | Customer service escalation | `examples/skills/customer-service-escalation/SKILL.md` | `examples/workflows/customer-service-escalation.workflow.json` | `examples/workflows/customer-service-escalation.litegraph.json` | SLA check, lead approval, handoff audit |
 | Risk review | `examples/skills/risk-review/SKILL.md` | `examples/workflows/risk-review.workflow.json` | `examples/workflows/risk-review.litegraph.json` | Policy check, analyst approval, disposition audit |
 | Operations analysis | `examples/skills/operations-analysis/SKILL.md` | `examples/workflows/operations-analysis.workflow.json` | `examples/workflows/operations-analysis.litegraph.json` | Metrics query, threshold check, owner confirmation |
-| HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request fixture |
+| HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request and body input-mapping fixture |
 
 ## Inspecting Examples
 
@@ -62,6 +62,10 @@ This example models a risk decision where the AI can collect and summarize evide
 ### Operations Analysis
 
 This example starts with a metrics query command, checks threshold breaches, drafts an operating narrative, waits for business owner confirmation, and verifies that every action has an owner and due date.
+
+### HTTP Connector
+
+This example demonstrates the built-in HTTP connector request metadata, including a body-only `input_mapping` that copies non-secret trigger input into the outbound request body at runtime.
 
 ## Fixture Synchronization
 

@@ -199,10 +199,12 @@ class ControlPlaneTests(TestCase):
             connectors = LocalControlPlane(Path(tmp)).list_connectors()
 
         connector_ids = {connector["id"] for connector in connectors}
+        http_connector = next(connector for connector in connectors if connector["id"] == "http")
         self.assertIn("manual", connector_ids)
         self.assertIn("http", connector_ids)
         self.assertTrue(all(connector["status"] == "active" for connector in connectors))
         self.assertTrue(all("node_types" in connector for connector in connectors))
+        self.assertIn("input_mapping", http_connector["config_schema"]["properties"]["request"]["properties"])
 
     def test_published_connector_run_records_connector_audit_events(self):
         server = _ConnectorTestServer()
@@ -253,6 +255,36 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(server.requests[0]["headers"]["Authorization"], "Bearer secret-token")
         self.assertNotIn("secret-token", json.dumps(run_state["node_results"]))
         self.assertNotIn("secret-token", json.dumps(audit_events))
+
+    def test_triggered_connector_mapping_promotes_compact_audit_metadata(self):
+        server = _ConnectorTestServer()
+
+        try:
+            with TemporaryDirectory() as tmp:
+                control = LocalControlPlane(Path(tmp), storage="sqlite")
+                control.publish_workflow(_mapped_connector_workflow("12.0.0", server.url))
+
+                result = control.trigger_workflow(
+                    {
+                        "workflow_id": "workflow_connector",
+                        "version": "12.0.0",
+                        "source": "local-test",
+                        "input": {"customer_id": "customer_123"},
+                    }
+                )
+                audit_events = control.list_audit_events(run_id=result["run_id"])
+                completed_events = control.list_audit_events(
+                    run_id=result["run_id"],
+                    event_type="connector_completed",
+                )
+        finally:
+            server.close()
+
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(server.requests[0]["body"], {"approved": True, "customer_id": "customer_123"})
+        self.assertEqual(completed_events[0]["input_mapping_status"], "applied")
+        self.assertEqual(completed_events[0]["input_mapping_keys"], ["customer_id"])
+        self.assertNotIn("customer_123", json.dumps(audit_events))
 
     def test_published_retry_policy_promotes_policy_events_to_audit(self):
         server = _FlakyConnectorTestServer()
@@ -383,6 +415,14 @@ def _credential_connector_workflow(version: str, url: str):
             "handle": "demo_api_token",
             "prefix": "Bearer ",
         }
+    ]
+    return workflow
+
+
+def _mapped_connector_workflow(version: str, url: str):
+    workflow = _connector_workflow(version, url)
+    workflow["nodes"][1]["connector"]["request"]["input_mapping"] = [
+        {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
     ]
     return workflow
 
