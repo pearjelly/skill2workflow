@@ -95,6 +95,72 @@ Current input mapping limits:
 - no arbitrary string templates, expression language, or script evaluation
 - trigger input must remain non-secret business metadata
 
+## Connector Extension Contract
+
+Loop 31 defines the manifest and execution boundary future connector packages must follow. It does not add a dynamic plugin loader or product-specific connector package. The built-in `manual` and `http` connectors are the reference implementations for this contract.
+
+Connector manifests use this minimum shape:
+
+```json
+{
+  "manifest_version": "skill2workflow-connector-0.1.0",
+  "id": "http",
+  "name": "HTTP Connector",
+  "kind": "http",
+  "status": "active",
+  "node_types": ["tool_call"],
+  "description": "Built-in connector for minimal HTTP requests from tool-call nodes.",
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "request": {"type": "object"}
+    }
+  },
+  "execution_contract": {
+    "contract_version": "skill2workflow-connector-execution-0.1.0",
+    "mode": "built_in",
+    "entrypoint": "skill2workflow.connectors:execute_connector",
+    "receives": ["node.connector", "run_context", "credential_provider"],
+    "returns": ["status", "connector", "output", "error", "input_mapping"]
+  },
+  "credential_contract": {
+    "supports_handles": true,
+    "targets": ["header"],
+    "resolved_value_policy": "never_in_workflow_run_state_or_audit"
+  },
+  "audit_contract": {
+    "value_policy": "compact_no_payload_values",
+    "events": ["connector_started", "connector_completed", "connector_failed"]
+  }
+}
+```
+
+Manifest fields:
+
+| Field | Behavior |
+| --- | --- |
+| `manifest_version` | Required. Current value is `skill2workflow-connector-0.1.0`. |
+| `id` | Required stable connector id used by Workflow DSL `connector.id`. |
+| `kind` | Required connector kind. Built-ins use `manual` and `http`. |
+| `status` | Required registry status such as `active`. |
+| `node_types` | Required non-empty list of supported Workflow DSL node types. |
+| `config_schema` | Required object describing connector configuration metadata. It is descriptive in this local runtime; Workflow DSL validation remains authoritative. |
+| `execution_contract` | Required object describing how the runtime calls the connector and what normalized result shape it returns. |
+| `credential_contract` | Required object describing handle support and resolved-value policy. |
+| `audit_contract` | Required object describing compact audit event behavior. |
+
+Execution handoff:
+
+- The Workflow DSL node remains the execution source of truth.
+- Connector code receives the node connector binding, optional durable run context, and an optional credential provider.
+- Connector code must return a normalized result with `status`, `connector`, `output`, and optional `error` fields.
+- Connector code must not mutate the published Workflow DSL artifact.
+- Connector code must not write resolved credentials, raw authorization headers, raw webhook bodies, or mapped business payload values into audit events.
+
+Future external connectors should use `execution_contract.mode: "external"` and provide their own package entrypoint, but this repository does not load external connector packages yet. Until a loader exists, external connector manifests are documentation and compatibility artifacts only.
+
+The Python helper `validate_connector_manifest(manifest)` checks the minimum manifest shape without importing or executing connector code. Use it for contract tests when connector registry metadata changes.
+
 HTTP connector bindings may also reference local credential handles:
 
 ```json

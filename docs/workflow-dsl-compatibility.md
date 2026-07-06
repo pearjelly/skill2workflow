@@ -64,7 +64,7 @@ Visual write-back is allowlisted. The editor may update:
 - Human approval prompt
 - Tool-call instruction
 - Retry max attempts
-- Built-in HTTP connector request method, URL, headers, body, and timeout
+- Built-in HTTP connector request method, URL, headers, body, body-only input mapping, and timeout
 
 The editor must not change:
 
@@ -85,6 +85,8 @@ Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on `tool
 Workflow DSL examples and fixtures must not store secrets. They may reference credential handles under connector metadata, but resolved credential values must stay in a local provider boundary outside Workflow DSL, LiteGraph fixtures, trigger input, run state, and audit events. Hosted credential storage, secret redaction, IAM, connector marketplaces, and product-specific SaaS connectors are outside the `0.1.x` built-in connector boundary.
 
 HTTP `connector.request.input_mapping` is a constrained runtime-copy mapping contract. It reads only `/input/...` paths from durable run context and writes only `/body/...` paths into the outbound HTTP request body copy. Header mapping, URL interpolation, expression syntax, credential mapping, and product-specific connector packages are outside the current compatibility boundary.
+
+Connector manifests use the minimum contract documented in `docs/connectors.md`. Workflow DSL `connector.id` and `connector.kind` identify the connector a runtime should use, but Workflow DSL remains authoritative over node identity, transitions, guards, policies, and request metadata. The current local runtime exposes built-in manifests and does not dynamically load external connector packages.
 
 Committed Workflow DSL and LiteGraph example fixtures are checked by `python3 scripts/secret_hygiene.py examples/workflows` for obvious secret-like values. See `docs/credential-boundary.md` for allowed placeholder patterns and the local credential-provider boundary.
 

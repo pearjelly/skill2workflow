@@ -4,11 +4,49 @@ import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import TestCase
 
-from skill2workflow.connectors import ConnectorExecutionError, _timeout_seconds, execute_connector
+from skill2workflow.connectors import (
+    CONNECTOR_MANIFEST_VERSION,
+    ConnectorExecutionError,
+    _timeout_seconds,
+    default_connectors,
+    execute_connector,
+    validate_connector_manifest,
+)
 from skill2workflow.credentials import StaticCredentialProvider
 
 
 class ConnectorTests(TestCase):
+    def test_default_connector_manifests_follow_extension_contract(self):
+        for manifest in default_connectors():
+            with self.subTest(connector=manifest["id"]):
+                self.assertEqual(validate_connector_manifest(manifest), [])
+                self.assertEqual(manifest["manifest_version"], CONNECTOR_MANIFEST_VERSION)
+                self.assertIn("execution_contract", manifest)
+                self.assertIn("credential_contract", manifest)
+                self.assertIn("audit_contract", manifest)
+
+    def test_validate_connector_manifest_reports_contract_gaps(self):
+        errors = validate_connector_manifest(
+            {
+                "id": "",
+                "kind": "http",
+                "status": "active",
+                "node_types": "tool_call",
+                "config_schema": [],
+                "execution_contract": {"mode": "dynamic"},
+                "credential_contract": {"supports_handles": "yes"},
+                "audit_contract": {"value_policy": ""},
+            }
+        )
+
+        self.assertIn("manifest_version must be skill2workflow-connector-0.1.0", errors)
+        self.assertIn("id is required", errors)
+        self.assertIn("node_types must be a non-empty list", errors)
+        self.assertIn("config_schema must be an object", errors)
+        self.assertIn("execution_contract.mode must be built_in or external", errors)
+        self.assertIn("credential_contract.supports_handles must be a boolean", errors)
+        self.assertIn("audit_contract.value_policy is required", errors)
+
     def test_http_connector_sends_method_headers_json_body_and_normalizes_response(self):
         server = _ConnectorTestServer()
 

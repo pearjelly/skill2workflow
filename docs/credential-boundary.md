@@ -91,6 +91,19 @@ Workflow DSL connector bindings may reference handles:
 
 Only the handle belongs in Workflow DSL. The resolved value is used for the outbound connector request and is not written to node results, run context, or audit events by the built-in runtime.
 
+## Connector Extension Requirements
+
+Connector extensions must preserve the same credential boundary as the built-in HTTP connector:
+
+- Workflow DSL may store credential handles, never resolved credential values.
+- Trigger input and input mapping payloads must not carry credentials, tokens, private keys, cookies, or production authorization headers.
+- Connector manifests must describe handle support under `credential_contract`.
+- Resolved credential values may be used only inside connector execution.
+- Connector results, run state, snapshots, LiteGraph overlays, and audit events must not include resolved credential values.
+- Audit metadata should expose compact connector status, attempt, policy, and key names only.
+
+Future product-specific connectors must use local handles first. Hosted secret stores, OAuth flows, IAM, and redaction policies require separate design work before they can become runtime features.
+
 ## Runtime Boundary
 
 The current local runtime does not implement:
