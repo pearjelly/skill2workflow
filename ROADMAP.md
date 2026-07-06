@@ -140,6 +140,42 @@ Loop 30 target contract baseline:
 - Audit policy: audit events expose mapping status and input keys only, not mapped values.
 - Compatibility policy: workflows without mappings keep the existing static connector request behavior.
 
+Loop 30 contract sketch:
+
+```json
+{
+  "connector": {
+    "id": "http",
+    "kind": "http",
+    "request": {
+      "method": "POST",
+      "url": "http://127.0.0.1:8080/example",
+      "body": {
+        "source": "skill2workflow"
+      },
+      "input_mapping": [
+        {
+          "from": "/input/customer_id",
+          "to": "/body/customer_id",
+          "required": true
+        }
+      ]
+    }
+  }
+}
+```
+
+The mapping is part of connector request metadata, not a new workflow node type. It is applied to a runtime copy of the request before HTTP execution and never mutates the published Workflow DSL artifact.
+
+Loop 30 first implementation cut:
+
+- Add a small mapping normalizer and JSON pointer helper with no third-party dependency.
+- Validate `connector.request.input_mapping` as a list of objects with `from`, `to`, and optional `required`.
+- Support `from` paths under `/input/...` and `to` paths under `/body/...` only.
+- Apply mappings to a deep copy of `connector.request.body` before `_execute_http_connector` serializes the request.
+- Cover one successful CLI-triggered HTTP connector run, one missing required value failure, and one unchanged static request run.
+- Defer header mapping, URL/path mapping, visual editor forms, expression syntax, and product-specific connector examples.
+
 Loop 30 implementation slices:
 
 1. Mapping contract
