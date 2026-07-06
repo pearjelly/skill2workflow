@@ -2,14 +2,15 @@
   "schema_version": "skill2workflow-control-snapshot-0.1.0",
   "summary": {
     "workflow_count": 3,
-    "run_count": 1,
-    "audit_event_count": 7,
+    "run_count": 2,
+    "audit_event_count": 17,
     "connector_count": 2,
     "status_counts": {
       "published": 3
     },
     "run_status_counts": {
-      "completed": 1
+      "completed": 1,
+      "failed": 1
     }
   },
   "workflows": [
@@ -20,16 +21,16 @@
       "status": "published",
       "checksum": "bf8dcbb60b02c56972fbb603e37e25ba9aaca2e3b40bdf9fc32646157ce298de",
       "artifact": "workflows/workflow_approval_flow/0.1.0.json",
-      "published_at": "2026-07-02T10:08:12.180330+00:00"
+      "published_at": "2026-07-06T01:12:11.941840+00:00"
     },
     {
       "workflow_id": "workflow_approval_flow",
       "name": "approval-flow",
       "version": "0.2.0",
       "status": "published",
-      "checksum": "05b4f110466c72269068ab6d8a46eb0d88b6b8ed417e7acef6b463f36eba1338",
+      "checksum": "b8dd3920c1ce8e3d90144dcb73a7ca0adb82513c63a58b4cf7987115f9f5ee39",
       "artifact": "workflows/workflow_approval_flow/0.2.0.json",
-      "published_at": "2026-07-02T10:08:12.655620+00:00"
+      "published_at": "2026-07-06T01:12:11.947707+00:00"
     },
     {
       "workflow_id": "workflow_http_connector",
@@ -38,18 +39,237 @@
       "status": "published",
       "checksum": "6cb33e6af2a56a4d9c9257d288c52e82f5b57034d84fb85d421e11e181d4126c",
       "artifact": "workflows/workflow_http_connector/0.1.0.json",
-      "published_at": "2026-07-02T10:08:14.770977+00:00"
+      "published_at": "2026-07-06T01:12:11.951871+00:00"
     }
   ],
   "runs": [
     {
-      "run_id": "run_3ae543f4f9f9",
+      "run_id": "run_e87061e3fda2",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0",
+      "status": "failed",
+      "current_node": "failure",
+      "event_count": 12,
+      "node_result_count": 4,
+      "node_overlays": {
+        "start": {
+          "node_id": "start",
+          "status": "completed",
+          "current": false,
+          "event_count": 2,
+          "latest_event_type": "node_completed",
+          "result_status": "completed",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "review": {
+          "node_id": "review",
+          "status": "approved",
+          "current": false,
+          "event_count": 2,
+          "latest_event_type": "human_gate_resumed",
+          "result_status": "approved",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "manual",
+          "connector_kind": "manual",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "call_api": {
+          "node_id": "call_api",
+          "status": "failed",
+          "current": false,
+          "event_count": 7,
+          "latest_event_type": "node_failed",
+          "result_status": "failed",
+          "attempts": 2,
+          "max_attempts": 1,
+          "retry_count": 1,
+          "recovered": false,
+          "connector_id": "http",
+          "connector_kind": "http",
+          "connector_status": "failed",
+          "error": "[Errno 61] Connection refused",
+          "audit_event_count": 6
+        },
+        "failure": {
+          "node_id": "failure",
+          "status": "failed",
+          "current": true,
+          "event_count": 1,
+          "latest_event_type": "run_failed",
+          "result_status": "failed",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "end": {
+          "node_id": "end",
+          "status": "not_started",
+          "current": false,
+          "event_count": 0,
+          "latest_event_type": "",
+          "result_status": "",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        }
+      },
+      "created_at": "",
+      "updated_at": ""
+    },
+    {
+      "run_id": "run_f1f85a54c2b8",
       "workflow_id": "workflow_approval_flow",
       "workflow_version": "0.2.0",
       "status": "completed",
       "current_node": "end",
       "event_count": 11,
       "node_result_count": 6,
+      "node_overlays": {
+        "start": {
+          "node_id": "start",
+          "status": "completed",
+          "current": false,
+          "event_count": 2,
+          "latest_event_type": "node_completed",
+          "result_status": "completed",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "node_001_explore_project_context": {
+          "node_id": "node_001_explore_project_context",
+          "status": "completed",
+          "current": false,
+          "event_count": 2,
+          "latest_event_type": "node_completed",
+          "result_status": "completed",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "node_002_draft_workflow": {
+          "node_id": "node_002_draft_workflow",
+          "status": "completed",
+          "current": false,
+          "event_count": 2,
+          "latest_event_type": "node_completed",
+          "result_status": "completed",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "node_003_ask_user_for_approval": {
+          "node_id": "node_003_ask_user_for_approval",
+          "status": "approved",
+          "current": false,
+          "event_count": 2,
+          "latest_event_type": "human_gate_resumed",
+          "result_status": "approved",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "manual",
+          "connector_kind": "manual",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "node_004_publish_workflow": {
+          "node_id": "node_004_publish_workflow",
+          "status": "completed",
+          "current": false,
+          "event_count": 2,
+          "latest_event_type": "node_completed",
+          "result_status": "completed",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "failure": {
+          "node_id": "failure",
+          "status": "not_started",
+          "current": false,
+          "event_count": 0,
+          "latest_event_type": "",
+          "result_status": "",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        },
+        "end": {
+          "node_id": "end",
+          "status": "completed",
+          "current": true,
+          "event_count": 1,
+          "latest_event_type": "run_completed",
+          "result_status": "completed",
+          "attempts": 0,
+          "max_attempts": 0,
+          "retry_count": 0,
+          "recovered": false,
+          "connector_id": "",
+          "connector_kind": "",
+          "connector_status": "",
+          "error": "",
+          "audit_event_count": 0
+        }
+      },
       "created_at": "",
       "updated_at": ""
     }
@@ -57,51 +277,157 @@
   "audit_events": [
     {
       "checksum": "bf8dcbb60b02c56972fbb603e37e25ba9aaca2e3b40bdf9fc32646157ce298de",
-      "timestamp": "2026-07-02T10:08:12.180330+00:00",
+      "timestamp": "2026-07-06T01:12:11.941840+00:00",
       "type": "workflow_published",
       "workflow_id": "workflow_approval_flow",
       "workflow_version": "0.1.0"
     },
     {
-      "checksum": "05b4f110466c72269068ab6d8a46eb0d88b6b8ed417e7acef6b463f36eba1338",
-      "timestamp": "2026-07-02T10:08:12.655620+00:00",
+      "checksum": "b8dd3920c1ce8e3d90144dcb73a7ca0adb82513c63a58b4cf7987115f9f5ee39",
+      "timestamp": "2026-07-06T01:12:11.947707+00:00",
       "type": "workflow_published",
       "workflow_id": "workflow_approval_flow",
       "workflow_version": "0.2.0"
     },
     {
-      "run_id": "run_3ae543f4f9f9",
-      "timestamp": "2026-07-02T10:08:13.084892+00:00",
+      "checksum": "6cb33e6af2a56a4d9c9257d288c52e82f5b57034d84fb85d421e11e181d4126c",
+      "timestamp": "2026-07-06T01:12:11.951871+00:00",
+      "type": "workflow_published",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "run_id": "run_f1f85a54c2b8",
+      "timestamp": "2026-07-06T01:12:11.953166+00:00",
       "type": "run_started",
       "workflow_id": "workflow_approval_flow",
       "workflow_version": "0.2.0"
     },
     {
-      "run_id": "run_3ae543f4f9f9",
-      "timestamp": "2026-07-02T10:08:13.090656+00:00",
+      "run_id": "run_f1f85a54c2b8",
+      "timestamp": "2026-07-06T01:12:11.962502+00:00",
       "type": "run_waiting",
       "workflow_id": "workflow_approval_flow",
       "workflow_version": "0.2.0"
     },
     {
       "approved": true,
-      "run_id": "run_3ae543f4f9f9",
-      "timestamp": "2026-07-02T10:08:14.237865+00:00",
+      "run_id": "run_f1f85a54c2b8",
+      "timestamp": "2026-07-06T01:12:11.970954+00:00",
       "type": "run_resumed",
       "workflow_id": "workflow_approval_flow",
       "workflow_version": "0.2.0"
     },
     {
-      "run_id": "run_3ae543f4f9f9",
-      "timestamp": "2026-07-02T10:08:14.238101+00:00",
+      "run_id": "run_f1f85a54c2b8",
+      "timestamp": "2026-07-06T01:12:11.971359+00:00",
       "type": "run_completed",
       "workflow_id": "workflow_approval_flow",
       "workflow_version": "0.2.0"
     },
     {
-      "checksum": "6cb33e6af2a56a4d9c9257d288c52e82f5b57034d84fb85d421e11e181d4126c",
-      "timestamp": "2026-07-02T10:08:14.770977+00:00",
-      "type": "workflow_published",
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:11.971992+00:00",
+      "type": "run_started",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:11.976583+00:00",
+      "type": "run_waiting",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "approved": true,
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:12.007429+00:00",
+      "type": "run_resumed",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "attempt": 1,
+      "connector_id": "http",
+      "connector_kind": "http",
+      "connector_status": "running",
+      "max_attempts": 1,
+      "node_id": "call_api",
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:11.979034+00:00",
+      "type": "connector_started",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "attempt": 1,
+      "connector_id": "http",
+      "connector_kind": "http",
+      "connector_status": "failed",
+      "error": "[Errno 61] Connection refused",
+      "max_attempts": 1,
+      "node_id": "call_api",
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:12.003174+00:00",
+      "type": "connector_failed",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "attempt": 1,
+      "error": "[Errno 61] Connection refused",
+      "max_attempts": 1,
+      "next_attempt": 2,
+      "node_id": "call_api",
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:12.003203+00:00",
+      "type": "node_retrying",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "attempt": 2,
+      "connector_id": "http",
+      "connector_kind": "http",
+      "connector_status": "running",
+      "max_attempts": 1,
+      "node_id": "call_api",
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:12.003216+00:00",
+      "type": "connector_started",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "attempt": 2,
+      "connector_id": "http",
+      "connector_kind": "http",
+      "connector_status": "failed",
+      "error": "[Errno 61] Connection refused",
+      "max_attempts": 1,
+      "node_id": "call_api",
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:12.003908+00:00",
+      "type": "connector_failed",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "attempt": 2,
+      "error": "[Errno 61] Connection refused",
+      "max_attempts": 1,
+      "node_id": "call_api",
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:12.003937+00:00",
+      "type": "node_failed",
+      "workflow_id": "workflow_http_connector",
+      "workflow_version": "0.1.0"
+    },
+    {
+      "run_id": "run_e87061e3fda2",
+      "timestamp": "2026-07-06T01:12:12.010026+00:00",
+      "type": "run_failed",
       "workflow_id": "workflow_http_connector",
       "workflow_version": "0.1.0"
     }
@@ -175,50 +501,109 @@
   "operator_insights": {
     "attention_counts": {
       "waiting_runs": 0,
-      "failed_runs": 0,
-      "connector_failures": 0,
+      "failed_runs": 1,
+      "connector_failures": 2,
       "version_changes": 1
     },
-    "attention_items": [],
+    "attention_items": [
+      {
+        "kind": "failed_run",
+        "severity": "critical",
+        "run_id": "run_e87061e3fda2",
+        "workflow_id": "workflow_http_connector",
+        "workflow_version": "0.1.0",
+        "status": "failed",
+        "current_node": "failure",
+        "message": "workflow_http_connector@0.1.0 is failed"
+      },
+      {
+        "kind": "connector_failure",
+        "severity": "critical",
+        "run_id": "run_e87061e3fda2",
+        "workflow_id": "workflow_http_connector",
+        "workflow_version": "0.1.0",
+        "node_id": "call_api",
+        "connector_id": "http",
+        "connector_kind": "http",
+        "timestamp": "2026-07-06T01:12:12.003174+00:00",
+        "message": "workflow_http_connector@0.1.0 connector http failed"
+      },
+      {
+        "kind": "connector_failure",
+        "severity": "critical",
+        "run_id": "run_e87061e3fda2",
+        "workflow_id": "workflow_http_connector",
+        "workflow_version": "0.1.0",
+        "node_id": "call_api",
+        "connector_id": "http",
+        "connector_kind": "http",
+        "timestamp": "2026-07-06T01:12:12.003908+00:00",
+        "message": "workflow_http_connector@0.1.0 connector http failed"
+      }
+    ],
     "recent_events": [
       {
-        "run_id": "run_3ae543f4f9f9",
-        "timestamp": "2026-07-02T10:08:13.084892+00:00",
-        "type": "run_started",
-        "workflow_id": "workflow_approval_flow",
-        "workflow_version": "0.2.0"
+        "attempt": 1,
+        "error": "[Errno 61] Connection refused",
+        "max_attempts": 1,
+        "next_attempt": 2,
+        "node_id": "call_api",
+        "run_id": "run_e87061e3fda2",
+        "timestamp": "2026-07-06T01:12:12.003203+00:00",
+        "type": "node_retrying",
+        "workflow_id": "workflow_http_connector",
+        "workflow_version": "0.1.0"
       },
       {
-        "run_id": "run_3ae543f4f9f9",
-        "timestamp": "2026-07-02T10:08:13.090656+00:00",
-        "type": "run_waiting",
-        "workflow_id": "workflow_approval_flow",
-        "workflow_version": "0.2.0"
+        "attempt": 2,
+        "connector_id": "http",
+        "connector_kind": "http",
+        "connector_status": "running",
+        "max_attempts": 1,
+        "node_id": "call_api",
+        "run_id": "run_e87061e3fda2",
+        "timestamp": "2026-07-06T01:12:12.003216+00:00",
+        "type": "connector_started",
+        "workflow_id": "workflow_http_connector",
+        "workflow_version": "0.1.0"
       },
       {
-        "approved": true,
-        "run_id": "run_3ae543f4f9f9",
-        "timestamp": "2026-07-02T10:08:14.237865+00:00",
-        "type": "run_resumed",
-        "workflow_id": "workflow_approval_flow",
-        "workflow_version": "0.2.0"
+        "attempt": 2,
+        "connector_id": "http",
+        "connector_kind": "http",
+        "connector_status": "failed",
+        "error": "[Errno 61] Connection refused",
+        "max_attempts": 1,
+        "node_id": "call_api",
+        "run_id": "run_e87061e3fda2",
+        "timestamp": "2026-07-06T01:12:12.003908+00:00",
+        "type": "connector_failed",
+        "workflow_id": "workflow_http_connector",
+        "workflow_version": "0.1.0"
       },
       {
-        "run_id": "run_3ae543f4f9f9",
-        "timestamp": "2026-07-02T10:08:14.238101+00:00",
-        "type": "run_completed",
-        "workflow_id": "workflow_approval_flow",
-        "workflow_version": "0.2.0"
+        "attempt": 2,
+        "error": "[Errno 61] Connection refused",
+        "max_attempts": 1,
+        "node_id": "call_api",
+        "run_id": "run_e87061e3fda2",
+        "timestamp": "2026-07-06T01:12:12.003937+00:00",
+        "type": "node_failed",
+        "workflow_id": "workflow_http_connector",
+        "workflow_version": "0.1.0"
       },
       {
-        "checksum": "6cb33e6af2a56a4d9c9257d288c52e82f5b57034d84fb85d421e11e181d4126c",
-        "timestamp": "2026-07-02T10:08:14.770977+00:00",
-        "type": "workflow_published",
+        "run_id": "run_e87061e3fda2",
+        "timestamp": "2026-07-06T01:12:12.010026+00:00",
+        "type": "run_failed",
         "workflow_id": "workflow_http_connector",
         "workflow_version": "0.1.0"
       }
     ],
-    "connector_event_counts": {},
+    "connector_event_counts": {
+      "connector_failed": 2,
+      "connector_started": 2
+    },
     "version_changes": [
       {
         "kind": "version_change",

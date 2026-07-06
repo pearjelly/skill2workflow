@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from .control_plane import LocalControlPlane
+from .visualizer import run_overlay_for_nodes
 
 
 SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
@@ -16,8 +17,8 @@ def build_control_snapshot(state_dir: Path, storage: str = "json") -> Dict[str, 
     """Build a read-only control-plane snapshot from existing local state."""
     control = LocalControlPlane(Path(state_dir), storage=storage)
     workflows = control.list_workflows()
-    runs = [_run_summary(control, run) for run in control.list_runs()]
     audit_events = control.list_audit_events()
+    runs = [_run_summary(control, run, audit_events) for run in control.list_runs()]
     connectors = control.list_connectors()
     version_comparisons = _version_comparisons(control, workflows)
 
@@ -40,7 +41,11 @@ def build_control_snapshot(state_dir: Path, storage: str = "json") -> Dict[str, 
     }
 
 
-def _run_summary(control: LocalControlPlane, run: Dict[str, object]) -> Dict[str, object]:
+def _run_summary(
+    control: LocalControlPlane,
+    run: Dict[str, object],
+    audit_events: Optional[List[Dict[str, object]]] = None,
+) -> Dict[str, object]:
     run_id = str(run.get("run_id", ""))
     detail = control.get_run(run_id) if run_id else run
     events = run.get("events", [])
@@ -53,6 +58,14 @@ def _run_summary(control: LocalControlPlane, run: Dict[str, object]) -> Dict[str
         node_results = detail.get("node_results", {})
     if not isinstance(node_results, dict):
         node_results = {}
+    workflow = detail.get("workflow", {})
+    nodes = _items(workflow, "nodes") if isinstance(workflow, dict) else []
+    node_ids = [str(node.get("id")) for node in nodes if isinstance(node, dict) and node.get("id")]
+    run_audit_events = [
+        event
+        for event in (audit_events or [])
+        if str(event.get("run_id", "")) == run_id
+    ]
     return {
         "run_id": run_id,
         "workflow_id": run.get("workflow_id", ""),
@@ -61,6 +74,7 @@ def _run_summary(control: LocalControlPlane, run: Dict[str, object]) -> Dict[str
         "current_node": run.get("current_node", ""),
         "event_count": len(events),
         "node_result_count": len(node_results),
+        "node_overlays": run_overlay_for_nodes(node_ids, detail, run_audit_events),
         "created_at": run.get("created_at", ""),
         "updated_at": run.get("updated_at", ""),
     }

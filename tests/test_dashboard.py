@@ -57,6 +57,11 @@ class DashboardTests(TestCase):
             failed_run = control.run_published_workflow("workflow_connector_failure", "1.0.0")
             snapshot = build_control_snapshot(state_dir)
 
+        waiting_summary = next(run for run in snapshot["runs"] if run["run_id"] == waiting_run["run_id"])
+        failed_summary = next(run for run in snapshot["runs"] if run["run_id"] == failed_run["run_id"])
+        waiting_overlay = waiting_summary["node_overlays"]["review"]
+        connector_overlay = failed_summary["node_overlays"]["call_api"]
+
         insights = snapshot["operator_insights"]
         self.assertEqual(insights["attention_counts"]["waiting_runs"], 1)
         self.assertEqual(insights["attention_counts"]["failed_runs"], 1)
@@ -73,6 +78,15 @@ class DashboardTests(TestCase):
         self.assertIn(("connector_failure", failed_run["run_id"]), attention)
         self.assertLessEqual(len(insights["recent_events"]), 5)
         self.assertEqual(insights["recent_events"][-1]["type"], "run_failed")
+        self.assertEqual(waiting_overlay["status"], "waiting")
+        self.assertEqual(waiting_overlay["current"], True)
+        self.assertEqual(waiting_overlay["latest_event_type"], "human_gate_waiting")
+        self.assertEqual(connector_overlay["status"], "failed")
+        self.assertEqual(connector_overlay["connector_id"], "http")
+        self.assertEqual(connector_overlay["connector_status"], "failed")
+        self.assertEqual(connector_overlay["attempts"], 1)
+        self.assertEqual(connector_overlay["audit_event_count"], 3)
+        self.assertNotIn("output", connector_overlay)
 
 
 def _workflow(version: str, node_title: str):

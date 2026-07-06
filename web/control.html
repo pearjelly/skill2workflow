@@ -56,6 +56,7 @@
             <button class="tab is-active" type="button" data-view="operator">Operator</button>
             <button class="tab" type="button" data-view="workflows">Registry</button>
             <button class="tab" type="button" data-view="runs">Runs</button>
+            <button class="tab" type="button" data-view="nodes">Nodes</button>
             <button class="tab" type="button" data-view="audit">Audit</button>
             <button class="tab" type="button" data-view="connectors">Connectors</button>
             <button class="tab" type="button" data-view="versions">Compare</button>
@@ -151,6 +152,21 @@
                 </tr>
               </thead>
               <tbody id="run-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrap" data-panel="nodes" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>Node</th>
+                  <th>Run</th>
+                  <th>Status</th>
+                  <th>Events</th>
+                  <th>Connector</th>
+                </tr>
+              </thead>
+              <tbody id="node-overlay-rows"></tbody>
             </table>
           </div>
 

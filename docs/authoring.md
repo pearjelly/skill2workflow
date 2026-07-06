@@ -29,6 +29,29 @@ Regenerate a LiteGraph fixture from a Workflow DSL file:
 PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-connector.workflow.json -o examples/workflows/http-connector.litegraph.json
 ```
 
+## Run Overlay Inspection
+
+The editor can also inspect read-only execution evidence when a run-state file is supplied:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/approval-flow.workflow.json --run-state /tmp/skill2workflow-state/runs/<run_id>.json -o /tmp/approval-flow-overlay.litegraph.json
+```
+
+Overlay data is attached under `properties.run_overlay` for each LiteGraph node and summarized under `extra.run_overlay`. It is derived from run state and, when available through control snapshots, promoted audit events. It can include status, current-node marker, event count, latest event type, connector id/kind/status, attempts, retry/recovery flags, compact trigger metadata, and audit event counts.
+
+Overlay data is view state only:
+
+- It is not part of Workflow DSL.
+- It is not written back by `write-back`.
+- It must not contain raw connector output, resolved credentials, authorization headers, raw webhook bodies, or full trigger input values.
+
+For control-plane inspection, export a snapshot and open the Nodes tab in `web/control.html`:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
+python3 -m http.server 4173
+```
+
 ## Safe Write-Back
 
 `write-back` preserves topology and execution identity:
@@ -37,6 +60,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-c
 - Edges and transition targets are not changed.
 - Source metadata, guards, policies, and connector identity are not changed.
 - Connector `id` and `kind` are not changed by visual edits.
+- Run overlay fields are ignored.
 
 Allowlisted fields:
 

@@ -27,12 +27,14 @@ LiteGraph visualization, enterprise control plane features, and connector expans
 </p>
 
 The visual editor loads Workflow DSL, renders it as a LiteGraph-compatible graph, and exposes allowlisted edits for node text, retry policy, actions, and HTTP connector request metadata. The graph is a view and editor; Workflow DSL remains the execution truth source.
+When a run-state file is provided, the editor also shows read-only node overlay evidence such as current node, status, connector outcome, attempts, retry/recovery markers, and compact trigger metadata.
 
 ### Local Control Plane And Audit Trail
 
 ![Control-plane screenshot showing workflow registry metrics, audit events, connector count, and snapshot detail](docs/assets/skill2workflow-control-plane.jpg)
 
 The local control-plane inspector reads exported snapshots so operators can inspect published workflow versions, runs, audit events, connectors, and version comparisons without adding a server dependency.
+Snapshot runs include compact per-node overlays, and the inspector's Nodes view lets operators scan run evidence without opening raw JSON.
 
 ### System Design
 
@@ -82,6 +84,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
 - Honor connector-node `retry.max_attempts` and record retry/recovery events
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
+- Derive read-only node-level run overlays from run state and audit evidence
 - Open a static LiteGraph visual editor for graph inspection and parameter edits
 - Write safe LiteGraph title and description edits back to Workflow DSL
 - Write safe action, retry, and HTTP connector request edits back to Workflow DSL
@@ -96,7 +99,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Audit connector execution events through the control plane
 - Audit runtime policy events such as `node_retrying`, `node_recovered`, and `node_failed` through the control plane
 - Export a read-only control-plane snapshot with derived operator insights
-- Inspect operator attention items, recent events, connector events, workflows, runs, audit events, and version deltas in a static local control-plane UI
+- Inspect operator attention items, recent events, connector events, per-node run overlays, workflows, runs, audit events, and version deltas in a static local control-plane UI
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Generate a deterministic first-run demo workspace for contributor onboarding
 - Verify editable install, package metadata, and the installed `skill2workflow` console script
@@ -130,7 +133,7 @@ Then open:
 http://localhost:4173/web/control.html
 ```
 
-Load `/tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json` to inspect the generated operator snapshot. Rerunning the demo resets the work directory by default; pass `--no-reset` to keep existing files.
+Load `/tmp/skill2workflow-demo/artifacts/control-plane-snapshot.json` to inspect the generated operator snapshot, including the Nodes view for per-node run evidence. Rerunning the demo resets the work directory by default; pass `--no-reset` to keep existing files.
 
 Run the package install smoke:
 
@@ -190,6 +193,12 @@ Generate LiteGraph JSON:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json -o /tmp/skill2workflow-litegraph.json
+```
+
+Generate LiteGraph JSON with read-only run overlay evidence:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json --run-state /tmp/skill2workflow-state/runs/<run_id>.json -o /tmp/skill2workflow-overlay.litegraph.json
 ```
 
 Apply safe LiteGraph edits back to Workflow DSL:
@@ -347,6 +356,7 @@ http://localhost:4173/web/control.html
 
 The inspector can load `examples/control-plane-snapshot.json` or a local snapshot exported by `control-snapshot`.
 It opens on the Operator view, which summarizes attention items, recent audit events, connector event counts, and version changes without mutating workflow artifacts.
+Use the Nodes tab to inspect the read-only `node_overlays` exported for each run. Overlay data is view state only; it is not written back to Workflow DSL.
 
 Inspect the enterprise example pack:
 
@@ -388,7 +398,7 @@ src/skill2workflow/
   dashboard.py     # Read-only control-plane snapshot aggregation
   executor.py     # Durable local execution
   storage.py      # JSON and SQLite local persistence backends
-  visualizer.py   # Workflow DSL -> LiteGraph JSON
+  visualizer.py   # Workflow DSL -> LiteGraph JSON and read-only run overlays
   secret_hygiene.py # Fixture secret hygiene scanner
   credentials.py  # Local credential provider boundary
   triggers.py     # Local trigger envelope helpers
@@ -442,8 +452,10 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Trigger And Local Run API
 - Workflow Inputs And Run Context
 - Credential Provider Interface
+- Local Webhook Adapter
+- Run Overlay In Visual Editor
 
-Next priority is Loop 26 Local Webhook Adapter.
+Next priority is Loop 28 Pilot Playbook And Example.
 
 See:
 
