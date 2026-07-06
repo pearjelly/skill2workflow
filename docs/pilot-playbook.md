@@ -142,8 +142,8 @@ git diff --check
 
 ## Next Pilot Work
 
-After this playbook and the local schedule boundary, the next useful closed loops are:
+After this playbook, the local schedule boundary, and body-only input mapping, the next useful closed loops are:
 
-- richer input mapping from trigger context into connector request bodies
+- connector extension contracts for product-specific connector packages
 - more pilot scenarios that reuse the same support boundary
-- explicit extension contracts for product-specific connector packages
+- richer mapping variants beyond the current body-only contract, once pilot evidence requires them

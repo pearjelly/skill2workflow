@@ -1,6 +1,7 @@
 import json
 import threading
 import urllib.request
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -133,6 +134,32 @@ class WebhookTests(TestCase):
         self.assertEqual(audit_events[0]["trigger_source"], "local-webhook")
         self.assertEqual(audit_events[0]["input_keys"], ["case_id"])
 
+    def test_handle_webhook_request_maps_input_into_connector_body(self):
+        server = _ConnectorTestServer()
+
+        try:
+            with TemporaryDirectory() as tmp:
+                control = LocalControlPlane(Path(tmp))
+                control.publish_workflow(_mapped_connector_workflow("4.0.0", server.url))
+
+                result = handle_webhook_request(
+                    control,
+                    "POST",
+                    "/webhooks/workflow_webhook/4.0.0",
+                    json.dumps({"input": {"customer_id": "customer_123"}}).encode("utf-8"),
+                )
+                completed_events = control.list_audit_events(
+                    run_id=result["run_id"],
+                    event_type="connector_completed",
+                )
+        finally:
+            server.close()
+
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(server.requests[0]["body"], {"source": "webhook", "customer_id": "customer_123"})
+        self.assertEqual(completed_events[0]["input_mapping_status"], "applied")
+        self.assertEqual(completed_events[0]["input_mapping_keys"], ["customer_id"])
+
     def test_serve_webhook_requests_handles_one_local_post(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp))
@@ -191,3 +218,86 @@ def _workflow(version: str):
         ],
         "edges": [{"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}],
     }
+
+
+def _mapped_connector_workflow(version: str, url: str):
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {
+            "id": "workflow_webhook",
+            "name": "webhook",
+            "version": version,
+            "status": "draft",
+        },
+        "entry": "start",
+        "nodes": [
+            {"id": "start", "type": "start", "title": "Start", "on_success": "call_api"},
+            {
+                "id": "call_api",
+                "type": "tool_call",
+                "title": "Call API",
+                "connector": {
+                    "id": "http",
+                    "kind": "http",
+                    "request": {
+                        "method": "POST",
+                        "url": url,
+                        "headers": {"Content-Type": "application/json"},
+                        "body": {"source": "webhook"},
+                        "input_mapping": [
+                            {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+                        ],
+                        "timeout_ms": 2000,
+                    },
+                },
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+            {"id": "failure", "type": "failure", "title": "Failure"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_call", "from": "start", "to": "call_api", "label": "next"},
+            {"id": "edge_call_end", "from": "call_api", "to": "end", "label": "next"},
+            {"id": "edge_call_failure", "from": "call_api", "to": "failure", "label": "failure"},
+        ],
+    }
+
+
+class _ConnectorRequestHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw_body = self.rfile.read(length).decode("utf-8")
+        body = json.loads(raw_body) if raw_body else None
+        self.server.requests.append({"body": body})
+        payload = json.dumps({"ok": True}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format, *args):
+        return
+
+
+class _ConnectorTestServer:
+    def __init__(self):
+        self._server = HTTPServer(("127.0.0.1", 0), _ConnectorRequestHandler)
+        self._server.requests = []
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    @property
+    def url(self) -> str:
+        host, port = self._server.server_address
+        return f"http://{host}:{port}/connector"
+
+    @property
+    def requests(self):
+        return self._server.requests
+
+    def close(self):
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=2)

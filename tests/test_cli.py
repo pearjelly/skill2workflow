@@ -137,6 +137,52 @@ class CliTests(TestCase):
         self.assertEqual(audit_events[0]["trigger_id"], result["trigger_id"])
         self.assertNotIn("input", audit_events[0])
 
+    def test_trigger_command_maps_input_into_http_connector_body(self):
+        server = _CliConnectorTestServer()
+
+        try:
+            with TemporaryDirectory() as tmp:
+                tmp_path = Path(tmp)
+                workflow_path = tmp_path / "mapped-workflow.json"
+                input_path = tmp_path / "trigger-input.json"
+                state_dir = tmp_path / "state"
+                workflow_path.write_text(json.dumps(_mapped_connector_workflow(server.url)), encoding="utf-8")
+                input_path.write_text(json.dumps({"customer_id": "customer_123"}), encoding="utf-8")
+                trigger_stdout = StringIO()
+
+                with redirect_stdout(StringIO()):
+                    publish_exit = main(["publish", str(workflow_path), "--state-dir", str(state_dir)])
+                with redirect_stdout(trigger_stdout):
+                    trigger_exit = main(
+                        [
+                            "trigger",
+                            "workflow_mapped_connector",
+                            "--version",
+                            "0.1.0",
+                            "--state-dir",
+                            str(state_dir),
+                            "--source",
+                            "local-cli",
+                            "--input",
+                            str(input_path),
+                        ]
+                    )
+
+                result = json.loads(trigger_stdout.getvalue())
+        finally:
+            server.close()
+
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(trigger_exit, 0)
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(
+            server.requests[0]["body"],
+            {
+                "source": "skill2workflow",
+                "customer_id": "customer_123",
+            },
+        )
+
     def test_trigger_command_rejects_non_object_input_json(self):
         with TemporaryDirectory() as tmp:
             input_path = Path(tmp) / "trigger-input.json"
@@ -680,9 +726,44 @@ def _credential_workflow(url: str):
     }
 
 
+def _mapped_connector_workflow(url: str):
+    workflow = _credential_workflow(url)
+    workflow["workflow"] = {
+        "id": "workflow_mapped_connector",
+        "name": "mapped-connector",
+        "version": "0.1.0",
+        "status": "draft",
+    }
+    connector = workflow["nodes"][1]["connector"]
+    connector.pop("credentials")
+    connector["request"] = {
+        "method": "POST",
+        "url": url,
+        "headers": {"Content-Type": "application/json"},
+        "body": {"source": "skill2workflow"},
+        "input_mapping": [
+            {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+        ],
+        "timeout_ms": 2000,
+    }
+    return workflow
+
+
 class _CliConnectorRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.server.requests.append({"headers": dict(self.headers.items())})
+        payload = json.dumps({"ok": True}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw_body = self.rfile.read(length).decode("utf-8")
+        body = json.loads(raw_body) if raw_body else None
+        self.server.requests.append({"headers": dict(self.headers.items()), "body": body})
         payload = json.dumps({"ok": True}).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

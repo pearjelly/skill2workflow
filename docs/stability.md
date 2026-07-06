@@ -20,6 +20,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Local trigger command and envelope documented in `docs/triggers.md`
 - Local trigger run-context shape documented in `docs/triggers.md`
 - Local webhook route and response shape documented in `docs/triggers.md`
+- Body-only HTTP connector input mapping documented in `docs/connectors.md`
 
 ## Experimental
 
@@ -31,11 +32,11 @@ These surfaces may change while the project learns from real workflows:
 - LiteGraph node layout and web editor UI
 - Visual write-back allowlist beyond the documented fields
 - Connector manifest details beyond built-in `manual` and `http`
-- HTTP connector request metadata shape
+- HTTP connector request metadata beyond documented method, URL, headers, body, timeout, credential handles, and body-only input mapping
 - Advanced credential provider configuration beyond local static files
 - Advanced retry behavior beyond documented connector-node retry execution
 - Enterprise credential storage, secret redaction, and IAM
-- Advanced trigger input mapping, templating, and connector request interpolation
+- Advanced input mapping beyond the body-only contract, templating, and connector request interpolation
 - Hosted webhook ingress, callback verification, queues, and schedulers
 - Local control-plane storage file layout
 - Executor event taxonomy beyond documented audit examples

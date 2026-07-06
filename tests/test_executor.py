@@ -198,6 +198,23 @@ class ExecutorTests(TestCase):
         self.assertIn(("connector_started", "call_api"), event_rows)
         self.assertIn(("connector_completed", "call_api"), event_rows)
 
+    def test_required_input_mapping_failure_uses_connector_failure_path(self):
+        server = _ConnectorTestServer()
+        workflow = _mapped_http_connector_workflow(server.url)
+
+        try:
+            with TemporaryDirectory() as tmp:
+                state = LocalExecutor(Path(tmp)).run(workflow, context={"input": {}})
+        finally:
+            server.close()
+
+        call_result = state["node_results"]["call_api"]
+        self.assertEqual(state["status"], "failed")
+        self.assertEqual(state["current_node"], "failure")
+        self.assertEqual(server.requests, [])
+        self.assertEqual(call_result["status"], "failed")
+        self.assertIn("required input mapping value missing: /input/customer_id", call_result["error"])
+
     def test_http_connector_credentials_do_not_persist_resolved_values(self):
         server = _ConnectorTestServer()
         workflow = _credential_connector_workflow(server.url)
@@ -321,6 +338,16 @@ def _credential_connector_workflow(url: str):
             "handle": "demo_api_token",
             "prefix": "Bearer ",
         }
+    ]
+    return workflow
+
+
+def _mapped_http_connector_workflow(url: str):
+    workflow = _http_connector_workflow(url)
+    request = workflow["nodes"][1]["connector"]["request"]
+    request["body"] = {"source": "static"}
+    request["input_mapping"] = [
+        {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
     ]
     return workflow
 

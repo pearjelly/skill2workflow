@@ -19,7 +19,7 @@ Current examples:
 - `customer-service-escalation.workflow.json`: support escalation with SLA check, lead approval, and handoff audit
 - `risk-review.workflow.json`: risk decisioning with policy check, analyst approval, and disposition audit
 - `operations-analysis.workflow.json`: operating metrics analysis with owner confirmation and action tracking
-- `http-connector.workflow.json`: authoring example with manual approval followed by an HTTP connector request
+- `http-connector.workflow.json`: authoring example with manual approval followed by an HTTP connector request and body input mapping
 
 See `docs/examples.md` for scenario notes and inspection commands.
 

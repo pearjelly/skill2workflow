@@ -60,6 +60,13 @@
             "source": "skill2workflow",
             "example": true
           },
+          "input_mapping": [
+            {
+              "from": "/input/customer_id",
+              "to": "/body/customer_id",
+              "required": true
+            }
+          ],
           "timeout_ms": 3000
         }
       },
