@@ -127,6 +127,61 @@ Acceptance criteria:
 - The feature has deterministic tests that do not depend on wall-clock waiting.
 - Documentation states scheduler limits and keeps production scheduling out of scope.
 
+Loop 29 implementation slices:
+
+1. Schedule contract
+   - Define a small local schedule document that targets one published workflow version and stores a trigger envelope template.
+   - Support deterministic one-shot execution first, with a schedule timestamp or manual due-run helper that tests can control without sleeping.
+   - Keep schedule input compact and non-secret. Credential handles remain outside schedule input and immutable workflow artifacts.
+2. Storage and control-plane boundary
+   - Persist schedule definitions under the local control-plane state directory in JSON first, with a clear path for SQLite parity if needed.
+   - Route due scheduled runs through `LocalControlPlane.trigger_workflow()` so `run_started` audit metadata, durable context, trigger responses, and snapshots remain consistent with CLI and webhook triggers.
+   - Record schedule identity in trigger source or metadata without changing Workflow DSL `0.1.0`.
+3. CLI or helper path
+   - Add the smallest source-checkout path a contributor can run from a fresh checkout, such as `schedule add`, `schedule run-due`, or a focused `scripts/schedule_smoke.py`.
+   - Prefer deterministic smoke helpers before any long-running local daemon.
+   - Keep generated artifacts inspectable through existing `control-snapshot` and `web/control.html`.
+4. Tests
+   - Add unit coverage for schedule validation, persistence, due-run selection, trigger envelope reuse, audit metadata, and JSON/SQLite behavior when storage boundaries are touched.
+   - Tests must not depend on wall-clock waiting, background threads, cron availability, or network access.
+5. Documentation
+   - Document the local schedule contract, smoke path, and inspection flow.
+   - State explicitly that hosted scheduling, distributed queues, retries across process restarts, cron management, auth, and production SLAs are out of scope.
+
+Loop 29 explicit non-goals:
+
+- Do not add a hosted scheduler, cron daemon manager, distributed queue, or background supervisor.
+- Do not bypass the trigger boundary or write runs directly from schedule execution.
+- Do not introduce auth, RBAC, IAM, multi-tenant state, or production deployment guidance.
+- Do not add product-specific SaaS schedules or connector packages.
+- Do not store secrets in schedule definitions, trigger input, Workflow DSL, run state, or audit events.
+
+Loop 29 expected file changes:
+
+- `src/skill2workflow/schedules.py` for schedule contract and deterministic due-run logic.
+- `src/skill2workflow/control_plane.py` only if schedule persistence belongs inside the control-plane API.
+- `src/skill2workflow/cli.py` if adding schedule commands.
+- `scripts/schedule_smoke.py` if using a focused source-checkout smoke helper.
+- `tests/test_schedules.py` and focused CLI/control-plane tests.
+- `docs/triggers.md`, `HARNESS.md`, `README.md`, and possibly `docs/pilot-playbook.md` for the operator flow.
+- `ROADMAP.md` when Loop 29 is complete and Loop 30 becomes active.
+
+Loop 29 verification commands:
+
+- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- `python3 -m py_compile src/skill2workflow/*.py`
+- `PYTHONPATH=src python3 -m unittest tests.test_schedules tests.test_triggers tests.test_control_plane tests.test_cli -v`
+- schedule smoke command chosen by the implementation, for example `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
+- `python3 scripts/secret_hygiene.py examples/workflows`
+- `git diff --check`
+
+Loop 29 done means:
+
+- A local evaluator can define and execute a deterministic scheduled trigger for a published workflow.
+- Scheduled runs use the same trigger, run context, audit, snapshot, and overlay inspection path as webhook and CLI triggers.
+- The feature remains local-first and dependency-free.
+- No hosted scheduler, daemon manager, queue, auth layer, or production scheduling claim is added.
+
 ## Near-Term Loop Queue
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
@@ -139,6 +194,7 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop 27: Run Overlay In Visual Editor | Complete | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
 | Loop 28: Pilot Playbook And Example | Complete | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
 | Loop 29: Scheduled Trigger Boundary | Next | Trigger published workflows from deterministic local schedules | schedule contract, CLI/helper path, audit tests |
+| Loop 30: Trigger Input Mapping | Planned | Map trigger context into connector request bodies without leaking secrets | input mapping contract, validator tests, connector examples |
 
 Loop selection rules:
 
@@ -238,7 +294,7 @@ Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Node
 
 ### v0.6: Local Trigger And Input Runtime
 
-Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local webhook adapter shipped in Loop 26.
+Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local webhook adapter shipped in Loop 26. Scheduled trigger boundary is the active Loop 29 priority.
 
 - Controlled local trigger envelope
 - Published-run API/helper path
@@ -248,7 +304,8 @@ Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local 
 - Audit coverage for triggered runs
 - Durable trigger input values under run context
 - Compact audit boundary for trigger input keys
-- Future: scheduled triggers
+- Next: scheduled triggers
+- Future: input mapping and connector request interpolation
 
 ### v0.7: Pilot Integration Boundary
 
