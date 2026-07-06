@@ -94,6 +94,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Trigger published workflow versions through a compact local API envelope
 - Persist trigger input values in durable run context without logging full input values to audit by default
 - Trigger published workflow versions from local HTTP webhook POST requests
+- Trigger published workflow versions from deterministic one-shot local schedules
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Audit connector execution events through the control plane
@@ -103,6 +104,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Generate a deterministic first-run demo workspace for contributor onboarding
 - Run a deterministic local pilot playbook with webhook trigger, credential handle, audit, snapshot, and node overlay artifacts
+- Run a deterministic local scheduled-trigger smoke with schedule, run, audit, and snapshot artifacts
 - Verify editable install, package metadata, and the installed `skill2workflow` console script
 - Check committed Workflow DSL and LiteGraph examples for obvious secret-like connector values
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
@@ -144,6 +146,14 @@ python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot
 
 The pilot playbook publishes and triggers a customer-support escalation workflow through the local webhook boundary, resumes a manual gate, calls a local HTTP receiver with a credential handle, and writes inspection artifacts under `/tmp/skill2workflow-pilot/artifacts/`.
 See `docs/pilot-playbook.md` for the supported pilot boundary and checklist.
+
+Run the local scheduled-trigger smoke:
+
+```bash
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
+```
+
+The schedule smoke publishes the approval example, writes a local one-shot schedule, runs due schedules with a fixed timestamp, resumes the manual gate, and writes inspection artifacts under `/tmp/skill2workflow-schedule-loop29/artifacts/`.
 
 Run the package install smoke:
 
@@ -302,6 +312,31 @@ PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --ve
 
 Triggered runs store input values under `context.input` and compact trigger metadata under `context.trigger`. Audit events and trigger responses expose `input_keys`, not full input values.
 
+Trigger a published version through a deterministic local schedule:
+
+```bash
+cat >/tmp/skill2workflow-schedule.json <<'JSON'
+{
+  "schema_version": "skill2workflow-schedule-0.1.0",
+  "schedule": {
+    "id": "schedule_approval_flow_daily",
+    "workflow_id": "workflow_approval_flow",
+    "version": "0.1.0",
+    "run_at": "2026-07-06T00:00:00Z"
+  },
+  "trigger": {
+    "input": {
+      "customer_id": "customer_123"
+    }
+  }
+}
+JSON
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/skill2workflow-schedule.json --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due --state-dir /tmp/skill2workflow-control --now 2026-07-06T00:00:00Z
+```
+
+Scheduled runs use the same trigger boundary as CLI and webhook triggers. The local schedule helper is not a hosted scheduler, cron manager, queue, auth layer, or production daemon.
+
 Start a local webhook adapter for pilot integration testing:
 
 ```bash
@@ -412,7 +447,9 @@ src/skill2workflow/
   secret_hygiene.py # Fixture secret hygiene scanner
   credentials.py  # Local credential provider boundary
   triggers.py     # Local trigger envelope helpers
+  schedules.py    # Deterministic local schedule helpers
   webhooks.py     # Local webhook adapter for published triggers
+  schedule_smoke.py # Local scheduled-trigger smoke helper
   release.py      # Read-only release preflight checks
   cli.py          # Command line interface
 scripts/          # Maintainer command helpers
@@ -466,8 +503,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Local Webhook Adapter
 - Run Overlay In Visual Editor
 - Pilot Playbook And Example
+- Scheduled Trigger Boundary
 
-Next priority is scheduled trigger boundary.
+Next priority is trigger input mapping.
 
 See:
 

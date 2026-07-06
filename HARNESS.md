@@ -33,6 +33,15 @@ python3 -m json.tool /tmp/skill2workflow-pilot/artifacts/workflow.overlay.litegr
 
 The pilot smoke exercises webhook trigger, durable input context, manual gate resume, local HTTP connector execution, credential-handle resolution, audit export, snapshot node overlays, and LiteGraph run overlays without using external services.
 
+Run the local scheduled-trigger smoke:
+
+```bash
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
+python3 -m json.tool /tmp/skill2workflow-schedule-loop29/artifacts/control-plane-snapshot.json >/tmp/skill2workflow-schedule-snapshot-check.json
+```
+
+The schedule smoke exercises a deterministic one-shot schedule, due-run selection with an explicit timestamp, the published trigger boundary, durable input context, audit export, and control-plane snapshot generation without cron, sleeping, background threads, or external services.
+
 Run the editable install and console-script smoke:
 
 ```bash
@@ -108,6 +117,12 @@ printf '{"credentials":{"demo_api_token":"local-secret-value"}}' >/tmp/skill2wor
 PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state --credential-file /tmp/skill2workflow-credentials.json
 printf '{"customer_id":"customer_123"}' >/tmp/skill2workflow-trigger-input.json
 PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001 --input /tmp/skill2workflow-trigger-input.json
+cat >/tmp/skill2workflow-schedule.json <<'JSON'
+{"schema_version":"skill2workflow-schedule-0.1.0","schedule":{"id":"schedule_approval_flow_daily","workflow_id":"workflow_approval_flow","version":"0.1.0","run_at":"2026-07-06T00:00:00Z"},"trigger":{"input":{"customer_id":"customer_123"}}}
+JSON
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/skill2workflow-schedule.json --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli schedules --state-dir /tmp/skill2workflow-control
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due --state-dir /tmp/skill2workflow-control --now 2026-07-06T00:00:00Z
 PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill2workflow-control
@@ -196,6 +211,7 @@ Implemented:
   - runs published workflow versions
   - triggers published workflow versions through a compact local API envelope
   - serves local webhook POST requests through the same published trigger boundary
+  - runs deterministic one-shot local schedules through the same published trigger boundary
   - resumes waiting published runs
   - lists and shows run state through control-plane commands
   - keeps run state bound to workflow id and version
@@ -218,6 +234,10 @@ Implemented:
   - generates a resettable local pilot workspace through `scripts/pilot_playbook_smoke.py`
   - exercises webhook trigger, manual gate resume, HTTP connector execution, credential handles, audit, snapshot, and LiteGraph overlay artifacts
   - documents the supported local pilot boundary in `docs/pilot-playbook.md`
+- Scheduled trigger smoke
+  - generates a resettable local schedule workspace through `scripts/schedule_smoke.py`
+  - exercises schedule definition, due-run selection, published trigger execution, manual gate resume, audit, and snapshot artifacts
+  - documents the schedule contract and non-goals in `docs/triggers.md`
 - Packaging and installability
   - verifies package metadata and empty runtime dependency policy through `tests/test_packaging.py`
   - verifies editable install and the installed `skill2workflow` console script through `scripts/package_smoke.py`
@@ -238,6 +258,7 @@ Implemented:
 - Local trigger API
   - documents the trigger request and response envelope in `docs/triggers.md`
   - exposes `trigger` as a CLI path for starting published workflow runs
+  - exposes `schedule-add`, `schedules`, and `schedule-run-due` for deterministic local schedule evaluation
   - records trigger id, source, idempotency key, and input keys in compact responses and audit events
   - persists trigger input values under `run_state.context.input`
   - exposes compact trigger metadata under `run_state.context.trigger`

@@ -160,6 +160,67 @@ class CliTests(TestCase):
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn("trigger input must be a JSON object", stderr.getvalue())
 
+    def test_schedule_commands_add_list_and_run_due(self):
+        with TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            workflow_path = tmp_path / "workflow.json"
+            schedule_path = tmp_path / "schedule.json"
+            state_dir = tmp_path / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            schedule_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "skill2workflow-schedule-0.1.0",
+                        "schedule": {
+                            "id": "schedule_daily_report",
+                            "workflow_id": "workflow_demo",
+                            "version": "0.1.0",
+                            "run_at": "2026-07-06T00:00:00Z",
+                        },
+                        "trigger": {"input": {"customer_id": "customer_123"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            schedules_stdout = StringIO()
+            run_due_stdout = StringIO()
+
+            with redirect_stdout(StringIO()):
+                publish_exit = main(["publish", str(workflow_path), "--state-dir", str(state_dir)])
+                add_exit = main(["schedule-add", str(schedule_path), "--state-dir", str(state_dir)])
+            with redirect_stdout(schedules_stdout):
+                schedules_exit = main(["schedules", "--state-dir", str(state_dir)])
+            with redirect_stdout(run_due_stdout):
+                run_due_exit = main(
+                    [
+                        "schedule-run-due",
+                        "--state-dir",
+                        str(state_dir),
+                        "--now",
+                        "2026-07-06T00:00:00Z",
+                    ]
+                )
+            result = json.loads(run_due_stdout.getvalue())
+            schedules = json.loads(schedules_stdout.getvalue())
+
+            from skill2workflow.control_plane import LocalControlPlane
+
+            control = LocalControlPlane(state_dir)
+            detail = control.get_run(result["runs"][0]["run_id"])
+            audit_events = control.list_audit_events(run_id=result["runs"][0]["run_id"])
+
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(add_exit, 0)
+        self.assertEqual(schedules_exit, 0)
+        self.assertEqual(run_due_exit, 0)
+        self.assertEqual(schedules[0]["schedule"]["id"], "schedule_daily_report")
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["runs"][0]["schedule_id"], "schedule_daily_report")
+        self.assertEqual(result["runs"][0]["source"], "local-schedule:schedule_daily_report")
+        self.assertEqual(detail["context"]["input"], {"customer_id": "customer_123"})
+        self.assertEqual(audit_events[0]["trigger_source"], "local-schedule:schedule_daily_report")
+        self.assertNotIn("input", audit_events[0])
+
     def test_webhook_server_command_wires_local_control_plane(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"

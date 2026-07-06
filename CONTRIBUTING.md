@@ -60,6 +60,12 @@ The sample workflow pauses at a human gate. Resume it with the returned run id:
 PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-state
 ```
 
+Run the deterministic local scheduled-trigger smoke:
+
+```bash
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
+```
+
 Open the web editor:
 
 ```bash
@@ -149,6 +155,12 @@ For Workflow DSL or visualizer changes, also run:
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/approval-flow.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-connector.workflow.json -o /tmp/http-connector.litegraph.json
+```
+
+For trigger, schedule, connector, or control-plane changes, also run:
+
+```bash
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
 ```
 
 For release PRs, run the release preflight with the target version and notes:

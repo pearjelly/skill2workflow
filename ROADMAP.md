@@ -14,7 +14,7 @@ Current capability snapshot:
 - DSL authority: Skill IR compiles to Workflow DSL, with JSON Schema and structured validation errors
 - Visual layer: Workflow DSL renders to LiteGraph JSON, read-only run overlays can be attached to nodes, and safe visual edits can write back to DSL
 - Runtime: local executor supports run state, initial run context, human-gate pause/resume, connector retry policy, recovery events, run listing, and run detail
-- Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API with durable input context, resume, audit log, filtered audit queries, promoted runtime policy events, and compact node overlay export
+- Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API with durable input context, deterministic local schedules, resume, audit log, filtered audit queries, promoted runtime policy events, and compact node overlay export
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
 - Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, local credential handles, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
 - Credential boundary and secret hygiene: documented placeholder and handle rules, local credential-file provider, committed-fixture scanner, and CI guardrail for obvious secret-like values
@@ -27,6 +27,7 @@ Current capability snapshot:
 - Runtime policy and recovery: connector-node retry execution, retry/recovery run events, and published-run policy audit promotion
 - Local webhook adapter: dependency-free local `POST /webhooks/<workflow_id>/<version>` path that invokes the existing trigger boundary without hosted ingress
 - Pilot playbook: one-command local customer-support pilot smoke with webhook trigger, durable input, manual gate resume, credential handle, HTTP connector execution, audit, snapshot, and LiteGraph overlay artifacts
+- Scheduled trigger boundary: deterministic one-shot local schedule definitions, due-run CLI, trigger-boundary execution, audit metadata, and snapshot inspection
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
 
 Important boundaries:
@@ -59,8 +60,8 @@ Ready now:
 
 Still needed before serious pilots:
 
-- Scheduled trigger boundary for recurring local runs.
 - Input mapping from trigger context into connector request bodies.
+- Production-grade recurring schedulers remain out of scope until the local trigger and mapping contracts are stable.
 
 Pilot sequencing rule: do not add product-specific SaaS connectors before local webhook/adapters and pilot playbooks are tested and documented. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
@@ -96,91 +97,91 @@ Pilot sequencing rule: do not add product-specific SaaS connectors before local 
 | Loop 26: Local Webhook Adapter | Complete | Local webhook request contract, stdlib webhook server, trigger-boundary adapter, JSON/SQLite tests, docs |
 | Loop 27: Run Overlay In Visual Editor | Complete | Read-only run overlay contract, LiteGraph node overlays, control snapshot `node_overlays`, static Nodes view, docs |
 | Loop 28: Pilot Playbook And Example | Complete | Local customer-support pilot smoke, webhook-triggered scenario, credential handle proof, snapshot and LiteGraph overlay artifacts, pilot docs |
+| Loop 29: Scheduled Trigger Boundary | Complete | Deterministic local schedule contract, schedule CLI, due-run helper, audit tests, schedule smoke, docs |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 28 added a runnable local pilot playbook:
+Post-`v0.1.0` work now has one active priority after Loop 29 added deterministic scheduled triggers:
 
-1. add a scheduled trigger boundary for recurring local runs without introducing a production scheduler.
+1. map durable trigger input into connector request bodies without leaking secrets.
 
-### Loop 29: Scheduled Trigger Boundary
+### Loop 30: Trigger Input Mapping
 
-Goal: let local evaluators schedule published workflow runs through the existing trigger boundary.
+Goal: let local evaluators map trigger context into connector request bodies through an explicit, safe contract.
 
-Why this is next: Loop 28 provides an end-to-end pilot scenario. Many real enterprise workflows are recurring checks or reports, so the next controlled surface should prove time-triggered runs while reusing the same publish, trigger, audit, and snapshot semantics.
+Why this is next: Loops 23-29 can trigger published workflows from CLI, webhook, and deterministic schedules, and they persist trigger input under durable run context. Connector requests are still static, so enterprise pilots cannot yet pass event-specific identifiers or fields into outbound connector calls without hand-editing Workflow DSL per run.
 
 Status: next engineering loop.
 
 Initial PR boundary:
 
-- Keep scheduling local and dependency-free.
-- Reuse the existing trigger request envelope instead of bypassing the control plane.
-- Prefer one-shot and deterministic test helpers before recurring background loops.
-- Do not add hosted schedulers, distributed queues, cron daemon management, auth, or production deployment guidance in this loop.
+- Keep mapping explicit, allowlisted, and dependency-free.
+- Support simple JSON pointer-style reads from `context.input` into HTTP connector request body fields first.
+- Keep resolved credential values and secret handles outside trigger input and mapping output.
+- Do not add arbitrary template evaluation, scripting, expression engines, auth, or product-specific connector packages in this loop.
 
 Acceptance criteria:
 
-- A contributor can define a local scheduled trigger for a published workflow.
-- The scheduled run enters the same trigger, audit, context, and snapshot paths as CLI/webhook triggers.
-- The feature has deterministic tests that do not depend on wall-clock waiting.
-- Documentation states scheduler limits and keeps production scheduling out of scope.
+- A contributor can declare connector request mappings that read from durable trigger context.
+- Mapped connector requests are visible enough for local inspection without exposing secrets.
+- Invalid mapping paths fail validation before or during local execution with clear errors.
+- CLI, webhook, and scheduled-trigger runs all use the same mapping behavior.
+- Documentation states mapping limits and keeps arbitrary templating out of scope.
 
-Loop 29 implementation slices:
+Loop 30 implementation slices:
 
-1. Schedule contract
-   - Define a small local schedule document that targets one published workflow version and stores a trigger envelope template.
-   - Support deterministic one-shot execution first, with a schedule timestamp or manual due-run helper that tests can control without sleeping.
-   - Keep schedule input compact and non-secret. Credential handles remain outside schedule input and immutable workflow artifacts.
-2. Storage and control-plane boundary
-   - Persist schedule definitions under the local control-plane state directory in JSON first, with a clear path for SQLite parity if needed.
-   - Route due scheduled runs through `LocalControlPlane.trigger_workflow()` so `run_started` audit metadata, durable context, trigger responses, and snapshots remain consistent with CLI and webhook triggers.
-   - Record schedule identity in trigger source or metadata without changing Workflow DSL `0.1.0`.
-3. CLI or helper path
-   - Add the smallest source-checkout path a contributor can run from a fresh checkout, such as `schedule add`, `schedule run-due`, or a focused `scripts/schedule_smoke.py`.
-   - Prefer deterministic smoke helpers before any long-running local daemon.
-   - Keep generated artifacts inspectable through existing `control-snapshot` and `web/control.html`.
+1. Mapping contract
+   - Define a small allowlisted mapping shape under connector request metadata.
+   - Support copying scalar/string/number/boolean values from `context.input` into HTTP request body fields first.
+   - Keep source paths explicit and reject missing or unsupported paths with readable errors.
+2. Runtime boundary
+   - Apply mapping during connector execution, after credential-handle resolution boundaries are established and without mutating the published workflow artifact.
+   - Avoid leaking mapped input into audit events beyond existing compact keys and connector status.
+   - Preserve existing static connector request behavior when no mapping is declared.
+3. Validation and examples
+   - Extend validator checks for mapping shape and supported targets.
+   - Add one local connector example that uses trigger input mapping without secrets.
+   - Keep examples compatible with visual write-back rules.
 4. Tests
-   - Add unit coverage for schedule validation, persistence, due-run selection, trigger envelope reuse, audit metadata, and JSON/SQLite behavior when storage boundaries are touched.
-   - Tests must not depend on wall-clock waiting, background threads, cron availability, or network access.
+   - Add unit coverage for validator failures, successful mapping, missing input values, CLI trigger, webhook trigger, and schedule trigger paths.
+   - Tests must use local HTTP servers only and must not depend on network access.
 5. Documentation
-   - Document the local schedule contract, smoke path, and inspection flow.
-   - State explicitly that hosted scheduling, distributed queues, retries across process restarts, cron management, auth, and production SLAs are out of scope.
+   - Document supported mapping source and target syntax.
+   - State explicitly that arbitrary templates, expression evaluation, secret injection, and product-specific connector packages are out of scope.
 
-Loop 29 explicit non-goals:
+Loop 30 explicit non-goals:
 
-- Do not add a hosted scheduler, cron daemon manager, distributed queue, or background supervisor.
-- Do not bypass the trigger boundary or write runs directly from schedule execution.
-- Do not introduce auth, RBAC, IAM, multi-tenant state, or production deployment guidance.
-- Do not add product-specific SaaS schedules or connector packages.
-- Do not store secrets in schedule definitions, trigger input, Workflow DSL, run state, or audit events.
+- Do not add arbitrary string templating, Jinja-like syntax, Python eval, or a general expression engine.
+- Do not map credential values, credential handles, authorization headers, or resolved secrets from trigger input.
+- Do not add product-specific SaaS connector packages.
+- Do not change Workflow DSL execution truth source or make LiteGraph the authority.
 
-Loop 29 expected file changes:
+Loop 30 expected file changes:
 
-- `src/skill2workflow/schedules.py` for schedule contract and deterministic due-run logic.
-- `src/skill2workflow/control_plane.py` only if schedule persistence belongs inside the control-plane API.
-- `src/skill2workflow/cli.py` if adding schedule commands.
-- `scripts/schedule_smoke.py` if using a focused source-checkout smoke helper.
-- `tests/test_schedules.py` and focused CLI/control-plane tests.
-- `docs/triggers.md`, `HARNESS.md`, `README.md`, and possibly `docs/pilot-playbook.md` for the operator flow.
-- `ROADMAP.md` when Loop 29 is complete and Loop 30 becomes active.
+- `src/skill2workflow/connectors.py` for request mapping application.
+- `src/skill2workflow/compiler.py` or validator helpers if mapping schema validation belongs there.
+- `tests/test_connectors.py`, `tests/test_executor.py`, `tests/test_webhooks.py`, `tests/test_schedules.py`, and focused CLI tests.
+- `examples/workflows/http-connector.workflow.json` or a new mapped connector example.
+- `docs/connectors.md`, `docs/triggers.md`, `HARNESS.md`, and `README.md`.
+- `ROADMAP.md` when Loop 30 is complete.
 
-Loop 29 verification commands:
+Loop 30 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
-- `PYTHONPATH=src python3 -m unittest tests.test_schedules tests.test_triggers tests.test_control_plane tests.test_cli -v`
-- schedule smoke command chosen by the implementation, for example `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
+- `PYTHONPATH=src python3 -m unittest tests.test_connectors tests.test_executor tests.test_triggers tests.test_webhooks tests.test_schedules tests.test_cli -v`
+- `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
 - `python3 scripts/secret_hygiene.py examples/workflows`
 - `git diff --check`
 
-Loop 29 done means:
+Loop 30 done means:
 
-- A local evaluator can define and execute a deterministic scheduled trigger for a published workflow.
-- Scheduled runs use the same trigger, run context, audit, snapshot, and overlay inspection path as webhook and CLI triggers.
-- The feature remains local-first and dependency-free.
-- No hosted scheduler, daemon manager, queue, auth layer, or production scheduling claim is added.
+- A local evaluator can pass non-secret trigger input into an HTTP connector request through an explicit mapping contract.
+- The behavior is consistent across CLI, webhook, and scheduled-trigger runs.
+- Existing static connector requests continue to work unchanged.
+- Secrets remain outside trigger input, Workflow DSL examples, run state, and audit output.
 
 ## Near-Term Loop Queue
 
@@ -193,8 +194,8 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop 26: Local Webhook Adapter | Complete | Let local HTTP events trigger published runs through the trigger boundary | stdlib webhook adapter, trigger examples, audit tests |
 | Loop 27: Run Overlay In Visual Editor | Complete | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
 | Loop 28: Pilot Playbook And Example | Complete | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
-| Loop 29: Scheduled Trigger Boundary | Next | Trigger published workflows from deterministic local schedules | schedule contract, CLI/helper path, audit tests |
-| Loop 30: Trigger Input Mapping | Planned | Map trigger context into connector request bodies without leaking secrets | input mapping contract, validator tests, connector examples |
+| Loop 29: Scheduled Trigger Boundary | Complete | Trigger published workflows from deterministic local schedules | schedule contract, CLI/helper path, audit tests |
+| Loop 30: Trigger Input Mapping | Next | Map trigger context into connector request bodies without leaking secrets | input mapping contract, validator tests, connector examples |
 
 Loop selection rules:
 
@@ -294,7 +295,7 @@ Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Node
 
 ### v0.6: Local Trigger And Input Runtime
 
-Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local webhook adapter shipped in Loop 26. Scheduled trigger boundary is the active Loop 29 priority.
+Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local webhook adapter shipped in Loop 26; deterministic local schedules shipped in Loop 29. Trigger input mapping is the active Loop 30 priority.
 
 - Controlled local trigger envelope
 - Published-run API/helper path
@@ -304,19 +305,20 @@ Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local 
 - Audit coverage for triggered runs
 - Durable trigger input values under run context
 - Compact audit boundary for trigger input keys
-- Next: scheduled triggers
-- Future: input mapping and connector request interpolation
+- Deterministic local scheduled triggers
+- Next: input mapping and connector request interpolation
 
 ### v0.7: Pilot Integration Boundary
 
-Status: local trigger, input, credential, webhook, visual inspection, and pilot playbook semantics are stable enough for local evaluation. Scheduled trigger boundary work starts in Loop 29.
+Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, and pilot playbook semantics are stable enough for local evaluation. Trigger input mapping work starts in Loop 30.
 
 - Credential provider interface
 - Secret-handle documentation without secret storage in Workflow DSL
 - Local webhook adapter for pilot integration tests
+- Deterministic schedule smoke for recurring local-run evaluation
 - Visual run/audit overlays
 - Pilot playbook and runnable scenario
-- Next: scheduled trigger boundary
+- Next: trigger input mapping
 - Future: product-specific connector packages and hosted control-plane integrations
 
 ### v1.0: Production Baseline
