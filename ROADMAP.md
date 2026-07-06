@@ -63,9 +63,10 @@ Ready now:
 Still needed before serious pilots:
 
 - A connector extension contract for product-specific connector packages.
+- A broader pilot scenario pack that reuses the same trigger, schedule, credential, mapping, audit, and overlay boundaries.
 - Production-grade recurring schedulers remain out of scope until the local trigger, mapping, and extension contracts are stable.
 
-Pilot sequencing rule: do not add product-specific SaaS connectors before the local webhook adapter, deterministic schedules, pilot playbook, trigger input mapping, and connector extension contract are tested and documented. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
+Pilot sequencing rule: do not add product-specific SaaS connectors until the connector extension contract is tested and documented. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
 ## Completed Loops
 
@@ -110,6 +111,8 @@ Post-`v0.1.0` work now has one active priority after Loop 30 added body-only tri
 
 1. define a stable connector extension contract before adding product-specific SaaS connectors.
 
+The next queued follow-on is a pilot scenario pack that proves the extension boundary can support more than the current customer-support smoke without adding real SaaS dependencies.
+
 ### Loop 31: Connector Extension Contract
 
 Goal: define how future connector packages plug into the local runtime without weakening Workflow DSL authority, credential boundaries, audit compactness, or dependency discipline.
@@ -125,6 +128,14 @@ Initial PR boundary:
 - Keep built-in `manual` and `http` behavior unchanged.
 - Add a local contract test fixture or dummy connector only if it proves the extension boundary without introducing a real SaaS dependency.
 - Do not add product-specific connectors in this loop.
+
+Loop 31 first implementation cut:
+
+- Treat the existing built-in `manual` and `http` connectors as reference implementations for the contract.
+- Document required manifest fields and optional metadata fields without introducing a dynamic plugin loader.
+- Define the execution handoff shape for future connector executors: node binding input, run context input, credential provider boundary, normalized result, and audit-safe summary.
+- Add contract tests only around stable metadata and registry behavior; avoid test-only loaders that imply extension loading is already supported.
+- Update public docs so contributors know where extension packages should live later and which runtime hooks are intentionally not available yet.
 
 Acceptance criteria:
 
@@ -151,6 +162,15 @@ Loop 31 implementation slices:
 5. Documentation
    - Update `docs/connectors.md`, `docs/credential-boundary.md`, `docs/stability.md`, and contributor guidance.
 
+Loop 31 expected file changes:
+
+- `docs/connectors.md` for the extension manifest and executor contract.
+- `docs/credential-boundary.md` for extension credential-handle requirements.
+- `docs/stability.md` and `docs/workflow-dsl-compatibility.md` for stable versus experimental connector boundaries.
+- `CONTRIBUTING.md` or `HARNESS.md` if contributor workflows change.
+- `src/skill2workflow/connectors.py`, `tests/test_connectors.py`, or `tests/test_control_plane.py` only if the registry needs small contract-level metadata changes.
+- `ROADMAP.md` when Loop 31 is complete.
+
 Loop 31 explicit non-goals:
 
 - Do not add Salesforce, Feishu/Lark, Slack, GitHub, Jira, or other product-specific connector packages.
@@ -169,6 +189,27 @@ Loop 31 done means:
 - The project has a documented, test-backed extension boundary that product-specific connectors can follow in later loops.
 - Built-in connector behavior remains stable and examples remain valid.
 - The public docs make clear that connector extensions must preserve Workflow DSL authority, credential isolation, and compact audit semantics.
+
+### Loop 32: Pilot Scenario Pack
+
+Goal: add more end-to-end local pilot scenarios that prove the current trigger, schedule, credential, input mapping, audit, snapshot, and overlay boundaries generalize beyond one customer-support example.
+
+Status: queued after Loop 31.
+
+Start condition: Loop 31 has documented the connector extension boundary, even if no product-specific connector packages exist yet.
+
+Initial PR boundary:
+
+- Add local-only scenarios that use existing built-in connectors and documented placeholders.
+- Prefer business workflows that enterprise evaluators recognize: sales renewal follow-up, risk exception review, operations alert triage, or approval-heavy back-office routing.
+- Reuse the same smoke-helper pattern as `scripts/pilot_playbook_smoke.py`.
+- Keep real SaaS APIs, OAuth, hosted ingress, and production schedulers out of scope.
+
+Loop 32 done means:
+
+- A fresh checkout can run multiple pilot smokes without external services.
+- The examples demonstrate trigger input, body-only mapping, credential handles, manual gates, audit, snapshots, and visual overlays in repeatable ways.
+- The project has stronger evidence for real team pilots before product-specific connector packages begin.
 
 ## Near-Term Loop Queue
 
