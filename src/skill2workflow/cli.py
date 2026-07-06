@@ -13,6 +13,7 @@ from .credentials import load_credential_file
 from .dashboard import build_control_snapshot
 from .executor import LocalExecutor
 from .parser import parse_skill_file
+from .schedules import LocalScheduleRunner
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 from .webhooks import serve_webhook_requests
 
@@ -101,6 +102,24 @@ def main(argv=None) -> int:
     trigger_cmd.add_argument("--idempotency-key", default="")
     trigger_cmd.add_argument("--input", type=Path, help="JSON object with trigger input metadata")
     trigger_cmd.add_argument("--credential-file", type=Path)
+
+    schedule_add_cmd = subparsers.add_parser("schedule-add", help="Add or replace a local schedule definition")
+    schedule_add_cmd.add_argument("schedule", type=Path)
+    schedule_add_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedule_add_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
+    schedules_cmd = subparsers.add_parser("schedules", help="List local schedule definitions")
+    schedules_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedules_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
+    schedule_run_due_cmd = subparsers.add_parser(
+        "schedule-run-due",
+        help="Run due local schedules through the trigger boundary",
+    )
+    schedule_run_due_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedule_run_due_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedule_run_due_cmd.add_argument("--now", required=True, help="ISO-8601 timestamp used for deterministic due checks")
+    schedule_run_due_cmd.add_argument("--credential-file", type=Path)
 
     webhook_server_cmd = subparsers.add_parser(
         "webhook-server",
@@ -280,6 +299,26 @@ def main(argv=None) -> int:
 
     if args.command == "trigger":
         return _control_action(lambda: _trigger_workflow(args))
+
+    if args.command == "schedule-add":
+        return _control_action(
+            lambda: LocalScheduleRunner(args.state_dir, storage=args.storage).add_schedule(
+                _load_json(args.schedule)
+            )
+        )
+
+    if args.command == "schedules":
+        _print_json(LocalScheduleRunner(args.state_dir, storage=args.storage).list_schedules())
+        return 0
+
+    if args.command == "schedule-run-due":
+        return _control_action(
+            lambda: LocalScheduleRunner(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).run_due(args.now)
+        )
 
     if args.command == "webhook-server":
         return _serve_webhook_server(args)

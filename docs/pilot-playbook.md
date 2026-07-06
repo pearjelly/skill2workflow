@@ -125,8 +125,10 @@ Run the focused pilot checks:
 ```bash
 PYTHONPATH=src python3 -m unittest tests.test_pilot -v
 python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
 python3 -m json.tool /tmp/skill2workflow-pilot/artifacts/control-plane-snapshot.json >/tmp/skill2workflow-pilot-snapshot-check.json
 python3 -m json.tool /tmp/skill2workflow-pilot/artifacts/workflow.overlay.litegraph.json >/tmp/skill2workflow-pilot-overlay-check.json
+python3 -m json.tool /tmp/skill2workflow-schedule-loop29/artifacts/control-plane-snapshot.json >/tmp/skill2workflow-schedule-snapshot-check.json
 ```
 
 Run the broader local verification before opening a PR:
@@ -140,9 +142,8 @@ git diff --check
 
 ## Next Pilot Work
 
-After this playbook is merged, the next useful closed loops are:
+After this playbook and the local schedule boundary, the next useful closed loops are:
 
-- scheduled trigger boundary for local recurring runs
 - richer input mapping from trigger context into connector request bodies
 - more pilot scenarios that reuse the same support boundary
 - explicit extension contracts for product-specific connector packages

@@ -39,6 +39,9 @@ This repository is the `skill2workflow` open-source harness.
 - Run published: `PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control`
 - Run published with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite`
 - Trigger published: `PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001 --input /tmp/skill2workflow-trigger-input.json`
+- Add schedule: `PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/skill2workflow-schedule.json --state-dir /tmp/skill2workflow-control`
+- List schedules: `PYTHONPATH=src python3 -m skill2workflow.cli schedules --state-dir /tmp/skill2workflow-control`
+- Run due schedules: `PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due --state-dir /tmp/skill2workflow-control --now 2026-07-06T00:00:00Z`
 - Local webhook server: `PYTHONPATH=src python3 -m skill2workflow.cli webhook-server --state-dir /tmp/skill2workflow-control --host 127.0.0.1 --port 8080`
 - Resume published: `PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control`
 - Control runs: `PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill2workflow-control`
@@ -52,6 +55,7 @@ This repository is the `skill2workflow` open-source harness.
 - Control snapshot: `PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json`
 - First-run demo: `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
 - Pilot smoke: `python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot`
+- Schedule smoke: `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
 - Package smoke: `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
 - Secret hygiene: `python3 scripts/secret_hygiene.py examples/workflows`
 - Editable install: `python3 -m venv /tmp/skill2workflow-venv && /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68" && /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .`
