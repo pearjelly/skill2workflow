@@ -106,6 +106,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Generate a deterministic first-run demo workspace for contributor onboarding
 - Run a deterministic local pilot playbook with webhook trigger, credential handle, audit, snapshot, and node overlay artifacts
+- Run a deterministic local pilot scenario pack covering customer support, sales renewal, and risk exception flows with mapped connector input
 - Run a deterministic local scheduled-trigger smoke with schedule, run, audit, and snapshot artifacts
 - Verify editable install, package metadata, and the installed `skill2workflow` console script
 - Check committed Workflow DSL and LiteGraph examples for obvious secret-like connector values
@@ -148,6 +149,14 @@ python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot
 
 The pilot playbook publishes and triggers a customer-support escalation workflow through the local webhook boundary, resumes a manual gate, calls a local HTTP receiver with a credential handle, and writes inspection artifacts under `/tmp/skill2workflow-pilot/artifacts/`.
 See `docs/pilot-playbook.md` for the supported pilot boundary and checklist.
+
+Run the broader local pilot scenario pack:
+
+```bash
+python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilot-pack
+```
+
+The scenario pack runs customer support escalation, sales renewal follow-up, and risk exception review against local-only receivers. It writes one set of workflow, trigger, run, snapshot, and LiteGraph overlay artifacts per scenario.
 
 Run the local scheduled-trigger smoke:
 
@@ -451,6 +460,7 @@ src/skill2workflow/
   triggers.py     # Local trigger envelope helpers
   schedules.py    # Deterministic local schedule helpers
   webhooks.py     # Local webhook adapter for published triggers
+  pilot_scenarios.py # Local multi-scenario pilot pack helper
   schedule_smoke.py # Local scheduled-trigger smoke helper
   release.py      # Read-only release preflight checks
   cli.py          # Command line interface
@@ -508,8 +518,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Scheduled Trigger Boundary
 - Trigger Input Mapping
 - Connector Extension Contract
+- Pilot Scenario Pack
 
-Next priority is a broader local pilot scenario pack.
+Next priority is the local Connector Extension Prototype.
 
 See:
 

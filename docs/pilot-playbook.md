@@ -4,7 +4,7 @@ This playbook describes the current supported path for a local enterprise pilot 
 
 The goal is to help a team evaluate the execution-control layer without guessing which parts are stable. The pilot stays local-first, dependency-light, and explicit about limits.
 
-## Scenario
+## Single Scenario
 
 The bundled pilot smoke models a customer support escalation flow:
 
@@ -13,9 +13,10 @@ The bundled pilot smoke models a customer support escalation flow:
 3. A manual review gate pauses the workflow.
 4. The runner approves the gate to simulate an operator decision.
 5. A `tool_call` node sends a request to a local HTTP receiver.
-6. The HTTP connector resolves an `Authorization` header from a credential handle.
-7. The control plane records audit events and exports a snapshot with node overlays.
-8. A LiteGraph overlay artifact shows run evidence without storing raw trigger input in overlay metadata.
+6. The HTTP connector maps non-secret trigger input into the request body.
+7. The HTTP connector resolves an `Authorization` header from a credential handle.
+8. The control plane records audit events and exports a snapshot with node overlays.
+9. A LiteGraph overlay artifact shows run evidence without storing raw trigger input in overlay metadata.
 
 This scenario is intentionally local. It does not call a real SaaS API, store real secrets, or expose a public webhook endpoint.
 
@@ -39,6 +40,24 @@ Expected high-level result:
   "run_status": "completed"
 }
 ```
+
+## Scenario Pack
+
+Run the broader local pilot pack:
+
+```bash
+python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilot-pack
+```
+
+The pack runs three local-only scenarios:
+
+| Scenario | Workflow | What it exercises |
+| --- | --- | --- |
+| Customer support escalation | `workflow_customer_support_pilot` | Webhook trigger, manual gate, credential handle, mapped ticket metadata, snapshot overlay |
+| Sales renewal follow-up | `workflow_sales_renewal_pilot` | Account metadata mapping, approval before outbound action, connector audit |
+| Risk exception review | `workflow_risk_exception_pilot` | Risk case metadata mapping, analyst approval boundary, connector audit |
+
+The pack prints a compact index with `scenario_count`, per-scenario run status, connector request summaries, and artifact paths. Connector summaries expose body keys and boolean mapping proof only; they do not expose secret values.
 
 ## Generated Artifacts
 
@@ -66,6 +85,8 @@ http://localhost:4173/web/control.html
 
 Load `/tmp/skill2workflow-pilot/artifacts/control-plane-snapshot.json`. Use the Operator, Runs, Audit, and Nodes views to inspect the completed pilot run. The Nodes view should show `call_support_api` with connector status `completed`.
 
+For the scenario pack, artifacts are written under `/tmp/skill2workflow-pilot-pack/<scenario-id>/artifacts/`, with an index at `/tmp/skill2workflow-pilot-pack/artifacts/scenario-pack.json`.
+
 ## What This Pilot Proves
 
 The current local bootstrap can demonstrate:
@@ -76,6 +97,7 @@ The current local bootstrap can demonstrate:
 - compact audit metadata that exposes input keys instead of full input values
 - manual gate pause and resume
 - HTTP connector execution through a local receiver
+- body-only mapping from trigger input into HTTP request bodies
 - credential handle resolution outside Workflow DSL
 - run and connector audit events
 - read-only node overlays in snapshots and LiteGraph JSON
@@ -124,7 +146,9 @@ Run the focused pilot checks:
 
 ```bash
 PYTHONPATH=src python3 -m unittest tests.test_pilot -v
+PYTHONPATH=src python3 -m unittest tests.test_pilot_scenarios -v
 python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot
+python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilot-pack
 python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
 python3 -m json.tool /tmp/skill2workflow-pilot/artifacts/control-plane-snapshot.json >/tmp/skill2workflow-pilot-snapshot-check.json
 python3 -m json.tool /tmp/skill2workflow-pilot/artifacts/workflow.overlay.litegraph.json >/tmp/skill2workflow-pilot-overlay-check.json
@@ -142,8 +166,7 @@ git diff --check
 
 ## Next Pilot Work
 
-After this playbook, the local schedule boundary, and body-only input mapping, the next useful closed loops are:
+After this playbook, the scenario pack, the local schedule boundary, and body-only input mapping, the next useful closed loops are:
 
-- connector extension contracts for product-specific connector packages
-- more pilot scenarios that reuse the same support boundary
+- a local connector extension prototype that proves the documented extension contract without SaaS dependencies
 - richer mapping variants beyond the current body-only contract, once pilot evidence requires them

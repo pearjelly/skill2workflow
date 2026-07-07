@@ -182,6 +182,11 @@ def _pilot_workflow(connector_url: str) -> Dict[str, object]:
                             "source": "skill2workflow-pilot",
                             "event": "support_escalation_approved",
                         },
+                        "input_mapping": [
+                            {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+                            {"from": "/input/priority", "to": "/body/priority", "required": True},
+                            {"from": "/input/ticket_id", "to": "/body/ticket_id", "required": True},
+                        ],
                         "timeout_ms": 2000,
                     },
                     "credentials": [
@@ -229,13 +234,22 @@ def _pilot_workflow(connector_url: str) -> Dict[str, object]:
 def _connector_request_summary(request: Dict[str, object]) -> Dict[str, object]:
     headers = request.get("headers", {}) if isinstance(request, dict) else {}
     authorization = headers.get("Authorization") if isinstance(headers, dict) else ""
+    body = request.get("body", {}) if isinstance(request, dict) else {}
+    body = body if isinstance(body, dict) else {}
+    expected_body = {
+        "customer_id": "customer_123",
+        "priority": "high",
+        "ticket_id": "ticket_123",
+    }
     return {
         "received": bool(request),
         "method": request.get("method", "") if isinstance(request, dict) else "",
         "path": request.get("path", "") if isinstance(request, dict) else "",
         "authorization_present": bool(authorization),
         "credential_header_matched": authorization == f"Bearer {PILOT_SECRET}",
-        "body_keys": sorted((request.get("body") or {}).keys()) if isinstance(request.get("body"), dict) else [],
+        "body_keys": sorted(str(key) for key in body.keys()),
+        "mapped_input_keys": sorted(expected_body.keys()),
+        "mapped_body_matched": all(body.get(key) == value for key, value in expected_body.items()),
     }
 
 
