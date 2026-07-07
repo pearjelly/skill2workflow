@@ -143,6 +143,17 @@ Initial PR boundary:
 - Preserve the same credential handle and audit boundaries used by built-in HTTP connector tests.
 - Keep real SaaS APIs, OAuth, hosted callbacks, queues, and production schedulers out of scope.
 
+Recommended first-cut order:
+
+1. Add a fixture manifest that uses `execution_contract.mode: "external"` and passes `validate_connector_manifest()`.
+2. Prove the default built-in connector registry is unchanged unless the fixture is explicitly loaded in a test.
+3. Add the narrowest execution handoff needed for the fixture to return the same normalized result shape as built-ins.
+4. Run the fixture through a published workflow and assert credential and audit redaction behavior.
+5. Add a documented local smoke command only after the manifest, execution, and audit tests are stable.
+
+First-cut stop rule: do not build a general connector marketplace, package installer, or dynamic discovery framework in Loop 33.
+If the fixture needs more than one explicit loading path, document the gap and decide whether the contract needs hardening before implementation continues.
+
 Loop 33 planning guardrails:
 
 - Treat the prototype as an out-of-core fixture, not as a new built-in connector.
