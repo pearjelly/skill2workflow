@@ -18,6 +18,7 @@ Current capability snapshot:
 - Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events, with operation-connection cleanup covered by tests
 - Connector runtime: built-in manual and HTTP connector manifests, minimum connector extension contract, `tool_call` binding validation, HTTP execution, body-only trigger input mapping, local credential handles, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
 - Connector extension prototype: explicitly loaded local `local_echo` fixture, narrow runtime registration, published-run smoke, credential-handle isolation, and compact audit evidence without changing the default built-in registry
+- Connector packaging boundary: repeatable local connector package layout, explicit-loading smoke contract, Workflow DSL compatibility notes, and stability boundaries for package conventions
 - Credential boundary and secret hygiene: documented placeholder and handle rules, local credential-file provider, committed-fixture scanner, and CI guardrail for obvious secret-like values
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
@@ -42,12 +43,12 @@ Important boundaries:
 
 ## Current Priority Snapshot
 
-- Active loop: Loop 34, Connector Packaging Boundary.
-- Active question: can the Loop 33 external connector prototype become a repeatable package shape without adding dynamic discovery, marketplace behavior, or product-specific connector scope?
-- Required evidence: documented package layout, compatibility notes, and a local loading command that keep explicit registration, credential isolation, compact audit behavior, and default registry stability intact.
-- First PR shape: documentation and compatibility boundaries first; runtime changes only if the current explicit loader cannot support the package convention.
-- Decision gate: only move to product-specific connector candidates after the package boundary is repeatable from a fresh checkout.
-- Deferred: product-specific SaaS connectors, hosted ingress, production scheduling, OAuth, and connector marketplace work.
+- Active loop: Loop 35, First Product Connector Candidate.
+- Active question: can one product-specific connector candidate fit the documented package boundary without adding automatic discovery, marketplace behavior, hosted callbacks, or broad credential infrastructure?
+- Required evidence: a selected connector candidate, package-local manifest/executor shape, local smoke strategy, credential-handle plan, and compact audit expectations.
+- First PR shape: candidate selection and local package plan first; implementation only after the candidate can be tested without committing secrets or relying on hosted infrastructure.
+- Decision gate: only implement the first product connector after the candidate plan proves it can stay out-of-core and respect the Loop 34 package boundary.
+- Deferred: connector marketplace work, dynamic discovery, hosted ingress, production scheduling, OAuth, token refresh systems, and broad SaaS connector catalogs.
 
 ## Real Team Pilot Readiness
 
@@ -74,11 +75,12 @@ Ready now:
 - Inspect the documented connector manifest contract that future extension packages must follow.
 - Explicitly load one local external connector fixture without changing the default built-in connector registry.
 - Run a documented external connector prototype smoke with credential-handle and compact audit evidence.
+- Follow a documented local connector package layout and compatibility/stability boundary.
 
 Still needed before serious pilots:
 
-- A connector packaging boundary that turns the prototype into a repeatable package shape and compatibility story.
-- A post-packaging decision gate that confirms whether product-specific connector candidates can stay out-of-core.
+- A first product connector candidate plan that confirms product-specific connector packages can stay out-of-core.
+- A local smoke path for the first product connector candidate that keeps credentials handle-based and audit output compact.
 - Production-grade recurring schedulers, hosted ingress, and real SaaS integrations remain out of scope until local pilot and connector-packaging evidence is stronger.
 
 Pilot sequencing rule: do not add product-specific SaaS connectors until the connector packaging boundary is repeatable after the local extension prototype. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
@@ -120,102 +122,62 @@ Pilot sequencing rule: do not add product-specific SaaS connectors until the con
 | Loop 31: Connector Extension Contract | Complete | Minimum connector manifest contract, execution handoff boundary, credential/audit rules, registry contract tests, docs |
 | Loop 32: Pilot Scenario Pack | Complete | Multi-scenario local pilot pack for customer support, sales renewal, and risk exception workflows, with mapped connector input evidence and artifacts |
 | Loop 33: Connector Extension Prototype | Complete | Explicit local external connector fixture, narrow runtime registration, published workflow smoke, credential-handle isolation, and compact audit evidence |
+| Loop 34: Connector Packaging Boundary | Complete | Repeatable local connector package layout, explicit-loading smoke contract, compatibility notes, and stability boundaries |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 33 proved the local external connector boundary:
+Post-`v0.1.0` work now has one active priority after Loop 34 made the external connector package shape repeatable:
 
-1. turn the explicit external connector prototype into a repeatable package shape before adding product-specific connector packages.
+1. choose and scope the first product connector candidate without coupling it into the core runtime.
 
-### Loop 34: Connector Packaging Boundary
+### Loop 35: First Product Connector Candidate
 
-Goal: turn the Loop 33 external connector prototype into a repeatable package boundary that contributors can copy without changing the core runtime.
+Goal: select one product-specific connector candidate and prove it can fit the Loop 34 package boundary before implementation broadens the runtime.
 
-Why this is next: Loop 33 proves that one out-of-core fixture can be explicitly loaded and executed while preserving Workflow DSL authority, credential isolation, and compact audit semantics. The next risk is whether that shape is clear enough for repeatable examples before any real SaaS connector is added.
+Why this is next: Loop 34 gives contributors a repeatable package layout, explicit-loading contract, compatibility notes, and stability boundaries. The next risk is selecting a product connector that can be tested locally, keep secrets handle-based, and produce compact audit evidence without pulling the project into marketplace or hosted-integration work.
 
-Status: next engineering loop.
+Status: next decision loop.
 
-Start condition: Loop 33 has merged the explicit local external connector fixture and smoke command.
+Start condition: Loop 34 has documented the repeatable package boundary and kept the `local_echo` smoke green.
 
 Initial PR boundary:
 
-- Document a minimal local connector package layout, including manifest module, executor entrypoint, tests, and smoke command expectations.
-- Keep explicit loading and registration as the only supported runtime path.
-- Preserve the default built-in registry unless a fixture is explicitly loaded.
-- Add compatibility notes for manifest version, execution contract version, credential summaries, and audit fields.
-- Keep real SaaS APIs, OAuth, hosted callbacks, queues, production schedulers, dynamic discovery, and marketplaces out of scope.
-- Avoid runtime changes in the first cut unless documentation exposes a concrete gap in the current explicit loader.
-
-Loop 34 work products:
-
-- A package layout checklist for local connector examples.
-- A compatibility note that separates Workflow DSL `0.1.0`, connector manifest version, and experimental package conventions.
-- A stability note that makes explicit loading stable enough for examples while keeping automatic discovery experimental.
-- A smoke-command contract that proves the packaged fixture can run without network SaaS dependencies.
-- A decision note for whether Loop 35 can evaluate a first product connector candidate.
+- Pick one candidate connector and document why it is the right first product-specific package.
+- Define the package-local manifest, executor scope, fixture strategy, credential handles, and smoke path before writing connector runtime code.
+- Require a local-only or dry-run smoke path that does not commit secrets and does not require hosted callbacks.
+- Keep the connector outside the built-in registry and load it explicitly.
+- Defer OAuth, token refresh, hosted callbacks, production scheduling, marketplace indexing, and broad connector catalogs.
 
 Recommended first-cut order:
 
-1. Extract the Loop 33 `local_echo` fixture shape into documented package conventions.
-2. Add a package-layout checklist to `docs/connectors.md` and `docs/examples.md`.
-3. Add tests or smoke assertions that package metadata remains compatible with the existing explicit loader.
-4. Update compatibility and stability docs so external connector packages know what is stable versus experimental.
-5. Keep the existing external connector smoke green as the acceptance path.
+1. Compare candidate connector options against local smokeability, credential boundary, audit evidence, and enterprise relevance.
+2. Select one candidate and document the minimum action surface.
+3. Define the package layout using the Loop 34 conventions.
+4. Define local fixtures and smoke commands before implementation.
+5. Add the implementation only if the candidate can satisfy the package and smoke boundary.
 
-First-cut stop rule: do not introduce a package installer, automatic discovery path, or product-specific connector during Loop 34. If repeatable packaging requires runtime behavior beyond explicit loading, document that gap before widening the runtime surface.
+Loop 35 acceptance evidence:
 
-Loop 34 planning guardrails:
+- The selected connector has a documented package-local manifest and executor scope.
+- The candidate has a local or dry-run smoke plan that can run from a fresh checkout without committed secrets.
+- Credential values remain outside Workflow DSL, run state, audit events, and committed fixtures.
+- Product-specific connector code remains out-of-core and explicitly loaded.
+- The work does not add automatic discovery, installer, marketplace, OAuth, hosted callbacks, queues, or production schedulers.
 
-- Treat connector packages as local source fixtures until the boundary is stable.
-- Keep `docs/connectors.md` as the connector contract source of truth.
-- Do not create a second manifest format.
-- Preserve existing audit field names for connector status, attempts, errors, credential handles, and input mapping evidence.
-- Prefer compatibility documentation and tests over new runtime abstraction unless the current prototype cannot be packaged cleanly.
-
-Loop 34 implementation entry points:
-
-- `docs/connectors.md` should define the repeatable package layout, required module-level symbols, explicit loader expectations, and audit/credential result shape.
-- `docs/examples.md` should explain how the local package fixture relates to committed examples versus runtime-generated smoke artifacts.
-- `docs/workflow-dsl-compatibility.md` should state how connector package manifests relate to Workflow DSL `0.1.0` compatibility and what remains experimental.
-- `docs/stability.md` should distinguish stable connector contract fields from experimental loader/package conventions.
-- `examples/connectors/local_echo_connector.py` should remain the reference fixture, but it should not become a hidden built-in connector.
-- `tests/test_connectors.py`, `tests/test_external_connector_smoke.py`, and `tests/test_storage.py` should keep proving explicit registration, smokeability, compact audit metadata, and storage hygiene.
-
-Loop 34 acceptance evidence:
-
-- A contributor can inspect one documented package layout and understand where manifest, executor, tests, and smoke command live.
-- Explicit loading remains the only supported extension path.
-- The Loop 33 `local_echo` smoke still runs from a fresh checkout.
-- Compatibility and stability docs state which connector package fields are stable, experimental, or intentionally unsupported.
-- Product-specific SaaS connector work remains deferred.
-
-Loop 34 explicit non-goals:
-
-- Do not add product-specific SaaS connectors.
-- Do not add automatic connector discovery, package installation, marketplace indexing, OAuth, hosted callbacks, queues, or production schedulers.
-- Do not broaden trigger input mapping beyond the current body-only contract.
-- Do not make connector package metadata override Workflow DSL authority.
-
-Loop 34 verification commands:
+Loop 35 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- `python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector-loop34`
+- `python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector-loop35`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/secret_hygiene.py examples/workflows`
 - `git diff --check`
 
-Loop 34 done means:
+Loop 35 done means:
 
-- The external connector extension path is not just a one-off prototype; it has a documented repeatable package boundary.
-- The project has enough packaging evidence to evaluate a first product-specific connector candidate without coupling it into the core runtime.
-
-After Loop 34 decision gate:
-
-- If the package boundary remains explicit, repeatable, and dependency-light, Loop 35 may evaluate one first product connector candidate.
-- If packaging requires broader runtime surface area, harden the connector package contract before selecting any SaaS connector.
-- Product-specific connectors remain deferred until credential handling, audit behavior, and package loading are repeatable from a fresh checkout.
+- The project has one justified product connector candidate and an implementation boundary that preserves the package model.
+- If implemented, the first product connector proves the out-of-core package path without becoming a marketplace or hosted integration platform.
 
 ## Near-Term Loop Queue
 
@@ -233,15 +195,15 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop 31: Connector Extension Contract | Complete | Define stable boundaries for product-specific connectors after input mapping | connector protocol docs, manifest contract, local test harness |
 | Loop 32: Pilot Scenario Pack | Complete | Add more end-to-end pilot scenarios using triggers, schedules, credentials, and mapped connector input | scenario fixtures, smoke helpers, operator checklist |
 | Loop 33: Connector Extension Prototype | Complete | Prove one local external connector shape after pilot scenario coverage | local external connector fixture, contract tests, no SaaS dependency |
-| Loop 34: Connector Packaging Boundary | Next | Turn the extension prototype into a repeatable package shape now that Loop 33 validates the boundary | package layout docs, fixture loading command, compatibility notes |
-| Loop 35: First Product Connector Candidate | Deferred | Add a product-specific connector only after packaging and credential boundaries are repeatable | selected connector package, local smoke, credential guide |
+| Loop 34: Connector Packaging Boundary | Complete | Turn the extension prototype into a repeatable package shape now that Loop 33 validates the boundary | package layout docs, fixture loading command, compatibility notes |
+| Loop 35: First Product Connector Candidate | Next | Select and scope one product connector candidate only after packaging and credential boundaries are repeatable | candidate decision note, package plan, local smoke strategy |
 
 Loop selection rules:
 
 - Pick the next loop only after the previous loop is merged or explicitly deferred.
 - Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
 - Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
-- Do not add product-specific SaaS connectors until the connector packaging boundary is repeatable outside the built-in registry.
+- Do not add product-specific SaaS connectors until the Loop 35 candidate plan proves the connector can stay outside the built-in registry.
 
 ## Release Tag Plan
 
@@ -283,7 +245,7 @@ Status: delivered by Loops 1-9.
 
 ### v0.2: Connector Runtime
 
-Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Body-only trigger input mapping shipped in Loop 30. Connector extension contract shipped in Loop 31. Pilot scenario pack evidence shipped in Loop 32. Local connector extension prototype shipped in Loop 33. Future work should add product-specific extensions only after the connector packaging boundary is repeatable.
+Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Body-only trigger input mapping shipped in Loop 30. Connector extension contract shipped in Loop 31. Pilot scenario pack evidence shipped in Loop 32. Local connector extension prototype shipped in Loop 33. Connector packaging boundary shipped in Loop 34. Future work should add product-specific extensions only after the Loop 35 candidate plan proves they can stay out-of-core.
 
 - Connector manifests
 - Connector binding validation
@@ -295,7 +257,8 @@ Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retr
 - Local credential-provider boundary for handle-based HTTP headers
 - Minimum connector manifest and execution handoff contract
 - Explicit local external connector prototype with credential and audit redaction evidence
-- Future: repeatable connector package boundary before product-specific connector packages
+- Repeatable connector package boundary before product-specific connector packages
+- Future: first product connector candidate selection and local smoke strategy
 
 ### v0.3: Authoring Experience
 
@@ -352,7 +315,7 @@ Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local 
 
 ### v0.7: Pilot Integration Boundary
 
-Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, body-only input mapping, pilot playbook, scenario pack, connector extension contract semantics, and one explicit external connector prototype are stable enough for local evaluation. Connector packaging boundary work starts in Loop 34.
+Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, body-only input mapping, pilot playbook, scenario pack, connector extension contract semantics, one explicit external connector prototype, and the connector package boundary are stable enough for local evaluation. First product connector candidate selection starts in Loop 35.
 
 - Credential provider interface
 - Secret-handle documentation without secret storage in Workflow DSL
@@ -364,7 +327,8 @@ Status: local trigger, input, credential, webhook, scheduled trigger, visual ins
 - Connector extension contract for future product-specific packages
 - Pilot scenario pack covering customer support, sales renewal, and risk exception workflows
 - Explicit local external connector prototype
-- Next: connector packaging boundary
+- Connector packaging boundary
+- Next: first product connector candidate
 - Future: product-specific connector packages and hosted control-plane integrations
 
 ### v1.0: Production Baseline
@@ -402,7 +366,7 @@ These are intentionally deferred until the local open-source runtime is stronger
 - Distributed scheduling
 - Automatic connector package discovery or installation
 - OAuth flows, hosted connector callbacks, and token refresh systems
-- Product-specific SaaS connectors before the Loop 34 package boundary decision gate
+- Product-specific SaaS connectors before the Loop 35 candidate decision gate
 - Complex enterprise connector marketplace
 - Guaranteed automatic conversion of arbitrary SOP documents
 

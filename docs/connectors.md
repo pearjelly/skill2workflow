@@ -198,6 +198,52 @@ External connector executors must return the same compact result shape as built-
 
 Published-run audit events promote compact connector metadata for inspection. For external fixtures this includes fields such as `credential_status`, `credential_handles`, `input_mapping_status`, and `input_mapping_keys`, not payload values.
 
+## Connector Package Layout
+
+Loop 34 treats a connector package as a local source fixture that can be copied, reviewed, tested, and explicitly loaded. A package is not installed automatically and does not register itself with the default connector registry.
+
+Reference layout:
+
+```text
+examples/connectors/
+  local_echo_connector.py  # MANIFEST plus execute(...) reference implementation
+```
+
+Required package surface:
+
+| Item | Requirement |
+| --- | --- |
+| `MANIFEST` | Module-level dict that passes `validate_connector_manifest(MANIFEST)`. |
+| `MANIFEST.execution_contract.mode` | Must be `external` for out-of-core connector fixtures. |
+| `MANIFEST.execution_contract.entrypoint` | Human-readable module path to the executor, such as `examples/connectors/local_echo_connector.py:execute`. |
+| `execute(binding, credential_provider=None, context=None)` | Module-level callable used by the explicit loader. |
+| Result shape | Dict with `status`, `connector`, `output`, and optional `error`, `input_mapping`, and `credentials` summaries. |
+| Credential behavior | Resolve handles at execution time, but return only handle names and compact status. |
+| Audit behavior | Return compact metadata only; never return raw payload values, raw authorization headers, or resolved secrets. |
+
+Explicit package loading remains the only supported package path:
+
+```python
+from pathlib import Path
+
+from skill2workflow.connectors import ConnectorRuntime
+from skill2workflow.external_connectors import load_external_connector
+
+external_connector = load_external_connector(Path("examples/connectors/local_echo_connector.py"))
+runtime = ConnectorRuntime([external_connector])
+```
+
+Connector package smoke contract:
+
+- The package can be loaded from a fresh checkout by file path.
+- `ConnectorRuntime().list_connectors()` still returns only `manual` and `http`.
+- `ConnectorRuntime([external_connector]).list_connectors()` includes the external connector id.
+- A published workflow can execute the external connector through the existing control plane.
+- Smoke artifacts include workflow, run, audit, connector, trigger, and control-plane snapshot JSON.
+- Resolved credential values and raw mapped business values do not appear in run state, audit events, or smoke result summaries.
+
+Package conventions intentionally exclude automatic connector discovery, package installation, marketplace indexing, OAuth, hosted callbacks, queues, production schedulers, and product-specific SaaS connector behavior.
+
 HTTP connector bindings may also reference local credential handles:
 
 ```json

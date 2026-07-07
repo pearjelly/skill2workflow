@@ -22,6 +22,8 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Local webhook route and response shape documented in `docs/triggers.md`
 - Body-only HTTP connector input mapping documented in `docs/connectors.md`
 - Minimum connector manifest contract documented in `docs/connectors.md`
+- explicit local connector fixture loading for examples, using `load_external_connector(path)` plus `ConnectorRuntime([external_connector])`
+- Connector package layout expectations documented in `docs/connectors.md`
 
 ## Experimental
 
@@ -33,7 +35,8 @@ These surfaces may change while the project learns from real workflows:
 - LiteGraph node layout and web editor UI
 - Visual write-back allowlist beyond the documented fields
 - Connector manifest fields beyond the documented minimum contract
-- Dynamic connector loading and external connector package discovery
+- Dynamic connector loading, automatic connector discovery and product-specific connector packages
+- Connector package installation, marketplace indexing, OAuth, hosted callbacks, queues, and production schedulers
 - HTTP connector request metadata beyond documented method, URL, headers, body, timeout, credential handles, and body-only input mapping
 - Advanced credential provider configuration beyond local static files
 - Advanced retry behavior beyond documented connector-node retry execution

@@ -78,6 +78,18 @@ python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-exter
 
 Use it to evaluate the connector extension boundary without product-specific SaaS APIs, OAuth, automatic discovery, hosted callbacks, queues, or production schedulers.
 
+### Local Connector Package Shape
+
+`examples/connectors/local_echo_connector.py` is the reference package-shape fixture for local external connectors. It is intentionally a single Python file with module-level `MANIFEST` and `execute(binding, credential_provider=None, context=None)` symbols so contributors can inspect the smallest repeatable package boundary.
+
+The fixture is not a committed Workflow DSL example. The workflow, run, audit, connector list, trigger response, and control-plane snapshot are runtime-generated smoke artifacts produced by:
+
+```bash
+python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector
+```
+
+Use this package shape when reviewing connector package conventions. Do not treat it as automatic connector discovery, a package installer, marketplace behavior, or a product-specific SaaS connector template.
+
 ### Local Pilot Scenario Pack
 
 The pilot scenario pack is generated at runtime rather than committed as static fixtures. It runs customer support escalation, sales renewal follow-up, and risk exception review through local-only workflows and HTTP receivers:
