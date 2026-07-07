@@ -45,6 +45,7 @@ Important boundaries:
 - Active loop: Loop 34, Connector Packaging Boundary.
 - Active question: can the Loop 33 external connector prototype become a repeatable package shape without adding dynamic discovery, marketplace behavior, or product-specific connector scope?
 - Required evidence: documented package layout, compatibility notes, and a local loading command that keep explicit registration, credential isolation, compact audit behavior, and default registry stability intact.
+- First PR shape: documentation and compatibility boundaries first; runtime changes only if the current explicit loader cannot support the package convention.
 - Decision gate: only move to product-specific connector candidates after the package boundary is repeatable from a fresh checkout.
 - Deferred: product-specific SaaS connectors, hosted ingress, production scheduling, OAuth, and connector marketplace work.
 
@@ -145,6 +146,15 @@ Initial PR boundary:
 - Preserve the default built-in registry unless a fixture is explicitly loaded.
 - Add compatibility notes for manifest version, execution contract version, credential summaries, and audit fields.
 - Keep real SaaS APIs, OAuth, hosted callbacks, queues, production schedulers, dynamic discovery, and marketplaces out of scope.
+- Avoid runtime changes in the first cut unless documentation exposes a concrete gap in the current explicit loader.
+
+Loop 34 work products:
+
+- A package layout checklist for local connector examples.
+- A compatibility note that separates Workflow DSL `0.1.0`, connector manifest version, and experimental package conventions.
+- A stability note that makes explicit loading stable enough for examples while keeping automatic discovery experimental.
+- A smoke-command contract that proves the packaged fixture can run without network SaaS dependencies.
+- A decision note for whether Loop 35 can evaluate a first product connector candidate.
 
 Recommended first-cut order:
 
@@ -377,6 +387,7 @@ Contributors can help in these areas:
 - LiteGraph node UI and expanded graph-to-DSL write-back
 - Executor policies such as retry, timeout, and checkpoint behavior
 - Connector manifests and example connectors
+- Connector package layout, compatibility notes, and explicit-loading smoke examples
 - Credential provider boundaries and safe connector examples
 - Example workflows for sales, approval, customer service, risk review, and operations analysis
 - Documentation and enterprise deployment guides
@@ -389,6 +400,9 @@ These are intentionally deferred until the local open-source runtime is stronger
 - Full RBAC or IAM
 - Complete BPMN compatibility
 - Distributed scheduling
+- Automatic connector package discovery or installation
+- OAuth flows, hosted connector callbacks, and token refresh systems
+- Product-specific SaaS connectors before the Loop 34 package boundary decision gate
 - Complex enterprise connector marketplace
 - Guaranteed automatic conversion of arbitrary SOP documents
 
