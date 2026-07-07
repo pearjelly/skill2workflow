@@ -39,6 +39,16 @@ Important boundaries:
 - Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
 - `0.1.x` compatibility is documented for Workflow DSL `0.1.0`; undocumented internals remain experimental.
 
+## Current Priority Snapshot
+
+- Active loop: Loop 33, Connector Extension Prototype.
+- Active question: can a connector live outside the built-in registry while preserving manifest validation,
+  credential isolation, normalized execution results, and compact audit behavior?
+- Required evidence: one local external connector fixture that runs from a fresh checkout without SaaS APIs,
+  OAuth, hosted callbacks, queues, or production schedulers.
+- Decision gate: only move to connector packaging if Loop 33 proves the boundary without making the core runtime connector-specific.
+- Deferred: product-specific SaaS connectors, hosted ingress, production scheduling, and connector marketplace work.
+
 ## Real Team Pilot Readiness
 
 The project is now useful for local evaluation and contributor onboarding. A real team pilot still needs a few controlled loops before the runtime should be positioned as an operational workflow system.
@@ -154,6 +164,24 @@ Loop 33 implementation slices:
 4. Tests
    - Add manifest, execution, credential, and audit coverage for the external fixture.
    - Keep secret hygiene and full test suite green.
+
+Loop 33 implementation entry points:
+
+- `docs/connectors.md` remains the connector contract source of truth.
+- `src/skill2workflow/connectors.py` should keep the built-in connector registry stable unless a test explicitly
+  registers or loads the external fixture.
+- `tests/test_connectors.py` should cover manifest validation, registry isolation, and normalized connector execution behavior.
+- `tests/test_control_plane.py` or a focused companion test should prove published-run audit behavior stays compact.
+- `README.md` and `docs/examples.md` should document one runnable local command only after the prototype path is stable.
+
+Loop 33 acceptance evidence:
+
+- Default connector listing remains stable without explicitly loading the prototype fixture.
+- The external fixture manifest validates through the same minimum connector contract as built-ins.
+- A workflow can execute the fixture and receive a normalized connector result.
+- Credential handles are resolved at execution time without writing resolved values to Workflow DSL, run state, or audit events.
+- Connector audit events preserve compact status, attempt, error, handle, and input-mapping metadata without raw payload values.
+- A fresh checkout can run the documented smoke command with no network dependency beyond local loopback.
 
 Loop 33 explicit non-goals:
 
