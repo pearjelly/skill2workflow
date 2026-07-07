@@ -15,7 +15,7 @@ Current capability snapshot:
 - Visual layer: Workflow DSL renders to LiteGraph JSON, read-only run overlays can be attached to nodes, and safe visual edits can write back to DSL
 - Runtime: local executor supports run state, initial run context, human-gate pause/resume, connector retry policy, recovery events, run listing, and run detail
 - Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API with durable input context, deterministic local schedules, resume, audit log, filtered audit queries, promoted runtime policy events, and compact node overlay export
-- Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
+- Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events, with operation-connection cleanup covered by tests
 - Connector runtime: built-in manual and HTTP connector manifests, minimum connector extension contract, `tool_call` binding validation, HTTP execution, body-only trigger input mapping, local credential handles, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
 - Connector extension prototype: explicitly loaded local `local_echo` fixture, narrow runtime registration, published-run smoke, credential-handle isolation, and compact audit evidence without changing the default built-in registry
 - Credential boundary and secret hygiene: documented placeholder and handle rules, local credential-file provider, committed-fixture scanner, and CI guardrail for obvious secret-like values
@@ -36,7 +36,7 @@ Important boundaries:
 
 - Published workflow artifacts remain immutable JSON documents in both storage modes.
 - The visual graph is an editor/view. Workflow DSL remains the execution truth source.
-- Connector runtime is an MVP boundary. Enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
+- Connector runtime is an MVP boundary. Enterprise credential management, dynamic connector discovery, connector marketplaces, and product-specific connectors remain later work.
 - Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
 - `0.1.x` compatibility is documented for Workflow DSL `0.1.0`; undocumented internals remain experimental.
 
@@ -44,7 +44,7 @@ Important boundaries:
 
 - Active loop: Loop 34, Connector Packaging Boundary.
 - Active question: can the Loop 33 external connector prototype become a repeatable package shape without adding dynamic discovery, marketplace behavior, or product-specific connector scope?
-- Required evidence: documented package layout, compatibility notes, and a local loading command that keep explicit registration, credential isolation, and compact audit behavior intact.
+- Required evidence: documented package layout, compatibility notes, and a local loading command that keep explicit registration, credential isolation, compact audit behavior, and default registry stability intact.
 - Decision gate: only move to product-specific connector candidates after the package boundary is repeatable from a fresh checkout.
 - Deferred: product-specific SaaS connectors, hosted ingress, production scheduling, OAuth, and connector marketplace work.
 
@@ -78,7 +78,7 @@ Still needed before serious pilots:
 
 - A connector packaging boundary that turns the prototype into a repeatable package shape and compatibility story.
 - A post-packaging decision gate that confirms whether product-specific connector candidates can stay out-of-core.
-- Production-grade recurring schedulers, hosted ingress, and real SaaS integrations remain out of scope until local pilot and connector-extension evidence is stronger.
+- Production-grade recurring schedulers, hosted ingress, and real SaaS integrations remain out of scope until local pilot and connector-packaging evidence is stronger.
 
 Pilot sequencing rule: do not add product-specific SaaS connectors until the connector packaging boundary is repeatable after the local extension prototype. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
@@ -164,6 +164,15 @@ Loop 34 planning guardrails:
 - Preserve existing audit field names for connector status, attempts, errors, credential handles, and input mapping evidence.
 - Prefer compatibility documentation and tests over new runtime abstraction unless the current prototype cannot be packaged cleanly.
 
+Loop 34 implementation entry points:
+
+- `docs/connectors.md` should define the repeatable package layout, required module-level symbols, explicit loader expectations, and audit/credential result shape.
+- `docs/examples.md` should explain how the local package fixture relates to committed examples versus runtime-generated smoke artifacts.
+- `docs/workflow-dsl-compatibility.md` should state how connector package manifests relate to Workflow DSL `0.1.0` compatibility and what remains experimental.
+- `docs/stability.md` should distinguish stable connector contract fields from experimental loader/package conventions.
+- `examples/connectors/local_echo_connector.py` should remain the reference fixture, but it should not become a hidden built-in connector.
+- `tests/test_connectors.py`, `tests/test_external_connector_smoke.py`, and `tests/test_storage.py` should keep proving explicit registration, smokeability, compact audit metadata, and storage hygiene.
+
 Loop 34 acceptance evidence:
 
 - A contributor can inspect one documented package layout and understand where manifest, executor, tests, and smoke command live.
@@ -171,6 +180,13 @@ Loop 34 acceptance evidence:
 - The Loop 33 `local_echo` smoke still runs from a fresh checkout.
 - Compatibility and stability docs state which connector package fields are stable, experimental, or intentionally unsupported.
 - Product-specific SaaS connector work remains deferred.
+
+Loop 34 explicit non-goals:
+
+- Do not add product-specific SaaS connectors.
+- Do not add automatic connector discovery, package installation, marketplace indexing, OAuth, hosted callbacks, queues, or production schedulers.
+- Do not broaden trigger input mapping beyond the current body-only contract.
+- Do not make connector package metadata override Workflow DSL authority.
 
 Loop 34 verification commands:
 
@@ -184,6 +200,12 @@ Loop 34 done means:
 
 - The external connector extension path is not just a one-off prototype; it has a documented repeatable package boundary.
 - The project has enough packaging evidence to evaluate a first product-specific connector candidate without coupling it into the core runtime.
+
+After Loop 34 decision gate:
+
+- If the package boundary remains explicit, repeatable, and dependency-light, Loop 35 may evaluate one first product connector candidate.
+- If packaging requires broader runtime surface area, harden the connector package contract before selecting any SaaS connector.
+- Product-specific connectors remain deferred until credential handling, audit behavior, and package loading are repeatable from a fresh checkout.
 
 ## Near-Term Loop Queue
 
