@@ -44,6 +44,8 @@ class PilotPlaybookTests(TestCase):
         self.assertNotIn("ticket_123", json.dumps(graph["extra"]["run_overlay"]))
         self.assertTrue(result["connector_request"]["authorization_present"])
         self.assertTrue(result["connector_request"]["credential_header_matched"])
+        self.assertTrue(result["connector_request"]["mapped_body_matched"])
+        self.assertIn("ticket_id", result["connector_request"]["body_keys"])
         self.assertNotIn("local-secret-value", json.dumps(result))
 
     def test_pilot_playbook_reset_replaces_previous_workspace(self):

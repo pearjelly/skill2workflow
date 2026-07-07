@@ -29,6 +29,7 @@ Current capability snapshot:
 - Pilot playbook: one-command local customer-support pilot smoke with webhook trigger, durable input, manual gate resume, credential handle, HTTP connector execution, audit, snapshot, and LiteGraph overlay artifacts
 - Scheduled trigger boundary: deterministic one-shot local schedule definitions, due-run CLI, trigger-boundary execution, audit metadata, and snapshot inspection
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
+- Pilot scenario pack: local customer-support, sales-renewal, and risk-exception smokes that reuse trigger input, body-only mapping, credential handles, manual gates, audit, snapshots, and LiteGraph overlays
 
 Important boundaries:
 
@@ -59,14 +60,15 @@ Ready now:
 - Trigger published workflows from deterministic one-shot local schedules.
 - Inspect read-only node-level run and audit overlays in the LiteGraph editor and local control-plane UI.
 - Follow a documented local pilot playbook with a runnable customer-support escalation scenario.
+- Run a documented local pilot scenario pack across customer-support, sales-renewal, and risk-exception workflow shapes.
 - Inspect the documented connector manifest contract that future extension packages must follow.
 
 Still needed before serious pilots:
 
-- A broader pilot scenario pack that reuses the same trigger, schedule, credential, mapping, audit, and overlay boundaries.
+- A local connector extension prototype that proves the extension contract with an out-of-core fixture and no SaaS dependency.
 - Production-grade recurring schedulers remain out of scope until local pilot evidence and scheduling contracts are stronger.
 
-Pilot sequencing rule: do not add product-specific SaaS connectors until the broader pilot scenario pack proves the extension boundary across more than one local workflow shape. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
+Pilot sequencing rule: do not add product-specific SaaS connectors until a local connector extension prototype proves the documented extension boundary after the scenario pack. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
 ## Completed Loops
 
@@ -103,64 +105,65 @@ Pilot sequencing rule: do not add product-specific SaaS connectors until the bro
 | Loop 29: Scheduled Trigger Boundary | Complete | Deterministic local schedule contract, schedule CLI, due-run helper, audit tests, schedule smoke, docs |
 | Loop 30: Trigger Input Mapping | Complete | Body-only HTTP connector input mapping from durable trigger context, validator/schema coverage, CLI/webhook/schedule tests, docs |
 | Loop 31: Connector Extension Contract | Complete | Minimum connector manifest contract, execution handoff boundary, credential/audit rules, registry contract tests, docs |
+| Loop 32: Pilot Scenario Pack | Complete | Multi-scenario local pilot pack for customer support, sales renewal, and risk exception workflows, with mapped connector input evidence and artifacts |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 31 documented the connector extension contract:
+Post-`v0.1.0` work now has one active priority after Loop 32 broadened local pilot evidence:
 
-1. broaden local pilot scenarios before adding product-specific connector packages.
+1. prove one local external connector shape before adding product-specific connector packages.
 
-### Loop 32: Pilot Scenario Pack
+### Loop 33: Connector Extension Prototype
 
-Goal: add more end-to-end local pilot scenarios that prove the current trigger, schedule, credential, input mapping, audit, snapshot, and overlay boundaries generalize beyond one customer-support example.
+Goal: prove that the documented connector extension contract can run one local external connector shape without product-specific SaaS dependencies.
 
-Why this is next: Loop 31 defines how future connectors should preserve Workflow DSL authority, credential isolation, and compact audit semantics. The project now needs more local pilot evidence before real SaaS connector packages are worth adding.
+Why this is next: Loop 32 proves the current runtime boundary across multiple local workflow shapes. The next risk is whether connector extensions can remain out-of-core while preserving Workflow DSL authority, credential isolation, and compact audit semantics.
 
 Status: next engineering loop.
 
-Start condition: Loop 31 has documented the connector extension boundary, even if no product-specific connector packages exist yet.
+Start condition: Loop 32 has completed the multi-scenario local pilot pack.
 
 Initial PR boundary:
 
-- Add local-only scenarios that use existing built-in connectors and documented placeholders.
-- Prefer business workflows that enterprise evaluators recognize: sales renewal follow-up, risk exception review, operations alert triage, or approval-heavy back-office routing.
-- Reuse the same smoke-helper pattern as `scripts/pilot_playbook_smoke.py`.
-- Keep real SaaS APIs, OAuth, hosted ingress, and production schedulers out of scope.
+- Add one local external connector fixture that is discovered through the documented manifest contract.
+- Keep execution deterministic and dependency-light.
+- Preserve the same credential handle and audit boundaries used by built-in HTTP connector tests.
+- Keep real SaaS APIs, OAuth, hosted callbacks, queues, and production schedulers out of scope.
 
-Loop 32 implementation slices:
+Loop 33 implementation slices:
 
-1. Scenario selection
-   - Pick two or three enterprise workflows that exercise different gates, trigger inputs, and connector mappings.
-   - Keep each scenario runnable from a fresh checkout with only local HTTP servers or fixture data.
-2. Smoke helpers
-   - Add deterministic smoke scripts or extend the pilot helper without coupling scenarios together.
-   - Export run state, audit, snapshots, and LiteGraph overlays for each scenario.
+1. Fixture shape
+   - Define one local external connector manifest and fixture implementation.
+   - Keep the fixture outside the built-in connector registry until explicitly loaded.
+2. Runtime handoff
+   - Prove the control plane can validate and execute the fixture through the documented extension boundary.
+   - Preserve credential redaction and compact connector audit fields.
 3. Documentation
-   - Update `docs/pilot-playbook.md`, `docs/examples.md`, and `README.md` so evaluators can run the scenarios.
+   - Update `docs/connectors.md`, `docs/examples.md`, and `README.md` with the supported local extension path.
 4. Tests
-   - Add unittest coverage for smoke helpers or generated artifacts.
-   - Keep secret hygiene and fixture synchronization green.
+   - Add manifest, execution, credential, and audit coverage for the external fixture.
+   - Keep secret hygiene and full test suite green.
 
-Loop 32 explicit non-goals:
+Loop 33 explicit non-goals:
 
 - Do not add product-specific SaaS connectors.
 - Do not add dynamic connector loading, OAuth, hosted callbacks, queues, or production schedulers.
-- Do not broaden body-only input mapping unless pilot evidence identifies a specific next contract.
+- Do not broaden body-only input mapping unless extension evidence identifies a specific next contract.
 
-Loop 32 verification commands:
+Loop 33 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/secret_hygiene.py examples/workflows`
 - `git diff --check`
 
-Loop 32 done means:
+Loop 33 done means:
 
-- A fresh checkout can run multiple pilot smokes without external services.
-- The examples demonstrate trigger input, body-only mapping, credential handles, manual gates, audit, snapshots, and visual overlays in repeatable ways.
-- The project has stronger evidence for real team pilots before product-specific connector packages begin.
+- A fresh checkout can run one local external connector fixture without external services.
+- The extension path preserves connector manifest validation, credential-handle isolation, execution handoff, and audit behavior.
+- The project has stronger evidence for future product-specific connector packages without coupling them into the core runtime.
 
 ## Near-Term Loop Queue
 
@@ -176,15 +179,15 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop 29: Scheduled Trigger Boundary | Complete | Trigger published workflows from deterministic local schedules | schedule contract, CLI/helper path, audit tests |
 | Loop 30: Trigger Input Mapping | Complete | Map trigger context into connector request bodies without leaking secrets | input mapping contract, validator tests, connector examples |
 | Loop 31: Connector Extension Contract | Complete | Define stable boundaries for product-specific connectors after input mapping | connector protocol docs, manifest contract, local test harness |
-| Loop 32: Pilot Scenario Pack | Next | Add more end-to-end pilot scenarios using triggers, schedules, credentials, and mapped connector input | scenario fixtures, smoke helpers, operator checklist |
-| Loop 33: Connector Extension Prototype | Planned | Prove one local external connector shape after pilot scenario coverage | local external connector fixture, contract tests, no SaaS dependency |
+| Loop 32: Pilot Scenario Pack | Complete | Add more end-to-end pilot scenarios using triggers, schedules, credentials, and mapped connector input | scenario fixtures, smoke helpers, operator checklist |
+| Loop 33: Connector Extension Prototype | Next | Prove one local external connector shape after pilot scenario coverage | local external connector fixture, contract tests, no SaaS dependency |
 
 Loop selection rules:
 
 - Pick the next loop only after the previous loop is merged or explicitly deferred.
 - Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
 - Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
-- Do not add product-specific SaaS connectors until pilot scenarios validate the connector extension contract against more than one workflow shape.
+- Do not add product-specific SaaS connectors until the local connector extension prototype validates the connector contract outside the built-in registry.
 
 ## Release Tag Plan
 
@@ -226,7 +229,7 @@ Status: delivered by Loops 1-9.
 
 ### v0.2: Connector Runtime
 
-Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Body-only trigger input mapping shipped in Loop 30. Connector extension contract shipped in Loop 31. Future work should add product-specific extensions only after broader local pilot scenarios prove the extension boundary.
+Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Body-only trigger input mapping shipped in Loop 30. Connector extension contract shipped in Loop 31. Pilot scenario pack evidence shipped in Loop 32. Future work should add product-specific extensions only after a local connector extension prototype proves the extension boundary.
 
 - Connector manifests
 - Connector binding validation
@@ -237,7 +240,7 @@ Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retr
 - Committed-fixture secret hygiene guardrails
 - Local credential-provider boundary for handle-based HTTP headers
 - Minimum connector manifest and execution handoff contract
-- Future: product-specific connector packages after broader local pilot evidence
+- Future: product-specific connector packages after a local extension prototype
 
 ### v0.3: Authoring Experience
 
@@ -294,7 +297,7 @@ Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local 
 
 ### v0.7: Pilot Integration Boundary
 
-Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, body-only input mapping, pilot playbook, and connector extension contract semantics are stable enough for local evaluation. Pilot scenario pack work starts in Loop 32.
+Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, body-only input mapping, pilot playbook, scenario pack, and connector extension contract semantics are stable enough for local evaluation. Connector extension prototype work starts in Loop 33.
 
 - Credential provider interface
 - Secret-handle documentation without secret storage in Workflow DSL
@@ -304,7 +307,8 @@ Status: local trigger, input, credential, webhook, scheduled trigger, visual ins
 - Pilot playbook and runnable scenario
 - Body-only trigger input mapping into HTTP connector request bodies
 - Connector extension contract for future product-specific packages
-- Next: pilot scenario pack
+- Pilot scenario pack covering customer support, sales renewal, and risk exception workflows
+- Next: local connector extension prototype
 - Future: product-specific connector packages and hosted control-plane integrations
 
 ### v1.0: Production Baseline
