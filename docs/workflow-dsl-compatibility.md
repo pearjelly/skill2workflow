@@ -90,6 +90,21 @@ Connector manifests use the minimum contract documented in `docs/connectors.md`.
 
 Committed Workflow DSL and LiteGraph example fixtures are checked by `python3 scripts/secret_hygiene.py examples/workflows` for obvious secret-like values. See `docs/credential-boundary.md` for allowed placeholder patterns and the local credential-provider boundary.
 
+## Connector Package Compatibility
+
+Workflow DSL `0.1.0` compatibility is separate from connector package conventions. Workflow DSL stores connector bindings such as `connector.id`, `connector.kind`, request metadata, credential handles, retry policy, and body-only input mapping. A connector package supplies executable code and a connector manifest version outside the Workflow DSL schema.
+
+Current connector package conventions use:
+
+- Workflow DSL schema version: `0.1.0`
+- Connector manifest version: `skill2workflow-connector-0.1.0`
+- Connector execution contract version: `skill2workflow-connector-execution-0.1.0`
+- Explicit local loader: `load_external_connector(path)`
+
+Changing the connector manifest version or execution contract version is not automatically a Workflow DSL breaking change. It becomes a Workflow DSL compatibility issue only if existing `schema_version: "0.1.0"` workflow artifacts can no longer bind to connector ids/kinds, preserve request metadata, validate, publish, or execute through an explicit runtime configuration.
+
+Connector package conventions remain local-first: explicit file loading and registration are supported for examples and smoke tests, while automatic discovery, package installation, connector marketplaces, OAuth, hosted callbacks, queues, and product-specific connector packages remain outside the current compatibility boundary.
+
 ## Consumer Guidance
 
 Consumers should:
