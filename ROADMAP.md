@@ -66,7 +66,8 @@ Ready now:
 Still needed before serious pilots:
 
 - A local connector extension prototype that proves the extension contract with an out-of-core fixture and no SaaS dependency.
-- Production-grade recurring schedulers remain out of scope until local pilot evidence and scheduling contracts are stronger.
+- A post-prototype decision gate that confirms whether the connector boundary is ready for reusable packages or still needs hardening.
+- Production-grade recurring schedulers, hosted ingress, and real SaaS integrations remain out of scope until local pilot and connector-extension evidence is stronger.
 
 Pilot sequencing rule: do not add product-specific SaaS connectors until a local connector extension prototype proves the documented extension boundary after the scenario pack. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
@@ -132,6 +133,14 @@ Initial PR boundary:
 - Preserve the same credential handle and audit boundaries used by built-in HTTP connector tests.
 - Keep real SaaS APIs, OAuth, hosted callbacks, queues, and production schedulers out of scope.
 
+Loop 33 planning guardrails:
+
+- Treat the prototype as an out-of-core fixture, not as a new built-in connector.
+- Require explicit loading or registration in tests so the default built-in connector registry remains stable.
+- Keep the manifest shape aligned with `docs/connectors.md`; do not introduce a second connector contract.
+- Preserve existing audit field names for connector status, attempts, errors, credential handles, and input mapping evidence.
+- Prefer one narrow execution path over a general plugin framework until the first fixture proves the boundary.
+
 Loop 33 implementation slices:
 
 1. Fixture shape
@@ -165,6 +174,12 @@ Loop 33 done means:
 - The extension path preserves connector manifest validation, credential-handle isolation, execution handoff, and audit behavior.
 - The project has stronger evidence for future product-specific connector packages without coupling them into the core runtime.
 
+After Loop 33 decision gate:
+
+- If the prototype preserves the boundary cleanly, the next loop should package the extension shape for repeatable connector examples.
+- If the prototype requires runtime changes, harden the connector contract before any product-specific connector package work.
+- Product-specific SaaS connectors remain deferred until extension packaging, credential handling, and audit behavior are repeatable from a fresh checkout.
+
 ## Near-Term Loop Queue
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
@@ -181,6 +196,8 @@ This queue is ordered by what most improves open-source adoption after the first
 | Loop 31: Connector Extension Contract | Complete | Define stable boundaries for product-specific connectors after input mapping | connector protocol docs, manifest contract, local test harness |
 | Loop 32: Pilot Scenario Pack | Complete | Add more end-to-end pilot scenarios using triggers, schedules, credentials, and mapped connector input | scenario fixtures, smoke helpers, operator checklist |
 | Loop 33: Connector Extension Prototype | Next | Prove one local external connector shape after pilot scenario coverage | local external connector fixture, contract tests, no SaaS dependency |
+| Loop 34: Connector Packaging Boundary | Planned | Turn the extension prototype into a repeatable package shape if Loop 33 validates the boundary | package layout docs, fixture loading command, compatibility notes |
+| Loop 35: First Product Connector Candidate | Deferred | Add a product-specific connector only after packaging and credential boundaries are repeatable | selected connector package, local smoke, credential guide |
 
 Loop selection rules:
 
