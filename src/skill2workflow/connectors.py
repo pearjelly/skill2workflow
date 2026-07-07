@@ -7,13 +7,15 @@ import json
 import socket
 import urllib.error
 import urllib.request
-from typing import Dict, List
+from dataclasses import dataclass
+from typing import Callable, Dict, List
 
 from .credentials import CredentialResolutionError
 
 
 ConnectorBinding = Dict[str, object]
 ConnectorResult = Dict[str, object]
+ExternalConnectorExecutor = Callable[..., ConnectorResult]
 
 CONNECTOR_MANIFEST_VERSION = "skill2workflow-connector-0.1.0"
 CONNECTOR_EXECUTION_CONTRACT_VERSION = "skill2workflow-connector-execution-0.1.0"
@@ -93,6 +95,64 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
 
 class ConnectorExecutionError(Exception):
     """Raised when a connector binding cannot be executed."""
+
+
+@dataclass(frozen=True)
+class ExternalConnector:
+    """Explicitly registered external connector fixture."""
+
+    manifest: Dict[str, object]
+    executor: ExternalConnectorExecutor
+
+
+class ConnectorRuntime:
+    """Execute built-in connectors plus explicitly registered external fixtures."""
+
+    def __init__(self, external_connectors: List[ExternalConnector] = None):
+        self._external_connectors: Dict[str, ExternalConnector] = {}
+        for connector in external_connectors or []:
+            self.register_external_connector(connector)
+
+    def register_external_connector(self, connector: ExternalConnector) -> None:
+        """Register one external connector fixture after validating its manifest."""
+        if not isinstance(connector, ExternalConnector):
+            raise ValueError("external connector must be an ExternalConnector")
+        errors = validate_connector_manifest(connector.manifest)
+        if errors:
+            raise ValueError("; ".join(errors))
+        execution_contract = connector.manifest.get("execution_contract", {})
+        if not isinstance(execution_contract, dict) or execution_contract.get("mode") != "external":
+            raise ValueError("external connector manifest must use execution_contract.mode external")
+        connector_id = str(connector.manifest.get("id") or "")
+        built_in_ids = {str(manifest["id"]) for manifest in DEFAULT_CONNECTORS}
+        if connector_id in built_in_ids:
+            raise ValueError(f"external connector id conflicts with built-in connector: {connector_id}")
+        if not callable(connector.executor):
+            raise ValueError("external connector executor must be callable")
+        self._external_connectors[connector_id] = ExternalConnector(
+            manifest=copy.deepcopy(connector.manifest),
+            executor=connector.executor,
+        )
+
+    def list_connectors(self) -> List[Dict[str, object]]:
+        """Return built-in manifests plus explicitly registered external manifests."""
+        manifests = default_connectors()
+        manifests.extend(copy.deepcopy(item.manifest) for item in self._external_connectors.values())
+        return manifests
+
+    def execute_connector(self, node: Dict[str, object], credential_provider=None, context=None) -> ConnectorResult:
+        """Execute a connector through the built-in path or an explicit external fixture."""
+        binding = node.get("connector")
+        ref = connector_ref(binding)
+        if ref["id"] in self._external_connectors:
+            return _execute_external_connector(
+                self._external_connectors[ref["id"]],
+                binding,
+                ref,
+                credential_provider=credential_provider,
+                context=context,
+            )
+        return execute_connector(node, credential_provider=credential_provider, context=context)
 
 
 def default_connectors() -> List[Dict[str, object]]:
@@ -192,6 +252,57 @@ def execute_connector(node: Dict[str, object], credential_provider=None, context
     if ref["id"] == "manual":
         raise ConnectorExecutionError("manual connector is resumed through human gate state")
     raise ConnectorExecutionError(f"unsupported connector: {ref['id']}")
+
+
+def _execute_external_connector(
+    connector: ExternalConnector,
+    binding: object,
+    ref: Dict[str, str],
+    credential_provider=None,
+    context=None,
+) -> ConnectorResult:
+    if not isinstance(binding, dict):
+        raise ConnectorExecutionError("external connector binding must be an object")
+    result = connector.executor(copy.deepcopy(binding), credential_provider=credential_provider, context=context)
+    if not isinstance(result, dict):
+        raise ConnectorExecutionError("external connector executor must return an object")
+
+    status = str(result.get("status") or "")
+    if status not in {"completed", "failed"}:
+        raise ConnectorExecutionError("external connector result.status must be completed or failed")
+
+    result_connector = connector_ref(result.get("connector") or ref)
+    if result_connector["id"] != ref["id"]:
+        raise ConnectorExecutionError("external connector result.connector.id must match the binding connector.id")
+    if not result_connector["kind"]:
+        result_connector["kind"] = ref["kind"]
+
+    normalized = {
+        "status": status,
+        "connector": result_connector,
+        "output": result.get("output") if isinstance(result.get("output"), dict) else {},
+    }
+    if result.get("error"):
+        normalized["error"] = str(result.get("error"))
+    input_mapping = result.get("input_mapping")
+    if isinstance(input_mapping, dict) and input_mapping:
+        normalized["input_mapping"] = copy.deepcopy(input_mapping)
+    credentials = _normalize_credential_summary(result.get("credentials"))
+    if credentials:
+        normalized["credentials"] = credentials
+    return normalized
+
+
+def _normalize_credential_summary(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    handles = summary.get("handles", [])
+    if not isinstance(handles, list):
+        handles = []
+    return {
+        "status": str(summary.get("status") or ""),
+        "handles": sorted({str(handle) for handle in handles if str(handle)}),
+    }
 
 
 def _execute_http_connector(binding: object, credential_provider=None, context=None) -> ConnectorResult:

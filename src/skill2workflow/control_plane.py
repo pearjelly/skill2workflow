@@ -24,11 +24,17 @@ AuditEvent = Dict[str, object]
 class LocalControlPlane:
     """Manage local workflow versions, published runs, and audit events."""
 
-    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None):
+    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None, connector_runtime=None):
         self.state_dir = Path(state_dir)
         self.workflows_dir = self.state_dir / "workflows"
         self.connectors_path = self.state_dir / "connectors.json"
-        self.executor = LocalExecutor(self.state_dir, storage=storage, credential_provider=credential_provider)
+        self.connector_runtime = connector_runtime
+        self.executor = LocalExecutor(
+            self.state_dir,
+            storage=storage,
+            credential_provider=credential_provider,
+            connector_runtime=connector_runtime,
+        )
         self.store = create_control_store(self.state_dir, storage=storage)
         self.workflows_dir.mkdir(parents=True, exist_ok=True)
         self.state_dir.mkdir(parents=True, exist_ok=True)
@@ -213,6 +219,8 @@ class LocalControlPlane:
             connectors = _load_json(self.connectors_path)
             if isinstance(connectors, list):
                 return connectors
+        if self.connector_runtime is not None:
+            return self.connector_runtime.list_connectors()
         return default_connectors()
 
     def _workflow_record(self, workflow_id: str, version: str) -> WorkflowRecord:
@@ -269,6 +277,8 @@ class LocalControlPlane:
                 "error",
                 "input_mapping_status",
                 "input_mapping_keys",
+                "credential_status",
+                "credential_handles",
             ):
                 if key in event:
                     audit_event[key] = event[key]

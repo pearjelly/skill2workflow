@@ -1,12 +1,16 @@
 import json
+import importlib.util
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from unittest import TestCase
 
 from skill2workflow.connectors import (
     CONNECTOR_MANIFEST_VERSION,
+    ConnectorRuntime,
     ConnectorExecutionError,
+    ExternalConnector,
     _timeout_seconds,
     default_connectors,
     execute_connector,
@@ -46,6 +50,49 @@ class ConnectorTests(TestCase):
         self.assertIn("execution_contract.mode must be built_in or external", errors)
         self.assertIn("credential_contract.supports_handles must be a boolean", errors)
         self.assertIn("audit_contract.value_policy is required", errors)
+
+    def test_connector_runtime_requires_explicit_external_registration(self):
+        runtime = ConnectorRuntime()
+
+        self.assertEqual([manifest["id"] for manifest in runtime.list_connectors()], ["manual", "http"])
+
+        fixture = _load_local_echo_fixture()
+        self.assertEqual(validate_connector_manifest(fixture.MANIFEST), [])
+        external_runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, fixture.execute)])
+
+        self.assertEqual(
+            [manifest["id"] for manifest in external_runtime.list_connectors()],
+            ["manual", "http", "local_echo"],
+        )
+        self.assertEqual([manifest["id"] for manifest in default_connectors()], ["manual", "http"])
+
+    def test_explicit_external_connector_executes_normalized_result_without_secret(self):
+        fixture = _load_local_echo_fixture()
+        runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, fixture.execute)])
+
+        result = runtime.execute_connector(
+            _local_echo_node(handle="demo_api_token"),
+            credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+            context={"input": {"customer_id": "customer_123"}},
+        )
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["connector"], {"id": "local_echo", "kind": "local_echo"})
+        self.assertEqual(result["output"]["body_keys"], ["customer_id", "source"])
+        self.assertEqual(result["credentials"], {"status": "resolved", "handles": ["demo_api_token"]})
+        self.assertEqual(result["input_mapping"], {"status": "applied", "input_keys": ["customer_id"]})
+        self.assertNotIn("secret-token", json.dumps(result))
+        self.assertNotIn("customer_123", json.dumps(result))
+
+    def test_external_connector_missing_credential_fails_before_completion(self):
+        fixture = _load_local_echo_fixture()
+        runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, fixture.execute)])
+
+        with self.assertRaisesRegex(ConnectorExecutionError, "credential handle not found: missing_token"):
+            runtime.execute_connector(
+                _local_echo_node(handle="missing_token"),
+                context={"input": {"customer_id": "customer_123"}},
+            )
 
     def test_http_connector_sends_method_headers_json_body_and_normalizes_response(self):
         server = _ConnectorTestServer()
@@ -263,6 +310,39 @@ def _credential_http_node(url, handle="demo_api_token"):
         }
     ]
     return node
+
+
+def _local_echo_node(handle="demo_api_token"):
+    return {
+        "id": "call_echo",
+        "type": "tool_call",
+        "connector": {
+            "id": "local_echo",
+            "kind": "local_echo",
+            "request": {
+                "body": {"source": "connector-test"},
+                "input_mapping": [
+                    {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+                ],
+            },
+            "credentials": [
+                {
+                    "target": "header",
+                    "name": "Authorization",
+                    "handle": handle,
+                    "prefix": "Bearer ",
+                }
+            ],
+        },
+    }
+
+
+def _load_local_echo_fixture():
+    path = Path(__file__).resolve().parents[1] / "examples" / "connectors" / "local_echo_connector.py"
+    spec = importlib.util.spec_from_file_location("local_echo_connector", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class _ConnectorRequestHandler(BaseHTTPRequestHandler):

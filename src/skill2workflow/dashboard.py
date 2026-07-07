@@ -13,9 +13,9 @@ SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
 MAX_RECENT_EVENTS = 5
 
 
-def build_control_snapshot(state_dir: Path, storage: str = "json") -> Dict[str, object]:
+def build_control_snapshot(state_dir: Path, storage: str = "json", connector_runtime=None) -> Dict[str, object]:
     """Build a read-only control-plane snapshot from existing local state."""
-    control = LocalControlPlane(Path(state_dir), storage=storage)
+    control = LocalControlPlane(Path(state_dir), storage=storage, connector_runtime=connector_runtime)
     workflows = control.list_workflows()
     audit_events = control.list_audit_events()
     runs = [_run_summary(control, run, audit_events) for run in control.list_runs()]

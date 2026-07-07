@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
-from .connectors import ConnectorExecutionError, connector_ref, execute_connector
+from .connectors import ConnectorExecutionError, ConnectorRuntime, connector_ref
 from .storage import create_run_store
 
 
@@ -18,10 +18,11 @@ RunState = Dict[str, object]
 class LocalExecutor:
     """Execute Workflow DSL with pluggable local run-state storage."""
 
-    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None):
+    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None, connector_runtime=None):
         self.state_dir = Path(state_dir)
         self.store = create_run_store(self.state_dir, storage)
         self.credential_provider = credential_provider
+        self.connector_runtime = connector_runtime or ConnectorRuntime()
 
     def run(self, workflow: Dict[str, object], context: Dict[str, object] = None) -> RunState:
         workflow_meta = workflow.get("workflow", {})
@@ -205,7 +206,7 @@ class LocalExecutor:
                 },
             )
             try:
-                connector_result = execute_connector(
+                connector_result = self.connector_runtime.execute_connector(
                     node,
                     credential_provider=self.credential_provider,
                     context=state.get("context", {}),
@@ -263,6 +264,9 @@ class LocalExecutor:
         mapping_summary = connector_result.get("input_mapping")
         if isinstance(mapping_summary, dict) and mapping_summary:
             node_result["input_mapping"] = mapping_summary
+        credential_summary = connector_result.get("credentials")
+        if isinstance(credential_summary, dict) and credential_summary:
+            node_result["credentials"] = credential_summary
         if last_error:
             node_result["last_error"] = last_error
         if connector_result.get("error"):
@@ -281,6 +285,7 @@ class LocalExecutor:
                     "attempt": attempts,
                     "max_attempts": max_attempts,
                     **_input_mapping_event_fields(mapping_summary),
+                    **_credential_event_fields(credential_summary),
                 },
             )
             if recovered:
@@ -306,6 +311,7 @@ class LocalExecutor:
                     "max_attempts": max_attempts,
                     "error": last_error,
                     **_input_mapping_event_fields(mapping_summary),
+                    **_credential_event_fields(credential_summary),
                 },
             )
             next_node = node.get("on_failure")
@@ -375,6 +381,16 @@ def _input_mapping_event_fields(summary: object) -> Dict[str, object]:
     keys = summary.get("input_keys", [])
     if isinstance(keys, list):
         fields["input_mapping_keys"] = [str(key) for key in keys]
+    return fields
+
+
+def _credential_event_fields(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    fields = {"credential_status": str(summary.get("status", ""))}
+    handles = summary.get("handles", [])
+    if isinstance(handles, list):
+        fields["credential_handles"] = [str(handle) for handle in handles]
     return fields
 
 
