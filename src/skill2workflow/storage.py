@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import Dict, List
 
@@ -49,7 +50,7 @@ class SqliteRunStore:
         if not isinstance(events, list):
             events = []
 
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 insert into runs (
@@ -107,19 +108,19 @@ class SqliteRunStore:
             )
 
     def load(self, run_id: str) -> RunState:
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute("select state_json from runs where run_id = ?", (run_id,)).fetchone()
         if row is None:
             raise FileNotFoundError(f"run not found: {run_id}")
         return json.loads(str(row[0]))
 
     def list(self) -> List[RunState]:
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute("select state_json from runs order by run_id").fetchall()
         return [json.loads(str(row[0])) for row in rows]
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 create table if not exists runs (
@@ -148,8 +149,8 @@ class SqliteRunStore:
                 """
             )
 
-    def _connect(self):
-        return sqlite3.connect(self.db_path)
+    def _connection(self):
+        return _sqlite_connection(self.db_path)
 
 
 def create_run_store(state_dir: Path, storage: str):
@@ -212,14 +213,14 @@ class SqliteControlStore:
         self._import_json_state()
 
     def load_index(self) -> Dict[str, WorkflowRecord]:
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute(
                 "select record_key, record_json from workflow_versions order by record_key"
             ).fetchall()
         return {str(row[0]): json.loads(str(row[1])) for row in rows}
 
     def save_index(self, index: Dict[str, WorkflowRecord]) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("delete from workflow_versions")
             connection.executemany(
                 """
@@ -255,7 +256,7 @@ class SqliteControlStore:
             )
 
     def append_audit(self, event: AuditEvent) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 insert into audit_events (
@@ -279,12 +280,12 @@ class SqliteControlStore:
             )
 
     def list_audit_events(self) -> List[AuditEvent]:
-        with self._connect() as connection:
+        with self._connection() as connection:
             rows = connection.execute("select payload_json from audit_events order by sequence").fetchall()
         return [json.loads(str(row[0])) for row in rows]
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 create table if not exists workflow_versions (
@@ -328,8 +329,8 @@ class SqliteControlStore:
                     if isinstance(event, dict):
                         self.append_audit(event)
 
-    def _connect(self):
-        return sqlite3.connect(self.db_path)
+    def _connection(self):
+        return _sqlite_connection(self.db_path)
 
 
 def create_control_store(state_dir: Path, storage: str):
@@ -338,6 +339,13 @@ def create_control_store(state_dir: Path, storage: str):
     if storage == "sqlite":
         return SqliteControlStore(state_dir)
     raise ValueError(f"unsupported control storage: {storage}")
+
+
+@contextmanager
+def _sqlite_connection(db_path: Path):
+    with closing(sqlite3.connect(db_path)) as connection:
+        with connection:
+            yield connection
 
 
 def _event_value(event: Dict[str, object], key: str, default: str) -> str:

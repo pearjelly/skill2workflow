@@ -99,6 +99,7 @@ The current implementation is a dependency-light Python harness because the loca
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Validate and inspect the minimum connector manifest contract for future extensions
+- Explicitly load one local external connector fixture through a narrow runtime registration path while keeping the default built-in registry stable
 - Audit connector execution events through the control plane
 - Audit runtime policy events such as `node_retrying`, `node_recovered`, and `node_failed` through the control plane
 - Export a read-only control-plane snapshot with derived operator insights
@@ -157,6 +158,14 @@ python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilo
 ```
 
 The scenario pack runs customer support escalation, sales renewal follow-up, and risk exception review against local-only receivers. It writes one set of workflow, trigger, run, snapshot, and LiteGraph overlay artifacts per scenario.
+
+Run the local external connector prototype smoke:
+
+```bash
+python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector
+```
+
+The smoke explicitly loads `examples/connectors/local_echo_connector.py`, publishes a workflow that calls it, and writes workflow, run, audit, connector, trigger, and control-plane snapshot artifacts under `/tmp/skill2workflow-external-connector/artifacts/`. The default connector registry remains `manual` and `http` unless this fixture is explicitly loaded.
 
 Run the local scheduled-trigger smoke:
 
@@ -453,6 +462,8 @@ src/skill2workflow/
   control_plane.py # Local workflow registry, audit log, and connector audit events
   dashboard.py     # Read-only control-plane snapshot aggregation
   executor.py     # Durable local execution
+  external_connectors.py # Explicit local external connector fixture loader
+  external_connector_smoke.py # Local external connector prototype smoke helper
   storage.py      # JSON and SQLite local persistence backends
   visualizer.py   # Workflow DSL -> LiteGraph JSON and read-only run overlays
   secret_hygiene.py # Fixture secret hygiene scanner
@@ -466,6 +477,7 @@ src/skill2workflow/
   cli.py          # Command line interface
 scripts/          # Maintainer command helpers
 examples/skills/  # Example SKILL.md inputs
+examples/connectors/ # Explicit local external connector fixtures
 examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
 examples/control-plane-snapshot.json # Example control-plane UI snapshot
 schemas/           # Versioned Workflow DSL JSON Schema
@@ -519,8 +531,9 @@ The bootstrap MVP now covers all five approved architecture layers in minimal lo
 - Trigger Input Mapping
 - Connector Extension Contract
 - Pilot Scenario Pack
+- Connector Extension Prototype
 
-Next priority is the local Connector Extension Prototype.
+Next priority is the Connector Packaging Boundary.
 
 See:
 

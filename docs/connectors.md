@@ -1,6 +1,7 @@
 # Connector Runtime
 
 `skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace.
+Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary, but it does not add automatic discovery or product-specific connector packages.
 
 Workflow DSL remains the execution truth source. Connector bindings live on workflow nodes, and the local executor records connector lifecycle events in run state and control-plane audit logs.
 
@@ -157,9 +158,45 @@ Execution handoff:
 - Connector code must not mutate the published Workflow DSL artifact.
 - Connector code must not write resolved credentials, raw authorization headers, raw webhook bodies, or mapped business payload values into audit events.
 
-Future external connectors should use `execution_contract.mode: "external"` and provide their own package entrypoint, but this repository does not load external connector packages yet. Until a loader exists, external connector manifests are documentation and compatibility artifacts only.
+Future external connectors should use `execution_contract.mode: "external"` and provide their own package entrypoint. The current runtime supports one narrow prototype path: tests or smoke helpers may explicitly load a local connector fixture file and register it with `ConnectorRuntime`. This is not a dynamic package loader, connector installer, marketplace, OAuth flow, hosted callback system, queue, or production scheduler.
+
+Explicit local fixture loading:
+
+```python
+from pathlib import Path
+
+from skill2workflow.connectors import ConnectorRuntime
+from skill2workflow.external_connectors import load_external_connector
+
+external_connector = load_external_connector(Path("examples/connectors/local_echo_connector.py"))
+runtime = ConnectorRuntime([external_connector])
+```
+
+Pass the runtime into the local control plane or snapshot builder when a published run needs that fixture:
+
+```python
+from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.dashboard import build_control_snapshot
+
+control = LocalControlPlane(state_dir, connector_runtime=runtime)
+snapshot = build_control_snapshot(state_dir, connector_runtime=runtime)
+```
+
+The default connector registry remains only `manual` and `http` unless an external fixture is explicitly registered.
+
+Run the prototype smoke from a source checkout:
+
+```bash
+python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector
+```
+
+The smoke loads `examples/connectors/local_echo_connector.py`, publishes a local workflow, triggers it with non-secret input, resolves a local credential handle at execution time, and writes workflow, run, audit, connector, trigger, and control-plane snapshot artifacts under the work directory.
 
 The Python helper `validate_connector_manifest(manifest)` checks the minimum manifest shape without importing or executing connector code. Use it for contract tests when connector registry metadata changes.
+
+External connector executors must return the same compact result shape as built-ins. They may include `credentials` and `input_mapping` summaries, but those summaries must contain handles, statuses, and input key names only. Resolved credential values and raw mapped business values must not be returned.
+
+Published-run audit events promote compact connector metadata for inspection. For external fixtures this includes fields such as `credential_status`, `credential_handles`, `input_mapping_status`, and `input_mapping_keys`, not payload values.
 
 HTTP connector bindings may also reference local credential handles:
 

@@ -12,6 +12,7 @@ The example pack shows how standard Agent `SKILL.md` files become controlled Wor
 | Risk review | `examples/skills/risk-review/SKILL.md` | `examples/workflows/risk-review.workflow.json` | `examples/workflows/risk-review.litegraph.json` | Policy check, analyst approval, disposition audit |
 | Operations analysis | `examples/skills/operations-analysis/SKILL.md` | `examples/workflows/operations-analysis.workflow.json` | `examples/workflows/operations-analysis.litegraph.json` | Metrics query, threshold check, owner confirmation |
 | HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request and body input-mapping fixture |
+| Local external connector | `examples/connectors/local_echo_connector.py` | runtime-generated | n/a | Explicitly loaded external connector fixture with credential and audit redaction |
 
 ## Inspecting Examples
 
@@ -66,6 +67,16 @@ This example starts with a metrics query command, checks threshold breaches, dra
 ### HTTP Connector
 
 This example demonstrates the built-in HTTP connector request metadata, including a body-only `input_mapping` that copies non-secret trigger input into the outbound request body at runtime.
+
+### Local External Connector Prototype
+
+The local external connector prototype is generated at runtime rather than committed as a static Workflow DSL fixture. It explicitly loads `examples/connectors/local_echo_connector.py`, registers it with `ConnectorRuntime`, publishes a workflow that calls `local_echo`, and verifies that credential handles and input mapping evidence remain compact:
+
+```bash
+python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector
+```
+
+Use it to evaluate the connector extension boundary without product-specific SaaS APIs, OAuth, automatic discovery, hosted callbacks, queues, or production schedulers.
 
 ### Local Pilot Scenario Pack
 

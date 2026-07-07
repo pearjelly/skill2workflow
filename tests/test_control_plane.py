@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import sqlite3
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -6,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
+from skill2workflow.connectors import ConnectorRuntime, ExternalConnector
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.credentials import StaticCredentialProvider
 
@@ -290,6 +292,49 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(completed_events[0]["input_mapping_keys"], ["customer_id"])
         self.assertNotIn("customer_123", json.dumps(audit_events))
 
+    def test_external_connector_runtime_promotes_compact_audit_metadata(self):
+        fixture = _load_local_echo_fixture()
+        runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, fixture.execute)])
+
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(
+                Path(tmp),
+                storage="sqlite",
+                credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+                connector_runtime=runtime,
+            )
+            control.publish_workflow(_external_connector_workflow("13.0.0"))
+
+            result = control.trigger_workflow(
+                {
+                    "workflow_id": "workflow_external_connector",
+                    "version": "13.0.0",
+                    "source": "local-test",
+                    "input": {"customer_id": "customer_123"},
+                }
+            )
+            detail = control.get_run(result["run_id"])
+            audit_events = control.list_audit_events(run_id=result["run_id"])
+            completed_events = control.list_audit_events(
+                run_id=result["run_id"],
+                event_type="connector_completed",
+            )
+
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(detail["node_results"]["call_echo"]["connector"], {"id": "local_echo", "kind": "local_echo"})
+        self.assertEqual(
+            detail["node_results"]["call_echo"]["credentials"],
+            {"status": "resolved", "handles": ["demo_api_token"]},
+        )
+        self.assertEqual(completed_events[0]["connector_id"], "local_echo")
+        self.assertEqual(completed_events[0]["credential_status"], "resolved")
+        self.assertEqual(completed_events[0]["credential_handles"], ["demo_api_token"])
+        self.assertEqual(completed_events[0]["input_mapping_status"], "applied")
+        self.assertEqual(completed_events[0]["input_mapping_keys"], ["customer_id"])
+        self.assertNotIn("secret-token", json.dumps(detail))
+        self.assertNotIn("secret-token", json.dumps(audit_events))
+        self.assertNotIn("customer_123", json.dumps(audit_events))
+
     def test_published_retry_policy_promotes_policy_events_to_audit(self):
         server = _FlakyConnectorTestServer()
 
@@ -429,6 +474,62 @@ def _mapped_connector_workflow(version: str, url: str):
         {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
     ]
     return workflow
+
+
+def _external_connector_workflow(version: str):
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {
+            "id": "workflow_external_connector",
+            "name": "external-connector",
+            "version": version,
+            "status": "draft",
+        },
+        "entry": "start",
+        "nodes": [
+            {"id": "start", "type": "start", "title": "Start", "on_success": "call_echo"},
+            {
+                "id": "call_echo",
+                "type": "tool_call",
+                "title": "Call external echo",
+                "connector": {
+                    "id": "local_echo",
+                    "kind": "local_echo",
+                    "request": {
+                        "body": {"source": "control-plane-test"},
+                        "input_mapping": [
+                            {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+                        ],
+                    },
+                    "credentials": [
+                        {
+                            "target": "header",
+                            "name": "Authorization",
+                            "handle": "demo_api_token",
+                            "prefix": "Bearer ",
+                        }
+                    ],
+                },
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+            {"id": "failure", "type": "failure", "title": "Failure"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_call", "from": "start", "to": "call_echo", "label": "next"},
+            {"id": "edge_call_end", "from": "call_echo", "to": "end", "label": "next"},
+            {"id": "edge_call_failure", "from": "call_echo", "to": "failure", "label": "failure"},
+        ],
+    }
+
+
+def _load_local_echo_fixture():
+    path = Path(__file__).resolve().parents[1] / "examples" / "connectors" / "local_echo_connector.py"
+    spec = importlib.util.spec_from_file_location("local_echo_connector", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class _ConnectorRequestHandler(BaseHTTPRequestHandler):
