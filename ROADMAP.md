@@ -43,13 +43,12 @@ Important boundaries:
 
 ## Current Priority Snapshot
 
-- Active loop: Loop 35, First Product Connector Candidate.
-- Active question: can one product-specific connector candidate fit the documented package boundary without adding automatic discovery, marketplace behavior, hosted callbacks, or broad credential infrastructure?
-- Required evidence: a selected connector candidate, package-local manifest/executor shape, local smoke strategy, credential-handle plan, and compact audit expectations.
-- First PR shape: candidate selection and local package plan first; implementation only after the candidate can be tested without committing secrets or relying on hosted infrastructure.
-- Selection rubric: prioritize enterprise workflow relevance, local or dry-run smokeability, handle-based credentials, narrow action surface, compact audit evidence, and explicit out-of-core loading.
-- Decision artifact: `docs/first-product-connector-candidate.md` should describe the chosen package boundary before any product connector code is added.
-- Decision gate: only implement the first product connector after the candidate plan proves it can stay out-of-core and respect the Loop 34 package boundary.
+- Active loop: Loop 36, First Product Connector Package Smoke.
+- Active question: can the selected Lark/Feishu task connector become an explicitly loaded dry-run package without changing the built-in connector registry or adding live SaaS infrastructure?
+- Required evidence: `examples/connectors/lark_task_connector.py`, package-local manifest/executor, `create_task` dry-run action, handle-based credential resolution, local smoke artifacts, and compact audit metadata.
+- First PR shape: implement the dry-run connector package and smoke path only; no live Lark API call, OAuth, hosted callback, automatic discovery, or marketplace behavior.
+- Selection result: Loop 35 selected the Lark/Feishu task connector in `docs/first-product-connector-candidate.md`.
+- Decision gate: only consider live Lark API behavior after the dry-run package proves the package boundary, credential behavior, and audit evidence.
 - Deferred: connector marketplace work, dynamic discovery, hosted ingress, production scheduling, OAuth, token refresh systems, and broad SaaS connector catalogs.
 
 ## Real Team Pilot Readiness
@@ -78,14 +77,15 @@ Ready now:
 - Explicitly load one local external connector fixture without changing the default built-in connector registry.
 - Run a documented external connector prototype smoke with credential-handle and compact audit evidence.
 - Follow a documented local connector package layout and compatibility/stability boundary.
+- Review the first product connector candidate decision for a Lark/Feishu task connector.
 
 Still needed before serious pilots:
 
-- A first product connector candidate plan that confirms product-specific connector packages can stay out-of-core.
-- A local smoke path for the first product connector candidate that keeps credentials handle-based and audit output compact.
+- A dry-run Lark/Feishu task connector package smoke that keeps the package out-of-core.
+- Credential-handle and compact audit evidence from the Lark/Feishu task package smoke.
 - Production-grade recurring schedulers, hosted ingress, and real SaaS integrations remain out of scope until local pilot and connector-packaging evidence is stronger.
 
-Pilot sequencing rule: do not implement a product-specific SaaS connector until Loop 35 has selected one candidate, documented its package-local boundary, and proved its smoke path can stay local or dry-run. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
+Pilot sequencing rule: implement the selected Lark/Feishu task connector as a dry-run, explicitly loaded package before any live SaaS behavior. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
 ## Completed Loops
 
@@ -125,102 +125,76 @@ Pilot sequencing rule: do not implement a product-specific SaaS connector until 
 | Loop 32: Pilot Scenario Pack | Complete | Multi-scenario local pilot pack for customer support, sales renewal, and risk exception workflows, with mapped connector input evidence and artifacts |
 | Loop 33: Connector Extension Prototype | Complete | Explicit local external connector fixture, narrow runtime registration, published workflow smoke, credential-handle isolation, and compact audit evidence |
 | Loop 34: Connector Packaging Boundary | Complete | Repeatable local connector package layout, explicit-loading smoke contract, compatibility notes, and stability boundaries |
+| Loop 35: First Product Connector Candidate | Complete | Lark/Feishu task connector selected, alternatives compared, package boundary and dry-run smoke plan documented |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 34 made the external connector package shape repeatable:
+Post-`v0.1.0` work now has one active priority after Loop 35 selected the first product connector candidate:
 
-1. choose and scope the first product connector candidate without coupling it into the core runtime.
+1. implement the selected Lark/Feishu task connector as an explicitly loaded dry-run package without coupling it into the core runtime.
 
-### Loop 35: First Product Connector Candidate
+### Loop 36: First Product Connector Package Smoke
 
-Goal: select one product-specific connector candidate and prove it can fit the Loop 34 package boundary before implementation broadens the runtime.
+Goal: implement the selected Lark/Feishu task connector as an out-of-core dry-run package and prove it can run through the existing publish, trigger, connector, audit, and snapshot paths.
 
-Why this is next: Loop 34 gives contributors a repeatable package layout, explicit-loading contract, compatibility notes, and stability boundaries. The next risk is selecting a product connector that can be tested locally, keep secrets handle-based, and produce compact audit evidence without pulling the project into marketplace or hosted-integration work.
+Why this is next: Loop 35 selected the Lark/Feishu task connector and documented the package boundary in `docs/first-product-connector-candidate.md`. The next risk is proving the selected connector can be implemented as a local dry-run package before any live SaaS behavior exists.
 
-Status: next decision loop.
+Status: next engineering loop.
 
-Start condition: Loop 34 has documented the repeatable package boundary and kept the `local_echo` smoke green.
+Start condition: Loop 35 has selected the Lark/Feishu task connector and kept live API behavior out of scope.
 
 Initial PR boundary:
 
-- Pick one candidate connector and document why it is the right first product-specific package.
-- Include a short candidate decision note that compares at least two plausible product connector options.
-- Define the package-local manifest, executor scope, fixture strategy, credential handles, and smoke path before writing connector runtime code.
-- Require a local-only or dry-run smoke path that does not commit secrets and does not require hosted callbacks.
-- Keep the connector outside the built-in registry and load it explicitly.
+- Add `examples/connectors/lark_task_connector.py` with `MANIFEST` plus `execute(binding, credential_provider=None, context=None)`.
+- Add a local smoke helper for `python3 scripts/lark_task_connector_smoke.py --work-dir /tmp/skill2workflow-lark-task-connector`.
+- Support `operation: create_task` in `mode: dry_run` only.
+- Resolve the `lark_bot_access_token` handle through the local credential provider without returning the resolved value.
+- Return compact metadata such as operation, mode, mapped input keys, presence booleans, credential status, and credential handles.
+- Keep the connector outside the built-in registry and load it explicitly through `load_external_connector(...)`.
 - Defer OAuth, token refresh, hosted callbacks, production scheduling, marketplace indexing, and broad connector catalogs.
-
-Candidate evaluation rubric:
-
-| Dimension | Loop 35 must prove |
-| --- | --- |
-| Enterprise relevance | The connector represents a real enterprise workflow touchpoint, not another generic HTTP example |
-| Local smokeability | A fresh checkout can run a local or dry-run smoke without live SaaS setup |
-| Credential boundary | All credentials are referenced by handles and never committed, persisted in Workflow DSL, or emitted in audit |
-| Action surface | The first action surface is intentionally narrow, such as create/update one object or send one notification |
-| Audit evidence | The connector can produce compact metadata that proves what happened without leaking payloads or secrets |
-| Package boundary | The connector stays outside the built-in registry and is loaded explicitly through the package contract |
-
-Candidate starting points:
-
-- GitHub Issues: strong open-source relevance and easy local dry-run shape, but weaker enterprise operations fit.
-- Lark/Feishu task or message: strong enterprise workflow fit, but auth and tenant setup must stay outside the package.
-- Slack message or workflow notification: common enterprise surface, but token handling and workspace dependency must stay dry-run first.
-
-Decision note outline:
-
-- Selected candidate and rationale.
-- Alternatives considered and why they were rejected or deferred.
-- Minimum first action surface and non-goals.
-- Package layout using the Loop 34 connector package conventions.
-- Manifest and executor scope, including result and error shapes.
-- Credential handles and explicit secret boundaries.
-- Local or dry-run smoke command and fixture strategy.
-- Compact audit metadata that proves execution without exposing payloads or secrets.
-- Conditions required before Loop 36 may implement the package.
 
 Recommended first-cut order:
 
-1. Compare candidate connector options against local smokeability, credential boundary, audit evidence, and enterprise relevance.
-2. Select one candidate and document the minimum action surface.
-3. Define the package layout using the Loop 34 conventions.
-4. Define local fixtures and smoke commands before implementation.
-5. Add the implementation only if the candidate can satisfy the package and smoke boundary.
+1. Add focused tests for the Lark/Feishu task connector manifest, dry-run executor, credential summary, and no-secret result behavior.
+2. Implement the package-local connector fixture.
+3. Add the smoke helper that publishes and triggers a generated workflow using explicit loading.
+4. Verify smoke artifacts include workflow, run, audit, connector, trigger, and control-plane snapshot JSON.
+5. Update docs only where the concrete smoke path changes contributor behavior.
 
-Loop 35 acceptance evidence:
+Loop 36 acceptance evidence:
 
-- The selected connector has a documented package-local manifest and executor scope.
-- The candidate has a local or dry-run smoke plan that can run from a fresh checkout without committed secrets.
+- `ConnectorRuntime().list_connectors()` still returns only built-ins by default.
+- `ConnectorRuntime([external_connector]).list_connectors()` includes `lark_task`.
+- The dry-run connector executes a published workflow through the control plane.
 - Credential values remain outside Workflow DSL, run state, audit events, and committed fixtures.
+- Connector result and audit metadata include handles, statuses, presence booleans, and input key names only.
 - Product-specific connector code remains out-of-core and explicitly loaded.
 - The work does not add automatic discovery, installer, marketplace, OAuth, hosted callbacks, queues, or production schedulers.
 
-Loop 35 verification commands:
+Loop 36 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- `python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector-loop35`
+- `python3 scripts/lark_task_connector_smoke.py --work-dir /tmp/skill2workflow-lark-task-connector`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/secret_hygiene.py examples/workflows`
 - `git diff --check`
 
-Loop 35 done means:
+Loop 36 done means:
 
-- The project has one justified product connector candidate and an implementation boundary that preserves the package model.
-- If implemented, the first product connector proves the out-of-core package path without becoming a marketplace or hosted integration platform.
+- The selected Lark/Feishu task connector proves the out-of-core package path with a deterministic dry-run smoke.
+- The implementation remains a local package fixture, not a marketplace, hosted integration platform, or live Lark API client.
 
 ## Near-Term Loop Queue
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
 
-Loops 24-34 are now historical execution evidence and are tracked in the Completed Loops table above. The near-term queue starts with the current decision gate and only lists work that should still be selected, scoped, or implemented.
+Loops 24-35 are now historical execution evidence and are tracked in the Completed Loops table above. The near-term queue starts with the current package smoke and only lists work that should still be scoped or implemented.
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 35: First Product Connector Candidate | Next | Select and scope one product connector candidate only after packaging and credential boundaries are repeatable | `docs/first-product-connector-candidate.md`, package plan, local smoke strategy |
-| Loop 36: First Product Connector Package Smoke | Candidate | Implement the selected connector only if Loop 35 proves it can stay out-of-core and explicitly loaded | package fixture, dry-run/local smoke, credential-handle evidence |
+| Loop 36: First Product Connector Package Smoke | Next | Implement the selected Lark/Feishu task connector only as an out-of-core dry-run package | package fixture, dry-run/local smoke, credential-handle evidence |
 | Loop 37: Product Connector Pilot Scenario | Candidate | Use the first connector package in one local pilot scenario without hosted callbacks or marketplace behavior | scenario workflow, operator snapshot, compact audit evidence |
 
 Loop selection rules:
@@ -228,8 +202,8 @@ Loop selection rules:
 - Pick the next loop only after the previous loop is merged or explicitly deferred.
 - Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
 - Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
-- Do not add product-specific SaaS connector implementation until the Loop 35 candidate plan proves the connector can stay outside the built-in registry.
-- Keep Loop 36 and Loop 37 tentative until Loop 35 has merged.
+- Do not add live SaaS connector behavior until the Loop 36 dry-run package proves the connector can stay outside the built-in registry.
+- Keep Loop 37 tentative until Loop 36 has merged.
 
 ## Release Tag Plan
 
@@ -271,7 +245,7 @@ Status: delivered by Loops 1-9.
 
 ### v0.2: Connector Runtime
 
-Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Body-only trigger input mapping shipped in Loop 30. Connector extension contract shipped in Loop 31. Pilot scenario pack evidence shipped in Loop 32. Local connector extension prototype shipped in Loop 33. Connector packaging boundary shipped in Loop 34. Future work should add product-specific extensions only after the Loop 35 candidate plan proves they can stay out-of-core.
+Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Body-only trigger input mapping shipped in Loop 30. Connector extension contract shipped in Loop 31. Pilot scenario pack evidence shipped in Loop 32. Local connector extension prototype shipped in Loop 33. Connector packaging boundary shipped in Loop 34. Lark/Feishu task connector selection shipped in Loop 35. Future work should add the selected connector only as an out-of-core dry-run package first.
 
 - Connector manifests
 - Connector binding validation
@@ -284,7 +258,8 @@ Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retr
 - Minimum connector manifest and execution handoff contract
 - Explicit local external connector prototype with credential and audit redaction evidence
 - Repeatable connector package boundary before product-specific connector packages
-- Future: first product connector candidate selection and local smoke strategy
+- Selected first product connector candidate: Lark/Feishu task connector
+- Future: first product connector package smoke for `create_task` dry-run behavior
 
 ### v0.3: Authoring Experience
 
@@ -341,7 +316,7 @@ Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local 
 
 ### v0.7: Pilot Integration Boundary
 
-Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, body-only input mapping, pilot playbook, scenario pack, connector extension contract semantics, one explicit external connector prototype, and the connector package boundary are stable enough for local evaluation. First product connector candidate selection starts in Loop 35.
+Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, body-only input mapping, pilot playbook, scenario pack, connector extension contract semantics, one explicit external connector prototype, the connector package boundary, and first product connector candidate selection are stable enough for local evaluation. The selected candidate is the Lark/Feishu task connector; dry-run package implementation starts in Loop 36.
 
 - Credential provider interface
 - Secret-handle documentation without secret storage in Workflow DSL
@@ -354,7 +329,8 @@ Status: local trigger, input, credential, webhook, scheduled trigger, visual ins
 - Pilot scenario pack covering customer support, sales renewal, and risk exception workflows
 - Explicit local external connector prototype
 - Connector packaging boundary
-- Next: first product connector candidate
+- First product connector candidate: Lark/Feishu task connector
+- Next: first product connector package smoke
 - Future: product-specific connector packages and hosted control-plane integrations
 
 ### v1.0: Production Baseline
@@ -392,7 +368,7 @@ These are intentionally deferred until the local open-source runtime is stronger
 - Distributed scheduling
 - Automatic connector package discovery or installation
 - OAuth flows, hosted connector callbacks, and token refresh systems
-- Product-specific SaaS connector implementation before the Loop 35 candidate decision gate
+- Live product-specific SaaS connector behavior before the Loop 36 dry-run package smoke
 - Complex enterprise connector marketplace
 - Guaranteed automatic conversion of arbitrary SOP documents
 
