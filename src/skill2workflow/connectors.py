@@ -284,6 +284,9 @@ def _execute_external_connector(
     }
     if result.get("error"):
         normalized["error"] = str(result.get("error"))
+    audit = _normalize_compact_metadata(result.get("audit"))
+    if audit:
+        normalized["audit"] = audit
     input_mapping = result.get("input_mapping")
     if isinstance(input_mapping, dict) and input_mapping:
         normalized["input_mapping"] = copy.deepcopy(input_mapping)
@@ -303,6 +306,27 @@ def _normalize_credential_summary(summary: object) -> Dict[str, object]:
         "status": str(summary.get("status") or ""),
         "handles": sorted({str(handle) for handle in handles if str(handle)}),
     }
+
+
+def _normalize_compact_metadata(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+
+    normalized: Dict[str, object] = {}
+    for key, value in summary.items():
+        normalized_key = str(key)
+        if not normalized_key:
+            continue
+        if isinstance(value, (str, bool, int, float)) or value is None:
+            normalized[normalized_key] = value
+            continue
+        if isinstance(value, list):
+            compact_values = []
+            for item in value:
+                if isinstance(item, (str, bool, int, float)) or item is None:
+                    compact_values.append(item)
+            normalized[normalized_key] = compact_values
+    return normalized
 
 
 def _execute_http_connector(binding: object, credential_provider=None, context=None) -> ConnectorResult:

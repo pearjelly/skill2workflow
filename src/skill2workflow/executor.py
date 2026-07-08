@@ -267,6 +267,9 @@ class LocalExecutor:
         credential_summary = connector_result.get("credentials")
         if isinstance(credential_summary, dict) and credential_summary:
             node_result["credentials"] = credential_summary
+        audit_summary = connector_result.get("audit")
+        if isinstance(audit_summary, dict) and audit_summary:
+            node_result["audit"] = audit_summary
         if last_error:
             node_result["last_error"] = last_error
         if connector_result.get("error"):
@@ -286,6 +289,7 @@ class LocalExecutor:
                     "max_attempts": max_attempts,
                     **_input_mapping_event_fields(mapping_summary),
                     **_credential_event_fields(credential_summary),
+                    **_connector_audit_event_fields(audit_summary),
                 },
             )
             if recovered:
@@ -312,6 +316,7 @@ class LocalExecutor:
                     "error": last_error,
                     **_input_mapping_event_fields(mapping_summary),
                     **_credential_event_fields(credential_summary),
+                    **_connector_audit_event_fields(audit_summary),
                 },
             )
             next_node = node.get("on_failure")
@@ -392,6 +397,12 @@ def _credential_event_fields(summary: object) -> Dict[str, object]:
     if isinstance(handles, list):
         fields["credential_handles"] = [str(handle) for handle in handles]
     return fields
+
+
+def _connector_audit_event_fields(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    return {"connector_metadata": copy.deepcopy(summary)}
 
 
 def _summarize_run(state: RunState) -> RunState:

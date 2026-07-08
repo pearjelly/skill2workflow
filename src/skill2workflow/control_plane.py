@@ -279,6 +279,7 @@ class LocalControlPlane:
                 "input_mapping_keys",
                 "credential_status",
                 "credential_handles",
+                "connector_metadata",
             ):
                 if key in event:
                     audit_event[key] = event[key]
