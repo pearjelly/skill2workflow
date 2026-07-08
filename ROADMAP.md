@@ -83,7 +83,7 @@ Still needed before serious pilots:
 - A local smoke path for the first product connector candidate that keeps credentials handle-based and audit output compact.
 - Production-grade recurring schedulers, hosted ingress, and real SaaS integrations remain out of scope until local pilot and connector-packaging evidence is stronger.
 
-Pilot sequencing rule: do not add product-specific SaaS connectors until the connector packaging boundary is repeatable after the local extension prototype. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
+Pilot sequencing rule: do not implement a product-specific SaaS connector until Loop 35 has selected one candidate, documented its package-local boundary, and proved its smoke path can stay local or dry-run. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
 ## Completed Loops
 
@@ -183,27 +183,21 @@ Loop 35 done means:
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
 
+Loops 24-34 are now historical execution evidence and are tracked in the Completed Loops table above. The near-term queue starts with the current decision gate and only lists work that should still be selected, scoped, or implemented.
+
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 24: Workflow Inputs And Run Context | Complete | Carry trigger input metadata into run state and node execution context | input contract, run context persistence, executor tests |
-| Loop 25: Credential Provider Interface | Complete | Reference credentials without storing secret values in Workflow DSL | provider protocol, placeholder-to-handle docs, local tests |
-| Loop 26: Local Webhook Adapter | Complete | Let local HTTP events trigger published runs through the trigger boundary | stdlib webhook adapter, trigger examples, audit tests |
-| Loop 27: Run Overlay In Visual Editor | Complete | Inspect run state and audit evidence on top of the workflow graph | graph overlay export, static UI updates, snapshot tests |
-| Loop 28: Pilot Playbook And Example | Complete | Document an end-to-end enterprise pilot path with supported limits | pilot guide, runnable scenario, verification checklist |
-| Loop 29: Scheduled Trigger Boundary | Complete | Trigger published workflows from deterministic local schedules | schedule contract, CLI/helper path, audit tests |
-| Loop 30: Trigger Input Mapping | Complete | Map trigger context into connector request bodies without leaking secrets | input mapping contract, validator tests, connector examples |
-| Loop 31: Connector Extension Contract | Complete | Define stable boundaries for product-specific connectors after input mapping | connector protocol docs, manifest contract, local test harness |
-| Loop 32: Pilot Scenario Pack | Complete | Add more end-to-end pilot scenarios using triggers, schedules, credentials, and mapped connector input | scenario fixtures, smoke helpers, operator checklist |
-| Loop 33: Connector Extension Prototype | Complete | Prove one local external connector shape after pilot scenario coverage | local external connector fixture, contract tests, no SaaS dependency |
-| Loop 34: Connector Packaging Boundary | Complete | Turn the extension prototype into a repeatable package shape now that Loop 33 validates the boundary | package layout docs, fixture loading command, compatibility notes |
 | Loop 35: First Product Connector Candidate | Next | Select and scope one product connector candidate only after packaging and credential boundaries are repeatable | candidate decision note, package plan, local smoke strategy |
+| Loop 36: First Product Connector Package Smoke | Candidate | Implement the selected connector only if Loop 35 proves it can stay out-of-core and explicitly loaded | package fixture, dry-run/local smoke, credential-handle evidence |
+| Loop 37: Product Connector Pilot Scenario | Candidate | Use the first connector package in one local pilot scenario without hosted callbacks or marketplace behavior | scenario workflow, operator snapshot, compact audit evidence |
 
 Loop selection rules:
 
 - Pick the next loop only after the previous loop is merged or explicitly deferred.
 - Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
 - Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
-- Do not add product-specific SaaS connectors until the Loop 35 candidate plan proves the connector can stay outside the built-in registry.
+- Do not add product-specific SaaS connector implementation until the Loop 35 candidate plan proves the connector can stay outside the built-in registry.
+- Keep Loop 36 and Loop 37 tentative until Loop 35 has merged.
 
 ## Release Tag Plan
 
@@ -366,7 +360,7 @@ These are intentionally deferred until the local open-source runtime is stronger
 - Distributed scheduling
 - Automatic connector package discovery or installation
 - OAuth flows, hosted connector callbacks, and token refresh systems
-- Product-specific SaaS connectors before the Loop 35 candidate decision gate
+- Product-specific SaaS connector implementation before the Loop 35 candidate decision gate
 - Complex enterprise connector marketplace
 - Guaranteed automatic conversion of arbitrary SOP documents
 
