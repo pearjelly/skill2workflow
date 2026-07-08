@@ -47,6 +47,8 @@ Important boundaries:
 - Active question: can one product-specific connector candidate fit the documented package boundary without adding automatic discovery, marketplace behavior, hosted callbacks, or broad credential infrastructure?
 - Required evidence: a selected connector candidate, package-local manifest/executor shape, local smoke strategy, credential-handle plan, and compact audit expectations.
 - First PR shape: candidate selection and local package plan first; implementation only after the candidate can be tested without committing secrets or relying on hosted infrastructure.
+- Selection rubric: prioritize enterprise workflow relevance, local or dry-run smokeability, handle-based credentials, narrow action surface, compact audit evidence, and explicit out-of-core loading.
+- Decision artifact: a Loop 35 candidate note should describe the chosen package boundary before any product connector code is added.
 - Decision gate: only implement the first product connector after the candidate plan proves it can stay out-of-core and respect the Loop 34 package boundary.
 - Deferred: connector marketplace work, dynamic discovery, hosted ingress, production scheduling, OAuth, token refresh systems, and broad SaaS connector catalogs.
 
@@ -145,10 +147,28 @@ Start condition: Loop 34 has documented the repeatable package boundary and kept
 Initial PR boundary:
 
 - Pick one candidate connector and document why it is the right first product-specific package.
+- Include a short candidate decision note that compares at least two plausible product connector options.
 - Define the package-local manifest, executor scope, fixture strategy, credential handles, and smoke path before writing connector runtime code.
 - Require a local-only or dry-run smoke path that does not commit secrets and does not require hosted callbacks.
 - Keep the connector outside the built-in registry and load it explicitly.
 - Defer OAuth, token refresh, hosted callbacks, production scheduling, marketplace indexing, and broad connector catalogs.
+
+Candidate evaluation rubric:
+
+| Dimension | Loop 35 must prove |
+| --- | --- |
+| Enterprise relevance | The connector represents a real enterprise workflow touchpoint, not another generic HTTP example |
+| Local smokeability | A fresh checkout can run a local or dry-run smoke without live SaaS setup |
+| Credential boundary | All credentials are referenced by handles and never committed, persisted in Workflow DSL, or emitted in audit |
+| Action surface | The first action surface is intentionally narrow, such as create/update one object or send one notification |
+| Audit evidence | The connector can produce compact metadata that proves what happened without leaking payloads or secrets |
+| Package boundary | The connector stays outside the built-in registry and is loaded explicitly through the package contract |
+
+Candidate starting points:
+
+- GitHub Issues: strong open-source relevance and easy local dry-run shape, but weaker enterprise operations fit.
+- Lark/Feishu task or message: strong enterprise workflow fit, but auth and tenant setup must stay outside the package.
+- Slack message or workflow notification: common enterprise surface, but token handling and workspace dependency must stay dry-run first.
 
 Recommended first-cut order:
 
