@@ -44,9 +44,10 @@ class FirstProductConnectorCandidateDocsTests(TestCase):
         self.assertIn("No OAuth", decision)
 
         self.assertIn("| Loop 35: First Product Connector Candidate | Complete |", roadmap)
-        self.assertIn("| Loop 36: First Product Connector Package Smoke | Next |", roadmap)
+        self.assertIn("| Loop 36: First Product Connector Package Smoke | Complete |", roadmap)
+        self.assertIn("| Loop 37: Product Connector Pilot Scenario | Next |", roadmap)
         self.assertIn("Lark/Feishu task connector", roadmap)
-        self.assertIn("docs/first-product-connector-candidate.md", roadmap)
+        self.assertIn("first product-shaped connector package boundary", roadmap)
 
 
 def _read(path: str) -> str:

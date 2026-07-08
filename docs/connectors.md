@@ -1,7 +1,7 @@
 # Connector Runtime
 
 `skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace.
-Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary, but it does not add automatic discovery or product-specific connector packages.
+Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Neither loop adds automatic discovery, live SaaS calls, OAuth, or marketplace behavior.
 
 Workflow DSL remains the execution truth source. Connector bindings live on workflow nodes, and the local executor records connector lifecycle events in run state and control-plane audit logs.
 
@@ -207,6 +207,7 @@ Reference layout:
 ```text
 examples/connectors/
   local_echo_connector.py  # MANIFEST plus execute(...) reference implementation
+  lark_task_connector.py   # Product-shaped dry-run connector package fixture
 ```
 
 Required package surface:
@@ -243,6 +244,36 @@ Connector package smoke contract:
 - Resolved credential values and raw mapped business values do not appear in run state, audit events, or smoke result summaries.
 
 Package conventions intentionally exclude automatic connector discovery, package installation, marketplace indexing, OAuth, hosted callbacks, queues, production schedulers, and product-specific SaaS connector behavior.
+
+## Lark/Feishu Task Connector Dry-Run Package
+
+`examples/connectors/lark_task_connector.py` is the first product-shaped connector package fixture. It stays outside the built-in connector registry and must be explicitly loaded with `load_external_connector(...)`.
+
+Supported scope:
+
+- connector id and kind: `lark_task`
+- operation: `create_task`
+- mode: `dry_run`
+- node type: `tool_call`
+- credential handle: `lark_bot_access_token`
+- input mapping: body-only values from `/input/title`, `/input/description`, `/input/assignee_open_id`, and `/input/due_at`
+
+The connector validates the request shape, resolves the local credential handle, and returns only compact metadata:
+
+- operation and mode
+- credential status and handle names
+- input mapping status and input key names
+- booleans indicating whether title, description, assignee, and due date were present
+
+It does not call the live Lark/Feishu API, create tasks, perform OAuth, refresh tokens, host callbacks, install packages, auto-discover connectors, or enqueue background jobs. Raw mapped task values and resolved credential values must not appear in connector output or audit metadata.
+
+Run the dry-run smoke from a source checkout:
+
+```bash
+python3 scripts/lark_task_connector_smoke.py --work-dir /tmp/skill2workflow-lark-task-connector
+```
+
+The smoke explicitly loads `examples/connectors/lark_task_connector.py`, publishes a generated workflow, triggers it with non-secret task input, resolves `lark_bot_access_token` through a temporary local credential provider, and writes workflow, run, audit, connector, trigger, and control-plane snapshot artifacts under the work directory.
 
 HTTP connector bindings may also reference local credential handles:
 

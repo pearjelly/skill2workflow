@@ -13,6 +13,7 @@ The example pack shows how standard Agent `SKILL.md` files become controlled Wor
 | Operations analysis | `examples/skills/operations-analysis/SKILL.md` | `examples/workflows/operations-analysis.workflow.json` | `examples/workflows/operations-analysis.litegraph.json` | Metrics query, threshold check, owner confirmation |
 | HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request and body input-mapping fixture |
 | Local external connector | `examples/connectors/local_echo_connector.py` | runtime-generated | n/a | Explicitly loaded external connector fixture with credential and audit redaction |
+| Lark/Feishu task connector | `examples/connectors/lark_task_connector.py` | runtime-generated | n/a | Explicitly loaded product-shaped dry-run connector package with compact audit metadata |
 
 ## Inspecting Examples
 
@@ -89,6 +90,16 @@ python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-exter
 ```
 
 Use this package shape when reviewing connector package conventions. Do not treat it as automatic connector discovery, a package installer, marketplace behavior, or a product-specific SaaS connector template.
+
+### Lark/Feishu Task Connector Dry-Run
+
+The Lark/Feishu task connector smoke is generated at runtime rather than committed as a static Workflow DSL fixture. It explicitly loads `examples/connectors/lark_task_connector.py`, registers `lark_task` with a local `ConnectorRuntime`, publishes a workflow that validates a `create_task` request in `dry_run` mode, and verifies that credential handles, mapped input keys, and task-field presence are recorded without duplicating raw payload values:
+
+```bash
+python3 scripts/lark_task_connector_smoke.py --work-dir /tmp/skill2workflow-lark-task-connector
+```
+
+Use it to evaluate the first product-shaped connector package boundary. It is not a live Lark/Feishu API client, OAuth flow, hosted callback, connector installer, marketplace entry, queue, or production scheduler.
 
 ### Local Pilot Scenario Pack
 
