@@ -48,7 +48,7 @@ Important boundaries:
 - Required evidence: a selected connector candidate, package-local manifest/executor shape, local smoke strategy, credential-handle plan, and compact audit expectations.
 - First PR shape: candidate selection and local package plan first; implementation only after the candidate can be tested without committing secrets or relying on hosted infrastructure.
 - Selection rubric: prioritize enterprise workflow relevance, local or dry-run smokeability, handle-based credentials, narrow action surface, compact audit evidence, and explicit out-of-core loading.
-- Decision artifact: a Loop 35 candidate note should describe the chosen package boundary before any product connector code is added.
+- Decision artifact: `docs/first-product-connector-candidate.md` should describe the chosen package boundary before any product connector code is added.
 - Decision gate: only implement the first product connector after the candidate plan proves it can stay out-of-core and respect the Loop 34 package boundary.
 - Deferred: connector marketplace work, dynamic discovery, hosted ingress, production scheduling, OAuth, token refresh systems, and broad SaaS connector catalogs.
 
@@ -170,6 +170,18 @@ Candidate starting points:
 - Lark/Feishu task or message: strong enterprise workflow fit, but auth and tenant setup must stay outside the package.
 - Slack message or workflow notification: common enterprise surface, but token handling and workspace dependency must stay dry-run first.
 
+Decision note outline:
+
+- Selected candidate and rationale.
+- Alternatives considered and why they were rejected or deferred.
+- Minimum first action surface and non-goals.
+- Package layout using the Loop 34 connector package conventions.
+- Manifest and executor scope, including result and error shapes.
+- Credential handles and explicit secret boundaries.
+- Local or dry-run smoke command and fixture strategy.
+- Compact audit metadata that proves execution without exposing payloads or secrets.
+- Conditions required before Loop 36 may implement the package.
+
 Recommended first-cut order:
 
 1. Compare candidate connector options against local smokeability, credential boundary, audit evidence, and enterprise relevance.
@@ -207,7 +219,7 @@ Loops 24-34 are now historical execution evidence and are tracked in the Complet
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 35: First Product Connector Candidate | Next | Select and scope one product connector candidate only after packaging and credential boundaries are repeatable | candidate decision note, package plan, local smoke strategy |
+| Loop 35: First Product Connector Candidate | Next | Select and scope one product connector candidate only after packaging and credential boundaries are repeatable | `docs/first-product-connector-candidate.md`, package plan, local smoke strategy |
 | Loop 36: First Product Connector Package Smoke | Candidate | Implement the selected connector only if Loop 35 proves it can stay out-of-core and explicitly loaded | package fixture, dry-run/local smoke, credential-handle evidence |
 | Loop 37: Product Connector Pilot Scenario | Candidate | Use the first connector package in one local pilot scenario without hosted callbacks or marketplace behavior | scenario workflow, operator snapshot, compact audit evidence |
 
