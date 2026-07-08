@@ -49,6 +49,7 @@ Important boundaries:
 - Required evidence: a scenario workflow, explicit connector loading, publish/trigger execution, operator snapshot, compact audit metadata, and no resolved credential or raw task-payload leakage in connector output/audit.
 - First PR shape: add one local pilot scenario that uses the existing `lark_task` dry-run package; no live Lark API call, OAuth, hosted callback, automatic discovery, queue, scheduler expansion, or marketplace behavior.
 - Selection result: Loop 36 proved the first product-shaped connector package boundary with `examples/connectors/lark_task_connector.py`.
+- Scenario direction: start with a sales renewal risk follow-up flow, because it already has clear owner accountability and a natural task handoff after a control decision.
 - Decision gate: only consider live Lark API behavior after the dry-run package works in at least one local pilot workflow with useful operator evidence.
 - Deferred: connector marketplace work, dynamic discovery, hosted ingress, production scheduling, OAuth, token refresh systems, and broad SaaS connector catalogs.
 
@@ -149,9 +150,12 @@ Status: next engineering loop.
 
 Start condition: Loop 36 has merged with `examples/connectors/lark_task_connector.py` and `python3 scripts/lark_task_connector_smoke.py --work-dir /tmp/skill2workflow-lark-task-connector`.
 
+Recommended first scenario: sales renewal risk follow-up. The workflow should accept durable trigger input for account, renewal risk, owner, and due date; pass through a controlled decision point; then invoke the `lark_task` dry-run connector to create an owner follow-up task. The pilot should prove the business handoff and operator evidence, not live task creation.
+
 Initial PR boundary:
 
 - Add one generated local pilot workflow that uses `lark_task` to create a dry-run task after a controlled business decision point.
+- Expose a deterministic smoke command, expected shape: `python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot`.
 - Reuse explicit connector loading through `load_external_connector(...)`; do not add registry auto-discovery.
 - Keep `operation: create_task` and `mode: dry_run`; do not call the live Lark/Feishu API.
 - Preserve credential-handle behavior and compact audit metadata from Loop 36.
@@ -179,6 +183,7 @@ Loop 37 acceptance evidence:
 Loop 37 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- `python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot`
 - `python3 -m py_compile src/skill2workflow/*.py`
 - `python3 scripts/secret_hygiene.py examples/workflows`
 - `git diff --check`
@@ -196,7 +201,7 @@ Loops 24-36 are now historical execution evidence and are tracked in the Complet
 
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 37: Product Connector Pilot Scenario | Next | Use the first connector package in one local pilot scenario without hosted callbacks or marketplace behavior | scenario workflow, operator snapshot, compact audit evidence |
+| Loop 37: Product Connector Pilot Scenario | Next | Use the first connector package in one local pilot scenario without hosted callbacks or marketplace behavior | sales renewal risk workflow, `lark_task_pilot_smoke.py`, operator snapshot, compact audit evidence |
 | Loop 38: Live Connector Readiness Review | Candidate | Decide whether live Lark/Feishu API behavior is justified after dry-run pilot evidence | decision note, risk checklist, scoped implementation plan |
 
 Loop selection rules:
