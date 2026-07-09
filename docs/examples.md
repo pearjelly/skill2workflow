@@ -14,6 +14,7 @@ The example pack shows how standard Agent `SKILL.md` files become controlled Wor
 | HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request and body input-mapping fixture |
 | Local external connector | `examples/connectors/local_echo_connector.py` | runtime-generated | n/a | Explicitly loaded external connector fixture with credential and audit redaction |
 | Lark/Feishu task connector | `examples/connectors/lark_task_connector.py` | runtime-generated | n/a | Explicitly loaded product-shaped dry-run connector package with compact audit metadata |
+| Lark/Feishu task pilot | `examples/connectors/lark_task_connector.py` | runtime-generated | runtime-generated | Sales renewal risk workflow with manual gate before dry-run owner task handoff |
 
 ## Inspecting Examples
 
@@ -100,6 +101,16 @@ python3 scripts/lark_task_connector_smoke.py --work-dir /tmp/skill2workflow-lark
 ```
 
 Use it to evaluate the first product-shaped connector package boundary. It is not a live Lark/Feishu API client, OAuth flow, hosted callback, connector installer, marketplace entry, queue, or production scheduler.
+
+### Lark/Feishu Task Pilot
+
+The Lark/Feishu task pilot is generated at runtime and uses the `lark_task` dry-run connector inside a sales renewal risk workflow. It starts through the local webhook trigger boundary, waits at a manual review gate, resumes with approval, then invokes the explicitly loaded connector to validate an owner follow-up task request:
+
+```bash
+python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot
+```
+
+The pilot writes workflow, trigger response, run state, audit, connector list, control-plane snapshot, and LiteGraph overlay artifacts. Use it to inspect whether a product connector package remains understandable in a business workflow with a control point. It is still dry-run only and does not create live Lark/Feishu tasks.
 
 ### Local Pilot Scenario Pack
 

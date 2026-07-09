@@ -1,7 +1,7 @@
 # Connector Runtime
 
 `skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace.
-Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Neither loop adds automatic discovery, live SaaS calls, OAuth, or marketplace behavior.
+Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. These loops do not add automatic discovery, live SaaS calls, OAuth, or marketplace behavior.
 
 Workflow DSL remains the execution truth source. Connector bindings live on workflow nodes, and the local executor records connector lifecycle events in run state and control-plane audit logs.
 
@@ -274,6 +274,14 @@ python3 scripts/lark_task_connector_smoke.py --work-dir /tmp/skill2workflow-lark
 ```
 
 The smoke explicitly loads `examples/connectors/lark_task_connector.py`, publishes a generated workflow, triggers it with non-secret task input, resolves `lark_bot_access_token` through a temporary local credential provider, and writes workflow, run, audit, connector, trigger, and control-plane snapshot artifacts under the work directory.
+
+Run the sales renewal risk pilot smoke from a source checkout:
+
+```bash
+python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot
+```
+
+The pilot uses the same explicitly loaded package inside a workflow that starts through the local webhook trigger boundary, waits at a manual gate, resumes with approval, and then invokes the connector. It proves business handoff and operator evidence, not live Lark/Feishu task creation.
 
 HTTP connector bindings may also reference local credential handles:
 
