@@ -1,7 +1,7 @@
 # Connector Runtime
 
 `skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace.
-Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. These loops do not add automatic discovery, live SaaS calls, OAuth, or marketplace behavior.
+Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. Loop 38 readiness review approved only a scoped live `create_task` follow-up, documented in `docs/lark-live-connector-readiness.md`. These loops do not add automatic discovery, live SaaS calls, OAuth, or marketplace behavior.
 
 Workflow DSL remains the execution truth source. Connector bindings live on workflow nodes, and the local executor records connector lifecycle events in run state and control-plane audit logs.
 
@@ -266,6 +266,8 @@ The connector validates the request shape, resolves the local credential handle,
 - booleans indicating whether title, description, assignee, and due date were present
 
 It does not call the live Lark/Feishu API, create tasks, perform OAuth, refresh tokens, host callbacks, install packages, auto-discover connectors, or enqueue background jobs. Raw mapped task values and resolved credential values must not appear in connector output or audit metadata.
+
+The live connector readiness decision is documented in `docs/lark-live-connector-readiness.md`. That decision approves only a future opt-in `create_task` live mode behind explicit credential, idempotency, failure-handling, audit-redaction, local-test, and rollback boundaries. The current package remains dry-run-only until that follow-up implementation is merged.
 
 Run the dry-run smoke from a source checkout:
 
