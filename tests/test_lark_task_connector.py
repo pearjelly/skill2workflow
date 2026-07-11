@@ -1,8 +1,16 @@
 import json
+import os
+from datetime import datetime
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
-from skill2workflow.connectors import ConnectorExecutionError, ConnectorRuntime, validate_connector_manifest
+from skill2workflow.connectors import (
+    ConnectorExecutionError,
+    ConnectorRuntime,
+    ExternalConnector,
+    validate_connector_manifest,
+)
 from skill2workflow.credentials import StaticCredentialProvider
 from skill2workflow.external_connectors import load_external_connector
 
@@ -27,6 +35,11 @@ class LarkTaskConnectorTests(TestCase):
             [manifest["id"] for manifest in ConnectorRuntime([connector]).list_connectors()],
             ["manual", "http", "lark_task"],
         )
+        self.assertEqual(
+            connector.manifest["config_schema"]["properties"]["mode"]["enum"],
+            ["dry_run", "live"],
+        )
+        self.assertIn("dry-run-default", connector.manifest["description"])
 
     def test_lark_task_dry_run_returns_compact_metadata_without_payload_values(self):
         runtime = ConnectorRuntime([_load_lark_task_connector()])
@@ -76,15 +89,204 @@ class LarkTaskConnectorTests(TestCase):
     def test_lark_task_rejects_live_mode_and_missing_credentials(self):
         runtime = ConnectorRuntime([_load_lark_task_connector()])
 
-        with self.assertRaisesRegex(ConnectorExecutionError, "lark_task connector only supports mode dry_run"):
-            runtime.execute_connector(_lark_task_node(mode="live"))
-
         with self.assertRaisesRegex(ConnectorExecutionError, "credential handle not found: lark_bot_access_token"):
             runtime.execute_connector(_lark_task_node(), context={"input": {"title": "Task"}})
 
+    def test_lark_task_live_mode_requires_exact_environment_opt_in(self):
+        transport = _FakeTransport()
+        runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
 
-def _load_lark_task_connector():
-    return load_external_connector(ROOT / "examples" / "connectors" / "lark_task_connector.py")
+        for value in (None, "", "true", "yes", "0"):
+            environment = {} if value is None else {"SKILL2WORKFLOW_LARK_TASK_LIVE": value}
+            with self.subTest(value=value), patch.dict(os.environ, environment, clear=True):
+                result = runtime.execute_connector(
+                    _lark_task_node(mode="live"),
+                    credential_provider=_FailIfResolvedCredentialProvider(),
+                    context=_execution_context(),
+                )
+
+            self.assertEqual(result["status"], "failed")
+            self.assertEqual(result["audit"]["provider_status"], "live_disabled")
+
+        self.assertEqual(transport.calls, [])
+
+    def test_lark_task_live_mode_sends_fixed_redacted_idempotent_request(self):
+        transport = _FakeTransport()
+        runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider(
+                    {"lark_bot_access_token": "local-lark-secret"}
+                ),
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(transport.calls), 1)
+        call = transport.calls[0]
+        request = call["request"]
+        request_body = json.loads(request.data.decode("utf-8"))
+        expected_due = str(int(datetime.fromisoformat("2026-07-09T09:00:00+00:00").timestamp() * 1000))
+
+        self.assertEqual(request.method, "POST")
+        self.assertEqual(
+            request.full_url,
+            "https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id",
+        )
+        self.assertEqual(request.get_header("Authorization"), "Bearer local-lark-secret")
+        self.assertEqual(request.get_header("Content-type"), "application/json; charset=utf-8")
+        self.assertEqual(request_body["summary"], "Renewal risk follow-up")
+        self.assertEqual(request_body["description"], "Customer ACME needs executive review")
+        self.assertEqual(
+            request_body["members"],
+            [{"id": "ou_123456", "type": "user", "role": "assignee"}],
+        )
+        self.assertEqual(request_body["due"], {"timestamp": expected_due, "is_all_day": False})
+        self.assertEqual(len(request_body["client_token"]), 64)
+        self.assertNotIn("source", request_body)
+        self.assertEqual(call["timeout"], 10.0)
+        self.assertEqual(result["audit"]["provider_status"], "completed")
+        self.assertTrue(result["audit"]["idempotency_key_present"])
+        self.assertTrue(result["audit"]["lark_task_id_present"])
+
+        encoded = json.dumps(result, ensure_ascii=False)
+        for forbidden in (
+            "local-lark-secret",
+            "Renewal risk follow-up",
+            "Customer ACME needs executive review",
+            "ou_123456",
+            "2026-07-09T09:00:00Z",
+            "task-guid-must-not-leak",
+            request_body["client_token"],
+        ):
+            self.assertNotIn(forbidden, encoded)
+
+    def test_lark_task_client_token_is_stable_per_execution_identity(self):
+        transport = _FakeTransport()
+        runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider(
+                    {"lark_bot_access_token": "local-lark-secret"}
+                ),
+                context=_execution_context(),
+            )
+            runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider(
+                    {"lark_bot_access_token": "local-lark-secret"}
+                ),
+                context=_execution_context(),
+            )
+            runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider(
+                    {"lark_bot_access_token": "local-lark-secret"}
+                ),
+                context=_execution_context(run_id="run_other"),
+            )
+            runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider(
+                    {"lark_bot_access_token": "local-lark-secret"}
+                ),
+                context=_execution_context(node_id="create_other_lark_task"),
+            )
+
+        tokens = [json.loads(call["request"].data.decode("utf-8"))["client_token"] for call in transport.calls]
+        self.assertEqual(tokens[0], tokens[1])
+        self.assertNotEqual(tokens[0], tokens[2])
+        self.assertNotEqual(tokens[0], tokens[3])
+
+    def test_lark_task_missing_mode_remains_dry_run(self):
+        node = _lark_task_node()
+        del node["connector"]["mode"]
+        runtime = ConnectorRuntime([_load_lark_task_connector()])
+
+        result = runtime.execute_connector(
+            node,
+            credential_provider=StaticCredentialProvider(
+                {"lark_bot_access_token": "local-lark-secret"}
+            ),
+            context={"input": {"title": "Task"}},
+        )
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["audit"]["mode"], "dry_run")
+
+
+def _load_lark_task_connector(transport=None):
+    connector = load_external_connector(ROOT / "examples" / "connectors" / "lark_task_connector.py")
+    if transport is None:
+        return connector
+
+    def execute_with_transport(binding, credential_provider=None, context=None):
+        return connector.executor(
+            binding,
+            credential_provider=credential_provider,
+            context=context,
+            transport=transport,
+        )
+
+    return ExternalConnector(manifest=connector.manifest, executor=execute_with_transport)
+
+
+class _FakeResponse:
+    def __init__(self, status, payload):
+        self.status = status
+        self._payload = payload
+
+    def read(self):
+        if isinstance(self._payload, bytes):
+            return self._payload
+        return json.dumps(self._payload).encode("utf-8")
+
+    def close(self):
+        return None
+
+
+class _FakeTransport:
+    def __init__(self, status=200, payload=None, error=None):
+        self.status = status
+        self.payload = payload if payload is not None else {
+            "code": 0,
+            "msg": "success",
+            "data": {"task": {"guid": "task-guid-must-not-leak"}},
+        }
+        self.error = error
+        self.calls = []
+
+    def __call__(self, request, timeout):
+        self.calls.append({"request": request, "timeout": timeout})
+        if self.error is not None:
+            raise self.error
+        return _FakeResponse(self.status, self.payload)
+
+
+class _FailIfResolvedCredentialProvider:
+    def resolve(self, handle):
+        raise AssertionError(f"credential resolution must not run: {handle}")
+
+
+def _execution_context(run_id="run_live", node_id="create_lark_task"):
+    return {
+        "input": {
+            "title": "Renewal risk follow-up",
+            "description": "Customer ACME needs executive review",
+            "assignee_open_id": "ou_123456",
+            "due_at": "2026-07-09T09:00:00Z",
+        },
+        "_execution": {
+            "workflow_id": "workflow_lark_live",
+            "workflow_version": "0.1.0",
+            "run_id": run_id,
+            "node_id": node_id,
+        },
+    }
 
 
 def _lark_task_node(operation="create_task", mode="dry_run"):

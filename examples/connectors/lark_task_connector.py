@@ -1,9 +1,14 @@
-"""Dry-run Lark/Feishu task connector package fixture for Loop 36."""
+"""Dry-run-default Lark/Feishu task connector with scoped live support."""
 
 from __future__ import annotations
 
 import copy
-from typing import Dict, List
+import hashlib
+import json
+import os
+from datetime import datetime
+from typing import Dict, List, Tuple
+from urllib import request as urllib_request
 
 from skill2workflow.connectors import (
     CONNECTOR_EXECUTION_CONTRACT_VERSION,
@@ -13,6 +18,12 @@ from skill2workflow.connectors import (
 from skill2workflow.credentials import CredentialResolutionError
 
 
+LIVE_ENVIRONMENT_SWITCH = "SKILL2WORKFLOW_LARK_TASK_LIVE"
+LIVE_URL = "https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id"
+LIVE_TIMEOUT_SECONDS = 10.0
+REQUIRED_CREDENTIAL_HANDLE = "lark_bot_access_token"
+
+
 MANIFEST = {
     "manifest_version": CONNECTOR_MANIFEST_VERSION,
     "id": "lark_task",
@@ -20,12 +31,12 @@ MANIFEST = {
     "kind": "lark_task",
     "status": "active",
     "node_types": ["tool_call"],
-    "description": "External dry-run connector package for creating Lark/Feishu task requests locally.",
+    "description": "Explicit dry-run-default connector with opt-in scoped Feishu task creation.",
     "config_schema": {
         "type": "object",
         "properties": {
             "operation": {"type": "string"},
-            "mode": {"type": "string"},
+            "mode": {"type": "string", "enum": ["dry_run", "live"]},
             "request": {
                 "type": "object",
                 "properties": {
@@ -54,8 +65,8 @@ MANIFEST = {
 }
 
 
-def execute(binding: Dict[str, object], credential_provider=None, context=None) -> Dict[str, object]:
-    """Validate a Lark task create request without calling the live Lark API."""
+def execute(binding: Dict[str, object], credential_provider=None, context=None, transport=None) -> Dict[str, object]:
+    """Validate or execute a scoped Lark task create request."""
     if not isinstance(binding, dict):
         raise ConnectorExecutionError("lark_task connector binding must be an object")
 
@@ -64,8 +75,8 @@ def execute(binding: Dict[str, object], credential_provider=None, context=None) 
         raise ConnectorExecutionError("lark_task connector only supports operation create_task")
 
     mode = str(binding.get("mode") or "dry_run")
-    if mode != "dry_run":
-        raise ConnectorExecutionError("lark_task connector only supports mode dry_run")
+    if mode not in ("dry_run", "live"):
+        raise ConnectorExecutionError("lark_task connector only supports modes dry_run and live")
 
     request = binding.get("request", {})
     if request is None:
@@ -74,8 +85,38 @@ def execute(binding: Dict[str, object], credential_provider=None, context=None) 
         raise ConnectorExecutionError("lark_task connector.request must be an object")
 
     body, mapping_summary = _mapped_body(request, context)
-    credential_summary = _resolve_credentials(binding.get("credentials", []), credential_provider)
     audit = _task_audit_metadata(operation, mode, body)
+
+    if mode == "live":
+        if not _live_enabled():
+            return _live_result("failed", audit, "live_disabled", mapping_summary)
+
+        payload = _provider_request_body(body, context)
+        credential_summary, credential_values = _resolve_credentials(
+            binding.get("credentials", []), credential_provider
+        )
+        if REQUIRED_CREDENTIAL_HANDLE not in credential_values:
+            raise ConnectorExecutionError(
+                f"credential handle not found: {REQUIRED_CREDENTIAL_HANDLE}"
+            )
+        response = (transport or _default_transport)(
+            _request(payload, credential_values[REQUIRED_CREDENTIAL_HANDLE]),
+            LIVE_TIMEOUT_SECONDS,
+        )
+        _successful_task_present(response)
+        return _live_result(
+            "completed",
+            audit,
+            "completed",
+            mapping_summary,
+            credential_summary,
+            True,
+            True,
+        )
+
+    credential_summary, _credential_values = _resolve_credentials(
+        binding.get("credentials", []), credential_provider
+    )
     if not audit["task_title_present"]:
         raise ConnectorExecutionError("lark_task connector task title is required")
 
@@ -112,13 +153,98 @@ def _present(value: object) -> bool:
     return True
 
 
-def _resolve_credentials(credentials: object, credential_provider) -> Dict[str, object]:
+def _live_enabled() -> bool:
+    return os.environ.get(LIVE_ENVIRONMENT_SWITCH) == "1"
+
+
+def _execution_identity(context: object) -> List[str]:
+    context_root = context if isinstance(context, dict) else {}
+    execution = context_root.get("_execution", {})
+    if not isinstance(execution, dict):
+        return []
+    values = [
+        str(execution.get("workflow_id") or ""),
+        str(execution.get("workflow_version") or ""),
+        str(execution.get("run_id") or ""),
+        str(execution.get("node_id") or ""),
+    ]
+    return values if all(values) else []
+
+
+def _client_token(context: object) -> str:
+    identity = _execution_identity(context)
+    if not identity:
+        raise ConnectorExecutionError("lark_task live execution identity is required")
+    canonical = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _provider_request_body(body: Dict[str, object], context: object) -> Dict[str, object]:
+    title = body.get("title")
+    if not isinstance(title, str) or not title.strip():
+        raise ConnectorExecutionError("lark_task connector task title is required")
+
+    payload: Dict[str, object] = {
+        "summary": title,
+        "client_token": _client_token(context),
+    }
+    description = body.get("description")
+    if description is not None:
+        if not isinstance(description, str):
+            raise ConnectorExecutionError("lark_task connector description must be a string")
+        payload["description"] = description
+
+    assignee = body.get("assignee_open_id")
+    if assignee is not None:
+        if not isinstance(assignee, str) or not assignee.strip():
+            raise ConnectorExecutionError("lark_task connector assignee_open_id must be a non-empty string")
+        payload["members"] = [{"id": assignee, "type": "user", "role": "assignee"}]
+
+    due_at = body.get("due_at")
+    if due_at is not None:
+        payload["due"] = {"timestamp": _due_timestamp(due_at), "is_all_day": False}
+    return payload
+
+
+def _due_timestamp(value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ConnectorExecutionError("lark_task connector due_at must be an RFC 3339 string")
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        raise ConnectorExecutionError("lark_task connector due_at must be an RFC 3339 string")
+    if parsed.tzinfo is None:
+        raise ConnectorExecutionError("lark_task connector due_at must include a timezone")
+    return str(int(parsed.timestamp() * 1000))
+
+
+def _request(payload: Dict[str, object], token: str) -> urllib_request.Request:
+    return urllib_request.Request(
+        LIVE_URL,
+        data=json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json; charset=utf-8",
+        },
+        method="POST",
+    )
+
+
+def _default_transport(request: urllib_request.Request, timeout: float):
+    return urllib_request.urlopen(request, timeout=timeout)
+
+
+def _resolve_credentials(
+    credentials: object, credential_provider
+) -> Tuple[Dict[str, object], Dict[str, str]]:
     if credentials in (None, []):
-        return {"status": "skipped", "handles": []}
+        return {"status": "skipped", "handles": []}, {}
     if not isinstance(credentials, list):
         raise ConnectorExecutionError("connector.credentials must be a list")
 
     handles: List[str] = []
+    values: Dict[str, str] = {}
     for index, credential in enumerate(credentials):
         if not isinstance(credential, dict):
             raise ConnectorExecutionError(f"connector.credentials[{index}] must be an object")
@@ -131,12 +257,68 @@ def _resolve_credentials(credentials: object, credential_provider) -> Dict[str, 
         if credential_provider is None:
             raise ConnectorExecutionError(f"credential handle not found: {handle}")
         try:
-            credential_provider.resolve(handle)
+            values[handle] = credential_provider.resolve(handle)
         except CredentialResolutionError as error:
             raise ConnectorExecutionError(str(error))
         handles.append(handle)
 
-    return {"status": "resolved", "handles": sorted(handles)}
+    return {"status": "resolved", "handles": sorted(handles)}, values
+
+
+def _successful_task_present(response) -> bool:
+    try:
+        status = int(getattr(response, "status", 0))
+        raw = response.read()
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+    if status < 200 or status >= 300:
+        raise ConnectorExecutionError("lark_task live provider request failed")
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        raise ConnectorExecutionError("lark_task live provider response is invalid")
+    if not isinstance(payload, dict) or payload.get("code") != 0:
+        raise ConnectorExecutionError("lark_task live provider response is invalid")
+    data = payload.get("data", {})
+    task = data.get("task", {}) if isinstance(data, dict) else {}
+    guid = task.get("guid") if isinstance(task, dict) else ""
+    if not isinstance(guid, str) or not guid:
+        raise ConnectorExecutionError("lark_task live provider response is invalid")
+    return True
+
+
+def _live_result(
+    status: str,
+    audit: Dict[str, object],
+    provider_status: str,
+    mapping_summary: Dict[str, object],
+    credential_summary: Dict[str, object] = None,
+    idempotency_key_present: bool = False,
+    task_id_present: bool = False,
+) -> Dict[str, object]:
+    compact = dict(audit)
+    compact.update(
+        {
+            "credential_status": str((credential_summary or {}).get("status") or "skipped"),
+            "idempotency_key_present": idempotency_key_present,
+            "provider_status": provider_status,
+            "lark_task_id_present": task_id_present,
+        }
+    )
+    result = {
+        "status": status,
+        "connector": {"id": "lark_task", "kind": "lark_task"},
+        "output": dict(compact),
+        "audit": compact,
+        "input_mapping": mapping_summary,
+    }
+    if credential_summary:
+        result["credentials"] = credential_summary
+    if status == "failed":
+        result["error"] = f"lark_task live request failed: {provider_status}"
+    return result
 
 
 def _mapped_body(request: Dict[str, object], context: object):
