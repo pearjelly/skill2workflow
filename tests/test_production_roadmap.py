@@ -55,9 +55,23 @@ class ProductionRoadmapTests(TestCase):
             roadmap,
         )
 
-        self.assertIn("SQLite is the minimum production persistence baseline", roadmap)
+        self.assertIn(
+            "SQLite is the minimum production persistence baseline for Self-hosted Beta. "
+            "JSON and JSONL remain supported for examples, local development, and evaluation.",
+            roadmap,
+        )
         self.assertIn("single-instance and single-tenant", roadmap)
         self.assertIn("must not claim exactly-once execution", roadmap)
+
+    def test_roadmap_rules_keep_loop_selection_and_dsl_migration_explicit(self):
+        roadmap = _read("ROADMAP.md")
+
+        self.assertIn("- Select only one active loop.", roadmap)
+        self.assertIn(
+            "- Preserve Workflow DSL compatibility unless a separately approved contract change "
+            "defines migration behavior.",
+            roadmap,
+        )
 
     def test_roadmap_preserves_complete_delivery_history(self):
         roadmap = _read("ROADMAP.md")
@@ -122,8 +136,15 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("Loop 39", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)
-        self.assertNotIn("Loop 40: Controlled Live Connector Pilot", readme)
-        self.assertNotIn("Loop 43: Durable Recurring Scheduling And Safe Dispatch", readme)
+        candidate_loop_titles = [
+            "Loop 40: Controlled Live Connector Pilot",
+            "Loop 41: Self-hosted Runtime Service Boundary",
+            "Loop 42: Authenticated Ingress And Production Credentials",
+            "Loop 43: Durable Recurring Scheduling And Safe Dispatch",
+        ]
+        for title in candidate_loop_titles:
+            with self.subTest(title=title):
+                self.assertNotIn(title, readme)
 
 
 def _read(path: str) -> str:

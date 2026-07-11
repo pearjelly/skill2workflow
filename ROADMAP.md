@@ -226,6 +226,8 @@ These areas require their own approved loops:
 
 ## Roadmap Rules
 
+- Select only one active loop.
+- Preserve Workflow DSL compatibility unless a separately approved contract change defines migration behavior.
 - Workflow DSL remains the execution truth source.
 - Parser, compiler, validator, executor, connector, storage, or CLI behavior changes start with tests.
 - User-facing capabilities need a CLI path before becoming UI-only controls.
