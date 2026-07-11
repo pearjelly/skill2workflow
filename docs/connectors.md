@@ -1,7 +1,7 @@
 # Connector Runtime
 
 `skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace.
-Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. Loop 38 readiness review approved only a scoped live `create_task` follow-up, documented in `docs/lark-live-connector-readiness.md`. These loops do not add automatic discovery, live SaaS calls, OAuth, or marketplace behavior.
+Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. Loop 38 readiness review approved only a scoped live `create_task` follow-up, documented in `docs/lark-live-connector-readiness.md`. Loop 39 implements that one opt-in live action while preserving explicit loading and the dry-run default; it does not add automatic discovery, OAuth, token refresh, or marketplace behavior.
 
 Workflow DSL remains the execution truth source. Connector bindings live on workflow nodes, and the local executor records connector lifecycle events in run state and control-plane audit logs.
 
@@ -245,7 +245,7 @@ Connector package smoke contract:
 
 Package conventions intentionally exclude automatic connector discovery, package installation, marketplace indexing, OAuth, hosted callbacks, queues, production schedulers, and product-specific SaaS connector behavior.
 
-## Lark/Feishu Task Connector Dry-Run Package
+## Lark/Feishu Task Connector: Dry-Run Default And Scoped Live Mode
 
 `examples/connectors/lark_task_connector.py` is the first product-shaped connector package fixture. It stays outside the built-in connector registry and must be explicitly loaded with `load_external_connector(...)`.
 
@@ -253,7 +253,8 @@ Supported scope:
 
 - connector id and kind: `lark_task`
 - operation: `create_task`
-- mode: `dry_run`
+- default mode: `dry_run`
+- opt-in mode: live
 - node type: `tool_call`
 - credential handle: `lark_bot_access_token`
 - input mapping: body-only values from `/input/title`, `/input/description`, `/input/assignee_open_id`, and `/input/due_at`
@@ -265,9 +266,33 @@ The connector validates the request shape, resolves the local credential handle,
 - input mapping status and input key names
 - booleans indicating whether title, description, assignee, and due date were present
 
-It does not call the live Lark/Feishu API, create tasks, perform OAuth, refresh tokens, host callbacks, install packages, auto-discover connectors, or enqueue background jobs. Raw mapped task values and resolved credential values must not appear in connector output or audit metadata.
+Dry-run remains the default when `mode` is missing or is `dry_run`. It validates and summarizes the request without a provider call. Raw mapped task values and resolved credential values must not appear in connector output or audit metadata.
 
-The live connector readiness decision is documented in `docs/lark-live-connector-readiness.md`. That decision approves only a future opt-in `create_task` live mode behind explicit credential, idempotency, failure-handling, audit-redaction, local-test, and rollback boundaries. The current package remains dry-run-only until that follow-up implementation is merged.
+The live connector readiness decision is documented in `docs/lark-live-connector-readiness.md`. The package now supports only the approved opt-in `create_task` action. Live network activity requires both an explicitly loaded binding with `mode: live` and the exact environment switch `SKILL2WORKFLOW_LARK_TASK_LIVE=1`; removing the switch immediately rolls the connector back to no live calls. No other truthy environment values enable it.
+
+The connector posts only to the fixed Feishu domestic Task API v2 endpoint:
+
+```text
+https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id
+```
+
+It uses a fixed 10-second timeout. The provider requires either `task:task:write` or `task:task:writeonly` scope and documents a limit of 10 create requests per second. The connector derives the native Feishu `client_token` from runtime-owned workflow id, workflow version, run id, and node id, so retries for one execution reuse the same provider idempotency token without persisting its value.
+
+Normal execution resolves the `lark_bot_access_token` handle through the configured credential provider. `LARK_BOT_ACCESS_TOKEN` is reserved for the guarded validation helper and is not a Workflow DSL or connector-binding field. The helper must be run outside CI with explicit confirmation:
+
+```bash
+SKILL2WORKFLOW_LARK_TASK_LIVE=1 LARK_BOT_ACCESS_TOKEN='<injected-secret>' \
+  python3 scripts/lark_task_live_validation.py \
+  --confirm-live-create \
+  --validation-run-id '<stable-run-id>' \
+  --assignee-open-id '<open_id>' \
+  --title '<task-title>' \
+  --description '<task-description>'
+```
+
+CI injects a fake transport and never accesses the live network. Live results use compact `provider_status` categories: `live_disabled`, `validation_failed`, `credential_failed`, `authorization_failed`, `permission_denied`, `rate_limited`, `resource_not_found`, `idempotency_conflict`, `provider_unavailable`, `timeout`, `malformed_response`, and `completed`.
+
+Connector-produced output, audit, events, snapshots, and summaries contain presence flags and compact statuses only. They never contain raw provider messages, task values, the task guid, resolved token, `client_token`, raw request, or raw response. Durable user-supplied task input remains unchanged under `run.context.input`; it is not connector-produced state.
 
 Run the dry-run smoke from a source checkout:
 

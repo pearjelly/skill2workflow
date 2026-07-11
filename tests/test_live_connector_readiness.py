@@ -72,8 +72,19 @@ class LiveConnectorReadinessTests(TestCase):
         self.assertIn("default remains dry-run", decision)
         self.assertIn("revert Loop 39 without changing Workflow DSL compatibility", decision)
 
+        self.assertIn("https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id", decision)
+        self.assertIn("native `client_token`", decision)
+        self.assertIn("SKILL2WORKFLOW_LARK_TASK_LIVE=1", decision)
+        self.assertIn("run.context.input", decision)
+        self.assertIn("must not copy raw task values into connector-produced state", decision)
+        self.assertIn("python3 scripts/lark_task_live_validation.py", decision)
+
         self.assertIn("docs/lark-live-connector-readiness.md", connectors)
         self.assertIn("Loop 38 readiness review approved only a scoped live `create_task` follow-up", connectors)
+        self.assertIn("mode: live", connectors)
+        self.assertIn("SKILL2WORKFLOW_LARK_TASK_LIVE=1", connectors)
+        self.assertIn("provider_status", connectors)
+        self.assertIn("LARK_BOT_ACCESS_TOKEN", connectors)
 
         self.assertIn("| Loop 38: Live Connector Readiness Review | Complete |", roadmap)
         self.assertIn("Active loop: Loop 39, Scoped Live Lark Task Connector", roadmap)
