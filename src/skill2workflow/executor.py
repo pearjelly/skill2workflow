@@ -209,7 +209,7 @@ class LocalExecutor:
                 connector_result = self.connector_runtime.execute_connector(
                     node,
                     credential_provider=self.credential_provider,
-                    context=state.get("context", {}),
+                    context=_connector_context(state, current_id),
                 )
             except ConnectorExecutionError as error:
                 connector_result = {
@@ -351,6 +351,18 @@ class LocalExecutor:
     @staticmethod
     def _node_map(workflow: Dict[str, object]) -> Dict[str, Dict[str, object]]:
         return {node["id"]: node for node in workflow.get("nodes", [])}
+
+
+def _connector_context(state: RunState, node_id: str) -> Dict[str, object]:
+    durable = state.get("context", {})
+    context = copy.deepcopy(durable) if isinstance(durable, dict) else {}
+    context["_execution"] = {
+        "workflow_id": str(state.get("workflow_id", "")),
+        "workflow_version": str(state.get("workflow_version", "")),
+        "run_id": str(state.get("run_id", "")),
+        "node_id": str(node_id),
+    }
+    return context
 
 
 def _now() -> str:
