@@ -256,6 +256,101 @@ class LarkTaskConnectorTests(TestCase):
                 self.assertNotIn("raw-http-body", encoded)
                 self.assertNotIn("not-json-success-body", encoded)
 
+    def test_lark_task_live_mode_normalizes_response_read_failures_and_closes(self):
+        timeout_response = _FakeResponse(
+            200,
+            {},
+            error=TimeoutError("raw response read timeout"),
+        )
+        http_error_body = _ReadErrorBody(
+            urllib_error.URLError(socket.timeout("raw http error read timeout"))
+        )
+        http_error = urllib_error.HTTPError(
+            "https://open.feishu.cn/open-apis/task/v2/tasks",
+            503,
+            "raw http error reason",
+            {},
+            http_error_body,
+        )
+        url_error_response = _FakeResponse(
+            200,
+            {},
+            error=urllib_error.URLError("raw response read network failure"),
+        )
+        cases = [
+            (_FakeTransport(response=timeout_response), timeout_response, "timeout"),
+            (_FakeTransport(error=http_error), http_error_body, "timeout"),
+            (
+                _FakeTransport(response=url_error_response),
+                url_error_response,
+                "provider_unavailable",
+            ),
+        ]
+
+        for transport, close_target, expected_status in cases:
+            with self.subTest(expected_status=expected_status):
+                runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+                with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+                    result = runtime.execute_connector(
+                        _lark_task_node(mode="live"),
+                        credential_provider=StaticCredentialProvider(
+                            {"lark_bot_access_token": "local-lark-secret"}
+                        ),
+                        context=_execution_context(),
+                    )
+
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["audit"]["provider_status"], expected_status)
+                self.assertTrue(result["audit"]["idempotency_key_present"])
+                self.assertFalse(result["audit"]["lark_task_id_present"])
+                self.assertEqual(
+                    result["error"],
+                    f"lark_task live request failed: {expected_status}",
+                )
+                self.assertTrue(close_target.closed)
+                encoded = json.dumps(result, ensure_ascii=False)
+                self.assertNotIn("local-lark-secret", encoded)
+                self.assertNotIn("raw response read timeout", encoded)
+                self.assertNotIn("raw http error read timeout", encoded)
+                self.assertNotIn("raw http error reason", encoded)
+                self.assertNotIn("raw response read network failure", encoded)
+
+    def test_lark_task_live_mode_requires_2xx_for_provider_success(self):
+        cases = [
+            (401, "authorization_failed"),
+            (403, "permission_denied"),
+            (429, "rate_limited"),
+            (500, "provider_unavailable"),
+        ]
+
+        for status, expected_status in cases:
+            with self.subTest(status=status, expected_status=expected_status):
+                transport = _FakeTransport(
+                    status=status,
+                    payload={
+                        "code": 0,
+                        "msg": "raw false success detail",
+                        "data": {"task": {"guid": "raw-false-success-guid"}},
+                    },
+                )
+                runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+                with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+                    result = runtime.execute_connector(
+                        _lark_task_node(mode="live"),
+                        credential_provider=StaticCredentialProvider(
+                            {"lark_bot_access_token": "local-lark-secret"}
+                        ),
+                        context=_execution_context(),
+                    )
+
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["audit"]["provider_status"], expected_status)
+                self.assertTrue(result["audit"]["idempotency_key_present"])
+                self.assertFalse(result["audit"]["lark_task_id_present"])
+                encoded = json.dumps(result, ensure_ascii=False)
+                self.assertNotIn("raw false success detail", encoded)
+                self.assertNotIn("raw-false-success-guid", encoded)
+
     def test_lark_task_live_preflight_failures_never_call_transport(self):
         missing_execution = {"input": dict(_execution_context()["input"])}
         invalid_due = json.loads(json.dumps(_execution_context()))
@@ -375,21 +470,37 @@ def _load_lark_task_connector(transport=None):
 
 
 class _FakeResponse:
-    def __init__(self, status, payload):
+    def __init__(self, status, payload, error=None):
         self.status = status
         self._payload = payload
+        self.error = error
+        self.closed = False
 
     def read(self):
+        if self.error is not None:
+            raise self.error
         if isinstance(self._payload, bytes):
             return self._payload
         return json.dumps(self._payload).encode("utf-8")
 
     def close(self):
-        return None
+        self.closed = True
+
+
+class _ReadErrorBody:
+    def __init__(self, error):
+        self.error = error
+        self.closed = False
+
+    def read(self):
+        raise self.error
+
+    def close(self):
+        self.closed = True
 
 
 class _FakeTransport:
-    def __init__(self, status=200, payload=None, error=None):
+    def __init__(self, status=200, payload=None, error=None, response=None):
         self.status = status
         self.payload = payload if payload is not None else {
             "code": 0,
@@ -397,12 +508,15 @@ class _FakeTransport:
             "data": {"task": {"guid": "task-guid-must-not-leak"}},
         }
         self.error = error
+        self.response = response
         self.calls = []
 
     def __call__(self, request, timeout):
         self.calls.append({"request": request, "timeout": timeout})
         if self.error is not None:
             raise self.error
+        if self.response is not None:
+            return self.response
         return _FakeResponse(self.status, self.payload)
 
 

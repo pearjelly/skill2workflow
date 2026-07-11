@@ -301,27 +301,41 @@ def _provider_outcome(status: int, raw: bytes) -> Tuple[str, bool]:
     payload = _decode_provider(raw)
     if payload is not None:
         code = payload.get("code")
+        if isinstance(code, int) and code in PROVIDER_CODE_STATUS:
+            return PROVIDER_CODE_STATUS[code], False
         if code == 0:
+            if status < 200 or status >= 300:
+                return _http_status(status), False
             data = payload.get("data", {})
             task = data.get("task", {}) if isinstance(data, dict) else {}
             guid = task.get("guid") if isinstance(task, dict) else ""
             if isinstance(guid, str) and guid:
                 return "completed", True
             return "malformed_response", False
-        if isinstance(code, int) and code in PROVIDER_CODE_STATUS:
-            return PROVIDER_CODE_STATUS[code], False
     return _http_status(status), False
+
+
+def _read_provider_outcome(response, status: int) -> Tuple[str, bool]:
+    try:
+        raw = response.read()
+    except (TimeoutError, socket.timeout):
+        return "timeout", False
+    except urllib_error.URLError as error:
+        if isinstance(error.reason, (TimeoutError, socket.timeout)):
+            return "timeout", False
+        return "provider_unavailable", False
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+    return _provider_outcome(status, raw)
 
 
 def _transport_outcome(request: urllib_request.Request, transport) -> Tuple[str, bool]:
     try:
         response = transport(request, LIVE_TIMEOUT_SECONDS)
     except urllib_error.HTTPError as error:
-        try:
-            raw = error.read()
-        finally:
-            error.close()
-        return _provider_outcome(int(error.code), raw)
+        return _read_provider_outcome(error, int(error.code))
     except (TimeoutError, socket.timeout):
         return "timeout", False
     except urllib_error.URLError as error:
@@ -331,12 +345,12 @@ def _transport_outcome(request: urllib_request.Request, transport) -> Tuple[str,
 
     try:
         status = int(getattr(response, "status", 0))
-        raw = response.read()
-    finally:
+    except Exception:
         close = getattr(response, "close", None)
         if callable(close):
             close()
-    return _provider_outcome(status, raw)
+        raise
+    return _read_provider_outcome(response, status)
 
 
 def _resolve_credentials(
