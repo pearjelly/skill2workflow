@@ -276,13 +276,12 @@ The connector posts only to the fixed Feishu domestic Task API v2 endpoint:
 https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id
 ```
 
-It uses a fixed 10-second timeout. The provider requires either `task:task:write` or `task:task:writeonly` scope and documents a limit of 10 create requests per second. The connector derives the native Feishu `client_token` from runtime-owned workflow id, workflow version, run id, and node id, so retries for one execution reuse the same provider idempotency token without persisting its value.
+It uses a fixed 10-second timeout. The required provider scope is either `task:task:write` or `task:task:writeonly`, and the documented limit is 10 create requests per second. The connector derives the native Feishu `client_token` from runtime-owned workflow id, workflow version, run id, and node id. Retries may still invoke transport; reusing the stable token with unchanged request parameters lets Feishu perform provider-side deduplication. The connector does not locally block retry transport calls.
 
 Normal execution resolves the `lark_bot_access_token` handle through the configured credential provider. `LARK_BOT_ACCESS_TOKEN` is reserved for the guarded validation helper and is not a Workflow DSL or connector-binding field. The helper must be run outside CI with explicit confirmation:
 
 ```bash
-SKILL2WORKFLOW_LARK_TASK_LIVE=1 LARK_BOT_ACCESS_TOKEN='<injected-secret>' \
-  python3 scripts/lark_task_live_validation.py \
+vibe vault run --env LARK_BOT_ACCESS_TOKEN -- env SKILL2WORKFLOW_LARK_TASK_LIVE=1 python3 scripts/lark_task_live_validation.py \
   --confirm-live-create \
   --validation-run-id '<stable-run-id>' \
   --assignee-open-id '<open_id>' \
@@ -290,7 +289,9 @@ SKILL2WORKFLOW_LARK_TASK_LIVE=1 LARK_BOT_ACCESS_TOKEN='<injected-secret>' \
   --description '<task-description>'
 ```
 
-CI injects a fake transport and never accesses the live network. Live results use compact `provider_status` categories: `live_disabled`, `validation_failed`, `credential_failed`, `authorization_failed`, `permission_denied`, `rate_limited`, `resource_not_found`, `idempotency_conflict`, `provider_unavailable`, `timeout`, `malformed_response`, and `completed`.
+Use Avibe Vault as shown, or an equivalent secret manager that injects `LARK_BOT_ACCESS_TOKEN` only into the child process. Never paste the token into the command or shell history.
+
+CI injects a fake transport and never accesses the live network. Recognized Feishu provider codes take precedence over generic HTTP status classification. Normalized `provider_status` values are exactly: `live_disabled`, `validation_failed`, `credential_failed`, `authorization_failed`, `permission_denied`, `rate_limited`, `resource_not_found`, `idempotency_conflict`, `provider_unavailable`, `timeout`, `malformed_response`, and `completed`.
 
 Connector-produced output, audit, events, snapshots, and summaries contain presence flags and compact statuses only. They never contain raw provider messages, task values, the task guid, resolved token, `client_token`, raw request, or raw response. Durable user-supplied task input remains unchanged under `run.context.input`; it is not connector-produced state.
 

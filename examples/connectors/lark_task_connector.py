@@ -372,6 +372,8 @@ def _resolve_credentials(
         handle = str(credential.get("handle") or "")
         if not handle:
             raise ConnectorExecutionError(f"connector.credentials[{index}].handle is required")
+        if handle != REQUIRED_CREDENTIAL_HANDLE:
+            continue
         if credential_provider is None:
             raise ConnectorExecutionError(f"credential handle not found: {handle}")
         try:

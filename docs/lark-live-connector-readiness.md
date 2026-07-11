@@ -45,7 +45,7 @@ Loop 39 implements that scoped path against one fixed provider boundary:
 POST https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id
 ```
 
-The connector constructs the method, Feishu domestic host, Task API v2 path, `user_id_type=open_id` query, and headers internally. Workflow input cannot override them. The provider requires either the `task:task:write` or `task:task:writeonly` scope for create access, documents a limit of 10 create requests per second, and the connector uses a fixed 10-second timeout.
+The connector constructs the method, Feishu domestic host, Task API v2 path, `user_id_type=open_id` query, and headers internally. Workflow input cannot override them. The required provider scope is either `task:task:write` or `task:task:writeonly`, the documented limit is 10 create requests per second, and the connector uses a fixed 10-second timeout.
 
 Live activation requires both `mode: live` in the explicitly loaded connector binding and the exact environment switch `SKILL2WORKFLOW_LARK_TASK_LIVE=1`. Missing mode and explicit `mode: dry_run` both retain dry-run behavior. Any other environment value returns compact `provider_status: live_disabled` metadata before credential resolution or transport invocation.
 
@@ -75,13 +75,13 @@ The token is resolved only through the credential provider at connector executio
 
 Workflow DSL may reference the handle name, but the resolved credential value must remain outside immutable workflow artifacts and persisted run evidence. Missing credentials, unsupported credential targets, or provider resolution errors must become failed connector results with compact error metadata.
 
-Normal connector execution resolves only that handle through the configured credential provider. `LARK_BOT_ACCESS_TOKEN` is not a general connector configuration surface; it is read only by the guarded live-validation helper, which immediately wraps it in the existing credential provider and never accepts or prints the token as a command-line value.
+Normal connector execution resolves only that approved handle through the configured credential provider. Unrelated header-target handles are not materialized. `LARK_BOT_ACCESS_TOKEN` is not a general connector configuration surface; it is read only by the guarded live-validation helper, which immediately wraps it in the existing credential provider and never accepts or prints the token as a command-line value.
 
 ## Idempotency And Duplicate Prevention
 
-Live `create_task` requires all four runtime-owned identity values from `workflow_id + version + run_id + node_id` before making a request. The connector canonicalizes those values and hashes them into the provider's native `client_token`. The token is stable for retries of the same execution identity and changes for a different version, run, or node.
+Live `create_task` requires all four runtime-owned identity values from `workflow_id + version + run_id + node_id` before making a request. The connector canonicalizes those values and hashes them into the provider's native `client_token`. This native token is the provider idempotency key: it is stable for retries of the same execution identity and changes for a different version, run, or node.
 
-Feishu requires retries using a `client_token` to keep request parameters unchanged. Because this native idempotency mechanism is available, Loop 39 adds no local idempotency database. Connector-produced state records only `idempotency_key_present`, never the token digest. An idempotency conflict becomes a safe failure with compact metadata instead of a guessed retry.
+Retries may still invoke transport; the stable native `client_token` and unchanged request parameters let Feishu perform provider-side deduplication. This provider mechanism controls duplicate task creation: the connector does not locally block retry transport calls and Loop 39 adds no local idempotency database. Connector-produced state records only `idempotency_key_present`, never the token digest. A provider-reported idempotency conflict becomes a safe failure with compact metadata instead of a guessed retry.
 
 ## Failure Modes
 
@@ -98,6 +98,10 @@ Loop 39 maps expected live failures into normalized connector results rather tha
 | HTTP 5xx/provider unavailable | `provider_unavailable` | A retry reuses the same `client_token`. |
 | `network timeout` | `timeout` | No raw request body or token in the error. |
 | Unexpected provider response | `malformed_response` | Failed connector result without raw response payload leakage. |
+
+Recognized Feishu provider codes take precedence over generic HTTP status classification. If no recognized code is available, the connector falls back to the HTTP status category.
+
+Normalized `provider_status` values are exactly: `live_disabled`, `validation_failed`, `credential_failed`, `authorization_failed`, `permission_denied`, `rate_limited`, `resource_not_found`, `idempotency_conflict`, `provider_unavailable`, `timeout`, `malformed_response`, and `completed`.
 
 Audit and run output should preserve enough state for operators to understand whether the live call was attempted, completed, failed, or skipped. It should not preserve raw provider responses unless a future redaction contract explicitly allows safe structured fields.
 
@@ -145,13 +149,12 @@ Required tests before any live API implementation can merge:
 - live mode sends only the approved `create_task` request shape
 - the fake receiver can simulate success, `401 or 403`, rate limit, network timeout, validation error, and malformed response cases
 - raw task values and resolved credentials do not appear in result summaries, run state, audit logs, or snapshot artifacts
-- the idempotency key blocks duplicate task creation attempts for the same `workflow_id + version + run_id + node_id`
+- retries for the same `workflow_id + version + run_id + node_id` reuse the stable native `client_token` and unchanged parameters so Feishu performs provider-side deduplication; the connector does not locally block retry transport calls
 
 The existing dry-run tests and smoke commands continue to pass unchanged. After CI-safe fake-transport tests pass, an operator may run the separately guarded validation helper outside CI:
 
 ```bash
-SKILL2WORKFLOW_LARK_TASK_LIVE=1 LARK_BOT_ACCESS_TOKEN='<injected-secret>' \
-  python3 scripts/lark_task_live_validation.py \
+vibe vault run --env LARK_BOT_ACCESS_TOKEN -- env SKILL2WORKFLOW_LARK_TASK_LIVE=1 python3 scripts/lark_task_live_validation.py \
   --confirm-live-create \
   --validation-run-id '<stable-run-id>' \
   --assignee-open-id '<open_id>' \
@@ -159,7 +162,7 @@ SKILL2WORKFLOW_LARK_TASK_LIVE=1 LARK_BOT_ACCESS_TOKEN='<injected-secret>' \
   --description '<task-description>'
 ```
 
-The helper is inert without the confirmation flag, the exact environment switch, a token injected through the environment, a stable validation run id, and an assignee open id. It prints compact presence/status metadata only and writes no run state.
+Use Avibe Vault as shown, or an equivalent secret manager that injects `LARK_BOT_ACCESS_TOKEN` only into the child process. Never paste the token into the command or shell history. The helper is inert without the confirmation flag, the exact environment switch, a token injected through the environment, a stable validation run id, and an assignee open id. It prints compact presence/status metadata only and writes no run state.
 
 ## Rollback Boundaries
 

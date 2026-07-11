@@ -166,6 +166,39 @@ class LarkTaskConnectorTests(TestCase):
         ):
             self.assertNotIn(forbidden, encoded)
 
+    def test_lark_task_live_mode_resolves_only_approved_credential_handle(self):
+        transport = _FakeTransport()
+        runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+        node = _lark_task_node(mode="live")
+        node["connector"]["credentials"].append(
+            {
+                "target": "header",
+                "name": "X-Unrelated-Secret",
+                "handle": "unrelated_header_secret",
+            }
+        )
+        provider = _RecordingCredentialProvider(
+            {
+                "lark_bot_access_token": "local-lark-secret",
+                "unrelated_header_secret": "must-not-be-materialized",
+            }
+        )
+
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                node,
+                credential_provider=provider,
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(provider.calls, ["lark_bot_access_token"])
+        self.assertEqual(
+            result["credentials"],
+            {"status": "resolved", "handles": ["lark_bot_access_token"]},
+        )
+        self.assertNotIn("must-not-be-materialized", json.dumps(result))
+
     def test_lark_task_live_mode_normalizes_provider_failures_without_leakage(self):
         cases = [
             (401, {"code": 999, "msg": "raw-auth-detail"}, "authorization_failed"),
@@ -523,6 +556,16 @@ class _FakeTransport:
 class _FailIfResolvedCredentialProvider:
     def resolve(self, handle):
         raise AssertionError(f"credential resolution must not run: {handle}")
+
+
+class _RecordingCredentialProvider:
+    def __init__(self, values):
+        self.values = values
+        self.calls = []
+
+    def resolve(self, handle):
+        self.calls.append(handle)
+        return self.values[handle]
 
 
 def _execution_context(run_id="run_live", node_id="create_lark_task"):
