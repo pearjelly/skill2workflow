@@ -498,42 +498,11 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-The bootstrap MVP now covers all five approved architecture layers in minimal local form:
+Current maturity: Local Evaluation. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-38 are complete.
 
-- Parser
-- Compiler and Validator
-- LiteGraph Editor
-- Durable Executor
-- Minimal Control Plane
-- Workflow DSL Contract
-- Visual Write-Back
-- SQLite durability for run state, workflow registry, and audit events
-- Control Plane Hardening
-- Connector Runtime MVP
-- Authoring Experience
-- Open Source Release Readiness
-- Local Control Plane UI
-- Release Automation
-- Workflow Example Pack
-- Connector Runtime Hardening
-- Control Plane Operator UX
-- Demo And Contributor Onboarding
-- Packaging And Installability
-- Runtime Policy And Recovery
-- Credential Boundary And Secret Hygiene
-- Trigger And Local Run API
-- Workflow Inputs And Run Context
-- Credential Provider Interface
-- Local Webhook Adapter
-- Run Overlay In Visual Editor
-- Pilot Playbook And Example
-- Scheduled Trigger Boundary
-- Trigger Input Mapping
-- Connector Extension Contract
-- Pilot Scenario Pack
-- Connector Extension Prototype
+The active priority is Loop 39: implement only the readiness-approved Lark/Feishu `create_task` live action behind explicit opt-in while keeping dry-run behavior as the default.
 
-Next priority is the Connector Packaging Boundary.
+The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
 

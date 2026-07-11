@@ -1,100 +1,163 @@
 # Roadmap
 
-This roadmap turns the approved `skill2workflow` design into an open-source delivery plan. It is intentionally organized around small closed loops: every milestone should produce runnable commands, tests, and a concrete artifact that future contributors can inspect.
+This roadmap turns the approved `skill2workflow` design into small, verifiable delivery loops. Each loop should leave behind a runnable command, tests, documentation, and an inspectable artifact.
 
-The execution source of truth remains the Workflow DSL. LiteGraph and future UI layers are editors and views, not runtime authorities.
+## Product Direction
 
-## Current Status
+The near-term target is a self-hosted, single-tenant workflow runtime for one team. The project remains local-first and dependency-light while adding the minimum controls needed for a durable production path.
 
-`main` now contains a runnable local harness. It demonstrates the five-layer architecture in local form and proves the core product direction: standard Agent skills can be compiled into workflow definitions that are controlled by a durable execution and control-plane layer.
+Workflow DSL remains the authoritative execution source of truth. LiteGraph and future UI layers are editors and views, not runtime authorities. The approved foundation remains in `docs/superpowers/specs/2026-07-01-skill2workflow-design.md`, and the production roadmap design is recorded in `docs/superpowers/specs/2026-07-11-production-roadmap-design.md`.
 
-Current capability snapshot:
+## Status At A Glance
 
-- Skill ingestion: `SKILL.md` frontmatter, hard gates, and ordered checklist steps become Skill IR
-- DSL authority: Skill IR compiles to Workflow DSL, with JSON Schema and structured validation errors
-- Visual layer: Workflow DSL renders to LiteGraph JSON, read-only run overlays can be attached to nodes, and safe visual edits can write back to DSL
-- Runtime: local executor supports run state, initial run context, human-gate pause/resume, connector retry policy, recovery events, run listing, and run detail
-- Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API with durable input context, deterministic local schedules, resume, audit log, filtered audit queries, promoted runtime policy events, and compact node overlay export
-- Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events, with operation-connection cleanup covered by tests
-- Connector runtime: built-in manual and HTTP connector manifests, minimum connector extension contract, `tool_call` binding validation, HTTP execution, body-only trigger input mapping, local credential handles, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
-- Connector extension prototype: explicitly loaded local `local_echo` fixture, narrow runtime registration, published-run smoke, credential-handle isolation, and compact audit evidence without changing the default built-in registry
-- Connector packaging boundary: repeatable local connector package layout, explicit-loading smoke contract, Workflow DSL compatibility notes, and stability boundaries for package conventions
-- First product connector package smoke: explicitly loaded Lark/Feishu task `create_task` dry-run fixture, local smoke artifacts, credential-handle isolation, and compact connector metadata
-- Credential boundary and secret hygiene: documented placeholder and handle rules, local credential-file provider, committed-fixture scanner, and CI guardrail for obvious secret-like values
-- Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
-- Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
-- Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
-- Local control-plane UI: read-only snapshot export, derived operator insights, and static inspector for attention items, recent events, connector events, node overlays, workflows, runs, audit events, connectors, and version comparisons
-- Demo onboarding: one-command local demo workspace generation with Workflow DSL, LiteGraph, run state, audit, and control-plane snapshot artifacts
-- Packaging and installability: package metadata guardrails, editable install smoke, and installed `skill2workflow` console-script verification
-- Runtime policy and recovery: connector-node retry execution, retry/recovery run events, and published-run policy audit promotion
-- Local webhook adapter: dependency-free local `POST /webhooks/<workflow_id>/<version>` path that invokes the existing trigger boundary without hosted ingress
-- Pilot playbook: one-command local customer-support pilot smoke with webhook trigger, durable input, manual gate resume, credential handle, HTTP connector execution, audit, snapshot, and LiteGraph overlay artifacts
-- Scheduled trigger boundary: deterministic one-shot local schedule definitions, due-run CLI, trigger-boundary execution, audit metadata, and snapshot inspection
-- Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
-- Pilot scenario pack: local customer-support, sales-renewal, and risk-exception smokes that reuse trigger input, body-only mapping, credential handles, manual gates, audit, snapshots, and LiteGraph overlays
-- Product connector pilot scenario: sales renewal risk workflow that uses the out-of-core Lark/Feishu task dry-run connector after a manual control gate, with webhook trigger, audit, snapshot, and LiteGraph overlay artifacts
-- Live connector readiness review: Loop 38 approved only scoped live `create_task` work for the Lark/Feishu task connector, with credential, idempotency, failure-mode, audit-redaction, test, and rollback boundaries documented before implementation
+- Published release: `v0.1.0`
+- Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
+- Completed delivery loops: 1-38
+- Current maturity: Local Evaluation
+- Active loop: Loop 39, Scoped Live Lark Task Connector
+- Next maturity gate: Controlled Live Pilot
+- Next decision: validate the scoped live action in a controlled pilot or explicitly defer broader live behavior
+
+## Production Readiness Path
+
+### Local Evaluation
+
+**Status:** Achieved.
+
+The repository can compile, validate, publish, trigger, execute, pause, resume, audit, and visualize workflows locally. It includes JSON and SQLite state, controlled connector boundaries, local pilot scenarios, and an out-of-core Lark task connector in dry-run mode.
+
+### Controlled Live Pilot
+
+**Target loops:** 39-40.
+
+This gate requires one explicitly enabled live connector action plus controlled pilot evidence. It does not imply general live SaaS readiness.
+
+### Self-hosted Beta
+
+**Target loops:** 41-43.
+
+This gate requires a long-running service boundary, authenticated ingress, a production credential boundary, durable recurring scheduling, restart recovery, and concurrency-safe dispatch for one self-hosted instance.
+
+SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON and JSONL remain supported for examples, local development, and evaluation.
+
+### Production Baseline
+
+**Status:** Directional; no loop numbers assigned.
+
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. These capabilities become numbered loops only after Self-hosted Beta evidence is reviewed.
+
+## Active Loop
+
+### Loop 39: Scoped Live Lark Task Connector
+
+**Status:** Next engineering loop.
+
+**Goal:** Implement only the Loop 38-approved Lark/Feishu `create_task` live action behind explicit opt-in while keeping dry-run mode as the default.
+
+**Why now:** Loop 36 proved the out-of-core package boundary, Loop 37 proved the connector in a sales renewal risk workflow after a manual control gate, and Loop 38 approved implementation after package-level and pilot-workflow dry-run evidence. The remaining risk is disciplined live execution without weakening credential isolation, duplicate prevention, audit redaction, rollback, or Workflow DSL compatibility.
+
+**Decision boundary:** Loop 38 approved only scoped live `create_task` work. Any broader Lark/Feishu API behavior requires another readiness review. The full decision is recorded in `docs/lark-live-connector-readiness.md`.
+
+Approved scope:
+
+- Connector id and kind: `lark_task`
+- Operation: `create_task`
+- Live mode: `live`
+- Default mode: `dry_run`
+- Credential handle: `lark_bot_access_token`
+- Idempotency key: derived from `workflow_id + version + run_id + node_id`
+- Test transport: fake Lark HTTP receiver or injected fake transport; no live network in CI
+- Evidence: compact connector and audit metadata only
+
+Implementation order:
+
+1. Add failing tests for opt-in, credential resolution, success, API failures, timeout, malformed responses, and redaction.
+2. Add idempotency and duplicate-prevention tests before outbound request code.
+3. Implement the minimal live `create_task` action.
+4. Prove existing dry-run tests and smokes remain unchanged.
+5. Update connector documentation without changing Workflow DSL compatibility.
+
+Acceptance criteria:
+
+- The project can create one live Lark/Feishu task through an explicitly enabled local connector path.
+- Live behavior requires a feature flag or equivalent explicit opt-in.
+- Dry-run remains the default for examples, CI, and contributor onboarding.
+- Credential handling and audit redaction rules are explicit in code, tests, and docs.
+- Resolved credentials, authorization headers, raw task values, raw request bodies, and raw response payloads never enter run state, audit, snapshots, or connector summaries.
+- Duplicate task creation is blocked for the same derived idempotency key.
+- `401 or 403`, rate limits, network timeouts, validation failures, and malformed responses become normalized failures where possible.
+- The live path can be disabled or reverted without changing Workflow DSL compatibility.
+
+Required verification:
+
+```bash
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+python3 -m py_compile src/skill2workflow/*.py
+python3 scripts/secret_hygiene.py examples/workflows
+python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot
+git diff --check
+```
+
+Explicitly excluded from Loop 39:
+
+- OAuth and token refresh
+- Hosted callbacks or ingress
+- Automatic connector discovery or package installation
+- Marketplace indexing
+- Queues or production scheduling
+- Other Lark/Feishu APIs or operations
+
+## Rolling Loop Queue
+
+This rolling queue is ordered, but only Loop 39 is committed. Select the next loop after reviewing evidence from the previous one; candidate loop numbers may change when that evidence changes the plan.
+
+| Loop | Status | Goal | Exit artifact |
+| --- | --- | --- | --- |
+| Loop 39: Scoped Live Lark Task Connector | Next | Implement the approved live `create_task` path behind explicit opt-in | Tested live path, fake-transport evidence, and updated docs |
+| Loop 40: Controlled Live Connector Pilot | Candidate | Exercise Loop 39 through a controlled real-team pilot | Controlled live-pilot runbook, redacted run and audit evidence, failure and rollback exercises, and a continue/harden/defer decision |
+| Loop 41: Self-hosted Runtime Service Boundary | Candidate | Add one long-running service entry point with validated configuration | Health/readiness checks, graceful shutdown, and restart continuity evidence |
+| Loop 42: Authenticated Ingress And Production Credentials | Candidate | Require authentication by default for the production service path and resolve credential handles at execution time | Compact security audit evidence and a documented external TLS termination boundary |
+| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Candidate | Persist recurring schedules with restart recovery and a defined missed-run policy | Durable dispatch records and lease or locking semantics for one SQLite-backed service instance |
+
+Loop 40 must produce a reproducible controlled live-pilot runbook, redacted evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
+
+Loop 41 keeps the runtime scope single-instance and single-tenant. It does not introduce worker coordination or a multi-tenant service boundary.
+
+Loop 42 requires authentication by default on the production service path, credential-handle resolution, compact security audit evidence, and external TLS termination. It does not introduce multi-tenant RBAC, an OAuth platform, or a hosted secret manager.
+
+Loop 43 covers persistent recurring schedules, restart recovery, missed-run policy, durable dispatch records, and lease or locking semantics for one SQLite-backed service instance. Duplicate suppression relies on persisted dispatch state and workflow or connector idempotency; the roadmap must not claim exactly-once execution.
+
+Selection rules:
+
+- Merge or explicitly defer the current loop before starting the next one.
+- Keep work local-first and dependency-light unless an approved capability requires otherwise.
+- Prefer trust, recovery, and operator evidence over broader platform surface area.
+- Do not expand live SaaS behavior beyond the Loop 38 decision without a new readiness review.
+- Keep candidate loops tentative until evidence from the preceding loop is complete.
+
+## Capability Baseline
+
+The project is a runnable local-first harness across all five approved architecture layers:
+
+| Area | Current capability |
+| --- | --- |
+| Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
+| Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
+| Runtime | Execute and resume durable runs with JSON or SQLite state, human gates, retry/recovery policy, run context, and connector events |
+| Control plane | Publish immutable workflow versions, trigger runs from CLI/webhook/schedules, query audit evidence, and export read-only operator snapshots |
+| Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:
 
 - Published workflow artifacts remain immutable JSON documents in both storage modes.
-- The visual graph is an editor/view. Workflow DSL remains the execution truth source.
-- Connector runtime is an MVP boundary. Enterprise credential management, dynamic connector discovery, connector marketplaces, and broad product-specific connector catalogs remain later work.
-- Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
-- `0.1.x` compatibility is documented for Workflow DSL `0.1.0`; undocumented internals remain experimental.
+- Visual write-back is allowlisted; topology, node ids, transition targets, and connector identity remain DSL-controlled.
+- JSON and JSONL remain the dependency-light defaults for examples, local development, and evaluation; SQLite is the minimum production persistence baseline.
+- Connector package loading is explicit. Automatic discovery, installation, and marketplace behavior are deferred.
+- `0.1.x` compatibility covers the documented Workflow DSL `0.1.0` contract; undocumented internals remain experimental.
 
-## Current Priority Snapshot
+## Delivery History
 
-- Active loop: Loop 39, Scoped Live Lark Task Connector.
-- Active question: can the approved Lark/Feishu `create_task` live action be implemented behind explicit opt-in without weakening the dry-run connector, credential boundary, audit redaction, or Workflow DSL compatibility?
-- Required evidence: fake-receiver or injected-transport tests for success, `401 or 403`, rate limit, network timeout, validation error, malformed response, idempotency, duplicate prevention, audit redaction, and rollback.
-- First PR shape: implementation and tests for the scoped live `create_task` action only; dry-run remains the default and live mode requires a feature flag or equivalent explicit opt-in.
-- Selection result: Loop 37 proved the `lark_task` dry-run package inside a sales renewal risk pilot workflow with manual control, webhook trigger, audit, snapshot, and LiteGraph overlay artifacts; Loop 38 approved the follow-up live action after package-level and pilot-workflow dry-run evidence.
-- Decision gate: Loop 38 approved only scoped live `create_task` work. Any broader live Lark API behavior requires another readiness review.
-- Deferred: connector marketplace work, dynamic discovery, hosted ingress, production scheduling, OAuth, token refresh systems, and broad SaaS connector catalogs.
-
-## Real Team Pilot Readiness
-
-The project is now useful for local evaluation and contributor onboarding. A real team pilot still needs a few controlled loops before the runtime should be positioned as an operational workflow system.
-
-Ready now:
-
-- Convert structured `SKILL.md` examples into validated Workflow DSL.
-- Inspect and safely edit workflows through the LiteGraph-style view.
-- Publish immutable workflow versions locally.
-- Run and resume published workflows with JSON or SQLite state.
-- Audit run lifecycle, connector events, retry/recovery events, and control-plane operations.
-- Demonstrate the complete local bootstrap from a fresh checkout.
-- Verify package installability and fixture secret hygiene in CI.
-- Trigger published workflows through a controlled local API envelope.
-- Pass local trigger input values into durable run context while keeping audit output compact.
-- Map non-secret trigger input into HTTP connector request bodies through an explicit body-only contract.
-- Reference connector credentials through local handles without storing resolved values in Workflow DSL, run state, or audit events.
-- Receive local HTTP webhook events and route them through the same published trigger boundary.
-- Trigger published workflows from deterministic one-shot local schedules.
-- Inspect read-only node-level run and audit overlays in the LiteGraph editor and local control-plane UI.
-- Follow a documented local pilot playbook with a runnable customer-support escalation scenario.
-- Run a documented local pilot scenario pack across customer-support, sales-renewal, and risk-exception workflow shapes.
-- Inspect the documented connector manifest contract that future extension packages must follow.
-- Explicitly load one local external connector fixture without changing the default built-in connector registry.
-- Run a documented external connector prototype smoke with credential-handle and compact audit evidence.
-- Follow a documented local connector package layout and compatibility/stability boundary.
-- Review the first product connector candidate decision for a Lark/Feishu task connector.
-- Run the selected Lark/Feishu task connector as an explicitly loaded out-of-core dry-run package.
-- Inspect compact Lark/Feishu task connector audit metadata without exposing resolved credentials or raw mapped task payloads.
-- Run a sales renewal risk pilot workflow that uses the Lark/Feishu task dry-run package after a manual gate.
-- Review the live connector readiness decision that approves a single scoped Lark/Feishu `create_task` implementation path.
-
-Still needed before serious pilots:
-
-- A scoped live Lark/Feishu task implementation that proves the Loop 38 credential model, idempotency, API error mapping, audit redaction, local test strategy, and rollback boundaries.
-- A local fake-receiver or injected-transport live connector test harness with no live network in CI.
-- Production-grade recurring schedulers, hosted ingress, and real SaaS integrations remain out of scope until local pilot and connector-packaging evidence is stronger.
-
-Pilot sequencing rule: implement only the live action approved by the Loop 38 readiness review. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
-
-## Completed Loops
+The detailed implementation plans under `docs/superpowers/plans/` are the historical evidence for these loops.
 
 | Loop | Status | Delivered |
 | --- | --- | --- |
@@ -137,268 +200,38 @@ Pilot sequencing rule: implement only the live action approved by the Loop 38 re
 | Loop 37: Product Connector Pilot Scenario | Complete | Sales renewal risk workflow using the Lark/Feishu task dry-run connector after a manual gate, with webhook trigger, audit, snapshot, and LiteGraph overlay artifacts |
 | Loop 38: Live Connector Readiness Review | Complete | Decision note approving only scoped live Lark/Feishu `create_task` follow-up, with credential, idempotency, failure, audit, test, and rollback boundaries |
 
-## Active Roadmap
+## Release Direction
 
-Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
+Release tags follow semantic versioning. Capability loops are planning units, not version promises. `v0.1.0` is the first public bootstrap release and supports Workflow DSL `0.1.0` on Python 3.9+ with a standard-library runtime.
 
-Post-`v0.1.0` work now has one active priority after Loop 38 approved a narrow live connector action:
-
-1. implement the scoped Lark/Feishu `create_task` live mode with the exact safety requirements from `docs/lark-live-connector-readiness.md`.
-
-### Loop 39: Scoped Live Lark Task Connector
-
-Goal: implement only the Loop 38 approved Lark/Feishu `create_task` live action behind explicit opt-in while keeping dry-run mode as the default.
-
-Why this is next: Loop 36 proved the connector package can stay out-of-core, Loop 37 proved it remains useful inside a controlled local pilot workflow, and Loop 38 decided that a single live `create_task` path is justified after package-level and pilot-workflow dry-run evidence. The next risk is implementation discipline: preserving credential isolation, duplicate prevention, compact audit evidence, and rollback behavior while making one real SaaS call possible.
-
-Status: next engineering loop.
-
-Start condition: Loop 38 has merged with `docs/lark-live-connector-readiness.md` and the Loop 37 smoke remains available with `python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot`.
-
-Approved implementation scope:
-
-- connector id: `lark_task`
-- operation: `create_task`
-- mode: `live`
-- credential handle: `lark_bot_access_token`
-- derived idempotency key from `workflow_id + version + run_id + node_id`
-- fake Lark HTTP receiver or injected fake transport for local tests
-- compact audit evidence only
-
-Initial PR boundary:
-
-- Add tests first for live-mode opt-in, credential resolution, fake success, `401 or 403`, rate limit, network timeout, validation error, malformed response, idempotency, duplicate prevention, and audit redaction.
-- Implement live `create_task` mode only after those tests fail for the expected reasons.
-- Keep `mode: dry_run` as the default and prove existing dry-run tests and smokes still pass.
-- Require a feature flag or equivalent explicit opt-in before live behavior can execute.
-- Keep Credential handling and audit redaction rules are explicit in code, tests, and docs.
-- Do not add OAuth, token refresh, hosted callbacks, automatic discovery, package installers, marketplace indexing, queues, production scheduling, or broader Lark/Feishu APIs.
-
-Recommended first-cut order:
-
-1. Add failing connector tests for opt-in live mode and fake-transport behavior.
-2. Add idempotency and duplicate-prevention tests before any outbound request code.
-3. Implement the minimal live action surface from the readiness decision.
-4. Update connector docs and examples without changing Workflow DSL compatibility.
-
-Loop 39 acceptance evidence:
-
-- Live mode is impossible without the feature flag or equivalent explicit opt-in.
-- Dry-run mode remains the default and existing dry-run smokes still pass.
-- Resolved credential values, authorization headers, raw task values, raw request bodies, and raw response payloads do not appear in run state, audit, snapshots, or connector summaries.
-- Idempotency blocks duplicate task creation attempts for the same `workflow_id + version + run_id + node_id`.
-- Failure cases return normalized failed connector results where possible.
-- The implementation can be disabled or reverted without changing Workflow DSL compatibility.
-
-Loop 39 verification commands:
-
-- `PYTHONPATH=src python3 -m unittest discover -s tests -v`
-- `python3 -m py_compile src/skill2workflow/*.py`
-- `python3 scripts/secret_hygiene.py examples/workflows`
-- `git diff --check`
-
-Loop 39 done means:
-
-- The project can create one live Lark/Feishu task through an explicitly enabled local connector path.
-- The dry-run connector remains safe for examples, CI, and local onboarding.
-- Any broader live SaaS behavior remains deferred until another readiness review.
-
-## Near-Term Loop Queue
-
-This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
-
-Loops 24-38 are now historical execution evidence and are tracked in the Completed Loops table above. The near-term queue starts with the scoped live connector implementation and only lists work that should still be scoped or implemented.
-
-| Loop | Status | Goal | Expected artifact |
-| --- | --- | --- | --- |
-| Loop 39: Scoped Live Lark Task Connector | Next | Implement only the Loop 38 approved live `create_task` action behind explicit opt-in | tested live connector path, fake receiver evidence, docs |
-| Loop 40: Live Connector Pilot Validation | Candidate | Exercise the scoped live connector in a controlled pilot path or defer broader live behavior based on Loop 39 evidence | pilot validation smoke or deferral note |
-
-Loop selection rules:
-
-- Pick the next loop only after the previous loop is merged or explicitly deferred.
-- Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
-- Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
-- Do not add live SaaS connector behavior beyond the Loop 38 approved `create_task` action.
-- Keep Loop 40 tentative until Loop 39 has merged.
-
-## Release Tag Plan
-
-Release tags use semantic versioning. The first public tag is `v0.1.0`; it packages the current local bootstrap through Loop 13, including parser, compiler, validator, LiteGraph editor, durable runtime, local control plane, SQLite durability, connector runtime, authoring experience, open-source readiness, and the local control-plane inspector.
-
-### v0.1.0: First Open-Source Bootstrap Release
-
-Status: published in Loop 14.
-
-Release source:
-
-- Branch: `main`
-- Tag: `v0.1.0`
 - Release: `https://github.com/pearjelly/skill2workflow/releases/tag/v0.1.0`
 - Notes: `docs/releases/v0.1.0.md`
-- Compatibility: Workflow DSL `0.1.0`, Python 3.9+, standard-library runtime
+- Process: `docs/release-process.md`
 
-Release checklist:
+Compatible `0.1.x` releases may package completed hardening, documentation, and narrow capabilities that preserve Workflow DSL `0.1.0`. Production maturity claims require evidence from the readiness gates rather than a speculative version-by-version capability inventory.
 
-- Release preflight passes for the target version and release notes
-- Full unit suite passes
-- Python modules compile
-- Example Workflow DSL fixtures validate
-- Release notes match the shipped scope
-- Tag and GitHub release are created from the same clean `main`
+## Deferred Work
 
-After this tag, future `0.1.x` releases should be patch-level hardening and docs updates unless they preserve Workflow DSL `0.1.0` compatibility.
-
-## Capability Milestones
-
-The numbered capability milestones below are product roadmap buckets, not already-created Git tags. The first tag, `v0.1.0`, intentionally includes all completed local bootstrap capability buckets through Loop 13.
-
-### v0.1: Bootstrap Harness
-
-Status: delivered by Loops 1-9.
-
-- Parser, compiler, validator, executor, LiteGraph view, write-back, control plane, JSON/SQLite durability
-- Suitable for local evaluation and early contributor onboarding
-
-### v0.2: Connector Runtime
-
-Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Body-only trigger input mapping shipped in Loop 30. Connector extension contract shipped in Loop 31. Pilot scenario pack evidence shipped in Loop 32. Local connector extension prototype shipped in Loop 33. Connector packaging boundary shipped in Loop 34. Lark/Feishu task connector selection shipped in Loop 35. First product connector package smoke shipped in Loop 36. Product connector pilot scenario shipped in Loop 37. Live connector readiness review shipped in Loop 38. Future work should implement only the approved scoped live `create_task` action before considering broader live SaaS behavior.
-
-- Connector manifests
-- Connector binding validation
-- Manual and HTTP connector implementations
-- Connector execution audit events
-- Connector test fixtures
-- Connector-node retry execution
-- Committed-fixture secret hygiene guardrails
-- Local credential-provider boundary for handle-based HTTP headers
-- Minimum connector manifest and execution handoff contract
-- Explicit local external connector prototype with credential and audit redaction evidence
-- Repeatable connector package boundary before product-specific connector packages
-- Selected first product connector candidate: Lark/Feishu task connector
-- First product connector package smoke for Lark/Feishu `create_task` dry-run behavior
-- Product connector pilot scenario using the dry-run package
-- Live connector readiness review approving only scoped live `create_task` work
-- Future: scoped live connector implementation before any broader live API behavior
-
-### v0.3: Authoring Experience
-
-Status: first MVP shipped in Loop 11. Enterprise example pack shipped in Loop 16. Read-only run overlays shipped in Loop 27. Future work should improve editor ergonomics and broaden safe write-back only where semantics are explicit.
-
-- Better LiteGraph parameter forms
-- Example workflow gallery
-- Enterprise example pack for sales, customer service, risk review, and operations analysis
-- Expanded safe write-back beyond title and description
-- Read-only run/audit overlays in the editor
-- Contributor docs for node types and compiler rules
-- Future: node creation flows and schema-backed forms
-
-### v0.4: Open Source Release Baseline
-
-Status: first MVP shipped in Loop 12. Release guardrails shipped in Loop 15.
-
-- CONTRIBUTING guide
-- Issue templates
-- First release notes
-- Workflow DSL `0.1.0` compatibility notes
-- Clear stable vs experimental API boundaries
-- Read-only release preflight command and CI dry-run
-- Future: automated GitHub release publishing and signed release artifacts
-
-### v0.5: Local Control Plane UI
-
-Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Node-level run overlays shipped in Loop 27. Future work should keep the local UI read-only until runtime control actions have explicit safety rules.
-
-- Workflow registry view
-- Run list and run detail view
-- Audit log view
-- Connector manifest view
-- Published workflow version comparison
-- Operator attention, recent event, connector event, and version change summaries
-- Per-node run overlay table for status, event counts, connector outcomes, attempts, and retry/recovery evidence
-- Future: live local server mode and workflow artifact diff views
-
-### v0.6: Local Trigger And Input Runtime
-
-Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local webhook adapter shipped in Loop 26; deterministic local schedules shipped in Loop 29; body-only trigger input mapping shipped in Loop 30.
-
-- Controlled local trigger envelope
-- Published-run API/helper path
-- Dependency-free local webhook adapter for published workflow triggers
-- Structured trigger response
-- Trigger metadata on `run_started` audit events
-- Audit coverage for triggered runs
-- Durable trigger input values under run context
-- Compact audit boundary for trigger input keys
-- Deterministic local scheduled triggers
-- Body-only HTTP connector request input mapping
-- Future: mapping variants beyond the body-only contract when pilot evidence requires them
-
-### v0.7: Pilot Integration Boundary
-
-Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, body-only input mapping, pilot playbook, scenario pack, connector extension contract semantics, one explicit external connector prototype, the connector package boundary, first product connector candidate selection, Lark/Feishu task dry-run package smoke, one product connector pilot scenario, and the live-readiness review are stable enough for local evaluation. The next step is a scoped live Lark/Feishu `create_task` implementation behind explicit opt-in.
-
-- Credential provider interface
-- Secret-handle documentation without secret storage in Workflow DSL
-- Local webhook adapter for pilot integration tests
-- Deterministic schedule smoke for recurring local-run evaluation
-- Visual run/audit overlays
-- Pilot playbook and runnable scenario
-- Body-only trigger input mapping into HTTP connector request bodies
-- Connector extension contract for future product-specific packages
-- Pilot scenario pack covering customer support, sales renewal, and risk exception workflows
-- Explicit local external connector prototype
-- Connector packaging boundary
-- First product connector candidate: Lark/Feishu task connector
-- First product connector package smoke for Lark/Feishu `create_task` dry-run behavior
-- Product connector pilot scenario using the Lark/Feishu task dry-run package
-- Live connector readiness review for scoped `create_task`
-- Next: scoped live Lark/Feishu task connector
-- Future: product-specific connector packages and hosted control-plane integrations
-
-### v1.0: Production Baseline
-
-Target: support real team pilots while keeping the project local-first and open-source friendly.
-
-- Stable Workflow DSL
-- Stable CLI
-- Local runtime and control plane suitable for real team pilots
-- Extension points documented for nodes, compiler rules, executors, and connectors
-
-## Contribution Lanes
-
-Contributors can help in these areas:
-
-- Parser coverage for real-world `SKILL.md` formats
-- Release automation and package verification
-- Workflow node types and compiler rules
-- Validator improvements and JSON Schema
-- LiteGraph node UI and expanded graph-to-DSL write-back
-- Executor policies such as retry, timeout, and checkpoint behavior
-- Connector manifests and example connectors
-- Connector package layout, compatibility notes, and explicit-loading smoke examples
-- Credential provider boundaries and safe connector examples
-- Example workflows for sales, approval, customer service, risk review, and operations analysis
-- Documentation and enterprise deployment guides
-
-## Not Yet In Scope
-
-These are intentionally deferred until the local open-source runtime is stronger:
+These areas require their own approved loops:
 
 - Cloud-hosted multi-tenant control plane
 - Full RBAC or IAM
 - Complete BPMN compatibility
-- Distributed scheduling
-- Automatic connector package discovery or installation
-- OAuth flows, hosted connector callbacks, and token refresh systems
-- Live product-specific SaaS connector behavior beyond the Loop 38 approved scoped `create_task` action
-- Complex enterprise connector marketplace
-- Guaranteed automatic conversion of arbitrary SOP documents
+- Distributed scheduling or worker coordination
+- Hosted ingress, callback verification, and queues
+- OAuth, token refresh, and hosted credential management
+- Automatic connector discovery, installation, or marketplace indexing
+- Live SaaS behavior beyond the Loop 38-approved `create_task` action
+- Guaranteed conversion of arbitrary SOP documents
 
 ## Roadmap Rules
 
-- Every milestone must keep the Workflow DSL as the execution truth source.
-- Every runtime or compiler change needs tests before behavior changes.
-- Every new user-facing capability should have a CLI path before it becomes UI-only.
+- Select only one active loop.
+- Preserve Workflow DSL compatibility unless a separately approved contract change defines migration behavior.
+- Workflow DSL remains the execution truth source.
+- Parser, compiler, validator, executor, connector, storage, or CLI behavior changes start with tests.
+- User-facing capabilities need a CLI path before becoming UI-only controls.
+- Each loop must define scope, exclusions, acceptance evidence, and verification commands.
 - Prefer small closed loops over broad platform shells.
-- Avoid runtime dependencies unless they directly unlock a spec-backed capability.
+- Avoid runtime dependencies unless they directly unlock an approved, spec-backed capability.
+- Update this file when a loop is selected, completed, or explicitly deferred; keep implementation detail in the matching plan or guide.
