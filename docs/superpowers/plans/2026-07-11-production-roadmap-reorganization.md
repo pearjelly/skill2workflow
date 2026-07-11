@@ -39,7 +39,7 @@
 - Consumes: `docs/superpowers/specs/2026-07-11-production-roadmap-design.md`, `docs/lark-live-connector-readiness.md`, and the current uncommitted `ROADMAP.md` reorganization draft
 - Produces: one authoritative roadmap organized by production maturity with Loop 39 active and Loops 40-43 candidate
 
-- [ ] **Step 1: Write the failing Roadmap contract test**
+- [x] **Step 1: Write the failing Roadmap contract test**
 
 Create `tests/test_production_roadmap.py` with this initial content:
 
@@ -110,7 +110,7 @@ def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 ```
 
-- [ ] **Step 2: Run the Roadmap contract test and confirm the expected failure**
+- [x] **Step 2: Run the Roadmap contract test and confirm the expected failure**
 
 Run:
 
@@ -120,7 +120,7 @@ PYTHONPATH=src python3 -m unittest tests.test_production_roadmap -v
 
 Expected: FAIL because `ROADMAP.md` does not yet contain `## Product Direction`, the four maturity gates, or candidate Loops 41-43.
 
-- [ ] **Step 3: Reorganize `ROADMAP.md` to satisfy the contract**
+- [x] **Step 3: Reorganize `ROADMAP.md` to satisfy the contract**
 
 Use the current uncommitted Roadmap draft as the baseline. Preserve its Loop 39 scope and delivery-history table, then arrange the document under these exact top-level headings and in this exact order:
 
@@ -196,7 +196,7 @@ State that the scope remains `single-instance and single-tenant` and that the ro
 
 Move the existing five-layer capability table under `Capability Baseline`. Remove the repeated `Pilot Readiness` prose because the new maturity gates replace it. Preserve the complete Loop 1-38 delivery-history table. Keep release direction compact and remove speculative version-by-version capability inventories. Preserve deferred boundaries for multi-tenancy, distributed scheduling, OAuth, hosted secrets, marketplace behavior, broader live SaaS actions, and arbitrary SOP conversion.
 
-- [ ] **Step 4: Run the Roadmap and legacy documentation contract tests**
+- [x] **Step 4: Run the Roadmap and legacy documentation contract tests**
 
 Run:
 
@@ -206,7 +206,7 @@ PYTHONPATH=src python3 -m unittest tests.test_production_roadmap tests.test_live
 
 Expected: all tests PASS.
 
-- [ ] **Step 5: Commit the Roadmap contract and reorganization**
+- [x] **Step 5: Commit the Roadmap contract and reorganization**
 
 Run:
 
@@ -227,7 +227,7 @@ Expected: one commit containing only the authoritative Roadmap and its focused c
 - Consumes: the maturity and active-loop language established in Task 1
 - Produces: a compact README summary consistent with `ROADMAP.md` but without duplicating the candidate queue
 
-- [ ] **Step 1: Add the failing README consistency test**
+- [x] **Step 1: Add the failing README consistency test**
 
 Add this method to `ProductionRoadmapTests` before `_read`:
 
@@ -244,7 +244,7 @@ Add this method to `ProductionRoadmapTests` before `_read`:
         self.assertNotIn("Loop 43: Durable Recurring Scheduling And Safe Dispatch", readme)
 ```
 
-- [ ] **Step 2: Run the README test and confirm the expected failure**
+- [x] **Step 2: Run the README test and confirm the expected failure**
 
 Run:
 
@@ -254,7 +254,7 @@ PYTHONPATH=src python3 -m unittest tests.test_production_roadmap.ProductionRoadm
 
 Expected: FAIL because the current README does not state the maturity or self-hosted single-tenant target.
 
-- [ ] **Step 3: Replace the README Roadmap summary with the compact approved copy**
+- [x] **Step 3: Replace the README Roadmap summary with the compact approved copy**
 
 Keep the `## Roadmap` heading and `See:` link list. Replace only the prose between them with:
 
@@ -266,7 +266,7 @@ The active priority is Loop 39: implement only the readiness-approved Lark/Feish
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 ```
 
-- [ ] **Step 4: Run the README and Roadmap contract tests**
+- [x] **Step 4: Run the README and Roadmap contract tests**
 
 Run:
 
@@ -276,7 +276,7 @@ PYTHONPATH=src python3 -m unittest tests.test_production_roadmap -v
 
 Expected: both tests PASS.
 
-- [ ] **Step 5: Commit the README alignment**
+- [x] **Step 5: Commit the README alignment**
 
 Run:
 
@@ -296,7 +296,7 @@ Expected: one commit containing the README summary and its consistency assertion
 - Consumes: the Roadmap, README, and tests completed in Tasks 1 and 2
 - Produces: a verified documentation change with a completed execution record
 
-- [ ] **Step 1: Run the full repository verification**
+- [x] **Step 1: Run the full repository verification**
 
 Run:
 
@@ -309,22 +309,22 @@ git diff --check
 
 Expected: the complete test suite passes, Python compilation exits successfully, secret hygiene reports no findings, and `git diff --check` emits no errors.
 
-- [ ] **Step 2: Inspect the final documentation diff and repository state**
+- [x] **Step 2: Inspect the final documentation diff and repository state**
 
 Run:
 
 ```bash
-git diff HEAD~2 -- ROADMAP.md README.md tests/test_production_roadmap.py
+git diff 282b551..HEAD -- ROADMAP.md README.md tests/test_production_roadmap.py
 git status --short
 ```
 
 Expected: the diff contains only the approved Roadmap reorganization, compact README summary, and documentation contract tests; no unrelated files are modified.
 
-- [ ] **Step 3: Mark the execution checklist complete**
+- [x] **Step 3: Mark the execution checklist complete**
 
 Change every completed `- [ ]` checkbox in this plan to `- [x]` after its command has produced the expected result.
 
-- [ ] **Step 4: Commit the completed execution record**
+- [x] **Step 4: Commit the completed execution record**
 
 Run:
 
