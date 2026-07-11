@@ -163,7 +163,7 @@ input {
 
 .summary-band {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1px;
   border-bottom: 1px solid var(--line);
   background: var(--line);
@@ -243,6 +243,32 @@ input {
   overflow: auto;
 }
 
+.operator-panel {
+  min-height: 0;
+  padding: 12px;
+  overflow: auto;
+}
+
+.operator-section {
+  min-width: 0;
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.operator-section:last-child {
+  margin-bottom: 0;
+}
+
+.operator-section h2 {
+  margin: 0;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #f8fafc;
+  font-size: 13px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -302,13 +328,16 @@ tbody tr.is-selected {
 }
 
 .pill.waiting,
-.pill.deprecated {
+.pill.deprecated,
+.pill.warning {
   background: var(--amber-soft);
   color: var(--amber);
 }
 
 .pill.failed,
-.pill.false {
+.pill.false,
+.pill.critical,
+.pill.connector_failed {
   background: var(--red-soft);
   color: var(--red);
 }

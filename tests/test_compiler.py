@@ -182,3 +182,72 @@ class CompilerTests(TestCase):
         errors = validate_workflow_structured(workflow)
 
         self.assertTrue(any(error["code"] == "connector_binding_missing" for error in errors))
+
+    def test_validate_accepts_http_input_mapping_contract(self):
+        workflow = _http_mapping_workflow(
+            [
+                {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+            ]
+        )
+
+        errors = validate_workflow_structured(workflow)
+
+        self.assertEqual(errors, [])
+
+    def test_validate_rejects_invalid_http_input_mapping_contract(self):
+        cases = [
+            ("not-list", "input_mapping_invalid"),
+            ([{"from": "/trigger/id", "to": "/body/customer_id"}], "input_mapping_source_invalid"),
+            ([{"from": "/input/", "to": "/body/customer_id"}], "input_mapping_source_invalid"),
+            ([{"from": "/input/customer_id", "to": "/headers/X-Customer"}], "input_mapping_target_invalid"),
+            ([{"from": "/input/customer_id", "to": "/body/"}], "input_mapping_target_invalid"),
+            ([{"from": "/input/customer_id", "to": "/body/customer_id", "required": "yes"}], "input_mapping_required_invalid"),
+        ]
+
+        for input_mapping, code in cases:
+            with self.subTest(code=code):
+                workflow = _http_mapping_workflow(input_mapping)
+
+                errors = validate_workflow_structured(workflow)
+
+                self.assertTrue(any(error["code"] == code for error in errors), errors)
+
+
+def _http_mapping_workflow(input_mapping):
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {
+            "id": "workflow_mapping",
+            "name": "mapping",
+            "version": "0.1.0",
+            "status": "draft",
+        },
+        "entry": "start",
+        "nodes": [
+            {"id": "start", "type": "start", "title": "Start", "on_success": "call_api"},
+            {
+                "id": "call_api",
+                "type": "tool_call",
+                "title": "Call API",
+                "connector": {
+                    "id": "http",
+                    "kind": "http",
+                    "request": {
+                        "method": "POST",
+                        "url": "http://127.0.0.1:8080/example",
+                        "body": {"source": "static"},
+                        "input_mapping": input_mapping,
+                    },
+                },
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+            {"id": "failure", "type": "failure", "title": "Failure"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_call", "from": "start", "to": "call_api", "label": "next"},
+            {"id": "edge_call_end", "from": "call_api", "to": "end", "label": "next"},
+            {"id": "edge_call_failure", "from": "call_api", "to": "failure", "label": "failure"},
+        ],
+    }

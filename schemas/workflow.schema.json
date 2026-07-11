@@ -149,8 +149,54 @@
           "type": "string"
         },
         "request": {
-          "type": "object",
-          "description": "Optional connector request metadata. The built-in HTTP connector uses this object."
+          "$ref": "#/$defs/connector_request"
+        },
+        "credentials": {
+          "type": "array",
+          "description": "Optional credential handle metadata. The built-in HTTP connector supports header credentials resolved by the local credential provider."
+        }
+      }
+    },
+    "connector_request": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional connector request metadata. The built-in HTTP connector uses this object.",
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object"
+        },
+        "body": {},
+        "timeout_ms": {
+          "type": "integer"
+        },
+        "input_mapping": {
+          "type": "array",
+          "description": "Optional body-only mapping from run context input into HTTP request body fields.",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": ["from", "to"],
+            "properties": {
+              "from": {
+                "type": "string",
+                "pattern": "^/input/.+"
+              },
+              "to": {
+                "type": "string",
+                "pattern": "^/body/.+"
+              },
+              "required": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
         }
       }
     },

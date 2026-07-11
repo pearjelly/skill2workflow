@@ -11,7 +11,10 @@ The example pack shows how standard Agent `SKILL.md` files become controlled Wor
 | Customer service escalation | `examples/skills/customer-service-escalation/SKILL.md` | `examples/workflows/customer-service-escalation.workflow.json` | `examples/workflows/customer-service-escalation.litegraph.json` | SLA check, lead approval, handoff audit |
 | Risk review | `examples/skills/risk-review/SKILL.md` | `examples/workflows/risk-review.workflow.json` | `examples/workflows/risk-review.litegraph.json` | Policy check, analyst approval, disposition audit |
 | Operations analysis | `examples/skills/operations-analysis/SKILL.md` | `examples/workflows/operations-analysis.workflow.json` | `examples/workflows/operations-analysis.litegraph.json` | Metrics query, threshold check, owner confirmation |
-| HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request fixture |
+| HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request and body input-mapping fixture |
+| Local external connector | `examples/connectors/local_echo_connector.py` | runtime-generated | n/a | Explicitly loaded external connector fixture with credential and audit redaction |
+| Lark/Feishu task connector | `examples/connectors/lark_task_connector.py` | runtime-generated | n/a | Explicitly loaded product-shaped dry-run connector package with compact audit metadata |
+| Lark/Feishu task pilot | `examples/connectors/lark_task_connector.py` | runtime-generated | runtime-generated | Sales renewal risk workflow with manual gate before dry-run owner task handoff |
 
 ## Inspecting Examples
 
@@ -62,6 +65,62 @@ This example models a risk decision where the AI can collect and summarize evide
 ### Operations Analysis
 
 This example starts with a metrics query command, checks threshold breaches, drafts an operating narrative, waits for business owner confirmation, and verifies that every action has an owner and due date.
+
+### HTTP Connector
+
+This example demonstrates the built-in HTTP connector request metadata, including a body-only `input_mapping` that copies non-secret trigger input into the outbound request body at runtime.
+
+### Local External Connector Prototype
+
+The local external connector prototype is generated at runtime rather than committed as a static Workflow DSL fixture. It explicitly loads `examples/connectors/local_echo_connector.py`, registers it with `ConnectorRuntime`, publishes a workflow that calls `local_echo`, and verifies that credential handles and input mapping evidence remain compact:
+
+```bash
+python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector
+```
+
+Use it to evaluate the connector extension boundary without product-specific SaaS APIs, OAuth, automatic discovery, hosted callbacks, queues, or production schedulers.
+
+### Local Connector Package Shape
+
+`examples/connectors/local_echo_connector.py` is the reference package-shape fixture for local external connectors. It is intentionally a single Python file with module-level `MANIFEST` and `execute(binding, credential_provider=None, context=None)` symbols so contributors can inspect the smallest repeatable package boundary.
+
+The fixture is not a committed Workflow DSL example. The workflow, run, audit, connector list, trigger response, and control-plane snapshot are runtime-generated smoke artifacts produced by:
+
+```bash
+python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector
+```
+
+Use this package shape when reviewing connector package conventions. Do not treat it as automatic connector discovery, a package installer, marketplace behavior, or a product-specific SaaS connector template.
+
+### Lark/Feishu Task Connector Dry-Run
+
+The Lark/Feishu task connector smoke is generated at runtime rather than committed as a static Workflow DSL fixture. It explicitly loads `examples/connectors/lark_task_connector.py`, registers `lark_task` with a local `ConnectorRuntime`, publishes a workflow that validates a `create_task` request in `dry_run` mode, and verifies that credential handles, mapped input keys, and task-field presence are recorded without duplicating raw payload values:
+
+```bash
+python3 scripts/lark_task_connector_smoke.py --work-dir /tmp/skill2workflow-lark-task-connector
+```
+
+Use it to evaluate the first product-shaped connector package boundary. It is not a live Lark/Feishu API client, OAuth flow, hosted callback, connector installer, marketplace entry, queue, or production scheduler.
+
+### Lark/Feishu Task Pilot
+
+The Lark/Feishu task pilot is generated at runtime and uses the `lark_task` dry-run connector inside a sales renewal risk workflow. It starts through the local webhook trigger boundary, waits at a manual review gate, resumes with approval, then invokes the explicitly loaded connector to validate an owner follow-up task request:
+
+```bash
+python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot
+```
+
+The pilot writes workflow, trigger response, run state, audit, connector list, control-plane snapshot, and LiteGraph overlay artifacts. Use it to inspect whether a product connector package remains understandable in a business workflow with a control point. It is still dry-run only and does not create live Lark/Feishu tasks.
+
+### Local Pilot Scenario Pack
+
+The pilot scenario pack is generated at runtime rather than committed as static fixtures. It runs customer support escalation, sales renewal follow-up, and risk exception review through local-only workflows and HTTP receivers:
+
+```bash
+python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilot-pack
+```
+
+Use it when evaluating whether trigger input, body-only connector mapping, credential handles, manual gates, audit, snapshots, and LiteGraph overlays generalize across more than one workflow shape.
 
 ## Fixture Synchronization
 

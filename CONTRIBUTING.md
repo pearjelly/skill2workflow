@@ -24,6 +24,21 @@ Run the full test suite:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
+Optionally install the checkout in editable mode to use the `skill2workflow` console script:
+
+```bash
+python3 -m venv /tmp/skill2workflow-venv
+/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68"
+/tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
+/tmp/skill2workflow-venv/bin/skill2workflow --help
+```
+
+You can also run the package smoke helper, which creates its own temporary virtual environment and validates the installed console script:
+
+```bash
+python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+```
+
 Run a fresh-checkout CLI smoke:
 
 ```bash
@@ -43,6 +58,12 @@ The sample workflow pauses at a human gate. Resume it with the returned run id:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli resume <run_id> --state-dir /tmp/skill2workflow-state
+```
+
+Run the deterministic local scheduled-trigger smoke:
+
+```bash
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
 ```
 
 Open the web editor:
@@ -86,6 +107,7 @@ Before changing behavior, read:
 
 - `ROADMAP.md`
 - `HARNESS.md`
+- `docs/credential-boundary.md`
 - `docs/workflow-dsl-contract.md`
 - `docs/workflow-dsl-compatibility.md`
 - `docs/stability.md`
@@ -99,8 +121,23 @@ Before changing behavior, read:
 - Keep Workflow DSL as the execution truth source.
 - Do not make LiteGraph JSON authoritative for execution.
 - Preserve published workflow immutability.
+- Do not commit secrets, credentials, private keys, cookies, production authorization headers, or customer data in Workflow DSL or LiteGraph fixtures.
 - Avoid runtime dependencies unless they directly support a spec-backed capability.
 - Update docs and examples when user-facing behavior changes.
+
+## Connector Example Safety
+
+Connector examples should be deterministic and safe from a fresh checkout. Prefer local endpoints such as `http://127.0.0.1` or documented placeholders such as `<redacted>`, `REDACTED`, `placeholder`, `example-token`, and `token-placeholder`.
+
+Connector manifest changes must follow the extension contract in `docs/connectors.md`. Add or update manifest contract tests when changing connector registry metadata. Do not add product-specific SaaS connector packages, dynamic plugin loading, OAuth flows, hosted credential stores, or connector marketplaces without a dedicated roadmap loop.
+
+Run the committed-fixture secret hygiene check before opening connector or example PRs:
+
+```bash
+python3 scripts/secret_hygiene.py examples/workflows
+```
+
+This check catches obvious secret-like keys and values in committed JSON fixtures. It is a guardrail, not a replacement for review.
 
 ## Pull Request Checklist
 
@@ -109,6 +146,8 @@ Before opening a PR:
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
+python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+python3 scripts/secret_hygiene.py examples/workflows
 git diff --check
 ```
 
@@ -118,6 +157,12 @@ For Workflow DSL or visualizer changes, also run:
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/approval-flow.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-connector.workflow.json -o /tmp/http-connector.litegraph.json
+```
+
+For trigger, schedule, connector, or control-plane changes, also run:
+
+```bash
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
 ```
 
 For release PRs, run the release preflight with the target version and notes:

@@ -2,7 +2,7 @@
   const EXAMPLE_URL = "../examples/control-plane-snapshot.json";
   const state = {
     snapshot: null,
-    view: "workflows",
+    view: "operator",
     selected: null,
     filter: "",
   };
@@ -26,10 +26,16 @@
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
     els.metricRuns = document.getElementById("metric-runs");
+    els.metricAttention = document.getElementById("metric-attention");
     els.metricAudit = document.getElementById("metric-audit");
     els.metricConnectors = document.getElementById("metric-connectors");
+    els.attentionRows = document.getElementById("attention-rows");
+    els.recentEventRows = document.getElementById("recent-event-rows");
+    els.connectorEventRows = document.getElementById("connector-event-rows");
+    els.operatorVersionRows = document.getElementById("operator-version-rows");
     els.workflowRows = document.getElementById("workflow-rows");
     els.runRows = document.getElementById("run-rows");
+    els.nodeOverlayRows = document.getElementById("node-overlay-rows");
     els.auditRows = document.getElementById("audit-rows");
     els.connectorRows = document.getElementById("connector-rows");
     els.versionRows = document.getElementById("version-rows");
@@ -112,8 +118,10 @@
 
   function renderSummary() {
     const summary = state.snapshot && state.snapshot.summary ? state.snapshot.summary : {};
+    const insights = state.snapshot && state.snapshot.operator_insights ? state.snapshot.operator_insights : {};
     els.metricWorkflows.textContent = String(summary.workflow_count || 0);
     els.metricRuns.textContent = String(summary.run_count || 0);
+    els.metricAttention.textContent = String(totalAttention(insights.attention_counts || {}));
     els.metricAudit.textContent = String(summary.audit_event_count || 0);
     els.metricConnectors.textContent = String(summary.connector_count || 0);
   }
@@ -129,6 +137,7 @@
 
   function renderTables() {
     const snapshot = state.snapshot || emptySnapshot();
+    renderOperatorTables(snapshot.operator_insights || emptyOperatorInsights());
     renderTable(
       els.workflowRows,
       filterRows(snapshot.workflows),
@@ -156,6 +165,20 @@
         ];
       },
       "run",
+    );
+    renderTable(
+      els.nodeOverlayRows,
+      filterRows(nodeOverlayRows(snapshot.runs)),
+      function (overlay) {
+        return [
+          linkCell(overlay.node_id || ""),
+          textCell(overlay.run_id || ""),
+          pillCell(overlay.status || ""),
+          textCell(String(overlay.event_count || 0)),
+          textCell(connectorLabel(overlay)),
+        ];
+      },
+      "node overlay",
     );
     renderTable(
       els.auditRows,
@@ -198,6 +221,65 @@
         ];
       },
       "connector",
+    );
+  }
+
+  function renderOperatorTables(insights) {
+    renderTable(
+      els.attentionRows,
+      filterRows(insights.attention_items || []),
+      function (item) {
+        return [
+          pillCell(item.severity || ""),
+          textCell(item.kind || ""),
+          textCell((item.workflow_id || "") + "@" + (item.workflow_version || "")),
+          textCell(item.run_id || ""),
+          textCell(item.message || ""),
+        ];
+      },
+      "attention",
+    );
+    renderTable(
+      els.recentEventRows,
+      filterRows(insights.recent_events || []),
+      function (event) {
+        return [
+          pillCell(event.type || ""),
+          textCell((event.workflow_id || "") + "@" + (event.workflow_version || "")),
+          textCell(event.run_id || ""),
+          textCell(event.node_id || ""),
+          textCell(formatDate(event.timestamp || "")),
+        ];
+      },
+      "recent event",
+    );
+    renderTable(
+      els.connectorEventRows,
+      filterRows(connectorEventRows(insights.connector_event_counts || {})),
+      function (event) {
+        return [
+          pillCell(event.type || ""),
+          textCell(String(event.count || 0)),
+          textCell(event.status || ""),
+          textCell(event.kind || "connector"),
+          textCell(event.scope || "control plane"),
+        ];
+      },
+      "connector event",
+    );
+    renderTable(
+      els.operatorVersionRows,
+      filterRows(insights.version_changes || []),
+      function (change) {
+        return [
+          linkCell(change.workflow_id || ""),
+          textCell((change.versions || []).join(" -> ")),
+          pillCell(String(Boolean(change.checksum_changed))),
+          textCell(formatDelta(change.node_count_delta)),
+          textCell(formatDelta(change.edge_count_delta)),
+        ];
+      },
+      "version change",
     );
   }
 
@@ -285,6 +367,12 @@
     if (value.workflow_id && value.version) {
       return [["Workflow", value.workflow_id], ["Version", value.version], ["Status", value.status || ""], ["Checksum", shorten(value.checksum || "")]];
     }
+    if (value.kind && value.severity) {
+      return [["Kind", value.kind || ""], ["Severity", value.severity || ""], ["Workflow", value.workflow_id || ""], ["Run", value.run_id || ""]];
+    }
+    if (value.node_id && Object.prototype.hasOwnProperty.call(value, "event_count")) {
+      return [["Node", value.node_id], ["Status", value.status || ""], ["Events", String(value.event_count || 0)], ["Connector", connectorLabel(value)]];
+    }
     if (value.run_id) {
       return [["Run", value.run_id], ["Workflow", value.workflow_id || ""], ["Status", value.status || ""], ["Events", String(value.event_count || 0)]];
     }
@@ -304,9 +392,14 @@
     const value = selected.value || {};
     if (selected.kind === "workflow") return value.workflow_id + "@" + value.version;
     if (selected.kind === "run") return value.run_id || "Run";
+    if (selected.kind === "node overlay") return value.node_id || "Node";
     if (selected.kind === "audit") return value.type || "Audit";
     if (selected.kind === "connector") return value.name || value.id || "Connector";
     if (selected.kind === "version comparison") return value.workflow_id || "Comparison";
+    if (selected.kind === "attention") return value.kind || "Attention";
+    if (selected.kind === "recent event") return value.type || "Recent Event";
+    if (selected.kind === "connector event") return value.type || "Connector Event";
+    if (selected.kind === "version change") return value.workflow_id || "Version Change";
     return "Snapshot";
   }
 
@@ -328,7 +421,65 @@
   }
 
   function emptySnapshot() {
-    return { workflows: [], runs: [], audit_events: [], connectors: [], version_comparisons: [] };
+    return {
+      workflows: [],
+      runs: [],
+      audit_events: [],
+      connectors: [],
+      version_comparisons: [],
+      operator_insights: emptyOperatorInsights(),
+    };
+  }
+
+  function emptyOperatorInsights() {
+    return {
+      attention_counts: {},
+      attention_items: [],
+      recent_events: [],
+      connector_event_counts: {},
+      version_changes: [],
+    };
+  }
+
+  function totalAttention(counts) {
+    return Object.keys(counts).reduce(function (total, key) {
+      return total + Number(counts[key] || 0);
+    }, 0);
+  }
+
+  function connectorEventRows(counts) {
+    return Object.keys(counts).sort().map(function (key) {
+      return {
+        type: key,
+        count: counts[key],
+        status: key.replace("connector_", ""),
+        kind: "connector",
+        scope: "audit events",
+      };
+    });
+  }
+
+  function nodeOverlayRows(runs) {
+    const rows = [];
+    (runs || []).forEach(function (run) {
+      const overlays = run.node_overlays || {};
+      Object.keys(overlays).sort().forEach(function (nodeId) {
+        const overlay = Object.assign({}, overlays[nodeId], {
+          run_id: run.run_id || "",
+          workflow_id: run.workflow_id || "",
+          workflow_version: run.workflow_version || "",
+        });
+        rows.push(overlay);
+      });
+    });
+    return rows;
+  }
+
+  function connectorLabel(overlay) {
+    if (!overlay.connector_id) return "";
+    const status = overlay.connector_status ? " " + overlay.connector_status : "";
+    const attempts = overlay.attempts ? " x" + overlay.attempts : "";
+    return overlay.connector_id + status + attempts;
   }
 
   function formatDate(value) {

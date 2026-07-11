@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
+from skill2workflow.credentials import StaticCredentialProvider
 from skill2workflow.executor import LocalExecutor
 
 
@@ -110,6 +111,30 @@ class ExecutorTests(TestCase):
         self.assertIn("events", detail)
         self.assertIn("node_results", detail)
 
+    def test_run_persists_initial_context(self):
+        workflow = _approval_workflow()
+
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp))
+            state = executor.run(
+                workflow,
+                context={
+                    "trigger": {
+                        "trigger_id": "trigger_demo",
+                        "source": "local-test",
+                        "idempotency_key": "demo-1",
+                        "input_keys": ["customer_id"],
+                    },
+                    "input": {"customer_id": "customer_123"},
+                },
+            )
+            detail = executor.get_run(state["run_id"])
+
+        self.assertEqual(state["context"]["input"]["customer_id"], "customer_123")
+        self.assertEqual(state["context"]["trigger"]["trigger_id"], "trigger_demo")
+        self.assertEqual(detail["context"]["input"]["customer_id"], "customer_123")
+        self.assertEqual(detail["context"]["trigger"]["input_keys"], ["customer_id"])
+
     def test_sqlite_storage_persists_run_state_and_event_rows_across_instances(self):
         workflow = _approval_workflow()
 
@@ -172,6 +197,64 @@ class ExecutorTests(TestCase):
         self.assertEqual(json.loads(call_result["output"]["body"]), {"ok": True})
         self.assertIn(("connector_started", "call_api"), event_rows)
         self.assertIn(("connector_completed", "call_api"), event_rows)
+
+    def test_required_input_mapping_failure_uses_connector_failure_path(self):
+        server = _ConnectorTestServer()
+        workflow = _mapped_http_connector_workflow(server.url)
+
+        try:
+            with TemporaryDirectory() as tmp:
+                state = LocalExecutor(Path(tmp)).run(workflow, context={"input": {}})
+        finally:
+            server.close()
+
+        call_result = state["node_results"]["call_api"]
+        self.assertEqual(state["status"], "failed")
+        self.assertEqual(state["current_node"], "failure")
+        self.assertEqual(server.requests, [])
+        self.assertEqual(call_result["status"], "failed")
+        self.assertIn("required input mapping value missing: /input/customer_id", call_result["error"])
+
+    def test_http_connector_credentials_do_not_persist_resolved_values(self):
+        server = _ConnectorTestServer()
+        workflow = _credential_connector_workflow(server.url)
+
+        try:
+            with TemporaryDirectory() as tmp:
+                state = LocalExecutor(
+                    Path(tmp),
+                    credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+                ).run(workflow)
+        finally:
+            server.close()
+
+        self.assertEqual(state["status"], "completed")
+        self.assertEqual(server.requests[0]["headers"]["Authorization"], "Bearer secret-token")
+        self.assertNotIn("secret-token", json.dumps(state["node_results"]))
+        self.assertNotIn("secret-token", json.dumps(state["events"]))
+        self.assertNotIn("secret-token", json.dumps(state["context"]))
+
+    def test_retry_policy_retries_failed_connector_and_records_recovery(self):
+        server = _FlakyConnectorTestServer()
+        workflow = _http_connector_workflow(server.url)
+        workflow["nodes"][1]["retry"] = {"max_attempts": 1}
+
+        try:
+            with TemporaryDirectory() as tmp:
+                state = LocalExecutor(Path(tmp), storage="sqlite").run(workflow)
+        finally:
+            server.close()
+
+        event_types = [event["type"] for event in state["events"]]
+        call_result = state["node_results"]["call_api"]
+        self.assertEqual(state["status"], "completed")
+        self.assertEqual(len(server.requests), 2)
+        self.assertEqual(call_result["status"], "completed")
+        self.assertEqual(call_result["attempts"], 2)
+        self.assertEqual(call_result["max_attempts"], 1)
+        self.assertIn("last_error", call_result)
+        self.assertIn("node_retrying", event_types)
+        self.assertIn("node_recovered", event_types)
 
 
 def _approval_workflow():
@@ -246,14 +329,59 @@ def _http_connector_workflow(url: str):
     }
 
 
+def _credential_connector_workflow(url: str):
+    workflow = _http_connector_workflow(url)
+    workflow["nodes"][1]["connector"]["credentials"] = [
+        {
+            "target": "header",
+            "name": "Authorization",
+            "handle": "demo_api_token",
+            "prefix": "Bearer ",
+        }
+    ]
+    return workflow
+
+
+def _mapped_http_connector_workflow(url: str):
+    workflow = _http_connector_workflow(url)
+    request = workflow["nodes"][1]["connector"]["request"]
+    request["body"] = {"source": "static"}
+    request["input_mapping"] = [
+        {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+    ]
+    return workflow
+
+
 class _ConnectorRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         length = int(self.headers.get("Content-Length", "0"))
         raw_body = self.rfile.read(length).decode("utf-8")
         body = json.loads(raw_body) if raw_body else None
-        self.server.requests.append({"path": self.path, "body": body})
+        self.server.requests.append({"path": self.path, "headers": dict(self.headers.items()), "body": body})
         payload = json.dumps({"ok": True}).encode("utf-8")
         self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format, *args):
+        return
+
+
+class _FlakyConnectorRequestHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        raw_body = self.rfile.read(length).decode("utf-8")
+        body = json.loads(raw_body) if raw_body else None
+        self.server.requests.append({"path": self.path, "headers": dict(self.headers.items()), "body": body})
+
+        if len(self.server.requests) == 1:
+            payload = json.dumps({"error": "temporary"}).encode("utf-8")
+            self.send_response(503)
+        else:
+            payload = json.dumps({"ok": True}).encode("utf-8")
+            self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
@@ -283,3 +411,11 @@ class _ConnectorTestServer:
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=2)
+
+
+class _FlakyConnectorTestServer(_ConnectorTestServer):
+    def __init__(self):
+        self._server = HTTPServer(("127.0.0.1", 0), _FlakyConnectorRequestHandler)
+        self._server.requests = []
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()

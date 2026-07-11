@@ -15,6 +15,15 @@ These surfaces should remain compatible during the `0.1.x` line:
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
+- Credential placeholder and fixture hygiene boundary documented in `docs/credential-boundary.md`
+- Local credential handle boundary documented in `docs/credential-boundary.md`
+- Local trigger command and envelope documented in `docs/triggers.md`
+- Local trigger run-context shape documented in `docs/triggers.md`
+- Local webhook route and response shape documented in `docs/triggers.md`
+- Body-only HTTP connector input mapping documented in `docs/connectors.md`
+- Minimum connector manifest contract documented in `docs/connectors.md`
+- explicit local connector fixture loading for examples, using `load_external_connector(path)` plus `ConnectorRuntime([external_connector])`
+- Connector package layout expectations documented in `docs/connectors.md`
 
 ## Experimental
 
@@ -25,10 +34,16 @@ These surfaces may change while the project learns from real workflows:
 - Compiler defaults for new node types
 - LiteGraph node layout and web editor UI
 - Visual write-back allowlist beyond the documented fields
-- Connector manifest details beyond built-in `manual` and `http`
-- HTTP connector request metadata shape
-- Automatic retry behavior for connector-bound nodes
-- Enterprise credential storage, token injection, secret redaction, and IAM
+- Connector manifest fields beyond the documented minimum contract
+- Dynamic connector loading, automatic connector discovery and product-specific connector packages
+- Connector package installation, marketplace indexing, OAuth, hosted callbacks, queues, and production schedulers
+- HTTP connector request metadata beyond documented method, URL, headers, body, timeout, credential handles, and body-only input mapping
+- Advanced credential provider configuration beyond local static files
+- Advanced retry behavior beyond documented connector-node retry execution
+- Enterprise credential storage, secret redaction, and IAM
+- Advanced input mapping beyond the body-only contract, templating, and connector request interpolation
+- Hosted webhook ingress, callback verification, queues, and schedulers
+- Product-specific connector packages and connector marketplaces
 - Local control-plane storage file layout
 - Executor event taxonomy beyond documented audit examples
 - Future UI/API boundaries

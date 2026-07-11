@@ -49,8 +49,23 @@ Connector-capable nodes declare a `connector` object directly on the node:
     "request": {
       "method": "POST",
       "url": "http://127.0.0.1:8080/example",
-      "body": {"example": true}
-    }
+      "body": {"example": true},
+      "input_mapping": [
+        {
+          "from": "/input/customer_id",
+          "to": "/body/customer_id",
+          "required": true
+        }
+      ]
+    },
+    "credentials": [
+      {
+        "target": "header",
+        "name": "Authorization",
+        "handle": "demo_api_token",
+        "prefix": "Bearer "
+      }
+    ]
   }
 }
 ```
@@ -59,6 +74,10 @@ Built-in bindings:
 
 - `manual`: default binding for compiled `human_gate` nodes. Human gates still pause and resume through run state.
 - `http`: default binding for compiled `tool_call` nodes. When `connector.request` is present, the local executor performs the HTTP request and records connector events.
+
+HTTP connector credentials may reference local handles under `connector.credentials`. Only handles belong in Workflow DSL; resolved secret values are supplied at runtime through the local credential provider and are not written to run state or audit events by the built-in runtime.
+
+HTTP connector request metadata may declare body-only `input_mapping`. The built-in runtime reads `/input/...` paths from durable run context and writes `/body/...` paths into a runtime copy of `connector.request.body`. This does not mutate the published Workflow DSL artifact. Mapping audit metadata exposes status and input keys only, not mapped values.
 
 Validation requires `tool_call` nodes to declare `connector.id`. Missing bindings produce `connector_binding_missing`.
 

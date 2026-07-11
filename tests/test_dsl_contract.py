@@ -21,6 +21,13 @@ class DslContractTests(TestCase):
         )
         self.assertIn("node", schema["$defs"])
         self.assertIn("edge", schema["$defs"])
+        connector_properties = schema["$defs"]["connector_binding"]["properties"]
+        self.assertIn("request", connector_properties)
+        self.assertIn("credentials", connector_properties)
+        request_properties = schema["$defs"]["connector_request"]["properties"]
+        self.assertIn("input_mapping", request_properties)
+        self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["from"]["pattern"], "^/input/.+")
+        self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["to"]["pattern"], "^/body/.+")
 
     def test_approval_flow_example_is_a_golden_valid_workflow_fixture(self):
         workflow = json.loads(

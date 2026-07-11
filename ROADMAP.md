@@ -12,24 +12,87 @@ Current capability snapshot:
 
 - Skill ingestion: `SKILL.md` frontmatter, hard gates, and ordered checklist steps become Skill IR
 - DSL authority: Skill IR compiles to Workflow DSL, with JSON Schema and structured validation errors
-- Visual layer: Workflow DSL renders to LiteGraph JSON, and safe visual edits can write back to DSL
-- Runtime: local executor supports run state, human-gate pause/resume, run listing, and run detail
-- Control plane: immutable workflow publish, version lifecycle, published-version runs, resume, audit log, and filtered audit queries
-- Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events
-- Connector runtime: built-in manual and HTTP connector manifests, `tool_call` binding validation, HTTP execution, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
+- Visual layer: Workflow DSL renders to LiteGraph JSON, read-only run overlays can be attached to nodes, and safe visual edits can write back to DSL
+- Runtime: local executor supports run state, initial run context, human-gate pause/resume, connector retry policy, recovery events, run listing, and run detail
+- Control plane: immutable workflow publish, version lifecycle, published-version runs, local trigger API with durable input context, deterministic local schedules, resume, audit log, filtered audit queries, promoted runtime policy events, and compact node overlay export
+- Durability: JSON/JSONL remains the dependency-light default; SQLite is available for run state, workflow registry metadata, and audit events, with operation-connection cleanup covered by tests
+- Connector runtime: built-in manual and HTTP connector manifests, minimum connector extension contract, `tool_call` binding validation, HTTP execution, body-only trigger input mapping, local credential handles, deterministic local connector tests, normalized HTTP errors/timeouts, connector docs, and connector audit events
+- Connector extension prototype: explicitly loaded local `local_echo` fixture, narrow runtime registration, published-run smoke, credential-handle isolation, and compact audit evidence without changing the default built-in registry
+- Connector packaging boundary: repeatable local connector package layout, explicit-loading smoke contract, Workflow DSL compatibility notes, and stability boundaries for package conventions
+- First product connector package smoke: explicitly loaded Lark/Feishu task `create_task` dry-run fixture, local smoke artifacts, credential-handle isolation, and compact connector metadata
+- Credential boundary and secret hygiene: documented placeholder and handle rules, local credential-file provider, committed-fixture scanner, and CI guardrail for obvious secret-like values
 - Authoring experience: example workflow gallery, richer LiteGraph inspector fields, safe action/retry/HTTP request write-back, and authoring docs
 - Workflow example pack: sales follow-up, customer service escalation, risk review, and operations analysis examples with synchronized DSL and LiteGraph fixtures
 - Open-source readiness: contributor guide, issue templates, release notes, Workflow DSL compatibility policy, and stability boundaries
-- Local control-plane UI: read-only snapshot export and static inspector for workflows, runs, audit events, connectors, and version comparisons
+- Local control-plane UI: read-only snapshot export, derived operator insights, and static inspector for attention items, recent events, connector events, node overlays, workflows, runs, audit events, connectors, and version comparisons
+- Demo onboarding: one-command local demo workspace generation with Workflow DSL, LiteGraph, run state, audit, and control-plane snapshot artifacts
+- Packaging and installability: package metadata guardrails, editable install smoke, and installed `skill2workflow` console-script verification
+- Runtime policy and recovery: connector-node retry execution, retry/recovery run events, and published-run policy audit promotion
+- Local webhook adapter: dependency-free local `POST /webhooks/<workflow_id>/<version>` path that invokes the existing trigger boundary without hosted ingress
+- Pilot playbook: one-command local customer-support pilot smoke with webhook trigger, durable input, manual gate resume, credential handle, HTTP connector execution, audit, snapshot, and LiteGraph overlay artifacts
+- Scheduled trigger boundary: deterministic one-shot local schedule definitions, due-run CLI, trigger-boundary execution, audit metadata, and snapshot inspection
 - Release automation: read-only release preflight checks, CI dry-run coverage, and maintainer release-process docs
+- Pilot scenario pack: local customer-support, sales-renewal, and risk-exception smokes that reuse trigger input, body-only mapping, credential handles, manual gates, audit, snapshots, and LiteGraph overlays
+- Product connector pilot scenario: sales renewal risk workflow that uses the out-of-core Lark/Feishu task dry-run connector after a manual control gate, with webhook trigger, audit, snapshot, and LiteGraph overlay artifacts
+- Live connector readiness review: Loop 38 approved only scoped live `create_task` work for the Lark/Feishu task connector, with credential, idempotency, failure-mode, audit-redaction, test, and rollback boundaries documented before implementation
 
 Important boundaries:
 
 - Published workflow artifacts remain immutable JSON documents in both storage modes.
 - The visual graph is an editor/view. Workflow DSL remains the execution truth source.
-- Connector runtime is an MVP boundary. Automatic retry execution, enterprise credential management, connector marketplaces, and product-specific connectors remain later work.
+- Connector runtime is an MVP boundary. Enterprise credential management, dynamic connector discovery, connector marketplaces, and broad product-specific connector catalogs remain later work.
 - Visual write-back is allowlisted. Topology, node ids, transition targets, and connector identity remain DSL-controlled.
 - `0.1.x` compatibility is documented for Workflow DSL `0.1.0`; undocumented internals remain experimental.
+
+## Current Priority Snapshot
+
+- Active loop: Loop 39, Scoped Live Lark Task Connector.
+- Active question: can the approved Lark/Feishu `create_task` live action be implemented behind explicit opt-in without weakening the dry-run connector, credential boundary, audit redaction, or Workflow DSL compatibility?
+- Required evidence: fake-receiver or injected-transport tests for success, `401 or 403`, rate limit, network timeout, validation error, malformed response, idempotency, duplicate prevention, audit redaction, and rollback.
+- First PR shape: implementation and tests for the scoped live `create_task` action only; dry-run remains the default and live mode requires a feature flag or equivalent explicit opt-in.
+- Selection result: Loop 37 proved the `lark_task` dry-run package inside a sales renewal risk pilot workflow with manual control, webhook trigger, audit, snapshot, and LiteGraph overlay artifacts; Loop 38 approved the follow-up live action after package-level and pilot-workflow dry-run evidence.
+- Decision gate: Loop 38 approved only scoped live `create_task` work. Any broader live Lark API behavior requires another readiness review.
+- Deferred: connector marketplace work, dynamic discovery, hosted ingress, production scheduling, OAuth, token refresh systems, and broad SaaS connector catalogs.
+
+## Real Team Pilot Readiness
+
+The project is now useful for local evaluation and contributor onboarding. A real team pilot still needs a few controlled loops before the runtime should be positioned as an operational workflow system.
+
+Ready now:
+
+- Convert structured `SKILL.md` examples into validated Workflow DSL.
+- Inspect and safely edit workflows through the LiteGraph-style view.
+- Publish immutable workflow versions locally.
+- Run and resume published workflows with JSON or SQLite state.
+- Audit run lifecycle, connector events, retry/recovery events, and control-plane operations.
+- Demonstrate the complete local bootstrap from a fresh checkout.
+- Verify package installability and fixture secret hygiene in CI.
+- Trigger published workflows through a controlled local API envelope.
+- Pass local trigger input values into durable run context while keeping audit output compact.
+- Map non-secret trigger input into HTTP connector request bodies through an explicit body-only contract.
+- Reference connector credentials through local handles without storing resolved values in Workflow DSL, run state, or audit events.
+- Receive local HTTP webhook events and route them through the same published trigger boundary.
+- Trigger published workflows from deterministic one-shot local schedules.
+- Inspect read-only node-level run and audit overlays in the LiteGraph editor and local control-plane UI.
+- Follow a documented local pilot playbook with a runnable customer-support escalation scenario.
+- Run a documented local pilot scenario pack across customer-support, sales-renewal, and risk-exception workflow shapes.
+- Inspect the documented connector manifest contract that future extension packages must follow.
+- Explicitly load one local external connector fixture without changing the default built-in connector registry.
+- Run a documented external connector prototype smoke with credential-handle and compact audit evidence.
+- Follow a documented local connector package layout and compatibility/stability boundary.
+- Review the first product connector candidate decision for a Lark/Feishu task connector.
+- Run the selected Lark/Feishu task connector as an explicitly loaded out-of-core dry-run package.
+- Inspect compact Lark/Feishu task connector audit metadata without exposing resolved credentials or raw mapped task payloads.
+- Run a sales renewal risk pilot workflow that uses the Lark/Feishu task dry-run package after a manual gate.
+- Review the live connector readiness decision that approves a single scoped Lark/Feishu `create_task` implementation path.
+
+Still needed before serious pilots:
+
+- A scoped live Lark/Feishu task implementation that proves the Loop 38 credential model, idempotency, API error mapping, audit redaction, local test strategy, and rollback boundaries.
+- A local fake-receiver or injected-transport live connector test harness with no live network in CI.
+- Production-grade recurring schedulers, hosted ingress, and real SaaS integrations remain out of scope until local pilot and connector-packaging evidence is stronger.
+
+Pilot sequencing rule: implement only the live action approved by the Loop 38 readiness review. Trigger input is durable, but credential material must stay outside trigger input and immutable workflow artifacts.
 
 ## Completed Loops
 
@@ -52,95 +115,112 @@ Important boundaries:
 | Loop 15: Release Automation | Complete | Read-only release preflight script, version/tag/notes guards, CI dry-run, maintainer docs |
 | Loop 16: Workflow Example Pack | Complete | Enterprise example skills, synchronized Workflow DSL and LiteGraph fixtures, example docs and gallery entries |
 | Loop 17: Connector Runtime Hardening | Complete | Deterministic HTTP connector tests, timeout/error normalization, retry/timeout docs, credential boundary docs |
+| Loop 18: Control Plane Operator UX | Complete | Snapshot operator insights, static Operator view, attention/recent/connector/version tables, docs |
+| Loop 19: Demo And Contributor Onboarding | Complete | Resettable local demo helper, generated onboarding artifacts, README/HARNESS entry path, tests |
+| Loop 20: Packaging And Installability | Complete | Package metadata guards, editable install smoke helper, installed console-script verification, contributor docs |
+| Loop 21: Runtime Policy And Recovery | Complete | Connector retry policy execution, retry/recovery events, audit promotion, runtime policy docs |
+| Loop 22: Credential Boundary And Secret Hygiene | Complete | Credential boundary docs, committed-fixture secret hygiene scanner, CI guardrail, contributor guidance |
+| Loop 23: Trigger And Local Run API | Complete | Trigger envelope, local trigger command, run-start audit metadata, trigger docs |
+| Loop 24: Workflow Inputs And Run Context | Complete | Trigger input persistence, durable run context, compact audit boundary, executor context tests |
+| Loop 25: Credential Provider Interface | Complete | Local credential provider, connector handle metadata, credential-file CLI path, leakage tests |
+| Loop 26: Local Webhook Adapter | Complete | Local webhook request contract, stdlib webhook server, trigger-boundary adapter, JSON/SQLite tests, docs |
+| Loop 27: Run Overlay In Visual Editor | Complete | Read-only run overlay contract, LiteGraph node overlays, control snapshot `node_overlays`, static Nodes view, docs |
+| Loop 28: Pilot Playbook And Example | Complete | Local customer-support pilot smoke, webhook-triggered scenario, credential handle proof, snapshot and LiteGraph overlay artifacts, pilot docs |
+| Loop 29: Scheduled Trigger Boundary | Complete | Deterministic local schedule contract, schedule CLI, due-run helper, audit tests, schedule smoke, docs |
+| Loop 30: Trigger Input Mapping | Complete | Body-only HTTP connector input mapping from durable trigger context, validator/schema coverage, CLI/webhook/schedule tests, docs |
+| Loop 31: Connector Extension Contract | Complete | Minimum connector manifest contract, execution handoff boundary, credential/audit rules, registry contract tests, docs |
+| Loop 32: Pilot Scenario Pack | Complete | Multi-scenario local pilot pack for customer support, sales renewal, and risk exception workflows, with mapped connector input evidence and artifacts |
+| Loop 33: Connector Extension Prototype | Complete | Explicit local external connector fixture, narrow runtime registration, published workflow smoke, credential-handle isolation, and compact audit evidence |
+| Loop 34: Connector Packaging Boundary | Complete | Repeatable local connector package layout, explicit-loading smoke contract, compatibility notes, and stability boundaries |
+| Loop 35: First Product Connector Candidate | Complete | Lark/Feishu task connector selected, alternatives compared, package boundary and dry-run smoke plan documented |
+| Loop 36: First Product Connector Package Smoke | Complete | Lark/Feishu task connector dry-run package fixture, explicit-loading smoke, credential-handle evidence, and compact connector metadata |
+| Loop 37: Product Connector Pilot Scenario | Complete | Sales renewal risk workflow using the Lark/Feishu task dry-run connector after a manual gate, with webhook trigger, audit, snapshot, and LiteGraph overlay artifacts |
+| Loop 38: Live Connector Readiness Review | Complete | Decision note approving only scoped live Lark/Feishu `create_task` follow-up, with credential, idempotency, failure, audit, test, and rollback boundaries |
 
 ## Active Roadmap
 
 Future work should stay in small closed loops. A loop is complete only when it has a CLI path, tests, documentation, and a merged PR.
 
-Post-`v0.1.0` work now has one active priority after Loop 17 hardened the connector runtime:
+Post-`v0.1.0` work now has one active priority after Loop 38 approved a narrow live connector action:
 
-1. improve local operator visibility while keeping Workflow DSL authoritative.
+1. implement the scoped Lark/Feishu `create_task` live mode with the exact safety requirements from `docs/lark-live-connector-readiness.md`.
 
-### Loop 18: Control Plane Operator UX
+### Loop 39: Scoped Live Lark Task Connector
 
-Goal: connect control-plane state back to workflow inspection so local operators can understand runs, audit events, connector outcomes, and workflow version changes without turning the project into a hosted control plane.
+Goal: implement only the Loop 38 approved Lark/Feishu `create_task` live action behind explicit opt-in while keeping dry-run mode as the default.
+
+Why this is next: Loop 36 proved the connector package can stay out-of-core, Loop 37 proved it remains useful inside a controlled local pilot workflow, and Loop 38 decided that a single live `create_task` path is justified after package-level and pilot-workflow dry-run evidence. The next risk is implementation discipline: preserving credential isolation, duplicate prevention, compact audit evidence, and rollback behavior while making one real SaaS call possible.
 
 Status: next engineering loop.
 
+Start condition: Loop 38 has merged with `docs/lark-live-connector-readiness.md` and the Loop 37 smoke remains available with `python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot`.
+
+Approved implementation scope:
+
+- connector id: `lark_task`
+- operation: `create_task`
+- mode: `live`
+- credential handle: `lark_bot_access_token`
+- derived idempotency key from `workflow_id + version + run_id + node_id`
+- fake Lark HTTP receiver or injected fake transport for local tests
+- compact audit evidence only
+
 Initial PR boundary:
 
-- Start from exported local control-plane state and static UI improvements.
-- Keep Workflow DSL and published workflow artifacts read-only from the operator UI.
-- Prefer snapshot-driven views before adding any local server mode.
-- Do not introduce auth, RBAC, hosted services, or live multi-user coordination in this loop.
+- Add tests first for live-mode opt-in, credential resolution, fake success, `401 or 403`, rate limit, network timeout, validation error, malformed response, idempotency, duplicate prevention, and audit redaction.
+- Implement live `create_task` mode only after those tests fail for the expected reasons.
+- Keep `mode: dry_run` as the default and prove existing dry-run tests and smokes still pass.
+- Require a feature flag or equivalent explicit opt-in before live behavior can execute.
+- Keep Credential handling and audit redaction rules are explicit in code, tests, and docs.
+- Do not add OAuth, token refresh, hosted callbacks, automatic discovery, package installers, marketplace indexing, queues, production scheduling, or broader Lark/Feishu APIs.
 
-Scope:
+Recommended first-cut order:
 
-- Improve local control-plane inspection for run state, audit events, connector outcomes, and published workflow versions
-- Add graph-adjacent run/audit overlay data where it helps operators reason about execution without mutating workflow DSL
-- Make workflow artifact version differences easier to inspect from exported snapshots
-- Document the operator flow from publish/run/audit/snapshot to local UI review
+1. Add failing connector tests for opt-in live mode and fake-transport behavior.
+2. Add idempotency and duplicate-prevention tests before any outbound request code.
+3. Implement the minimal live action surface from the readiness decision.
+4. Update connector docs and examples without changing Workflow DSL compatibility.
 
-Acceptance criteria:
+Loop 39 acceptance evidence:
 
-- A local operator can inspect published versions, run status, connector events, audit events, and version comparisons from a static artifact or local UI path
-- The operator UI remains read-only and does not become the execution authority
-- Snapshot generation has tests for any new fields
-- Documentation explains how to generate and inspect the local operator view from a fresh checkout
+- Live mode is impossible without the feature flag or equivalent explicit opt-in.
+- Dry-run mode remains the default and existing dry-run smokes still pass.
+- Resolved credential values, authorization headers, raw task values, raw request bodies, and raw response payloads do not appear in run state, audit, snapshots, or connector summaries.
+- Idempotency blocks duplicate task creation attempts for the same `workflow_id + version + run_id + node_id`.
+- Failure cases return normalized failed connector results where possible.
+- The implementation can be disabled or reverted without changing Workflow DSL compatibility.
 
-Loop 18 implementation slices:
-
-1. Snapshot shape review
-   - Identify which run, audit, connector, and version comparison fields are already exported and which small additions would improve inspection.
-2. Static operator UI improvement
-   - Add read-only panels or graph-adjacent overlays that make execution status and connector failures easier to scan.
-3. Version comparison clarity
-   - Make published workflow version differences easier to inspect without changing immutable artifacts.
-4. Operator docs
-   - Document the publish, run, audit, snapshot, and local UI inspection flow.
-
-Loop 18 explicit non-goals:
-
-- Do not add a hosted control plane.
-- Do not add authentication, RBAC, or multi-tenant state.
-- Do not make the visual graph authoritative for execution.
-- Do not add workflow mutation from the operator UI.
-
-Loop 18 expected file changes:
-
-- `tests/test_dashboard.py` for snapshot shape changes.
-- `src/skill2workflow/dashboard.py` only if exported snapshot fields need to change.
-- `web/control.html` and related static assets for read-only operator UI improvements.
-- `examples/control-plane-snapshot.json` when the committed fixture must show new operator data.
-- `README.md`, `HARNESS.md`, or a focused docs page for the operator inspection flow.
-
-Loop 18 verification commands:
+Loop 39 verification commands:
 
 - `PYTHONPATH=src python3 -m unittest discover -s tests -v`
 - `python3 -m py_compile src/skill2workflow/*.py`
-- `PYTHONPATH=src python3 -m unittest tests.test_dashboard tests.test_control_plane -v`
-- `PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json`
+- `python3 scripts/secret_hygiene.py examples/workflows`
 - `git diff --check`
 
-Loop 18 done means:
+Loop 39 done means:
 
-- Operators can inspect local control-plane state more clearly from an exported artifact or static UI.
-- Published workflow artifacts remain immutable and Workflow DSL remains authoritative.
-- No hosted service, auth layer, or runtime dependency is added.
+- The project can create one live Lark/Feishu task through an explicitly enabled local connector path.
+- The dry-run connector remains safe for examples, CI, and local onboarding.
+- Any broader live SaaS behavior remains deferred until another readiness review.
 
 ## Near-Term Loop Queue
 
 This queue is ordered by what most improves open-source adoption after the first release. Treat it as a planning queue, not a commitment to implement all items without review.
 
+Loops 24-38 are now historical execution evidence and are tracked in the Completed Loops table above. The near-term queue starts with the scoped live connector implementation and only lists work that should still be scoped or implemented.
+
 | Loop | Status | Goal | Expected artifact |
 | --- | --- | --- | --- |
-| Loop 18: Control Plane Operator UX | Next | Connect control-plane state back to visual inspection | static artifact flow for run/audit overlays and workflow artifact diffs |
+| Loop 39: Scoped Live Lark Task Connector | Next | Implement only the Loop 38 approved live `create_task` action behind explicit opt-in | tested live connector path, fake receiver evidence, docs |
+| Loop 40: Live Connector Pilot Validation | Candidate | Exercise the scoped live connector in a controlled pilot path or defer broader live behavior based on Loop 39 evidence | pilot validation smoke or deferral note |
 
 Loop selection rules:
 
 - Pick the next loop only after the previous loop is merged or explicitly deferred.
 - Keep implementation local-first and dependency-light unless a spec-backed capability requires otherwise.
 - Prefer examples and guardrails that make the current runtime easier to trust before adding new platform surface area.
+- Do not add live SaaS connector behavior beyond the Loop 38 approved `create_task` action.
+- Keep Loop 40 tentative until Loop 39 has merged.
 
 ## Release Tag Plan
 
@@ -182,25 +262,36 @@ Status: delivered by Loops 1-9.
 
 ### v0.2: Connector Runtime
 
-Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Future work should add explicit retry execution, credential boundaries, and product-specific extensions only when backed by tests and docs.
+Status: first MVP shipped in Loop 10. Runtime hardening shipped in Loop 17. Retry execution shipped in Loop 21. Credential fixture hygiene shipped in Loop 22. Local credential handles shipped in Loop 25. Body-only trigger input mapping shipped in Loop 30. Connector extension contract shipped in Loop 31. Pilot scenario pack evidence shipped in Loop 32. Local connector extension prototype shipped in Loop 33. Connector packaging boundary shipped in Loop 34. Lark/Feishu task connector selection shipped in Loop 35. First product connector package smoke shipped in Loop 36. Product connector pilot scenario shipped in Loop 37. Live connector readiness review shipped in Loop 38. Future work should implement only the approved scoped live `create_task` action before considering broader live SaaS behavior.
 
 - Connector manifests
 - Connector binding validation
 - Manual and HTTP connector implementations
 - Connector execution audit events
 - Connector test fixtures
-- Future: connector credentials, automatic retry execution, and product-specific connector packages
+- Connector-node retry execution
+- Committed-fixture secret hygiene guardrails
+- Local credential-provider boundary for handle-based HTTP headers
+- Minimum connector manifest and execution handoff contract
+- Explicit local external connector prototype with credential and audit redaction evidence
+- Repeatable connector package boundary before product-specific connector packages
+- Selected first product connector candidate: Lark/Feishu task connector
+- First product connector package smoke for Lark/Feishu `create_task` dry-run behavior
+- Product connector pilot scenario using the dry-run package
+- Live connector readiness review approving only scoped live `create_task` work
+- Future: scoped live connector implementation before any broader live API behavior
 
 ### v0.3: Authoring Experience
 
-Status: first MVP shipped in Loop 11. Enterprise example pack shipped in Loop 16. Future work should improve editor ergonomics and broaden safe write-back only where semantics are explicit.
+Status: first MVP shipped in Loop 11. Enterprise example pack shipped in Loop 16. Read-only run overlays shipped in Loop 27. Future work should improve editor ergonomics and broaden safe write-back only where semantics are explicit.
 
 - Better LiteGraph parameter forms
 - Example workflow gallery
 - Enterprise example pack for sales, customer service, risk review, and operations analysis
 - Expanded safe write-back beyond title and description
+- Read-only run/audit overlays in the editor
 - Contributor docs for node types and compiler rules
-- Future: node creation flows, schema-backed forms, and run/audit overlays in the editor
+- Future: node creation flows and schema-backed forms
 
 ### v0.4: Open Source Release Baseline
 
@@ -216,14 +307,54 @@ Status: first MVP shipped in Loop 12. Release guardrails shipped in Loop 15.
 
 ### v0.5: Local Control Plane UI
 
-Status: first MVP shipped in Loop 13. Future work should connect run/audit overlays back into the graph view.
+Status: first MVP shipped in Loop 13. Operator insights shipped in Loop 18. Node-level run overlays shipped in Loop 27. Future work should keep the local UI read-only until runtime control actions have explicit safety rules.
 
 - Workflow registry view
 - Run list and run detail view
 - Audit log view
 - Connector manifest view
 - Published workflow version comparison
-- Future: live local server mode, graph overlays, and workflow artifact diff views
+- Operator attention, recent event, connector event, and version change summaries
+- Per-node run overlay table for status, event counts, connector outcomes, attempts, and retry/recovery evidence
+- Future: live local server mode and workflow artifact diff views
+
+### v0.6: Local Trigger And Input Runtime
+
+Status: trigger API shipped in Loop 23; input runtime shipped in Loop 24; local webhook adapter shipped in Loop 26; deterministic local schedules shipped in Loop 29; body-only trigger input mapping shipped in Loop 30.
+
+- Controlled local trigger envelope
+- Published-run API/helper path
+- Dependency-free local webhook adapter for published workflow triggers
+- Structured trigger response
+- Trigger metadata on `run_started` audit events
+- Audit coverage for triggered runs
+- Durable trigger input values under run context
+- Compact audit boundary for trigger input keys
+- Deterministic local scheduled triggers
+- Body-only HTTP connector request input mapping
+- Future: mapping variants beyond the body-only contract when pilot evidence requires them
+
+### v0.7: Pilot Integration Boundary
+
+Status: local trigger, input, credential, webhook, scheduled trigger, visual inspection, body-only input mapping, pilot playbook, scenario pack, connector extension contract semantics, one explicit external connector prototype, the connector package boundary, first product connector candidate selection, Lark/Feishu task dry-run package smoke, one product connector pilot scenario, and the live-readiness review are stable enough for local evaluation. The next step is a scoped live Lark/Feishu `create_task` implementation behind explicit opt-in.
+
+- Credential provider interface
+- Secret-handle documentation without secret storage in Workflow DSL
+- Local webhook adapter for pilot integration tests
+- Deterministic schedule smoke for recurring local-run evaluation
+- Visual run/audit overlays
+- Pilot playbook and runnable scenario
+- Body-only trigger input mapping into HTTP connector request bodies
+- Connector extension contract for future product-specific packages
+- Pilot scenario pack covering customer support, sales renewal, and risk exception workflows
+- Explicit local external connector prototype
+- Connector packaging boundary
+- First product connector candidate: Lark/Feishu task connector
+- First product connector package smoke for Lark/Feishu `create_task` dry-run behavior
+- Product connector pilot scenario using the Lark/Feishu task dry-run package
+- Live connector readiness review for scoped `create_task`
+- Next: scoped live Lark/Feishu task connector
+- Future: product-specific connector packages and hosted control-plane integrations
 
 ### v1.0: Production Baseline
 
@@ -245,6 +376,8 @@ Contributors can help in these areas:
 - LiteGraph node UI and expanded graph-to-DSL write-back
 - Executor policies such as retry, timeout, and checkpoint behavior
 - Connector manifests and example connectors
+- Connector package layout, compatibility notes, and explicit-loading smoke examples
+- Credential provider boundaries and safe connector examples
 - Example workflows for sales, approval, customer service, risk review, and operations analysis
 - Documentation and enterprise deployment guides
 
@@ -256,6 +389,9 @@ These are intentionally deferred until the local open-source runtime is stronger
 - Full RBAC or IAM
 - Complete BPMN compatibility
 - Distributed scheduling
+- Automatic connector package discovery or installation
+- OAuth flows, hosted connector callbacks, and token refresh systems
+- Live product-specific SaaS connector behavior beyond the Loop 38 approved scoped `create_task` action
 - Complex enterprise connector marketplace
 - Guaranteed automatic conversion of arbitrary SOP documents
 

@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import copy
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 
-from .connectors import ConnectorExecutionError, connector_ref, execute_connector
+from .connectors import ConnectorExecutionError, ConnectorRuntime, connector_ref
 from .storage import create_run_store
 
 
@@ -17,14 +18,22 @@ RunState = Dict[str, object]
 class LocalExecutor:
     """Execute Workflow DSL with pluggable local run-state storage."""
 
-    def __init__(self, state_dir: Path, storage: str = "json"):
+    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None, connector_runtime=None):
         self.state_dir = Path(state_dir)
         self.store = create_run_store(self.state_dir, storage)
+        self.credential_provider = credential_provider
+        self.connector_runtime = connector_runtime or ConnectorRuntime()
 
-    def run(self, workflow: Dict[str, object]) -> RunState:
+    def run(self, workflow: Dict[str, object], context: Dict[str, object] = None) -> RunState:
         workflow_meta = workflow.get("workflow", {})
         if not isinstance(workflow_meta, dict):
             workflow_meta = {}
+        if context is None:
+            run_context = {}
+        elif isinstance(context, dict):
+            run_context = copy.deepcopy(context)
+        else:
+            raise ValueError("run context must be a JSON object")
 
         state: RunState = {
             "run_id": f"run_{uuid.uuid4().hex[:12]}",
@@ -32,7 +41,7 @@ class LocalExecutor:
             "workflow_version": workflow_meta.get("version", "0.1.0"),
             "status": "created",
             "current_node": workflow.get("entry", "start"),
-            "context": {},
+            "context": run_context,
             "node_results": {},
             "events": [],
             "workflow": workflow,
@@ -175,26 +184,72 @@ class LocalExecutor:
             self._save(state)
             return state
 
-        self._event(state, "node_started", current_id)
-        self._event(
-            state,
-            "connector_started",
-            current_id,
-            {
-                "connector_id": ref["id"],
-                "connector_kind": ref["kind"],
-                "connector_status": "running",
-            },
-        )
-        try:
-            connector_result = execute_connector(node)
-        except ConnectorExecutionError as error:
-            connector_result = {
-                "status": "failed",
-                "connector": ref,
-                "error": str(error),
-                "output": {},
-            }
+        max_attempts = _retry_max_attempts(node, state.get("workflow", {}))
+        self._event(state, "node_started", current_id, {"max_attempts": max_attempts})
+        last_error = ""
+        connector_result = {}
+        attempts = 0
+        recovered = False
+
+        for attempt in range(1, max_attempts + 2):
+            attempts = attempt
+            self._event(
+                state,
+                "connector_started",
+                current_id,
+                {
+                    "connector_id": ref["id"],
+                    "connector_kind": ref["kind"],
+                    "connector_status": "running",
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                },
+            )
+            try:
+                connector_result = self.connector_runtime.execute_connector(
+                    node,
+                    credential_provider=self.credential_provider,
+                    context=state.get("context", {}),
+                )
+            except ConnectorExecutionError as error:
+                connector_result = {
+                    "status": "failed",
+                    "connector": ref,
+                    "error": str(error),
+                    "output": {},
+                }
+
+            result_status = str(connector_result.get("status", "failed"))
+            if result_status == "completed":
+                recovered = attempt > 1
+                break
+
+            last_error = str(connector_result.get("error") or "connector failed")
+            self._event(
+                state,
+                "connector_failed",
+                current_id,
+                {
+                    "connector_id": ref["id"],
+                    "connector_kind": ref["kind"],
+                    "connector_status": "failed",
+                    "attempt": attempt,
+                    "max_attempts": max_attempts,
+                    "error": last_error,
+                },
+            )
+            if attempt <= max_attempts:
+                self._event(
+                    state,
+                    "node_retrying",
+                    current_id,
+                    {
+                        "attempt": attempt,
+                        "next_attempt": attempt + 1,
+                        "max_attempts": max_attempts,
+                        "error": last_error,
+                    },
+                )
 
         result_status = str(connector_result.get("status", "failed"))
         node_result = {
@@ -202,8 +257,21 @@ class LocalExecutor:
             "title": node.get("title", current_id),
             "connector": connector_result.get("connector", ref),
             "output": connector_result.get("output", {}),
+            "attempts": attempts,
+            "max_attempts": max_attempts,
             "timestamp": _now(),
         }
+        mapping_summary = connector_result.get("input_mapping")
+        if isinstance(mapping_summary, dict) and mapping_summary:
+            node_result["input_mapping"] = mapping_summary
+        credential_summary = connector_result.get("credentials")
+        if isinstance(credential_summary, dict) and credential_summary:
+            node_result["credentials"] = credential_summary
+        audit_summary = connector_result.get("audit")
+        if isinstance(audit_summary, dict) and audit_summary:
+            node_result["audit"] = audit_summary
+        if last_error:
+            node_result["last_error"] = last_error
         if connector_result.get("error"):
             node_result["error"] = connector_result["error"]
         state["node_results"][current_id] = node_result
@@ -217,22 +285,40 @@ class LocalExecutor:
                     "connector_id": ref["id"],
                     "connector_kind": ref["kind"],
                     "connector_status": "completed",
+                    "attempt": attempts,
+                    "max_attempts": max_attempts,
+                    **_input_mapping_event_fields(mapping_summary),
+                    **_credential_event_fields(credential_summary),
+                    **_connector_audit_event_fields(audit_summary),
                 },
             )
+            if recovered:
+                self._event(
+                    state,
+                    "node_recovered",
+                    current_id,
+                    {
+                        "attempt": attempts,
+                        "max_attempts": max_attempts,
+                        "error": last_error,
+                    },
+                )
             self._event(state, "node_completed", current_id)
             next_node = node.get("on_success")
         else:
             self._event(
                 state,
-                "connector_failed",
+                "node_failed",
                 current_id,
                 {
-                    "connector_id": ref["id"],
-                    "connector_kind": ref["kind"],
-                    "connector_status": "failed",
+                    "attempt": attempts,
+                    "max_attempts": max_attempts,
+                    "error": last_error,
+                    **_input_mapping_event_fields(mapping_summary),
+                    **_credential_event_fields(credential_summary),
+                    **_connector_audit_event_fields(audit_summary),
                 },
             )
-            self._event(state, "node_failed", current_id)
             next_node = node.get("on_failure")
 
         if not isinstance(next_node, str) or next_node not in node_map:
@@ -269,6 +355,54 @@ class LocalExecutor:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _retry_max_attempts(node: Dict[str, object], workflow: object) -> int:
+    retry = node.get("retry")
+    if isinstance(retry, dict) and retry.get("max_attempts") is not None:
+        return _non_negative_int(retry.get("max_attempts"))
+
+    if isinstance(workflow, dict):
+        policies = workflow.get("policies")
+        if isinstance(policies, dict):
+            default_retry = policies.get("default_retry")
+            if isinstance(default_retry, dict):
+                return _non_negative_int(default_retry.get("max_attempts"))
+    return 0
+
+
+def _non_negative_int(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int) and value > 0:
+        return value
+    return 0
+
+
+def _input_mapping_event_fields(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    fields = {"input_mapping_status": str(summary.get("status", ""))}
+    keys = summary.get("input_keys", [])
+    if isinstance(keys, list):
+        fields["input_mapping_keys"] = [str(key) for key in keys]
+    return fields
+
+
+def _credential_event_fields(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    fields = {"credential_status": str(summary.get("status", ""))}
+    handles = summary.get("handles", [])
+    if isinstance(handles, list):
+        fields["credential_handles"] = [str(handle) for handle in handles]
+    return fields
+
+
+def _connector_audit_event_fields(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    return {"connector_metadata": copy.deepcopy(summary)}
 
 
 def _summarize_run(state: RunState) -> RunState:

@@ -9,10 +9,13 @@ from pathlib import Path
 
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
+from .credentials import load_credential_file
 from .dashboard import build_control_snapshot
 from .executor import LocalExecutor
 from .parser import parse_skill_file
+from .schedules import LocalScheduleRunner
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
+from .webhooks import serve_webhook_requests
 
 
 def main(argv=None) -> int:
@@ -44,11 +47,13 @@ def main(argv=None) -> int:
     run_cmd.add_argument("workflow", type=Path)
     run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    run_cmd.add_argument("--credential-file", type=Path)
 
     resume_cmd = subparsers.add_parser("resume", help="Resume a waiting run")
     resume_cmd.add_argument("run_id")
     resume_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     resume_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_cmd.add_argument("--credential-file", type=Path)
     resume_cmd.add_argument("--reject", action="store_true")
 
     runs_cmd = subparsers.add_parser("runs", help="List local runs")
@@ -86,11 +91,52 @@ def main(argv=None) -> int:
     run_published_cmd.add_argument("--version", required=True)
     run_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    run_published_cmd.add_argument("--credential-file", type=Path)
+
+    trigger_cmd = subparsers.add_parser("trigger", help="Trigger a published workflow through the local API")
+    trigger_cmd.add_argument("workflow_id")
+    trigger_cmd.add_argument("--version", required=True)
+    trigger_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    trigger_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    trigger_cmd.add_argument("--source", default="local-cli")
+    trigger_cmd.add_argument("--idempotency-key", default="")
+    trigger_cmd.add_argument("--input", type=Path, help="JSON object with trigger input metadata")
+    trigger_cmd.add_argument("--credential-file", type=Path)
+
+    schedule_add_cmd = subparsers.add_parser("schedule-add", help="Add or replace a local schedule definition")
+    schedule_add_cmd.add_argument("schedule", type=Path)
+    schedule_add_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedule_add_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
+    schedules_cmd = subparsers.add_parser("schedules", help="List local schedule definitions")
+    schedules_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedules_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
+    schedule_run_due_cmd = subparsers.add_parser(
+        "schedule-run-due",
+        help="Run due local schedules through the trigger boundary",
+    )
+    schedule_run_due_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedule_run_due_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedule_run_due_cmd.add_argument("--now", required=True, help="ISO-8601 timestamp used for deterministic due checks")
+    schedule_run_due_cmd.add_argument("--credential-file", type=Path)
+
+    webhook_server_cmd = subparsers.add_parser(
+        "webhook-server",
+        help="Serve local webhook requests for published workflow triggers",
+    )
+    webhook_server_cmd.add_argument("--host", default="127.0.0.1")
+    webhook_server_cmd.add_argument("--port", type=int, default=8080)
+    webhook_server_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    webhook_server_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    webhook_server_cmd.add_argument("--credential-file", type=Path)
+    webhook_server_cmd.add_argument("--once", action="store_true", help="Handle one request and then exit")
 
     resume_published_cmd = subparsers.add_parser("resume-published", help="Resume a waiting published run")
     resume_published_cmd.add_argument("run_id")
     resume_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     resume_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_published_cmd.add_argument("--credential-file", type=Path)
     resume_published_cmd.add_argument("--reject", action="store_true")
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
@@ -189,11 +235,21 @@ def main(argv=None) -> int:
             for error in errors:
                 print(error, file=sys.stderr)
             return 1
-        _print_json(LocalExecutor(args.state_dir, storage=args.storage).run(workflow))
+        _print_json(
+            LocalExecutor(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).run(workflow)
+        )
         return 0
 
     if args.command == "resume":
-        state = LocalExecutor(args.state_dir, storage=args.storage).resume(args.run_id, approved=not args.reject)
+        state = LocalExecutor(
+            args.state_dir,
+            storage=args.storage,
+            credential_provider=_credential_provider(args),
+        ).resume(args.run_id, approved=not args.reject)
         _print_json(state)
         return 0
 
@@ -232,14 +288,48 @@ def main(argv=None) -> int:
 
     if args.command == "run-published":
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).run_published_workflow(
+            lambda: LocalControlPlane(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).run_published_workflow(
                 args.workflow_id, args.version
             )
         )
 
+    if args.command == "trigger":
+        return _control_action(lambda: _trigger_workflow(args))
+
+    if args.command == "schedule-add":
+        return _control_action(
+            lambda: LocalScheduleRunner(args.state_dir, storage=args.storage).add_schedule(
+                _load_json(args.schedule)
+            )
+        )
+
+    if args.command == "schedules":
+        _print_json(LocalScheduleRunner(args.state_dir, storage=args.storage).list_schedules())
+        return 0
+
+    if args.command == "schedule-run-due":
+        return _control_action(
+            lambda: LocalScheduleRunner(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).run_due(args.now)
+        )
+
+    if args.command == "webhook-server":
+        return _serve_webhook_server(args)
+
     if args.command == "resume-published":
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).resume_published_run(
+            lambda: LocalControlPlane(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).resume_published_run(
                 args.run_id, approved=not args.reject
             )
         )
@@ -294,6 +384,59 @@ def _control_action(callback) -> int:
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1
+
+
+def _trigger_workflow(args):
+    trigger_input = _load_trigger_input(args.input)
+    return LocalControlPlane(
+        args.state_dir,
+        storage=args.storage,
+        credential_provider=_credential_provider(args),
+    ).trigger_workflow(
+        {
+            "workflow_id": args.workflow_id,
+            "version": args.version,
+            "source": args.source,
+            "idempotency_key": args.idempotency_key,
+            "input": trigger_input,
+        }
+    )
+
+
+def _serve_webhook_server(args) -> int:
+    try:
+        serve_webhook_requests(
+            host=args.host,
+            port=args.port,
+            control_plane=LocalControlPlane(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ),
+            once=args.once,
+        )
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
+
+
+def _credential_provider(args):
+    path = getattr(args, "credential_file", None)
+    if path is None:
+        return None
+    return load_credential_file(path)
+
+
+def _load_trigger_input(path: Path):
+    if path is None:
+        return {}
+    value = _load_json(path)
+    if not isinstance(value, dict):
+        raise ValueError("trigger input must be a JSON object")
+    return value
 
 
 def _write_back_workflow(workflow, graph):
