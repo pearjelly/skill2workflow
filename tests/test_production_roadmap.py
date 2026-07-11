@@ -114,6 +114,17 @@ class ProductionRoadmapTests(TestCase):
             roadmap,
         )
 
+    def test_readme_summarizes_without_copying_the_rolling_queue(self):
+        readme = _read("README.md")
+
+        self.assertIn("Current maturity: Local Evaluation", readme)
+        self.assertIn("Delivery Loops 1-38 are complete", readme)
+        self.assertIn("Loop 39", readme)
+        self.assertIn("self-hosted, single-tenant runtime for one team", readme)
+        self.assertIn("`ROADMAP.md`", readme)
+        self.assertNotIn("Loop 40: Controlled Live Connector Pilot", readme)
+        self.assertNotIn("Loop 43: Durable Recurring Scheduling And Safe Dispatch", readme)
+
 
 def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
