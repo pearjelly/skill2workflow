@@ -1,9 +1,12 @@
+import io
 import json
 import os
+import socket
 from datetime import datetime
 from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
+from urllib import error as urllib_error
 
 from skill2workflow.connectors import (
     ConnectorExecutionError,
@@ -162,6 +165,142 @@ class LarkTaskConnectorTests(TestCase):
             request_body["client_token"],
         ):
             self.assertNotIn(forbidden, encoded)
+
+    def test_lark_task_live_mode_normalizes_provider_failures_without_leakage(self):
+        cases = [
+            (401, {"code": 999, "msg": "raw-auth-detail"}, "authorization_failed"),
+            (403, {"code": 1470403, "msg": "raw-permission-detail"}, "permission_denied"),
+            (429, {"code": 999, "msg": "raw-rate-detail"}, "rate_limited"),
+            (400, {"code": 1470400, "msg": "raw-validation-detail"}, "validation_failed"),
+            (404, {"code": 1470404, "msg": "raw-resource-detail"}, "resource_not_found"),
+            (500, {"code": 1470422, "msg": "raw-idempotency-detail"}, "idempotency_conflict"),
+            (500, {"code": 1470500, "msg": "raw-provider-detail"}, "provider_unavailable"),
+            (500, b"not-json-provider-body", "provider_unavailable"),
+        ]
+
+        for status, payload, expected_status in cases:
+            with self.subTest(status=status, expected_status=expected_status):
+                transport = _FakeTransport(status=status, payload=payload)
+                runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+                with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+                    result = runtime.execute_connector(
+                        _lark_task_node(mode="live"),
+                        credential_provider=StaticCredentialProvider(
+                            {"lark_bot_access_token": "local-lark-secret"}
+                        ),
+                        context=_execution_context(),
+                    )
+
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["audit"]["provider_status"], expected_status)
+                self.assertTrue(result["audit"]["idempotency_key_present"])
+                self.assertFalse(result["audit"]["lark_task_id_present"])
+                self.assertEqual(
+                    result["error"],
+                    f"lark_task live request failed: {expected_status}",
+                )
+                self.assertEqual(result["output"], result["audit"])
+                encoded = json.dumps(result, ensure_ascii=False)
+                self.assertNotIn("local-lark-secret", encoded)
+                self.assertNotIn("raw-", encoded)
+                self.assertNotIn("not-json-provider-body", encoded)
+
+    def test_lark_task_live_mode_normalizes_timeout_and_malformed_success(self):
+        cases = [
+            (_FakeTransport(error=TimeoutError("raw timeout body")), "timeout"),
+            (_FakeTransport(error=urllib_error.URLError(socket.timeout("raw socket timeout"))), "timeout"),
+            (_FakeTransport(error=urllib_error.URLError("raw network failure")), "provider_unavailable"),
+            (
+                _FakeTransport(
+                    error=urllib_error.HTTPError(
+                        "https://open.feishu.cn/open-apis/task/v2/tasks",
+                        403,
+                        "raw http reason",
+                        {},
+                        io.BytesIO(b'{"code":1470403,"msg":"raw-http-body"}'),
+                    )
+                ),
+                "permission_denied",
+            ),
+            (_FakeTransport(payload=b"not-json-success-body"), "malformed_response"),
+            (_FakeTransport(payload={"code": 0, "data": {}}), "malformed_response"),
+            (_FakeTransport(payload={"code": 0, "data": {"task": {"guid": ""}}}), "malformed_response"),
+        ]
+
+        for transport, expected_status in cases:
+            with self.subTest(expected_status=expected_status):
+                runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+                with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+                    result = runtime.execute_connector(
+                        _lark_task_node(mode="live"),
+                        credential_provider=StaticCredentialProvider(
+                            {"lark_bot_access_token": "local-lark-secret"}
+                        ),
+                        context=_execution_context(),
+                    )
+
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["audit"]["provider_status"], expected_status)
+                self.assertTrue(result["audit"]["idempotency_key_present"])
+                self.assertFalse(result["audit"]["lark_task_id_present"])
+                self.assertEqual(
+                    result["error"],
+                    f"lark_task live request failed: {expected_status}",
+                )
+                encoded = json.dumps(result, ensure_ascii=False)
+                self.assertNotIn("local-lark-secret", encoded)
+                self.assertNotIn("raw timeout body", encoded)
+                self.assertNotIn("raw socket timeout", encoded)
+                self.assertNotIn("raw network failure", encoded)
+                self.assertNotIn("raw http reason", encoded)
+                self.assertNotIn("raw-http-body", encoded)
+                self.assertNotIn("not-json-success-body", encoded)
+
+    def test_lark_task_live_preflight_failures_never_call_transport(self):
+        missing_execution = {"input": dict(_execution_context()["input"])}
+        invalid_due = json.loads(json.dumps(_execution_context()))
+        invalid_due["input"]["due_at"] = "2026-07-09T09:00:00"
+        cases = [
+            (
+                missing_execution,
+                StaticCredentialProvider({"lark_bot_access_token": "secret"}),
+                "validation_failed",
+                False,
+            ),
+            (
+                invalid_due,
+                StaticCredentialProvider({"lark_bot_access_token": "secret"}),
+                "validation_failed",
+                False,
+            ),
+            (_execution_context(), StaticCredentialProvider({}), "credential_failed", True),
+        ]
+
+        for context, provider, expected_status, idempotency_key_present in cases:
+            with self.subTest(expected_status=expected_status):
+                transport = _FakeTransport()
+                runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+                with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+                    result = runtime.execute_connector(
+                        _lark_task_node(mode="live"),
+                        credential_provider=provider,
+                        context=context,
+                    )
+
+                self.assertEqual(result["status"], "failed")
+                self.assertEqual(result["audit"]["provider_status"], expected_status)
+                self.assertEqual(
+                    result["audit"]["idempotency_key_present"],
+                    idempotency_key_present,
+                )
+                self.assertFalse(result["audit"]["lark_task_id_present"])
+                self.assertEqual(
+                    result["error"],
+                    f"lark_task live request failed: {expected_status}",
+                )
+                self.assertEqual(transport.calls, [])
+                encoded = json.dumps(result, ensure_ascii=False)
+                self.assertNotIn("secret", encoded)
 
     def test_lark_task_client_token_is_stable_per_execution_identity(self):
         transport = _FakeTransport()

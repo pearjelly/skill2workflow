@@ -6,8 +6,10 @@ import copy
 import hashlib
 import json
 import os
+import socket
 from datetime import datetime
 from typing import Dict, List, Tuple
+from urllib import error as urllib_error
 from urllib import request as urllib_request
 
 from skill2workflow.connectors import (
@@ -22,6 +24,13 @@ LIVE_ENVIRONMENT_SWITCH = "SKILL2WORKFLOW_LARK_TASK_LIVE"
 LIVE_URL = "https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id"
 LIVE_TIMEOUT_SECONDS = 10.0
 REQUIRED_CREDENTIAL_HANDLE = "lark_bot_access_token"
+PROVIDER_CODE_STATUS = {
+    1470400: "validation_failed",
+    1470403: "permission_denied",
+    1470404: "resource_not_found",
+    1470422: "idempotency_conflict",
+    1470500: "provider_unavailable",
+}
 
 
 MANIFEST = {
@@ -91,19 +100,48 @@ def execute(binding: Dict[str, object], credential_provider=None, context=None, 
         if not _live_enabled():
             return _live_result("failed", audit, "live_disabled", mapping_summary)
 
-        payload = _provider_request_body(body, context)
-        credential_summary, credential_values = _resolve_credentials(
-            binding.get("credentials", []), credential_provider
-        )
-        if REQUIRED_CREDENTIAL_HANDLE not in credential_values:
-            raise ConnectorExecutionError(
-                f"credential handle not found: {REQUIRED_CREDENTIAL_HANDLE}"
+        try:
+            payload = _provider_request_body(body, context)
+        except ConnectorExecutionError:
+            return _failed_live_result(
+                audit,
+                "validation_failed",
+                mapping_summary,
+                idempotency_key_present=False,
             )
-        response = (transport or _default_transport)(
+
+        try:
+            credential_summary, credential_values = _resolve_credentials(
+                binding.get("credentials", []), credential_provider
+            )
+            if REQUIRED_CREDENTIAL_HANDLE not in credential_values:
+                raise ConnectorExecutionError(
+                    f"credential handle not found: {REQUIRED_CREDENTIAL_HANDLE}"
+                )
+        except ConnectorExecutionError:
+            return _failed_live_result(
+                audit,
+                "credential_failed",
+                mapping_summary,
+                credential_summary={
+                    "status": "failed",
+                    "handles": [REQUIRED_CREDENTIAL_HANDLE],
+                },
+                idempotency_key_present=True,
+            )
+
+        provider_status, task_id_present = _transport_outcome(
             _request(payload, credential_values[REQUIRED_CREDENTIAL_HANDLE]),
-            LIVE_TIMEOUT_SECONDS,
+            transport or _default_transport,
         )
-        _successful_task_present(response)
+        if provider_status != "completed" or not task_id_present:
+            return _failed_live_result(
+                audit,
+                provider_status,
+                mapping_summary,
+                credential_summary,
+                idempotency_key_present=True,
+            )
         return _live_result(
             "completed",
             audit,
@@ -235,6 +273,72 @@ def _default_transport(request: urllib_request.Request, timeout: float):
     return urllib_request.urlopen(request, timeout=timeout)
 
 
+def _http_status(status: int) -> str:
+    if status == 400:
+        return "validation_failed"
+    if status == 401:
+        return "authorization_failed"
+    if status == 403:
+        return "permission_denied"
+    if status == 404:
+        return "resource_not_found"
+    if status == 429:
+        return "rate_limited"
+    if status >= 500:
+        return "provider_unavailable"
+    return "malformed_response"
+
+
+def _decode_provider(raw: bytes):
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _provider_outcome(status: int, raw: bytes) -> Tuple[str, bool]:
+    payload = _decode_provider(raw)
+    if payload is not None:
+        code = payload.get("code")
+        if code == 0:
+            data = payload.get("data", {})
+            task = data.get("task", {}) if isinstance(data, dict) else {}
+            guid = task.get("guid") if isinstance(task, dict) else ""
+            if isinstance(guid, str) and guid:
+                return "completed", True
+            return "malformed_response", False
+        if isinstance(code, int) and code in PROVIDER_CODE_STATUS:
+            return PROVIDER_CODE_STATUS[code], False
+    return _http_status(status), False
+
+
+def _transport_outcome(request: urllib_request.Request, transport) -> Tuple[str, bool]:
+    try:
+        response = transport(request, LIVE_TIMEOUT_SECONDS)
+    except urllib_error.HTTPError as error:
+        try:
+            raw = error.read()
+        finally:
+            error.close()
+        return _provider_outcome(int(error.code), raw)
+    except (TimeoutError, socket.timeout):
+        return "timeout", False
+    except urllib_error.URLError as error:
+        if isinstance(error.reason, (TimeoutError, socket.timeout)):
+            return "timeout", False
+        return "provider_unavailable", False
+
+    try:
+        status = int(getattr(response, "status", 0))
+        raw = response.read()
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+    return _provider_outcome(status, raw)
+
+
 def _resolve_credentials(
     credentials: object, credential_provider
 ) -> Tuple[Dict[str, object], Dict[str, str]]:
@@ -263,30 +367,6 @@ def _resolve_credentials(
         handles.append(handle)
 
     return {"status": "resolved", "handles": sorted(handles)}, values
-
-
-def _successful_task_present(response) -> bool:
-    try:
-        status = int(getattr(response, "status", 0))
-        raw = response.read()
-    finally:
-        close = getattr(response, "close", None)
-        if callable(close):
-            close()
-    if status < 200 or status >= 300:
-        raise ConnectorExecutionError("lark_task live provider request failed")
-    try:
-        payload = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        raise ConnectorExecutionError("lark_task live provider response is invalid")
-    if not isinstance(payload, dict) or payload.get("code") != 0:
-        raise ConnectorExecutionError("lark_task live provider response is invalid")
-    data = payload.get("data", {})
-    task = data.get("task", {}) if isinstance(data, dict) else {}
-    guid = task.get("guid") if isinstance(task, dict) else ""
-    if not isinstance(guid, str) or not guid:
-        raise ConnectorExecutionError("lark_task live provider response is invalid")
-    return True
 
 
 def _live_result(
@@ -318,6 +398,35 @@ def _live_result(
         result["credentials"] = credential_summary
     if status == "failed":
         result["error"] = f"lark_task live request failed: {provider_status}"
+    return result
+
+
+def _failed_live_result(
+    audit: Dict[str, object],
+    provider_status: str,
+    mapping_summary: Dict[str, object],
+    credential_summary: Dict[str, object] = None,
+    idempotency_key_present: bool = False,
+) -> Dict[str, object]:
+    compact = dict(audit)
+    compact.update(
+        {
+            "credential_status": str((credential_summary or {}).get("status") or "skipped"),
+            "idempotency_key_present": idempotency_key_present,
+            "provider_status": provider_status,
+            "lark_task_id_present": False,
+        }
+    )
+    result = {
+        "status": "failed",
+        "connector": {"id": "lark_task", "kind": "lark_task"},
+        "output": dict(compact),
+        "error": f"lark_task live request failed: {provider_status}",
+        "audit": compact,
+        "input_mapping": mapping_summary,
+    }
+    if credential_summary:
+        result["credentials"] = credential_summary
     return result
 
 
