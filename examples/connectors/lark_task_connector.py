@@ -130,10 +130,18 @@ def execute(binding: Dict[str, object], credential_provider=None, context=None, 
                 idempotency_key_present=True,
             )
 
-        provider_status, task_id_present = _transport_outcome(
-            _request(payload, credential_values[REQUIRED_CREDENTIAL_HANDLE]),
-            transport or _default_transport,
-        )
+        try:
+            live_request = _request(payload, credential_values[REQUIRED_CREDENTIAL_HANDLE])
+        except Exception:
+            return _failed_live_result(
+                audit,
+                "credential_failed",
+                mapping_summary,
+                credential_summary,
+                idempotency_key_present=True,
+            )
+
+        provider_status, task_id_present = _transport_outcome(live_request, transport or _default_transport)
         if provider_status != "completed" or not task_id_present:
             return _failed_live_result(
                 audit,
@@ -324,6 +332,8 @@ def _read_provider_outcome(response, status: int) -> Tuple[str, bool]:
         if isinstance(error.reason, (TimeoutError, socket.timeout)):
             return "timeout", False
         return "provider_unavailable", False
+    except Exception:
+        return "provider_unavailable", False
     finally:
         close = getattr(response, "close", None)
         if callable(close):
@@ -335,12 +345,21 @@ def _transport_outcome(request: urllib_request.Request, transport) -> Tuple[str,
     try:
         response = transport(request, LIVE_TIMEOUT_SECONDS)
     except urllib_error.HTTPError as error:
-        return _read_provider_outcome(error, int(error.code))
+        try:
+            status = int(error.code)
+        except Exception:
+            close = getattr(error, "close", None)
+            if callable(close):
+                close()
+            return "malformed_response", False
+        return _read_provider_outcome(error, status)
     except (TimeoutError, socket.timeout):
         return "timeout", False
     except urllib_error.URLError as error:
         if isinstance(error.reason, (TimeoutError, socket.timeout)):
             return "timeout", False
+        return "provider_unavailable", False
+    except Exception:
         return "provider_unavailable", False
 
     try:
@@ -349,7 +368,7 @@ def _transport_outcome(request: urllib_request.Request, transport) -> Tuple[str,
         close = getattr(response, "close", None)
         if callable(close):
             close()
-        raise
+        return "malformed_response", False
     return _read_provider_outcome(response, status)
 
 

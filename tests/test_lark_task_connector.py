@@ -348,6 +348,91 @@ class LarkTaskConnectorTests(TestCase):
                 self.assertNotIn("raw http error reason", encoded)
                 self.assertNotIn("raw response read network failure", encoded)
 
+    def test_lark_task_live_mode_normalizes_ordinary_transport_failures_without_leakage(self):
+        token = "dummy-transport-token"
+
+        def transport(request, timeout):
+            raise ValueError(f"raw transport failure: {request.get_header('Authorization')}")
+
+        runtime = ConnectorRuntime([_load_lark_task_connector(transport)])
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider({"lark_bot_access_token": token}),
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["audit"]["provider_status"], "provider_unavailable")
+        self.assertEqual(result["error"], "lark_task live request failed: provider_unavailable")
+        encoded = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn(token, encoded)
+        self.assertNotIn("raw transport failure", encoded)
+
+    def test_lark_task_live_mode_normalizes_ordinary_response_read_failures_and_closes(self):
+        token = "dummy-read-token"
+        response = _FakeResponse(200, {}, error=ValueError(f"raw response read failure: {token}"))
+        runtime = ConnectorRuntime([_load_lark_task_connector(_FakeTransport(response=response))])
+
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider({"lark_bot_access_token": token}),
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["audit"]["provider_status"], "provider_unavailable")
+        self.assertEqual(result["error"], "lark_task live request failed: provider_unavailable")
+        self.assertTrue(response.closed)
+        encoded = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn(token, encoded)
+        self.assertNotIn("raw response read failure", encoded)
+
+    def test_lark_task_live_mode_normalizes_ordinary_status_failures_and_closes(self):
+        token = "dummy-status-token"
+        response = _StatusErrorResponse(ValueError(f"raw status failure: {token}"))
+        runtime = ConnectorRuntime([_load_lark_task_connector(_FakeTransport(response=response))])
+
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider({"lark_bot_access_token": token}),
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["audit"]["provider_status"], "malformed_response")
+        self.assertEqual(result["error"], "lark_task live request failed: malformed_response")
+        self.assertTrue(response.closed)
+        encoded = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn(token, encoded)
+        self.assertNotIn("raw status failure", encoded)
+
+    def test_lark_task_live_mode_normalizes_request_construction_failures_without_leakage(self):
+        token = "dummy-construction-token"
+        connector = _load_lark_task_connector()
+        request_module = connector.executor.__globals__["urllib_request"]
+        runtime = ConnectorRuntime([connector])
+
+        with patch.object(
+            request_module,
+            "Request",
+            side_effect=ValueError(f"raw request construction failure: {token}"),
+        ), patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider({"lark_bot_access_token": token}),
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["audit"]["provider_status"], "credential_failed")
+        self.assertEqual(result["error"], "lark_task live request failed: credential_failed")
+        encoded = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn(token, encoded)
+        self.assertNotIn("raw request construction failure", encoded)
+
     def test_lark_task_live_mode_requires_2xx_for_provider_success(self):
         cases = [
             (401, "authorization_failed"),
@@ -526,6 +611,19 @@ class _ReadErrorBody:
         self.closed = False
 
     def read(self):
+        raise self.error
+
+    def close(self):
+        self.closed = True
+
+
+class _StatusErrorResponse:
+    def __init__(self, error):
+        self.error = error
+        self.closed = False
+
+    @property
+    def status(self):
         raise self.error
 
     def close(self):
