@@ -15,7 +15,7 @@ Observed compact result:
 
 The validation task was assigned to the consenting current user and retained as visible evidence.
 
-A standard-tier short-lived Vault credential was used as a one-time fallback after passkey/WebAuthn could not be provisioned. It was constrained to the fixed connector endpoint and removed immediately after success.
+The user explicitly approved a one-time standard-tier Vault fallback after protected-tier passkey/WebAuthn provisioning failed. The credential had `open.feishu.cn` allowed-host metadata, was short-lived, and was deleted immediately after success.
 
 Raw task values, user ids, credentials, request bodies, response bodies, and task ids are intentionally omitted.
 

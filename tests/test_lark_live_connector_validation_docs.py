@@ -22,3 +22,14 @@ class LarkLiveConnectorValidationDocsTests(TestCase):
             "Raw task values, user ids, credentials, request bodies, response bodies, and task ids are intentionally omitted.",
             evidence,
         )
+        self.assertIn(
+            "The user explicitly approved a one-time standard-tier Vault fallback after protected-tier "
+            "passkey/WebAuthn provisioning failed.",
+            evidence,
+        )
+        self.assertIn(
+            "The credential had `open.feishu.cn` allowed-host metadata, was short-lived, and was deleted "
+            "immediately after success.",
+            evidence,
+        )
+        self.assertNotIn("constrained to the fixed connector endpoint", evidence)
