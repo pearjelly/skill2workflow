@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-38
+- Completed delivery loops: 1-39
 - Current maturity: Local Evaluation
-- Active loop: Loop 39, Scoped Live Lark Task Connector
+- Active loop: Loop 40, Controlled Live Connector Pilot
 - Next maturity gate: Controlled Live Pilot
-- Next decision: validate the scoped live action in a controlled pilot or explicitly defer broader live behavior
+- Next decision: complete the controlled real-team business-workflow pilot or explicitly defer broader live behavior
 
 ## Production Readiness Path
 
@@ -28,9 +28,9 @@ The repository can compile, validate, publish, trigger, execute, pause, resume, 
 
 ### Controlled Live Pilot
 
-**Target loops:** 39-40.
+**Target loops:** 40.
 
-This gate requires one explicitly enabled live connector action plus controlled pilot evidence. It does not imply general live SaaS readiness.
+This gate requires the completed scoped live connector action plus controlled pilot evidence. It does not imply general live SaaS readiness.
 
 ### Self-hosted Beta
 
@@ -48,73 +48,52 @@ Candidate evidence includes backup and restore, upgrade and migration policy, ca
 
 ## Active Loop
 
-### Loop 39: Scoped Live Lark Task Connector
+### Loop 40: Controlled Live Connector Pilot
 
 **Status:** Next engineering loop.
 
-**Goal:** Implement only the Loop 38-approved Lark/Feishu `create_task` live action behind explicit opt-in while keeping dry-run mode as the default.
+**Goal:** Exercise the completed scoped Lark/Feishu `create_task` action through one controlled real-team business-workflow pilot.
 
-**Why now:** Loop 36 proved the out-of-core package boundary, Loop 37 proved the connector in a sales renewal risk workflow after a manual control gate, and Loop 38 approved implementation after package-level and pilot-workflow dry-run evidence. The remaining risk is disciplined live execution without weakening credential isolation, duplicate prevention, audit redaction, rollback, or Workflow DSL compatibility.
+**Why now:** Loop 36 and Loop 37 supplied package-level and pilot-workflow dry-run evidence, including the sales renewal risk workflow after a manual control gate. Loop 39 then delivered the explicitly enabled live path with fake-transport coverage, native provider idempotency, audit redaction, and rollback boundaries. It also produced one redacted real-validation evidence note at `docs/lark-live-connector-validation.md`. The remaining evidence is controlled use in a real-team business workflow without weakening those boundaries or Workflow DSL compatibility.
 
-**Decision boundary:** Loop 38 approved only scoped live `create_task` work. Any broader Lark/Feishu API behavior requires another readiness review. The full decision is recorded in `docs/lark-live-connector-readiness.md`.
+**Decision boundary:** Live behavior remains limited to the fixed `create_task` action. The one scoped live connector validation is not the controlled real-team business-workflow pilot required for Loop 40. Any broader Lark/Feishu API behavior requires another readiness review. The original readiness decision is recorded in `docs/lark-live-connector-readiness.md`.
 
-Approved scope:
+Scope:
 
-- Connector id and kind: `lark_task`
-- Operation: `create_task`
-- Live mode: `live`
-- Default mode: `dry_run`
-- Credential handle: `lark_bot_access_token`
-- Idempotency key: derived from `workflow_id + version + run_id + node_id`
-- Test transport: fake Lark HTTP receiver or injected fake transport; no live network in CI
-- Evidence: compact connector and audit metadata only
+- One controlled real-team business-workflow pilot using the completed `lark_task` connector.
+- The fixed `create_task` action only, behind the existing explicit opt-in while dry-run remains the default.
+- A reproducible runbook, compact redacted run and audit evidence, and explicit failure and rollback exercises.
+- A continue, harden, or defer decision based on the pilot evidence.
 
-Implementation order:
+Excluded from Loop 40:
 
-1. Add failing tests for opt-in, credential resolution, success, API failures, timeout, malformed responses, and redaction.
-2. Add idempotency and duplicate-prevention tests before outbound request code.
-3. Implement the minimal live `create_task` action.
-4. Prove existing dry-run tests and smokes remain unchanged.
-5. Update connector documentation without changing Workflow DSL compatibility.
+- Additional Lark/Feishu APIs or operations.
+- OAuth, token refresh, hosted callbacks or ingress, automatic connector discovery, marketplace indexing, queues, or production scheduling.
+- Treating the one connector validation as a substitute for the Loop 40 controlled business-workflow pilot.
 
-Acceptance criteria:
+Acceptance evidence:
 
-- The project can create one live Lark/Feishu task through an explicitly enabled local connector path.
-- Live behavior requires a feature flag or equivalent explicit opt-in.
-- Dry-run remains the default for examples, CI, and contributor onboarding.
-- Credential handling and audit redaction rules are explicit in code, tests, and docs.
-- Resolved credentials, authorization headers, raw task values, raw request bodies, and raw response payloads never enter run state, audit, snapshots, or connector summaries.
-- Duplicate task creation is blocked for the same derived idempotency key.
-- `401 or 403`, rate limits, network timeouts, validation failures, and malformed responses become normalized failures where possible.
-- The live path can be disabled or reverted without changing Workflow DSL compatibility.
+- Controlled live-pilot runbook.
+- Redacted run and audit evidence.
+- Failure and rollback exercise evidence.
+- A documented continue, harden, or defer decision.
 
-Required verification:
+Verification direction:
+
+Verify the controlled pilot against its approved runbook while preserving the existing automated test suite, fake-transport coverage, secret hygiene, and dry-run smoke checks, including:
 
 ```bash
-PYTHONPATH=src python3 -m unittest discover -s tests -v
-python3 -m py_compile src/skill2workflow/*.py
-python3 scripts/secret_hygiene.py examples/workflows
 python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot
-git diff --check
 ```
-
-Explicitly excluded from Loop 39:
-
-- OAuth and token refresh
-- Hosted callbacks or ingress
-- Automatic connector discovery or package installation
-- Marketplace indexing
-- Queues or production scheduling
-- Other Lark/Feishu APIs or operations
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered, but only Loop 39 is committed. Select the next loop after reviewing evidence from the previous one; candidate loop numbers may change when that evidence changes the plan.
+This rolling queue is ordered, but only Loop 40 is committed. Select the next loop after reviewing evidence from the previous one; candidate loop numbers may change when that evidence changes the plan.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
-| Loop 39: Scoped Live Lark Task Connector | Next | Implement the approved live `create_task` path behind explicit opt-in | Tested live path, fake-transport evidence, and updated docs |
-| Loop 40: Controlled Live Connector Pilot | Candidate | Exercise Loop 39 through a controlled real-team pilot | Controlled live-pilot runbook, redacted run and audit evidence, failure and rollback exercises, and a continue/harden/defer decision |
+| Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
+| Loop 40: Controlled Live Connector Pilot | Next | Exercise Loop 39 through a controlled real-team pilot | Controlled live-pilot runbook, redacted run and audit evidence, failure and rollback exercises, and a continue/harden/defer decision |
 | Loop 41: Self-hosted Runtime Service Boundary | Candidate | Add one long-running service entry point with validated configuration | Health/readiness checks, graceful shutdown, and restart continuity evidence |
 | Loop 42: Authenticated Ingress And Production Credentials | Candidate | Require authentication by default for the production service path and resolve credential handles at execution time | Compact security audit evidence and a documented external TLS termination boundary |
 | Loop 43: Durable Recurring Scheduling And Safe Dispatch | Candidate | Persist recurring schedules with restart recovery and a defined missed-run policy | Durable dispatch records and lease or locking semantics for one SQLite-backed service instance |
@@ -199,6 +178,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 36: First Product Connector Package Smoke | Complete | Lark/Feishu task connector dry-run package fixture, explicit-loading smoke, credential-handle evidence, and compact connector metadata |
 | Loop 37: Product Connector Pilot Scenario | Complete | Sales renewal risk workflow using the Lark/Feishu task dry-run connector after a manual gate, with webhook trigger, audit, snapshot, and LiteGraph overlay artifacts |
 | Loop 38: Live Connector Readiness Review | Complete | Decision note approving only scoped live Lark/Feishu `create_task` follow-up, with credential, idempotency, failure, audit, test, and rollback boundaries |
+| Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
 
 ## Release Direction
 

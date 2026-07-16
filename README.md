@@ -498,9 +498,9 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Local Evaluation. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-38 are complete.
+Current maturity: Local Evaluation. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-39 are complete.
 
-The active priority is Loop 39: implement only the readiness-approved Lark/Feishu `create_task` live action behind explicit opt-in while keeping dry-run behavior as the default.
+The active priority is Loop 40: run a controlled real-team business-workflow pilot of the completed, fixed Lark/Feishu `create_task` action.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
