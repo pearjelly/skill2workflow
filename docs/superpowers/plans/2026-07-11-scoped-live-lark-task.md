@@ -52,7 +52,7 @@
 - Consumes: `LocalExecutor._execute_connector_node(...)` and `ConnectorRuntime.execute_connector(node, credential_provider=None, context=None)`
 - Produces: `_connector_context(state: RunState, node_id: str) -> Dict[str, object]`, consumed by every connector call and by Task 2 idempotency derivation
 
-- [ ] **Step 1: Write the failing executor test**
+- [x] **Step 1: Write the failing executor test**
 
 Add this test to `ExecutorTests`:
 
@@ -100,7 +100,7 @@ class _CapturingConnectorRuntime:
         }
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -110,7 +110,7 @@ PYTHONPATH=src python3 -m unittest tests.test_executor.ExecutorTests.test_connec
 
 Expected: FAIL because the connector receives only the durable context and the forged `_execution` object is not replaced.
 
-- [ ] **Step 3: Implement the runtime-owned connector context**
+- [x] **Step 3: Implement the runtime-owned connector context**
 
 Replace the connector call's current `context=state.get("context", {})` argument with:
 
@@ -133,7 +133,7 @@ def _connector_context(state: RunState, node_id: str) -> Dict[str, object]:
     return context
 ```
 
-- [ ] **Step 4: Run focused and executor tests**
+- [x] **Step 4: Run focused and executor tests**
 
 Run:
 
@@ -143,7 +143,7 @@ PYTHONPATH=src python3 -m unittest tests.test_executor -v
 
 Expected: all executor tests PASS.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 Run:
 
@@ -164,7 +164,7 @@ Expected: one commit containing only the executor context change and its test.
 - Consumes: Task 1 `_execution` context and existing `StaticCredentialProvider`
 - Produces: `execute(binding, credential_provider=None, context=None, transport=None)`, `_provider_request_body(...)`, `_client_token(...)`, and the injectable transport contract used by Tasks 3 and 4
 
-- [ ] **Step 1: Add deterministic test transport helpers**
+- [x] **Step 1: Add deterministic test transport helpers**
 
 Retain the existing `json` import and add:
 
@@ -249,7 +249,7 @@ def _execution_context(run_id="run_live", node_id="create_lark_task"):
     }
 ```
 
-- [ ] **Step 2: Write live-disabled and successful-request tests**
+- [x] **Step 2: Write live-disabled and successful-request tests**
 
 Add these tests to `LarkTaskConnectorTests`:
 
@@ -391,7 +391,7 @@ Extend `test_lark_task_manifest_is_explicit_external_connector` with:
         self.assertIn("dry-run-default", connector.manifest["description"])
 ```
 
-- [ ] **Step 3: Run live tests and verify RED**
+- [x] **Step 3: Run live tests and verify RED**
 
 Run:
 
@@ -401,7 +401,7 @@ PYTHONPATH=src python3 -m unittest tests.test_lark_task_connector -v
 
 Expected: FAIL because `execute` rejects live mode and has no transport parameter.
 
-- [ ] **Step 4: Implement live activation and successful request construction**
+- [x] **Step 4: Implement live activation and successful request construction**
 
 Update the module docstring to describe a dry-run-default connector with scoped live support. Add these imports and constants:
 
@@ -631,7 +631,7 @@ Implement the live branch in this exact order:
 
 Do not add live-only keys to the base `_task_audit_metadata`; `_live_result` adds them so existing dry-run audit equality remains unchanged.
 
-- [ ] **Step 5: Run the connector tests and verify GREEN**
+- [x] **Step 5: Run the connector tests and verify GREEN**
 
 Run:
 
@@ -641,7 +641,7 @@ PYTHONPATH=src python3 -m unittest tests.test_lark_task_connector -v
 
 Expected: all dry-run and new successful live tests PASS.
 
-- [ ] **Step 6: Commit Task 2**
+- [x] **Step 6: Commit Task 2**
 
 Run:
 
@@ -662,7 +662,7 @@ Expected: one commit containing the live happy path and its focused tests.
 - Consumes: Task 2 transport, request builder, credential values, and compact audit metadata
 - Produces: `_provider_outcome(status: int, raw: bytes)`, `_failed_live_result(...)`, and stable `provider_status` behavior consumed by runtime audit and Task 4
 
-- [ ] **Step 1: Add the table-driven provider failure tests**
+- [x] **Step 1: Add the table-driven provider failure tests**
 
 Add this test:
 
@@ -785,7 +785,7 @@ Add this preflight test proving the transport is not called for missing executio
                 self.assertEqual(transport.calls, [])
 ```
 
-- [ ] **Step 2: Run the new tests and verify RED**
+- [x] **Step 2: Run the new tests and verify RED**
 
 Run:
 
@@ -795,7 +795,7 @@ PYTHONPATH=src python3 -m unittest tests.test_lark_task_connector -v
 
 Expected: FAIL because provider and transport failures are not yet returned as compact failed results.
 
-- [ ] **Step 3: Implement fixed failure classification**
+- [x] **Step 3: Implement fixed failure classification**
 
 Add:
 
@@ -920,7 +920,7 @@ Provider code classification must precede generic HTTP classification. Never inc
 
 In the live branch, wrap `_provider_request_body(...)` in `except ConnectorExecutionError` and return `_failed_live_result(..., "validation_failed", ..., idempotency_key_present=False)`. Wrap `_resolve_credentials(...)` in a separate `except ConnectorExecutionError` and return `_failed_live_result(..., "credential_failed", ..., credential_summary={"status": "failed", "handles": [REQUIRED_CREDENTIAL_HANDLE]}, idempotency_key_present=True)` because the client token has already been derived. Preserve existing dry-run exceptions exactly.
 
-- [ ] **Step 4: Run focused connector and dry-run smoke tests**
+- [x] **Step 4: Run focused connector and dry-run smoke tests**
 
 Run:
 
@@ -932,7 +932,7 @@ python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-tas
 
 Expected: all tests and both dry-run smokes PASS without live network access.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 Run:
 
@@ -954,7 +954,7 @@ Expected: one commit containing failure and leakage hardening.
 - Consumes: Task 2/3 `lark_task` entrypoint, `ConnectorRuntime`, `ExternalConnector`, `StaticCredentialProvider`
 - Produces: `run_lark_task_live_validation(repo_root, title, description, assignee_open_id, validation_run_id, confirmed, transport=None) -> Dict[str, object]` and `main(argv=None) -> int`
 
-- [ ] **Step 1: Write validation guard and compact-output tests**
+- [x] **Step 1: Write validation guard and compact-output tests**
 
 Create `tests/test_lark_task_live_validation.py`:
 
@@ -1057,7 +1057,7 @@ class _FakeTransport:
         return _FakeResponse()
 ```
 
-- [ ] **Step 2: Run the new test and verify RED**
+- [x] **Step 2: Run the new test and verify RED**
 
 Run:
 
@@ -1067,7 +1067,7 @@ PYTHONPATH=src python3 -m unittest tests.test_lark_task_live_validation -v
 
 Expected: FAIL because the validation module does not exist.
 
-- [ ] **Step 3: Implement the validation module**
+- [x] **Step 3: Implement the validation module**
 
 Create `src/skill2workflow/lark_task_live_validation.py` with:
 
@@ -1204,7 +1204,7 @@ def main(argv=None) -> int:
 
 Create `scripts/lark_task_live_validation.py` using the same source-checkout wrapper pattern as `scripts/lark_task_connector_smoke.py`, importing `main` from `skill2workflow.lark_task_live_validation`.
 
-- [ ] **Step 4: Run validation and focused connector tests**
+- [x] **Step 4: Run validation and focused connector tests**
 
 Run:
 
@@ -1214,7 +1214,7 @@ PYTHONPATH=src python3 -m unittest tests.test_lark_task_live_validation tests.te
 
 Expected: all tests PASS with injected transport only.
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
 
 Run:
 
@@ -1236,7 +1236,7 @@ Expected: one commit containing the validation command and tests.
 - Consumes: implemented behavior from Tasks 1-4 and the approved design
 - Produces: tested public documentation for activation, endpoint, native idempotency, durable-input interpretation, failure categories, and validation command
 
-- [ ] **Step 1: Extend the failing documentation contract**
+- [x] **Step 1: Extend the failing documentation contract**
 
 Add assertions to `test_lark_live_connector_readiness_decision_is_documented` for these exact strings across the readiness and connector guides:
 
@@ -1254,7 +1254,7 @@ Add assertions to `test_lark_live_connector_readiness_decision_is_documented` fo
         self.assertIn("LARK_BOT_ACCESS_TOKEN", connectors)
 ```
 
-- [ ] **Step 2: Run the docs contract and verify RED**
+- [x] **Step 2: Run the docs contract and verify RED**
 
 Run:
 
@@ -1264,7 +1264,7 @@ PYTHONPATH=src python3 -m unittest tests.test_live_connector_readiness -v
 
 Expected: FAIL because the docs still describe live mode as future work.
 
-- [ ] **Step 3: Update connector and readiness documentation**
+- [x] **Step 3: Update connector and readiness documentation**
 
 Document these exact boundaries:
 
@@ -1284,7 +1284,7 @@ Document these exact boundaries:
 
 Preserve the historical sentence `examples/connectors/lark_task_connector.py remains dry-run-only in Loop 38` because existing tests use it as Loop 38 evidence. Replace only current-state language saying the package remains dry-run-only with language saying dry-run remains the default and live is opt-in.
 
-- [ ] **Step 4: Run documentation and connector tests**
+- [x] **Step 4: Run documentation and connector tests**
 
 Run:
 
@@ -1294,7 +1294,7 @@ PYTHONPATH=src python3 -m unittest tests.test_live_connector_readiness tests.tes
 
 Expected: all tests PASS.
 
-- [ ] **Step 5: Commit Task 5**
+- [x] **Step 5: Commit Task 5**
 
 Run:
 
@@ -1315,7 +1315,7 @@ Expected: one docs-contract commit.
 - Consumes: guarded validation command from Task 4, Vault secret `LARK_BOT_ACCESS_TOKEN`, and the current Lark user's authenticated `open_id` from conversation metadata
 - Produces: one retained Feishu validation task and one committed redacted evidence note
 
-- [ ] **Step 1: Run all offline verification before any live write**
+- [x] **Step 1: Run all offline verification before any live write**
 
 Run:
 
@@ -1330,7 +1330,7 @@ git diff --check
 
 Expected: all tests, compilation, hygiene, smokes, and diff checks PASS. Stop before live validation if any command fails.
 
-- [ ] **Step 2: Locate or request the protected Vault secret**
+- [x] **Step 2: Locate or request the protected Vault secret**
 
 Run:
 
@@ -1346,7 +1346,7 @@ vibe vault request LARK_BOT_ACCESS_TOKEN --reason "Validate the explicitly appro
 
 Expected: the Vault either reports an existing static secret or asks the user to add/approve it in the browser. Never ask the user to paste the token into chat.
 
-- [ ] **Step 3: Prepare ephemeral approved task parameters**
+- [x] **Step 3: Prepare ephemeral approved task parameters**
 
 In the execution shell, set these three variables from the already approved conversation values and authenticated current-message metadata:
 
@@ -1358,7 +1358,7 @@ test -n "$LARK_VALIDATION_ASSIGNEE_OPEN_ID"
 
 Expected: all three checks exit `0`. Do not write their values to a repository file, report, audit note, or terminal output.
 
-- [ ] **Step 4: Execute the approved live write exactly once**
+- [x] **Step 4: Execute the approved live write exactly once**
 
 Run:
 
@@ -1392,7 +1392,7 @@ Expected compact output:
 
 If protected Vault use requests approval, wait for the user to approve and rerun the same `vibe vault run` command once. If the provider response is not completed, stop and diagnose without changing the idempotency run id or task parameters.
 
-- [ ] **Step 5: Write the failing evidence-note contract test**
+- [x] **Step 5: Write the failing evidence-note contract test**
 
 Create `tests/test_lark_live_connector_validation_docs.py`:
 
@@ -1420,7 +1420,7 @@ class LarkLiveConnectorValidationDocsTests(TestCase):
         self.assertIn("Raw task values, user ids, credentials, request bodies, response bodies, and task ids are intentionally omitted.", evidence)
 ```
 
-- [ ] **Step 6: Run the evidence test and verify RED**
+- [x] **Step 6: Run the evidence test and verify RED**
 
 Run:
 
@@ -1430,7 +1430,7 @@ PYTHONPATH=src python3 -m unittest tests.test_lark_live_connector_validation_doc
 
 Expected: FAIL because the evidence file does not exist.
 
-- [ ] **Step 7: Create the redacted evidence note from actual compact output**
+- [x] **Step 7: Create the redacted evidence note from actual compact output**
 
 Create `docs/lark-live-connector-validation.md` with:
 
@@ -1443,7 +1443,7 @@ Create `docs/lark-live-connector-validation.md` with:
 
 Do not include the task title, description, assignee id, task guid, token, request body, response body, provider message, or idempotency digest.
 
-- [ ] **Step 8: Run evidence test and secret checks**
+- [x] **Step 8: Run evidence test and secret checks**
 
 Run:
 
@@ -1455,7 +1455,7 @@ git diff --check
 
 Expected: test PASS, no secret findings, no whitespace errors.
 
-- [ ] **Step 9: Commit Task 6 evidence**
+- [x] **Step 9: Commit Task 6 evidence**
 
 Run:
 
@@ -1481,7 +1481,7 @@ Expected: one commit containing only redacted evidence and its contract test.
 - Consumes: all implementation, offline evidence, and real validation from Tasks 1-6
 - Produces: completed Loop 39 history, active Loop 40 planning state, matching README summary, and a checked execution record
 
-- [ ] **Step 1: Update Roadmap contract tests to the completed state**
+- [x] **Step 1: Update Roadmap contract tests to the completed state**
 
 Update exact assertions so they require:
 
@@ -1497,7 +1497,7 @@ Keep Loops 41-43 as Candidate. Preserve the four maturity gates and keep current
 
 Add assertions that Roadmap links `docs/lark-live-connector-validation.md`, keeps live behavior limited to the fixed `create_task` action, and distinguishes the one connector validation from the Loop 40 controlled business-workflow pilot.
 
-- [ ] **Step 2: Run Roadmap tests and verify RED**
+- [x] **Step 2: Run Roadmap tests and verify RED**
 
 Run:
 
@@ -1507,7 +1507,7 @@ PYTHONPATH=src python3 -m unittest tests.test_production_roadmap tests.test_prod
 
 Expected: FAIL because Roadmap and README still show Loop 39 active.
 
-- [ ] **Step 3: Transition Roadmap and README**
+- [x] **Step 3: Transition Roadmap and README**
 
 In `ROADMAP.md`:
 
@@ -1522,7 +1522,7 @@ In `ROADMAP.md`:
 
 In `README.md`, change only the compact Roadmap summary to Loops 1-39 complete and Loop 40 active. Do not copy Loop 41-43 titles or acceptance criteria.
 
-- [ ] **Step 4: Run Roadmap and all focused Loop 39 tests**
+- [x] **Step 4: Run Roadmap and all focused Loop 39 tests**
 
 Run:
 
@@ -1540,7 +1540,7 @@ PYTHONPATH=src python3 -m unittest \
 
 Expected: all focused tests PASS.
 
-- [ ] **Step 5: Commit the Roadmap transition**
+- [x] **Step 5: Commit the Roadmap transition**
 
 Run:
 
@@ -1551,7 +1551,7 @@ git commit -m "docs: complete loop 39 live lark connector"
 
 Expected: one Roadmap/README contract commit.
 
-- [ ] **Step 6: Run final full verification**
+- [x] **Step 6: Run final full verification**
 
 Run:
 
@@ -1567,11 +1567,11 @@ git status --short
 
 Expected: all tests and checks PASS; only this plan is modified for checkbox completion.
 
-- [ ] **Step 7: Mark every completed plan step**
+- [x] **Step 7: Mark every completed plan step**
 
 Change each successfully executed `- [ ]` checkbox in this file to `- [x]`. Do not mark a step whose expected command or live-write outcome was not achieved.
 
-- [ ] **Step 8: Commit the completed execution record**
+- [x] **Step 8: Commit the completed execution record**
 
 Run:
 
