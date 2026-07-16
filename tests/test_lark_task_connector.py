@@ -433,6 +433,79 @@ class LarkTaskConnectorTests(TestCase):
         self.assertNotIn(token, encoded)
         self.assertNotIn("raw request construction failure", encoded)
 
+    def test_lark_task_live_mode_normalizes_read_and_close_failures_without_leakage(self):
+        token = "dummy-read-close-token"
+        response = _CloseErrorResponse(
+            read_error=ValueError(f"raw response read failure: {token}"),
+            close_error=ValueError(f"raw close failure: {token}"),
+        )
+        runtime = ConnectorRuntime([_load_lark_task_connector(_FakeTransport(response=response))])
+
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider({"lark_bot_access_token": token}),
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["audit"]["provider_status"], "provider_unavailable")
+        self.assertTrue(response.close_attempted)
+        encoded = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn(token, encoded)
+        self.assertNotIn("raw response read failure", encoded)
+        self.assertNotIn("raw close failure", encoded)
+
+    def test_lark_task_live_mode_normalizes_status_and_close_failures_without_leakage(self):
+        token = "dummy-status-close-token"
+        response = _CloseErrorResponse(
+            status_error=ValueError(f"raw status failure: {token}"),
+            close_error=ValueError(f"raw close failure: {token}"),
+        )
+        runtime = ConnectorRuntime([_load_lark_task_connector(_FakeTransport(response=response))])
+
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider({"lark_bot_access_token": token}),
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["audit"]["provider_status"], "malformed_response")
+        self.assertTrue(response.close_attempted)
+        encoded = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn(token, encoded)
+        self.assertNotIn("raw status failure", encoded)
+        self.assertNotIn("raw close failure", encoded)
+
+    def test_lark_task_live_mode_normalizes_http_error_code_and_close_failures_without_leakage(self):
+        token = "dummy-http-close-token"
+        body = _CloseErrorBody(ValueError(f"raw close failure: {token}"))
+        error = urllib_error.HTTPError(
+            "https://open.feishu.cn/open-apis/task/v2/tasks",
+            _IntErrorCode(ValueError(f"raw http status failure: {token}")),
+            "raw http error reason",
+            {},
+            body,
+        )
+        runtime = ConnectorRuntime([_load_lark_task_connector(_FakeTransport(error=error))])
+
+        with patch.dict(os.environ, {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"}, clear=True):
+            result = runtime.execute_connector(
+                _lark_task_node(mode="live"),
+                credential_provider=StaticCredentialProvider({"lark_bot_access_token": token}),
+                context=_execution_context(),
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["audit"]["provider_status"], "malformed_response")
+        self.assertTrue(body.close_attempted)
+        encoded = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn(token, encoded)
+        self.assertNotIn("raw http status failure", encoded)
+        self.assertNotIn("raw close failure", encoded)
+
     def test_lark_task_live_mode_requires_2xx_for_provider_success(self):
         cases = [
             (401, "authorization_failed"),
@@ -628,6 +701,49 @@ class _StatusErrorResponse:
 
     def close(self):
         self.closed = True
+
+
+class _CloseErrorResponse:
+    def __init__(self, status=200, read_error=None, status_error=None, close_error=None):
+        self._status = status
+        self.read_error = read_error
+        self.status_error = status_error
+        self.close_error = close_error
+        self.close_attempted = False
+
+    @property
+    def status(self):
+        if self.status_error is not None:
+            raise self.status_error
+        return self._status
+
+    def read(self):
+        if self.read_error is not None:
+            raise self.read_error
+        return b"{}"
+
+    def close(self):
+        self.close_attempted = True
+        if self.close_error is not None:
+            raise self.close_error
+
+
+class _CloseErrorBody:
+    def __init__(self, close_error):
+        self.close_error = close_error
+        self.close_attempted = False
+
+    def close(self):
+        self.close_attempted = True
+        raise self.close_error
+
+
+class _IntErrorCode:
+    def __init__(self, error):
+        self.error = error
+
+    def __int__(self):
+        raise self.error
 
 
 class _FakeTransport:

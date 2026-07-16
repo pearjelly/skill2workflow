@@ -323,6 +323,15 @@ def _provider_outcome(status: int, raw: bytes) -> Tuple[str, bool]:
     return _http_status(status), False
 
 
+def _safe_close(response) -> None:
+    try:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
+    except Exception:
+        return
+
+
 def _read_provider_outcome(response, status: int) -> Tuple[str, bool]:
     try:
         raw = response.read()
@@ -335,9 +344,7 @@ def _read_provider_outcome(response, status: int) -> Tuple[str, bool]:
     except Exception:
         return "provider_unavailable", False
     finally:
-        close = getattr(response, "close", None)
-        if callable(close):
-            close()
+        _safe_close(response)
     return _provider_outcome(status, raw)
 
 
@@ -348,9 +355,7 @@ def _transport_outcome(request: urllib_request.Request, transport) -> Tuple[str,
         try:
             status = int(error.code)
         except Exception:
-            close = getattr(error, "close", None)
-            if callable(close):
-                close()
+            _safe_close(error)
             return "malformed_response", False
         return _read_provider_outcome(error, status)
     except (TimeoutError, socket.timeout):
@@ -365,9 +370,7 @@ def _transport_outcome(request: urllib_request.Request, transport) -> Tuple[str,
     try:
         status = int(getattr(response, "status", 0))
     except Exception:
-        close = getattr(response, "close", None)
-        if callable(close):
-            close()
+        _safe_close(response)
         return "malformed_response", False
     return _read_provider_outcome(response, status)
 
