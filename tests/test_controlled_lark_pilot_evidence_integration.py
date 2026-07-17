@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,6 +11,12 @@ from skill2workflow.controlled_lark_pilot import (
     finalize_pilot,
     generate_pilot_evidence,
     initialize_pilot,
+)
+from skill2workflow.controlled_lark_pilot_evidence import (
+    prepare_evidence_pack_transaction,
+)
+from skill2workflow._controlled_lark_pilot_private_authorization import (
+    open_private_session,
 )
 
 from tests.test_controlled_lark_pilot_evidence import (
@@ -28,7 +35,339 @@ def _json_bytes_map(directory):
     }
 
 
+def _valid_finalization_marker():
+    return {
+        "schema_version": "controlled-lark-pilot-finalization-0.1.0",
+        "finalized": True,
+        "decision": "continue",
+        "finalized_at": "2026-07-23T17:00:00+08:00",
+    }
+
+
+def _write_owner_only_json(path, value):
+    path.write_text(json.dumps(value), encoding="utf-8")
+    os.chmod(path, 0o600)
+
+
 class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
+    def test_repository_export_fails_closed_while_private_authorization_is_locked(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            _write_owner_only_json(
+                work_dir / "private" / "finalization.json",
+                _valid_finalization_marker(),
+            )
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+
+            with open_private_session(work_dir / "private"):
+                with self.assertRaisesRegex(ValueError, "busy"):
+                    generate_pilot_evidence(
+                        repo_root,
+                        work_dir,
+                        output_dir=requested,
+                        now=NOW,
+                    )
+
+            self.assertFalse(requested.exists())
+
+    def test_repeated_finalization_fails_before_changing_committed_bundle_or_packs(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            (work_dir / "private" / "decision.json").unlink()
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            decision = _valid_decision()
+            finalize_pilot(
+                repo_root,
+                work_dir,
+                decision,
+                output_dir=requested,
+                now=NOW,
+            )
+            private_pack = _json_bytes_map(work_dir / "evidence")
+            requested_pack = _json_bytes_map(requested)
+            decision_bytes = (work_dir / "private" / "decision.json").read_bytes()
+            marker_bytes = (work_dir / "private" / "finalization.json").read_bytes()
+
+            with self.assertRaisesRegex(ValueError, "already finalized"):
+                finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    decision,
+                    output_dir=requested,
+                    now=NOW + timedelta(minutes=1),
+                )
+
+            self.assertEqual(_json_bytes_map(work_dir / "evidence"), private_pack)
+            self.assertEqual(_json_bytes_map(requested), requested_pack)
+            self.assertEqual(
+                (work_dir / "private" / "decision.json").read_bytes(),
+                decision_bytes,
+            )
+            self.assertEqual(
+                (work_dir / "private" / "finalization.json").read_bytes(),
+                marker_bytes,
+            )
+            transient = [
+                path
+                for base in (work_dir, requested.parent)
+                for path in base.rglob("*")
+                if path.name.endswith((".tmp", ".txn"))
+            ]
+            self.assertEqual(transient, [])
+
+    def test_finalize_removes_marker_injected_after_decision_and_rolls_back_all_outputs(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            decision_path = work_dir / "private" / "decision.json"
+            decision_path.unlink()
+            marker_path = work_dir / "private" / "finalization.json"
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            (work_dir / "evidence" / "old.json").write_text(
+                '{"pack":"old-private"}', encoding="utf-8"
+            )
+            requested.mkdir(parents=True)
+            (requested / "old.json").write_text(
+                '{"pack":"old-requested"}', encoding="utf-8"
+            )
+            private_before = _json_bytes_map(work_dir / "evidence")
+            requested_before = _json_bytes_map(requested)
+            real_replace = os.replace
+            injected = []
+
+            def inject_marker_after_decision(
+                source,
+                target,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
+                result = real_replace(
+                    source,
+                    target,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+                if os.fspath(target) == "decision.json" and not injected:
+                    _write_owner_only_json(marker_path, _valid_finalization_marker())
+                    injected.append(True)
+                return result
+
+            with patch.object(
+                os,
+                "replace",
+                side_effect=inject_marker_after_decision,
+            ), self.assertRaises(ValueError):
+                finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_decision(),
+                    output_dir=requested,
+                    now=NOW,
+                )
+
+            self.assertEqual(injected, [True])
+            with self.assertRaisesRegex(ValueError, "finalization"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=requested,
+                    now=NOW,
+                )
+            self.assertEqual(_json_bytes_map(work_dir / "evidence"), private_before)
+            self.assertEqual(_json_bytes_map(requested), requested_before)
+            self.assertFalse(decision_path.exists())
+            self.assertFalse(marker_path.exists())
+
+    def test_finalize_parent_swap_after_decision_cannot_leave_repository_authorization(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            decision_path = work_dir / "private" / "decision.json"
+            decision_path.unlink()
+            private = work_dir / "private"
+            original_private = root / "original-private"
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            real_replace = os.replace
+            swapped = []
+
+            def swap_private_after_decision(
+                source,
+                target,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
+                result = real_replace(
+                    source,
+                    target,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+                if os.fspath(target) == "decision.json" and not swapped:
+                    private.rename(original_private)
+                    shutil.copytree(original_private, private)
+                    os.chmod(private, 0o700)
+                    _write_owner_only_json(
+                        private / "finalization.json",
+                        _valid_finalization_marker(),
+                    )
+                    swapped.append(True)
+                return result
+
+            with patch.object(
+                os,
+                "replace",
+                side_effect=swap_private_after_decision,
+            ), self.assertRaises(ValueError):
+                finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_decision(),
+                    output_dir=requested,
+                    now=NOW,
+                )
+
+            self.assertEqual(swapped, [True])
+            with self.assertRaisesRegex(ValueError, "finalization"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=requested,
+                    now=NOW,
+                )
+            self.assertFalse((private / "finalization.json").exists())
+            self.assertFalse(requested.exists())
+
+    def test_repository_export_rejects_private_swap_after_decision_open(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            private = work_dir / "private"
+            original_private = root / "original-private"
+            _write_owner_only_json(
+                private / "finalization.json",
+                _valid_finalization_marker(),
+            )
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            real_open = os.open
+            swapped = []
+
+            def swap_after_decision_open(path, flags, mode=0o777, *, dir_fd=None):
+                descriptor = (
+                    real_open(path, flags, mode)
+                    if dir_fd is None
+                    else real_open(path, flags, mode, dir_fd=dir_fd)
+                )
+                if (
+                    dir_fd is not None
+                    and os.fspath(path) == "decision.json"
+                    and not swapped
+                ):
+                    private.rename(original_private)
+                    private.mkdir(mode=0o700)
+                    _write_owner_only_json(
+                        private / "finalization.json",
+                        _valid_finalization_marker(),
+                    )
+                    swapped.append(True)
+                return descriptor
+
+            with patch.object(
+                os,
+                "open",
+                side_effect=swap_after_decision_open,
+            ), self.assertRaisesRegex(ValueError, "private|authorization|changed"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=requested,
+                    now=NOW,
+                )
+
+            self.assertEqual(swapped, [True])
+            self.assertFalse(requested.exists())
+
+    def test_repository_authorization_requires_owner_only_parent_decision_and_marker(self):
+        for permissive in ("parent", "decision", "marker"):
+            with self.subTest(permissive=permissive), TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                repo_root, work_dir, _transport = _build_ready_state(root)
+                private = work_dir / "private"
+                marker = private / "finalization.json"
+                _write_owner_only_json(marker, _valid_finalization_marker())
+                target = {
+                    "parent": private,
+                    "decision": private / "decision.json",
+                    "marker": marker,
+                }[permissive]
+                os.chmod(target, 0o755 if permissive == "parent" else 0o644)
+                requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+
+                with self.assertRaisesRegex(ValueError, "owner-only"):
+                    generate_pilot_evidence(
+                        repo_root,
+                        work_dir,
+                        output_dir=requested,
+                        now=NOW,
+                    )
+
+                self.assertFalse(requested.exists())
+
+    def test_finalize_decision_publication_failure_restores_both_old_packs(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            decision_path = work_dir / "private" / "decision.json"
+            decision_path.unlink()
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            (work_dir / "evidence" / "old.json").write_text(
+                '{"pack":"old-private"}', encoding="utf-8"
+            )
+            requested.mkdir(parents=True)
+            (requested / "old.json").write_text(
+                '{"pack":"old-requested"}', encoding="utf-8"
+            )
+            private_before = _json_bytes_map(work_dir / "evidence")
+            requested_before = _json_bytes_map(requested)
+            real_replace = os.replace
+
+            def fail_decision_publish(
+                source,
+                target,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
+                if os.fspath(target) == "decision.json":
+                    raise OSError("decision publication failed")
+                return real_replace(
+                    source,
+                    target,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            with patch.object(
+                os,
+                "replace",
+                side_effect=fail_decision_publish,
+            ), self.assertRaisesRegex(OSError, "decision publication failed"):
+                finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_decision(),
+                    output_dir=requested,
+                    now=NOW,
+                )
+
+            self.assertEqual(_json_bytes_map(work_dir / "evidence"), private_before)
+            self.assertEqual(_json_bytes_map(requested), requested_before)
+            self.assertFalse(decision_path.exists())
+            self.assertFalse((work_dir / "private" / "finalization.json").exists())
+
     def test_finalize_rejects_incomplete_evidence_before_any_write(self):
         expected_unmet = (
             "approved_live_runs_threshold, distinct_calendar_days_threshold, "
@@ -269,16 +608,15 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
 
             def failing_second_write(output_dir, pack):
                 writes.append(Path(output_dir))
+                transaction = prepare_evidence_pack_transaction(output_dir, pack)
                 if len(writes) == 2:
-                    raise OSError("requested export failed")
-                return {
-                    "status": "written",
-                    "file_count": 1,
-                    "output_dir": str(output_dir),
-                }
+                    transaction.commit = lambda: (_ for _ in ()).throw(
+                        OSError("requested export failed")
+                    )
+                return transaction
 
             with patch(
-                "skill2workflow.controlled_lark_pilot.write_evidence_pack",
+                "skill2workflow.controlled_lark_pilot.prepare_evidence_pack_transaction",
                 side_effect=failing_second_write,
             ), self.assertRaisesRegex(OSError, "requested export failed"):
                 finalize_pilot(
@@ -290,9 +628,19 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                 )
 
             self.assertEqual(writes, [work_dir / "evidence", requested])
+            self.assertEqual(list((work_dir / "evidence").iterdir()), [])
+            self.assertFalse(requested.exists())
             self.assertFalse((work_dir / "private" / "decision.json").exists())
             self.assertFalse(
                 (work_dir / "private" / "finalization.json").exists()
+            )
+            self.assertEqual(
+                [
+                    path
+                    for path in work_dir.rglob("*")
+                    if path.name.endswith((".tmp", ".txn"))
+                ],
+                [],
             )
 
     def test_finalize_rejects_static_private_decision_or_marker_symlink_before_pack_write(self):
@@ -420,7 +768,7 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                 {**valid_marker, "finalized_at": "2026-07-23T17:00:00"},
             ]
             for marker in invalid_markers:
-                finalization.write_text(json.dumps(marker), encoding="utf-8")
+                _write_owner_only_json(finalization, marker)
                 with self.subTest(marker=marker), self.assertRaises(ValueError):
                     generate_pilot_evidence(
                         repo_root,
@@ -430,7 +778,7 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                     )
                 self.assertFalse(repo_output.exists())
 
-            finalization.write_text(json.dumps(valid_marker), encoding="utf-8")
+            _write_owner_only_json(finalization, valid_marker)
             exported = generate_pilot_evidence(
                 repo_root,
                 work_dir,

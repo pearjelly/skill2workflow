@@ -40,6 +40,7 @@ from ._controlled_lark_pilot_evidence_validation import (
     validate_run as _validate_run,
 )
 from ._controlled_lark_pilot_evidence_writer import (
+    prepare_evidence_pack as _prepare_evidence_pack,
     write_evidence_pack as _write_evidence_pack,
 )
 
@@ -547,3 +548,11 @@ def validate_evidence_pack(
 def write_evidence_pack(output_dir: Path, pack: Dict[str, object]) -> Dict[str, object]:
     validate_evidence_pack(pack, [])
     return _write_evidence_pack(output_dir, pack)
+
+
+def prepare_evidence_pack_transaction(
+    output_dir: Path,
+    pack: Dict[str, object],
+):
+    validate_evidence_pack(pack, [])
+    return _prepare_evidence_pack(output_dir, pack)

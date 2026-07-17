@@ -31,9 +31,16 @@ from .controlled_lark_pilot_evidence import (
     build_acceptance_summary,
     build_run_evidence,
     validate_evidence_pack,
+    prepare_evidence_pack_transaction,
     write_evidence_pack,
 )
-from ._controlled_lark_pilot_evidence_writer import read_json_anchored
+from ._controlled_lark_pilot_private_authorization import (
+    PrivateFinalizationBundle,
+    open_private_session,
+)
+from ._controlled_lark_pilot_evidence_writer import (
+    read_json_anchored,
+)
 from .external_connectors import load_external_connector
 from .lark_task_pilot import build_lark_task_pilot_workflow
 
@@ -78,7 +85,9 @@ def _task6_dependencies() -> Task6Dependencies:
         control_plane=_pilot_control_plane,
         build_evidence=_build_pilot_evidence,
         evidence_output=_evidence_output,
-        write_evidence_pack=write_evidence_pack,
+        prepare_evidence_pack=prepare_evidence_pack_transaction,
+        open_private_session=open_private_session,
+        finalization_bundle=PrivateFinalizationBundle,
         pilot_timezone=PILOT_TIMEZONE,
     )
 
@@ -149,10 +158,40 @@ def generate_pilot_evidence(
     work_dir = Path(work_dir).resolve()
     _require_outside_repository(repo_root, work_dir, "pilot work directory")
     output, repository_export = _evidence_output(repo_root, work_dir, output_dir)
-    pack = _build_pilot_evidence(repo_root, work_dir, now=now)
     if repository_export:
-        _require_finalized_export(work_dir, pack)
-    written = write_evidence_pack(output, pack)
+        with open_private_session(work_dir / "private") as private_session:
+            try:
+                decision = private_session.read_json(Path("decision.json"))
+                marker = private_session.read_json(Path("finalization.json"))
+            except FileNotFoundError as error:
+                raise ValueError(
+                    "successful private finalization is required for repository export"
+                ) from error
+            private_session.check_identity()
+            pack = _build_pilot_evidence(
+                repo_root,
+                work_dir,
+                decision_override=decision,
+                now=now,
+                private_session=private_session,
+            )
+            _require_finalized_export(pack, marker, decision)
+            transaction = prepare_evidence_pack_transaction(output, pack)
+            try:
+                transaction.commit()
+                private_session.check_identity()
+                written = {
+                    "status": "written",
+                    "file_count": transaction.file_count,
+                    "output_dir": str(transaction.output),
+                }
+                transaction.finish()
+            except BaseException:
+                transaction.abort()
+                raise
+    else:
+        pack = _build_pilot_evidence(repo_root, work_dir, now=now)
+        written = write_evidence_pack(output, pack)
     index = pack["index"]
     return {
         "status": written["status"],
@@ -172,6 +211,7 @@ def _build_pilot_evidence(
     work_dir: Path,
     decision_override: Dict[str, object] = None,
     now: datetime = None,
+    private_session=None,
 ) -> Dict[str, object]:
     repo_root = Path(repo_root).resolve()
     work_dir = Path(work_dir).resolve()
@@ -218,17 +258,37 @@ def _build_pilot_evidence(
 
     private_dir = work_dir / "private"
     exercise_dir = private_dir / "exercises"
+    if private_session is not None:
+        private_session.check_identity()
     exercises = {
         "rejection": _rejection_exercise(runs),
-        "failure": _load_optional_private_json(exercise_dir / "failure.json"),
-        "rollback": _load_optional_private_json(exercise_dir / "rollback.json"),
+        "failure": (
+            private_session.read_json(Path("exercises/failure.json"), required=False)
+            if private_session is not None
+            else _load_optional_private_json(exercise_dir / "failure.json")
+        ),
+        "rollback": (
+            private_session.read_json(Path("exercises/rollback.json"), required=False)
+            if private_session is not None
+            else _load_optional_private_json(exercise_dir / "rollback.json")
+        ),
     }
-    verification = _load_optional_private_json(private_dir / "verification.json")
+    verification = (
+        private_session.read_json(Path("verification.json"), required=False)
+        if private_session is not None
+        else _load_optional_private_json(private_dir / "verification.json")
+    )
     decision = (
         json.loads(json.dumps(decision_override, ensure_ascii=False))
         if decision_override is not None
-        else _load_optional_private_json(private_dir / "decision.json")
+        else (
+            private_session.read_json(Path("decision.json"), required=False)
+            if private_session is not None
+            else _load_optional_private_json(private_dir / "decision.json")
+        )
     )
+    if private_session is not None:
+        private_session.check_identity()
     summary = build_acceptance_summary(
         charter,
         runs,
@@ -303,12 +363,11 @@ def _evidence_output(
     return output, True
 
 
-def _require_finalized_export(work_dir: Path, pack: Dict[str, object]) -> None:
-    path = work_dir / "private" / "finalization.json"
-    try:
-        marker = read_json_anchored(path)
-    except FileNotFoundError:
-        raise ValueError("successful private finalization is required for repository export")
+def _require_finalized_export(
+    pack: Dict[str, object],
+    marker: object,
+    decision: object,
+) -> None:
     if not isinstance(marker, dict) or set(marker) != FINALIZATION_KEYS:
         raise ValueError("private finalization marker is invalid")
     if (
@@ -318,11 +377,12 @@ def _require_finalized_export(work_dir: Path, pack: Dict[str, object]) -> None:
     ):
         raise ValueError("private finalization marker is invalid")
     _require_aware_iso(marker.get("finalized_at"), "private finalization timestamp")
-    decision = pack.get("decision")
+    pack_decision = pack.get("decision")
     index = pack.get("index")
     if (
         not isinstance(decision, dict)
         or marker["decision"] != decision.get("decision")
+        or decision != pack_decision
         or not isinstance(index, dict)
         or index.get("ready_to_finalize") is not True
     ):

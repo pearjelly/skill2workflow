@@ -1,4 +1,4 @@
-"""Anchored directory-FD I/O for controlled pilot evidence."""
+"""Secure low-level I/O and stable evidence-writer facade."""
 
 from __future__ import annotations
 
@@ -8,7 +8,12 @@ import os
 import secrets
 import stat
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict
+
+from ._controlled_lark_pilot_pack_transaction import (
+    EvidencePackTransaction,
+    PackTransactionIO,
+)
 
 
 def _replace_supports_dir_fd() -> bool:
@@ -23,11 +28,23 @@ _DIR_FD_SUPPORTED = bool(
     os.name == "posix"
     and hasattr(os, "O_DIRECTORY")
     and hasattr(os, "O_NOFOLLOW")
+    and hasattr(os, "O_NONBLOCK")
     and all(
         function in os.supports_dir_fd
-        for function in (os.open, os.mkdir, os.stat, os.unlink)
+        for function in (
+            os.open,
+            os.mkdir,
+            os.stat,
+            os.unlink,
+            os.link,
+            os.rename,
+            os.rmdir,
+        )
     )
-    and os.stat in os.supports_follow_symlinks
+    and all(
+        function in os.supports_follow_symlinks
+        for function in (os.stat, os.link)
+    )
     and os.listdir in os.supports_fd
     and _replace_supports_dir_fd()
 )
@@ -91,43 +108,14 @@ def _open_relative_directory(root_fd: int, components: tuple, create: bool) -> i
         raise
 
 
-def _open_output_directory(output_dir: Path) -> tuple:
-    path = Path(os.path.abspath(os.fspath(output_dir)))
-    if path == Path(path.anchor):
-        raise ValueError("evidence output must not be a filesystem root")
-    root_descriptor = os.open(path.anchor, _directory_flags())
-    descriptor = None
-    try:
-        descriptor = _open_relative_directory(
-            root_descriptor,
-            path.parts[1:],
-            create=True,
-        )
-        return path, root_descriptor, descriptor
-    except BaseException:
-        _close_descriptors(descriptor, root_descriptor)
-        raise
-
-
-def read_json_anchored(path: Path):
-    _require_dir_fd_support()
-    absolute = Path(os.path.abspath(os.fspath(path)))
-    if absolute == Path(absolute.anchor):
-        raise ValueError("anchored JSON path must not be a filesystem root")
-    root_descriptor = os.open(absolute.anchor, _directory_flags())
-    parent_descriptor = None
+def _read_json_at(parent_fd: int, name: str, *, owner_only: bool = False):
     file_descriptor = None
     try:
-        parent_descriptor = _open_relative_directory(
-            root_descriptor,
-            absolute.parts[1:-1],
-            create=False,
-        )
         try:
             file_descriptor = os.open(
-                absolute.name,
-                os.O_RDONLY | os.O_NOFOLLOW,
-                dir_fd=parent_descriptor,
+                name,
+                os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW,
+                dir_fd=parent_fd,
             )
         except FileNotFoundError:
             raise
@@ -135,14 +123,35 @@ def read_json_anchored(path: Path):
             raise ValueError(
                 "anchored JSON file must not be a symbolic link or non-regular file"
             ) from error
-        if not stat.S_ISREG(os.fstat(file_descriptor).st_mode):
+        item = os.fstat(file_descriptor)
+        if not stat.S_ISREG(item.st_mode):
             raise ValueError("anchored JSON file must be a regular file")
+        if owner_only and os.name == "posix" and item.st_mode & 0o077:
+            raise ValueError("private authorization JSON must use owner-only permissions")
         handle = os.fdopen(file_descriptor, "r", encoding="utf-8")
         file_descriptor = None
         with handle:
             return json.load(handle)
     finally:
-        _close_descriptors(file_descriptor, parent_descriptor, root_descriptor)
+        _close_descriptors(file_descriptor)
+
+
+def read_json_anchored(path: Path):
+    _require_dir_fd_support()
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    if absolute == Path(absolute.anchor):
+        raise ValueError("anchored JSON path must not be a filesystem root")
+    root_fd = os.open(absolute.anchor, _directory_flags())
+    parent_fd = None
+    try:
+        parent_fd = _open_relative_directory(
+            root_fd,
+            absolute.parts[1:-1],
+            create=False,
+        )
+        return _read_json_at(parent_fd, absolute.name)
+    finally:
+        _close_descriptors(parent_fd, root_fd)
 
 
 def _require_declared_directory_identity(
@@ -171,19 +180,6 @@ def _require_declared_directory_identity(
     finally:
         if observed is not None:
             os.close(observed)
-
-
-def _require_declared_output_identity(
-    root_fd: int,
-    output: Path,
-    anchored_output_fd: int,
-) -> None:
-    _require_declared_directory_identity(
-        root_fd,
-        output,
-        anchored_output_fd,
-        "output",
-    )
 
 
 def _private_target_stat(parent_fd: int, name: str):
@@ -247,25 +243,24 @@ def require_private_json_target(path: Path) -> None:
         _close_descriptors(parent_fd, root_fd)
 
 
-def write_private_json_anchored(
-    path: Path,
+def _write_private_json_at(
+    parent_fd: int,
+    name: str,
     value: object,
     *,
     require_missing: bool = False,
 ) -> None:
-    """Atomically replace owner-only JSON through anchored no-follow descriptors."""
-    absolute, root_fd, parent_fd = _open_private_parent(path, create=True)
     descriptor = None
     temporary = ""
-    published = False
+    linked = False
     completed = False
     try:
-        initial = _private_target_stat(parent_fd, absolute.name)
+        initial = _private_target_stat(parent_fd, name)
         if require_missing and initial is not None:
             raise ValueError("private JSON target must not already exist")
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         for _attempt in range(16):
-            temporary = f".{absolute.name}.{secrets.token_hex(8)}.tmp"
+            temporary = f".{name}.{secrets.token_hex(8)}.tmp"
             try:
                 descriptor = os.open(
                     temporary,
@@ -278,29 +273,75 @@ def write_private_json_anchored(
                 continue
         if descriptor is None:
             raise FileExistsError("could not allocate a private JSON temporary file")
-        if os.name == "posix":
-            os.fchmod(descriptor, 0o600)
+        os.fchmod(descriptor, 0o600)
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = None
             json.dump(value, handle, ensure_ascii=False, indent=2)
             handle.flush()
             os.fsync(handle.fileno())
 
-        current = _private_target_stat(parent_fd, absolute.name)
+        current = _private_target_stat(parent_fd, name)
         if not _same_entry(initial, current):
             raise ValueError("private JSON target changed during write")
-        os.replace(
-            temporary,
-            absolute.name,
-            src_dir_fd=parent_fd,
-            dst_dir_fd=parent_fd,
-        )
+        if require_missing:
+            os.link(
+                temporary,
+                name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+                follow_symlinks=False,
+            )
+            linked = True
+            os.unlink(temporary, dir_fd=parent_fd)
+        else:
+            os.replace(
+                temporary,
+                name,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
         temporary = ""
-        published = True
-        final = _private_target_stat(parent_fd, absolute.name)
+        final = _private_target_stat(parent_fd, name)
         if final is None or (os.name == "posix" and final.st_mode & 0o077):
             raise ValueError("private JSON target must use owner-only permissions")
         os.fsync(parent_fd)
+        completed = True
+    finally:
+        try:
+            if descriptor is not None:
+                os.close(descriptor)
+        finally:
+            if temporary:
+                try:
+                    os.unlink(temporary, dir_fd=parent_fd)
+                except FileNotFoundError:
+                    pass
+            if require_missing and linked and not completed:
+                try:
+                    os.unlink(name, dir_fd=parent_fd)
+                    os.fsync(parent_fd)
+                except FileNotFoundError:
+                    pass
+
+
+def write_private_json_anchored(
+    path: Path,
+    value: object,
+    *,
+    require_missing: bool = False,
+) -> None:
+    """Atomically replace owner-only JSON through anchored no-follow descriptors."""
+    absolute, root_fd, parent_fd = _open_private_parent(path, create=True)
+    published = False
+    completed = False
+    try:
+        _write_private_json_at(
+            parent_fd,
+            absolute.name,
+            value,
+            require_missing=require_missing,
+        )
+        published = True
         _require_declared_directory_identity(
             root_fd,
             absolute.parent,
@@ -310,25 +351,14 @@ def write_private_json_anchored(
         completed = True
     finally:
         try:
-            if descriptor is not None:
-                os.close(descriptor)
-        finally:
-            try:
-                if temporary:
-                    try:
-                        os.unlink(temporary, dir_fd=parent_fd)
-                    except FileNotFoundError:
-                        pass
-            finally:
+            if require_missing and published and not completed:
                 try:
-                    if require_missing and published and not completed:
-                        try:
-                            os.unlink(absolute.name, dir_fd=parent_fd)
-                            os.fsync(parent_fd)
-                        except FileNotFoundError:
-                            pass
-                finally:
-                    _close_descriptors(parent_fd, root_fd)
+                    os.unlink(absolute.name, dir_fd=parent_fd)
+                    os.fsync(parent_fd)
+                except FileNotFoundError:
+                    pass
+        finally:
+            _close_descriptors(parent_fd, root_fd)
 
 
 def _write_json_atomic(parent_fd: int, name: str, value: object) -> None:
@@ -361,6 +391,7 @@ def _write_json_atomic(parent_fd: int, name: str, value: object) -> None:
             src_dir_fd=parent_fd,
             dst_dir_fd=parent_fd,
         )
+        temporary = ""
         os.fsync(parent_fd)
     finally:
         try:
@@ -374,58 +405,71 @@ def _write_json_atomic(parent_fd: int, name: str, value: object) -> None:
                     pass
 
 
-def _remove_stale_json_files(
-    directory_fd: int,
-    expected: Set[str],
-    prefix: tuple = (),
-) -> None:
-    for name in os.listdir(directory_fd):
-        item = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-        relative = "/".join(prefix + (name,))
-        if stat.S_ISLNK(item.st_mode):
-            raise ValueError("evidence output descendants must not be symbolic links")
-        if stat.S_ISDIR(item.st_mode):
-            child = _open_child_directory(directory_fd, name, create=False)
-            try:
-                _remove_stale_json_files(child, expected, prefix + (name,))
-            finally:
-                os.close(child)
+def _remove_tree_at(parent_fd: int, name: str) -> None:
+    try:
+        item = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return
+    if stat.S_ISDIR(item.st_mode) and not stat.S_ISLNK(item.st_mode):
+        directory_fd = os.open(name, _directory_flags(), dir_fd=parent_fd)
+        try:
+            for child in os.listdir(directory_fd):
+                _remove_tree_at(directory_fd, child)
+        finally:
+            os.close(directory_fd)
+        os.rmdir(name, dir_fd=parent_fd)
+    else:
+        os.unlink(name, dir_fd=parent_fd)
+
+
+def _allocate_transaction_directory(parent_fd: int, label: str) -> tuple:
+    for _attempt in range(16):
+        name = f".{label}.{secrets.token_hex(8)}.txn"
+        try:
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+        except FileExistsError:
             continue
-        if not stat.S_ISREG(item.st_mode):
-            raise ValueError("evidence output descendants must be regular files")
-        if name.endswith(".json") and relative not in expected:
-            os.unlink(name, dir_fd=directory_fd)
+        descriptor = os.open(name, _directory_flags(), dir_fd=parent_fd)
+        if os.fstat(descriptor).st_mode & 0o077:
+            _close_descriptors(descriptor)
+            _remove_tree_at(parent_fd, name)
+            raise ValueError("transaction directory must be owner-only")
+        return name, descriptor
+    raise FileExistsError("could not allocate a transaction directory")
+
+
+def _pack_io() -> PackTransactionIO:
+    return PackTransactionIO(
+        require_dir_fd_support=_require_dir_fd_support,
+        directory_flags=_directory_flags,
+        close_descriptors=_close_descriptors,
+        open_relative_directory=_open_relative_directory,
+        require_declared_directory_identity=_require_declared_directory_identity,
+        same_entry=_same_entry,
+        write_json_atomic=_write_json_atomic,
+        remove_tree_at=_remove_tree_at,
+        allocate_transaction_directory=_allocate_transaction_directory,
+    )
+
+
+def prepare_evidence_pack(
+    output_dir: Path,
+    pack: Dict[str, object],
+) -> EvidencePackTransaction:
+    return EvidencePackTransaction(_pack_io(), output_dir, pack)
 
 
 def write_evidence_pack(output_dir: Path, pack: Dict[str, object]) -> Dict[str, object]:
-    _require_dir_fd_support()
-    output = Path(os.path.abspath(os.fspath(output_dir)))
-    files = {
-        ((), "pilot-charter.json"): pack["charter"],
-        ((), "evidence-index.json"): pack["index"],
-    }
-    for sequence, run in enumerate(pack["runs"], start=1):
-        files[(("runs",), f"{sequence:03d}.json")] = run
-    for name in ("rejection", "failure", "rollback"):
-        exercise = pack["exercises"][name]
-        if exercise is not None:
-            files[(("exercises",), f"{name}.json")] = exercise
-    if pack["verification"] is not None:
-        files[((), "verification.json")] = pack["verification"]
-    if pack["decision"] is not None:
-        files[((), "decision.json")] = pack["decision"]
-
-    output, root_fd, output_fd = _open_output_directory(output)
-    expected = {"/".join(components + (name,)) for components, name in files}
+    transaction = prepare_evidence_pack(output_dir, pack)
     try:
-        for (components, name), item in files.items():
-            parent_fd = _open_relative_directory(output_fd, components, create=True)
-            try:
-                _write_json_atomic(parent_fd, name, item)
-            finally:
-                os.close(parent_fd)
-        _remove_stale_json_files(output_fd, expected)
-        _require_declared_output_identity(root_fd, output, output_fd)
-    finally:
-        _close_descriptors(output_fd, root_fd)
-    return {"status": "written", "file_count": len(files), "output_dir": str(output)}
+        transaction.commit()
+        result = {
+            "status": "written",
+            "file_count": transaction.file_count,
+            "output_dir": str(transaction.output),
+        }
+        transaction.finish()
+        return result
+    except BaseException:
+        transaction.abort()
+        raise

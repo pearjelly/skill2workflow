@@ -192,7 +192,7 @@ class ControlledLarkPilotTests(TestCase):
         self.assertEqual({key: persisted[key] for key in expected}, expected)
         self.assertEqual(exercise_mode, 0)
         for forbidden in (
-            "exercise-case-disabled-live",
+            "exercise-disabled-001",
             "Disabled Live Exercise Account",
             "Disabled Live Exercise Risk",
             "ou_disabled_live_exercise",

@@ -23,8 +23,6 @@ from ._controlled_lark_pilot_evidence_validation import (
     VERIFICATION_SCHEMA_VERSION,
 )
 from ._controlled_lark_pilot_evidence_writer import (
-    read_json_anchored,
-    require_private_json_target,
     write_private_json_anchored,
 )
 
@@ -45,7 +43,9 @@ class Task6Dependencies:
     control_plane: Callable
     build_evidence: Callable
     evidence_output: Callable
-    write_evidence_pack: Callable
+    prepare_evidence_pack: Callable
+    open_private_session: Callable
+    finalization_bundle: Callable
     pilot_timezone: str
 
 
@@ -284,41 +284,11 @@ def finalize_pilot_operation(
         output_dir,
     )
     normalized_decision = validate_final_decision(decision)
-    decision_path = work_dir / "private" / "decision.json"
-    marker_path = work_dir / "private" / "finalization.json"
-    require_private_json_target(decision_path)
-    try:
-        read_json_anchored(marker_path)
-    except FileNotFoundError:
-        pass
-    else:
-        raise ValueError("controlled pilot is already finalized")
     finalized = now or datetime.now(timezone.utc)
     if finalized.tzinfo is None or finalized.utcoffset() is None:
         raise ValueError("pilot finalization time must include a timezone")
 
-    pack = dependencies.build_evidence(
-        repo_root,
-        work_dir,
-        decision_override=normalized_decision,
-        now=now,
-    )
-    index = pack.get("index")
-    if not isinstance(index, dict):
-        raise ValueError("pilot evidence index is invalid")
-    if index.get("ready_to_finalize") is not True:
-        unmet = index.get("unmet_conditions")
-        if not isinstance(unmet, list) or any(type(item) is not str for item in unmet):
-            raise ValueError("pilot evidence unmet conditions are invalid")
-        raise ValueError(
-            "pilot evidence is not ready to finalize: " + ", ".join(unmet)
-        )
-
     private_output = work_dir / "evidence"
-    dependencies.write_evidence_pack(private_output, pack)
-    if output != private_output:
-        dependencies.write_evidence_pack(output, pack)
-
     marker = {
         "schema_version": FINALIZATION_SCHEMA_VERSION,
         "finalized": True,
@@ -327,8 +297,69 @@ def finalize_pilot_operation(
             ZoneInfo(dependencies.pilot_timezone)
         ).isoformat(),
     }
-    write_private_json_anchored(decision_path, normalized_decision)
-    write_private_json_anchored(marker_path, marker, require_missing=True)
+    transactions = []
+    with dependencies.open_private_session(
+        work_dir / "private"
+    ) as private_session:
+        bundle = dependencies.finalization_bundle(private_session)
+        try:
+            pack = dependencies.build_evidence(
+                repo_root,
+                work_dir,
+                decision_override=normalized_decision,
+                now=now,
+                private_session=private_session,
+            )
+            private_session.check_identity()
+            index = pack.get("index")
+            if not isinstance(index, dict):
+                raise ValueError("pilot evidence index is invalid")
+            if index.get("ready_to_finalize") is not True:
+                unmet = index.get("unmet_conditions")
+                if not isinstance(unmet, list) or any(
+                    type(item) is not str for item in unmet
+                ):
+                    raise ValueError("pilot evidence unmet conditions are invalid")
+                raise ValueError(
+                    "pilot evidence is not ready to finalize: " + ", ".join(unmet)
+                )
+
+            transactions.append(
+                dependencies.prepare_evidence_pack(private_output, pack)
+            )
+            if output != private_output:
+                transactions.append(
+                    dependencies.prepare_evidence_pack(output, pack)
+                )
+            private_session.check_identity()
+            for transaction in transactions:
+                transaction.commit()
+                private_session.check_identity()
+            bundle.publish_decision(normalized_decision)
+            observed_decision, observed_marker = bundle.publish_marker(marker)
+            if observed_decision != normalized_decision or observed_marker != marker:
+                raise ValueError("private finalization bundle verification failed")
+            private_session.check_identity()
+        except BaseException as error:
+            rollback_errors = []
+            try:
+                bundle.rollback()
+            except BaseException as rollback_error:
+                rollback_errors.append(rollback_error)
+            for transaction in reversed(transactions):
+                try:
+                    transaction.abort()
+                except BaseException as rollback_error:
+                    rollback_errors.append(rollback_error)
+            if rollback_errors:
+                raise RuntimeError(
+                    "controlled pilot finalization rollback failed"
+                ) from rollback_errors[0]
+            raise error
+        else:
+            bundle.finish()
+            for transaction in transactions:
+                transaction.finish()
     return {
         "status": "finalized",
         "decision": normalized_decision["decision"],
