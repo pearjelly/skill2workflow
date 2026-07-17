@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -12,10 +13,13 @@ from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.controlled_lark_pilot import (
     _validate_controlled_live_binding,
     decide_pilot_run,
+    exercise_disabled_live,
+    exercise_rollback,
     initialize_pilot,
     load_pilot_charter,
     load_private_case,
     start_pilot_run,
+    verify_pilot,
 )
 from skill2workflow.credentials import StaticCredentialProvider
 from skill2workflow.lark_task_pilot import build_lark_task_pilot_workflow
@@ -48,6 +52,29 @@ class _FakeTransport:
     def __call__(self, request, timeout):
         self.calls.append((request, timeout))
         return _FakeResponse()
+
+
+class _FakeCommandResult:
+    def __init__(self, returncode=0):
+        self.returncode = returncode
+        self.stdout = "private-command-stdout"
+        self.stderr = "private-command-stderr"
+
+
+class _FakeCommandRunner:
+    def __init__(self, exit_codes=None):
+        self.exit_codes = list(exit_codes or [0] * 7)
+        self.arguments = []
+        self.environments = []
+        self.working_directories = []
+        self.capture_output = []
+
+    def __call__(self, arguments, *, cwd, env, capture_output):
+        self.arguments.append(list(arguments))
+        self.environments.append(dict(env))
+        self.working_directories.append(cwd)
+        self.capture_output.append(capture_output)
+        return _FakeCommandResult(self.exit_codes[len(self.arguments) - 1])
 
 
 def _valid_charter():
@@ -117,6 +144,329 @@ def _published_controlled_workflow():
 
 
 class ControlledLarkPilotTests(TestCase):
+    def test_exercise_disabled_live_uses_real_boundary_without_credentials_or_transport(self):
+        expected = {
+            "exercise": "disabled_live",
+            "passed": True,
+            "provider_status": "live_disabled",
+            "credential_resolution_attempted": False,
+            "transport_attempted": False,
+        }
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            environment = {
+                "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                "LARK_BOT_ACCESS_TOKEN": "private-token",
+            }
+            with patch.dict(os.environ, environment, clear=True):
+                result = exercise_disabled_live(ROOT, work_dir, now=NOW)
+                restored = {
+                    key: os.environ.get(key)
+                    for key in environment
+                }
+
+            exercise_path = work_dir / "private" / "exercises" / "failure.json"
+            persisted = json.loads(exercise_path.read_text(encoding="utf-8"))
+            exercise_mode = exercise_path.stat().st_mode & 0o077
+            encoded = json.dumps({"result": result, "persisted": persisted})
+            remaining_private_bytes = b"".join(
+                path.read_bytes()
+                for path in work_dir.rglob("*")
+                if path.is_file()
+            )
+
+        self.assertEqual(result, expected)
+        self.assertEqual(restored, environment)
+        self.assertEqual(
+            set(persisted),
+            {
+                "schema_version",
+                "exercise",
+                "passed",
+                "provider_status",
+                "credential_resolution_attempted",
+                "transport_attempted",
+            },
+        )
+        self.assertEqual({key: persisted[key] for key in expected}, expected)
+        self.assertEqual(exercise_mode, 0)
+        for forbidden in (
+            "exercise-case-disabled-live",
+            "Disabled Live Exercise Account",
+            "Disabled Live Exercise Risk",
+            "ou_disabled_live_exercise",
+            "private-token",
+        ):
+            self.assertNotIn(forbidden, encoded)
+            self.assertNotIn(forbidden.encode("utf-8"), remaining_private_bytes)
+
+    def test_exercise_rollback_rejects_enabled_live_before_writes(self):
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            with patch.dict(
+                os.environ,
+                {
+                    "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                    "LARK_BOT_ACCESS_TOKEN": "private-token",
+                },
+                clear=True,
+            ), patch(
+                "skill2workflow.lark_task_pilot.run_lark_task_pilot",
+                side_effect=AssertionError("dry run must not start"),
+            ) as dry_run:
+                with self.assertRaisesRegex(ValueError, "remove.*live switch"):
+                    exercise_rollback(ROOT, work_dir, now=NOW)
+
+            dry_run.assert_not_called()
+            self.assertFalse(
+                (work_dir / "private" / "exercises" / "rollback.json").exists()
+            )
+            self.assertFalse((work_dir / "private" / "rollback-live-probe").exists())
+
+    def test_task6_operations_restore_live_environment_on_every_exception_path(self):
+        environment = {
+            "SKILL2WORKFLOW_LARK_TASK_LIVE": "0",
+            "LARK_BOT_ACCESS_TOKEN": "private-token",
+        }
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            with patch.dict(os.environ, environment, clear=True):
+                with patch(
+                    "skill2workflow.controlled_lark_pilot.start_pilot_run",
+                    side_effect=RuntimeError("disabled exercise failed"),
+                ), self.assertRaisesRegex(RuntimeError, "disabled exercise failed"):
+                    exercise_disabled_live(ROOT, work_dir, now=NOW)
+                disabled_restored = {
+                    key: os.environ.get(key) for key in environment
+                }
+
+            with patch.dict(os.environ, environment, clear=True):
+                with patch(
+                    "skill2workflow.lark_task_pilot.run_lark_task_pilot",
+                    side_effect=RuntimeError("rollback dry run failed"),
+                ), self.assertRaisesRegex(RuntimeError, "rollback dry run failed"):
+                    exercise_rollback(ROOT, work_dir, now=NOW)
+                rollback_restored = {
+                    key: os.environ.get(key) for key in environment
+                }
+
+            observed_environment = {}
+
+            def failing_runner(arguments, *, cwd, env, capture_output):
+                observed_environment.update(env)
+                raise RuntimeError("verification runner failed")
+
+            with patch.dict(os.environ, environment, clear=True):
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "verification runner failed",
+                ):
+                    verify_pilot(ROOT, work_dir, command_runner=failing_runner)
+                verification_restored = {
+                    key: os.environ.get(key) for key in environment
+                }
+
+            self.assertFalse(
+                (work_dir / "private" / "exercises" / "failure.json").exists()
+            )
+            self.assertFalse(
+                (work_dir / "private" / "exercises" / "rollback.json").exists()
+            )
+            self.assertFalse((work_dir / "private" / "verification.json").exists())
+
+        self.assertEqual(disabled_restored, environment)
+        self.assertEqual(rollback_restored, environment)
+        self.assertEqual(verification_restored, environment)
+        self.assertNotIn("SKILL2WORKFLOW_LARK_TASK_LIVE", observed_environment)
+        self.assertNotIn("LARK_BOT_ACCESS_TOKEN", observed_environment)
+
+    def test_task6_operations_reject_repository_work_dir_before_side_effects(self):
+        runner = _FakeCommandRunner()
+        with patch(
+            "skill2workflow.controlled_lark_pilot.load_pilot_charter",
+            side_effect=AssertionError("charter must not be loaded"),
+        ) as load_charter, patch(
+            "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+            side_effect=AssertionError("control plane must not be created"),
+        ) as control_plane:
+            for operation in (
+                lambda: exercise_disabled_live(ROOT, ROOT / "private", now=NOW),
+                lambda: exercise_rollback(ROOT, ROOT / "private", now=NOW),
+                lambda: verify_pilot(
+                    ROOT,
+                    ROOT / "private",
+                    command_runner=runner,
+                ),
+            ):
+                with self.subTest(operation=operation), self.assertRaisesRegex(
+                    ValueError,
+                    "outside the repository",
+                ):
+                    operation()
+
+        load_charter.assert_not_called()
+        control_plane.assert_not_called()
+        self.assertEqual(runner.arguments, [])
+
+    def test_exercise_rollback_proves_guard_preserves_waiting_run_and_dry_run(self):
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            with patch.dict(
+                os.environ,
+                {"LARK_BOT_ACCESS_TOKEN": "private-token"},
+                clear=True,
+            ):
+                result = exercise_rollback(ROOT, work_dir, now=NOW)
+                restored_token = os.environ.get("LARK_BOT_ACCESS_TOKEN")
+
+            persisted_path = (
+                work_dir / "private" / "exercises" / "rollback.json"
+            )
+            persisted = json.loads(persisted_path.read_text(encoding="utf-8"))
+            persisted_mode = persisted_path.stat().st_mode & 0o077
+            proof_control = LocalControlPlane(
+                work_dir / "private" / "rollback-live-probe" / "state",
+                storage="sqlite",
+            )
+            proof_runs = proof_control.list_runs()
+            dry_run_artifact_exists = (
+                work_dir
+                / "private"
+                / "rollback-dry-run"
+                / "artifacts"
+                / "run.json"
+            ).is_file()
+
+        self.assertEqual(
+            result,
+            {
+                "exercise": "rollback",
+                "passed": True,
+                "live_switch_enabled": False,
+                "live_approval_blocked": True,
+                "dry_run_status": "completed",
+            },
+        )
+        self.assertEqual(restored_token, "private-token")
+        self.assertEqual({key: persisted[key] for key in result}, result)
+        self.assertEqual(persisted_mode, 0)
+        self.assertEqual(len(proof_runs), 1)
+        self.assertEqual(proof_runs[0]["status"], "waiting")
+        self.assertTrue(dry_run_artifact_exists)
+
+    def test_verify_pilot_runs_exact_offline_commands_and_persists_compact_results(self):
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            runner = _FakeCommandRunner()
+            with patch.dict(
+                os.environ,
+                {
+                    "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                    "LARK_BOT_ACCESS_TOKEN": "private-token",
+                    "KEEP_ME": "yes",
+                },
+                clear=True,
+            ):
+                result = verify_pilot(ROOT, work_dir, command_runner=runner)
+            resolved_work_dir = work_dir.resolve()
+
+            verification_path = work_dir / "private" / "verification.json"
+            persisted = json.loads(verification_path.read_text(encoding="utf-8"))
+            verification_mode = verification_path.stat().st_mode & 0o077
+
+        python = sys.executable
+        sorted_source_files = sorted(
+            str(path.relative_to(ROOT))
+            for path in (ROOT / "src" / "skill2workflow").glob("*.py")
+        )
+        expected_arguments = [
+            [
+                python,
+                "-m",
+                "unittest",
+                "tests.test_controlled_lark_pilot",
+                "tests.test_controlled_lark_pilot_evidence",
+                "tests.test_controlled_lark_pilot_docs",
+                "-v",
+            ],
+            [python, "-m", "unittest", "discover", "-s", "tests", "-v"],
+            [
+                python,
+                "-m",
+                "py_compile",
+                *sorted_source_files,
+                "examples/connectors/lark_task_connector.py",
+            ],
+            [python, "scripts/secret_hygiene.py", "examples/workflows"],
+            [
+                python,
+                "scripts/lark_task_connector_smoke.py",
+                "--work-dir",
+                str(resolved_work_dir / "private" / "connector-smoke"),
+            ],
+            [
+                python,
+                "scripts/lark_task_pilot_smoke.py",
+                "--work-dir",
+                str(resolved_work_dir / "private" / "dry-run-smoke"),
+            ],
+            ["git", "diff", "--check"],
+        ]
+        self.assertEqual(runner.arguments, expected_arguments)
+        self.assertEqual(runner.working_directories, [ROOT] * 7)
+        self.assertEqual(runner.capture_output, [True] * 7)
+        for environment in runner.environments:
+            self.assertNotIn("LARK_BOT_ACCESS_TOKEN", environment)
+            self.assertNotIn("SKILL2WORKFLOW_LARK_TASK_LIVE", environment)
+            self.assertEqual(environment["PYTHONPATH"], "src")
+            self.assertEqual(environment["KEEP_ME"], "yes")
+        self.assertTrue(result["all_passed"])
+        self.assertEqual(
+            [item["id"] for item in result["commands"]],
+            [
+                "focused-tests",
+                "full-tests",
+                "compile",
+                "secret-hygiene",
+                "connector-smoke",
+                "dry-run-pilot-smoke",
+                "diff-check",
+            ],
+        )
+        self.assertEqual(result, persisted)
+        self.assertEqual(
+            set(result), {"schema_version", "all_passed", "commands"}
+        )
+        for item in result["commands"]:
+            self.assertEqual(
+                set(item), {"id", "exit_code", "passed", "duration_ms"}
+            )
+            self.assertIs(type(item["duration_ms"]), int)
+            self.assertGreaterEqual(item["duration_ms"], 0)
+        encoded = json.dumps(result)
+        self.assertNotIn("private-command-stdout", encoded)
+        self.assertNotIn("private-command-stderr", encoded)
+        self.assertNotIn("private-token", encoded)
+        self.assertEqual(verification_mode, 0)
+
+    def test_verify_pilot_records_nonzero_command_without_short_circuiting(self):
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            runner = _FakeCommandRunner([1, 0, 0, 0, 0, 0, 0])
+
+            result = verify_pilot(ROOT, work_dir, command_runner=runner)
+
+        self.assertFalse(result["all_passed"])
+        self.assertEqual(len(runner.arguments), 7)
+        self.assertEqual(result["commands"][0]["exit_code"], 1)
+        self.assertFalse(result["commands"][0]["passed"])
+
     def test_decide_approve_requires_all_live_guards_and_returns_redacted_summary(self):
         with TemporaryDirectory() as tmp:
             work_dir, started = _start_waiting_pilot(tmp)

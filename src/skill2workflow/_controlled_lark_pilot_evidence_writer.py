@@ -145,10 +145,11 @@ def read_json_anchored(path: Path):
         _close_descriptors(file_descriptor, parent_descriptor, root_descriptor)
 
 
-def _require_declared_output_identity(
+def _require_declared_directory_identity(
     root_fd: int,
     output: Path,
     anchored_output_fd: int,
+    label: str,
 ) -> None:
     observed = None
     try:
@@ -159,17 +160,175 @@ def _require_declared_output_identity(
                 create=False,
             )
         except (FileNotFoundError, OSError, ValueError) as error:
-            raise ValueError("declared output path changed during evidence write") from error
+            raise ValueError(f"declared {label} path changed during write") from error
         expected_stat = os.fstat(anchored_output_fd)
         observed_stat = os.fstat(observed)
         if (expected_stat.st_dev, expected_stat.st_ino) != (
             observed_stat.st_dev,
             observed_stat.st_ino,
         ):
-            raise ValueError("declared output path changed during evidence write")
+            raise ValueError(f"declared {label} path changed during write")
     finally:
         if observed is not None:
             os.close(observed)
+
+
+def _require_declared_output_identity(
+    root_fd: int,
+    output: Path,
+    anchored_output_fd: int,
+) -> None:
+    _require_declared_directory_identity(
+        root_fd,
+        output,
+        anchored_output_fd,
+        "output",
+    )
+
+
+def _private_target_stat(parent_fd: int, name: str):
+    try:
+        item = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    if stat.S_ISLNK(item.st_mode):
+        raise ValueError("private JSON target must not be a symbolic link")
+    if not stat.S_ISREG(item.st_mode):
+        raise ValueError("private JSON target must be a regular file")
+    return item
+
+
+def _same_entry(first, second) -> bool:
+    if first is None or second is None:
+        return first is second
+    return (first.st_dev, first.st_ino, first.st_mode) == (
+        second.st_dev,
+        second.st_ino,
+        second.st_mode,
+    )
+
+
+def _open_private_parent(path: Path, create: bool) -> tuple:
+    _require_dir_fd_support()
+    absolute = Path(os.path.abspath(os.fspath(path)))
+    if absolute == Path(absolute.anchor) or not absolute.name:
+        raise ValueError("private JSON path must not be a filesystem root")
+    root_fd = os.open(absolute.anchor, _directory_flags())
+    parent_fd = None
+    try:
+        parent_fd = _open_relative_directory(
+            root_fd,
+            absolute.parts[1:-1],
+            create=create,
+        )
+        parent_mode = os.fstat(parent_fd).st_mode
+        if not stat.S_ISDIR(parent_mode):
+            raise ValueError("private JSON parent must be a directory")
+        if os.name == "posix" and parent_mode & 0o077:
+            raise ValueError("private JSON parent must use owner-only permissions")
+        return absolute, root_fd, parent_fd
+    except BaseException:
+        _close_descriptors(parent_fd, root_fd)
+        raise
+
+
+def require_private_json_target(path: Path) -> None:
+    """Fail closed unless a private JSON target is missing or a regular file."""
+    absolute, root_fd, parent_fd = _open_private_parent(path, create=False)
+    try:
+        _private_target_stat(parent_fd, absolute.name)
+        _require_declared_directory_identity(
+            root_fd,
+            absolute.parent,
+            parent_fd,
+            "private",
+        )
+    finally:
+        _close_descriptors(parent_fd, root_fd)
+
+
+def write_private_json_anchored(
+    path: Path,
+    value: object,
+    *,
+    require_missing: bool = False,
+) -> None:
+    """Atomically replace owner-only JSON through anchored no-follow descriptors."""
+    absolute, root_fd, parent_fd = _open_private_parent(path, create=True)
+    descriptor = None
+    temporary = ""
+    published = False
+    completed = False
+    try:
+        initial = _private_target_stat(parent_fd, absolute.name)
+        if require_missing and initial is not None:
+            raise ValueError("private JSON target must not already exist")
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
+        for _attempt in range(16):
+            temporary = f".{absolute.name}.{secrets.token_hex(8)}.tmp"
+            try:
+                descriptor = os.open(
+                    temporary,
+                    flags,
+                    0o600,
+                    dir_fd=parent_fd,
+                )
+                break
+            except FileExistsError:
+                continue
+        if descriptor is None:
+            raise FileExistsError("could not allocate a private JSON temporary file")
+        if os.name == "posix":
+            os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = None
+            json.dump(value, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+        current = _private_target_stat(parent_fd, absolute.name)
+        if not _same_entry(initial, current):
+            raise ValueError("private JSON target changed during write")
+        os.replace(
+            temporary,
+            absolute.name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+        )
+        temporary = ""
+        published = True
+        final = _private_target_stat(parent_fd, absolute.name)
+        if final is None or (os.name == "posix" and final.st_mode & 0o077):
+            raise ValueError("private JSON target must use owner-only permissions")
+        os.fsync(parent_fd)
+        _require_declared_directory_identity(
+            root_fd,
+            absolute.parent,
+            parent_fd,
+            "private",
+        )
+        completed = True
+    finally:
+        try:
+            if descriptor is not None:
+                os.close(descriptor)
+        finally:
+            try:
+                if temporary:
+                    try:
+                        os.unlink(temporary, dir_fd=parent_fd)
+                    except FileNotFoundError:
+                        pass
+            finally:
+                try:
+                    if require_missing and published and not completed:
+                        try:
+                            os.unlink(absolute.name, dir_fd=parent_fd)
+                            os.fsync(parent_fd)
+                        except FileNotFoundError:
+                            pass
+                finally:
+                    _close_descriptors(parent_fd, root_fd)
 
 
 def _write_json_atomic(parent_fd: int, name: str, value: object) -> None:

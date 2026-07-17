@@ -9,11 +9,165 @@ from skill2workflow.controlled_lark_pilot_evidence import (
     build_acceptance_summary,
     write_evidence_pack,
 )
+from skill2workflow._controlled_lark_pilot_evidence_writer import (
+    write_private_json_anchored,
+)
 
 from tests.test_controlled_lark_pilot_evidence import _valid_pack
 
 
 class ControlledLarkPilotEvidenceWriterTests(TestCase):
+    def test_private_json_writer_is_owner_only_atomic_and_rejects_static_links(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            private = root / "pilot" / "private" / "exercises"
+            path = private / "failure.json"
+
+            write_private_json_anchored(path, {"passed": True})
+
+            self.assertEqual(
+                json.loads(path.read_text(encoding="utf-8")), {"passed": True}
+            )
+            self.assertEqual(path.stat().st_mode & 0o077, 0)
+            self.assertEqual(private.stat().st_mode & 0o077, 0)
+            self.assertFalse(
+                any(item.name.endswith(".tmp") for item in private.iterdir())
+            )
+
+            target = root / "outside.json"
+            target.write_text("sentinel", encoding="utf-8")
+            path.unlink()
+            path.symlink_to(target)
+            with self.assertRaisesRegex(ValueError, "symbolic link"):
+                write_private_json_anchored(path, {"passed": False})
+            self.assertEqual(target.read_text(encoding="utf-8"), "sentinel")
+
+            path.unlink()
+            path.mkdir()
+            with self.assertRaisesRegex(ValueError, "regular file"):
+                write_private_json_anchored(path, {"passed": False})
+
+    def test_private_json_writer_rejects_parent_path_swap_without_redirecting(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            private = root / "pilot" / "private"
+            private.mkdir(parents=True)
+            os.chmod(private, 0o700)
+            anchored = root / "anchored-private"
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "sentinel.json"
+            sentinel.write_text("sentinel", encoding="utf-8")
+            real_open = os.open
+            swapped = []
+
+            def racing_open(path, flags, mode=0o777, *, dir_fd=None):
+                name = os.fspath(path)
+                if not swapped and name.endswith(".tmp"):
+                    private.rename(anchored)
+                    private.symlink_to(outside, target_is_directory=True)
+                    swapped.append(True)
+                if dir_fd is None:
+                    return real_open(path, flags, mode)
+                return real_open(path, flags, mode, dir_fd=dir_fd)
+
+            with patch.object(os, "open", side_effect=racing_open), self.assertRaisesRegex(
+                ValueError,
+                "declared private path",
+            ):
+                write_private_json_anchored(
+                    private / "decision.json", {"decision": "continue"}
+                )
+
+            self.assertEqual(swapped, [True])
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
+            self.assertEqual(list(outside.glob("*.json")), [sentinel])
+            self.assertTrue((anchored / "decision.json").is_file())
+
+    def test_private_json_writer_removes_new_marker_when_parent_swap_fails(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            private = root / "pilot" / "private"
+            private.mkdir(parents=True)
+            os.chmod(private, 0o700)
+            anchored = root / "anchored-private"
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "sentinel.json"
+            sentinel.write_text("sentinel", encoding="utf-8")
+            real_open = os.open
+            swapped = []
+
+            def racing_open(path, flags, mode=0o777, *, dir_fd=None):
+                name = os.fspath(path)
+                if not swapped and name.endswith(".tmp"):
+                    private.rename(anchored)
+                    private.symlink_to(outside, target_is_directory=True)
+                    swapped.append(True)
+                if dir_fd is None:
+                    return real_open(path, flags, mode)
+                return real_open(path, flags, mode, dir_fd=dir_fd)
+
+            with patch.object(os, "open", side_effect=racing_open), self.assertRaisesRegex(
+                ValueError,
+                "declared private path",
+            ):
+                write_private_json_anchored(
+                    private / "finalization.json",
+                    {"finalized": True},
+                    require_missing=True,
+                )
+
+            self.assertEqual(swapped, [True])
+            self.assertFalse((anchored / "finalization.json").exists())
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
+            self.assertEqual(list(outside.glob("*.json")), [sentinel])
+
+    def test_private_json_writer_rejects_final_path_swap_before_replace(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            private = root / "pilot" / "private"
+            private.mkdir(parents=True)
+            os.chmod(private, 0o700)
+            path = private / "decision.json"
+            path.write_text("{}", encoding="utf-8")
+            backup = private / "original-decision.json"
+            outside = root / "outside.json"
+            outside.write_text("sentinel", encoding="utf-8")
+            real_stat = os.stat
+            observed = []
+
+            def racing_stat(target, *, dir_fd=None, follow_symlinks=True):
+                if (
+                    dir_fd is not None
+                    and os.fspath(target) == "decision.json"
+                    and follow_symlinks is False
+                ):
+                    observed.append(True)
+                    if len(observed) == 2:
+                        path.rename(backup)
+                        path.symlink_to(outside)
+                if dir_fd is None:
+                    return real_stat(target, follow_symlinks=follow_symlinks)
+                return real_stat(
+                    target,
+                    dir_fd=dir_fd,
+                    follow_symlinks=follow_symlinks,
+                )
+
+            with patch.object(os, "stat", side_effect=racing_stat), self.assertRaisesRegex(
+                ValueError,
+                "changed|symbolic link",
+            ):
+                write_private_json_anchored(path, {"decision": "continue"})
+
+            self.assertEqual(len(observed), 2)
+            self.assertEqual(outside.read_text(encoding="utf-8"), "sentinel")
+            self.assertTrue(path.is_symlink())
+            self.assertFalse(
+                any(item.name.endswith(".tmp") for item in private.iterdir())
+            )
+
     def test_write_pack_is_atomic_idempotent_and_removes_only_stale_json(self):
         pack = _valid_pack()
         with TemporaryDirectory() as tmp:

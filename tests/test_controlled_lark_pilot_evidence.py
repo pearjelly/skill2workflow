@@ -343,12 +343,20 @@ def _write_case(path, case_id):
 
 def _write_private_artifacts(work_dir):
     private = work_dir / "private"
-    values = {
+    exercises = private / "exercises"
+    exercises.mkdir(mode=0o700)
+    exercise_values = {
         "failure.json": _valid_exercises()["failure"],
         "rollback.json": _valid_exercises()["rollback"],
+    }
+    values = {
         "verification.json": _valid_verification(),
         "decision.json": _valid_decision(),
     }
+    for name, value in exercise_values.items():
+        path = exercises / name
+        path.write_text(json.dumps(value), encoding="utf-8")
+        os.chmod(path, 0o600)
     for name, value in values.items():
         path = private / name
         path.write_text(json.dumps(value), encoding="utf-8")

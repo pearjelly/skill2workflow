@@ -12,6 +12,17 @@ from zoneinfo import ZoneInfo
 from .connectors import ConnectorRuntime, ExternalConnector
 from .control_plane import LocalControlPlane
 from .credentials import StaticCredentialProvider
+from ._controlled_lark_pilot_operations import (
+    FINALIZATION_KEYS,
+    FINALIZATION_SCHEMA_VERSION,
+    LIVE_SWITCH,
+    TOKEN_ENVIRONMENT,
+    Task6Dependencies,
+    exercise_disabled_live_operation,
+    exercise_rollback_operation,
+    finalize_pilot_operation,
+    verify_pilot_operation,
+)
 from .controlled_lark_pilot_evidence import (
     INDEX_SCHEMA_VERSION,
     _is_approved_live_run,
@@ -55,10 +66,77 @@ REQUIRED_CASE_KEYS = {
     "owner_open_id",
     "due_at",
 }
-LIVE_SWITCH = "SKILL2WORKFLOW_LARK_TASK_LIVE"
-TOKEN_ENVIRONMENT = "LARK_BOT_ACCESS_TOKEN"
-FINALIZATION_SCHEMA_VERSION = "controlled-lark-pilot-finalization-0.1.0"
-FINALIZATION_KEYS = {"schema_version", "finalized", "decision", "finalized_at"}
+
+
+def _task6_dependencies() -> Task6Dependencies:
+    return Task6Dependencies(
+        require_outside_repository=_require_outside_repository,
+        load_charter=load_pilot_charter,
+        initialize=initialize_pilot,
+        start=start_pilot_run,
+        decide=decide_pilot_run,
+        control_plane=_pilot_control_plane,
+        build_evidence=_build_pilot_evidence,
+        evidence_output=_evidence_output,
+        write_evidence_pack=write_evidence_pack,
+        pilot_timezone=PILOT_TIMEZONE,
+    )
+
+
+def exercise_disabled_live(
+    repo_root: Path,
+    work_dir: Path,
+    now: datetime = None,
+) -> Dict[str, object]:
+    return exercise_disabled_live_operation(
+        repo_root,
+        work_dir,
+        now,
+        _task6_dependencies(),
+    )
+
+
+def exercise_rollback(
+    repo_root: Path,
+    work_dir: Path,
+    now: datetime = None,
+) -> Dict[str, object]:
+    return exercise_rollback_operation(
+        repo_root,
+        work_dir,
+        now,
+        _task6_dependencies(),
+    )
+
+
+def verify_pilot(
+    repo_root: Path,
+    work_dir: Path,
+    command_runner=None,
+) -> Dict[str, object]:
+    return verify_pilot_operation(
+        repo_root,
+        work_dir,
+        command_runner,
+        _task6_dependencies(),
+    )
+
+
+def finalize_pilot(
+    repo_root: Path,
+    work_dir: Path,
+    decision: Dict[str, object],
+    output_dir: Path = None,
+    now: datetime = None,
+) -> Dict[str, object]:
+    return finalize_pilot_operation(
+        repo_root,
+        work_dir,
+        decision,
+        output_dir,
+        now,
+        _task6_dependencies(),
+    )
 
 
 def generate_pilot_evidence(
@@ -139,10 +217,11 @@ def _build_pilot_evidence(
     del private_runs
 
     private_dir = work_dir / "private"
+    exercise_dir = private_dir / "exercises"
     exercises = {
         "rejection": _rejection_exercise(runs),
-        "failure": _load_optional_private_json(private_dir / "failure.json"),
-        "rollback": _load_optional_private_json(private_dir / "rollback.json"),
+        "failure": _load_optional_private_json(exercise_dir / "failure.json"),
+        "rollback": _load_optional_private_json(exercise_dir / "rollback.json"),
     }
     verification = _load_optional_private_json(private_dir / "verification.json")
     decision = (
@@ -198,10 +277,10 @@ def _private_string_values(value: object) -> List[str]:
 
 
 def _load_optional_private_json(path: Path):
-    _require_regular_file_or_missing(path)
-    if not path.exists():
+    try:
+        value = read_json_anchored(path)
+    except FileNotFoundError:
         return None
-    value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise ValueError(f"private pilot artifact {path.name} must be an object")
     return value
@@ -214,11 +293,12 @@ def _evidence_output(
         return work_dir / "evidence", False
     output = Path(os.path.abspath(os.fspath(output_dir)))
     resolved = output.resolve()
-    in_repository = resolved == repo_root or repo_root in resolved.parents
-    if not in_repository:
+    declared_in_repository = output == repo_root or repo_root in output.parents
+    resolved_in_repository = resolved == repo_root or repo_root in resolved.parents
+    if not declared_in_repository and not resolved_in_repository:
         return output, False
-    allowed = (repo_root / "docs" / "pilot-evidence" / "loop-40").resolve()
-    if resolved != allowed:
+    allowed = repo_root / "docs" / "pilot-evidence" / "loop-40"
+    if output != allowed or resolved != allowed:
         raise ValueError("repository evidence output must equal docs/pilot-evidence/loop-40")
     return output, True
 
