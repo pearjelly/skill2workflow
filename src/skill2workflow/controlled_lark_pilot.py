@@ -9,6 +9,12 @@ from pathlib import Path
 from typing import Dict, Tuple
 from zoneinfo import ZoneInfo
 
+from .connectors import ConnectorRuntime, ExternalConnector
+from .control_plane import LocalControlPlane
+from .credentials import StaticCredentialProvider
+from .external_connectors import load_external_connector
+from .lark_task_pilot import build_lark_task_pilot_workflow
+
 
 PILOT_SCHEMA_VERSION = "controlled-lark-pilot-0.1.0"
 WORKFLOW_ID = "workflow_controlled_lark_pilot"
@@ -38,6 +44,89 @@ REQUIRED_CASE_KEYS = {
     "owner_open_id",
     "due_at",
 }
+
+
+def start_pilot_run(
+    repo_root: Path,
+    work_dir: Path,
+    input_path: Path,
+    now: datetime = None,
+    transport=None,
+) -> Dict[str, object]:
+    repo_root = Path(repo_root).resolve()
+    work_dir = Path(work_dir).resolve()
+    _require_outside_repository(repo_root, work_dir, "pilot work directory")
+    load_pilot_charter(work_dir, now=now)
+    pilot_input = load_private_case(repo_root, input_path)
+    control = _pilot_control_plane(
+        repo_root,
+        work_dir,
+        credential_provider=StaticCredentialProvider({}),
+        transport=transport,
+    )
+    workflow = build_lark_task_pilot_workflow(
+        mode="live",
+        workflow_id=WORKFLOW_ID,
+        workflow_version=WORKFLOW_VERSION,
+        workflow_name="controlled-lark-task-sales-renewal-pilot",
+    )
+    control.publish_workflow(workflow)
+    response = control.trigger_workflow(
+        {
+            "workflow_id": WORKFLOW_ID,
+            "version": WORKFLOW_VERSION,
+            "source": "controlled-live-pilot",
+            "idempotency_key": "",
+            "input": pilot_input,
+        }
+    )
+    run = control.get_run(str(response["run_id"]))
+    if (
+        run.get("status") != "waiting"
+        or run.get("current_node") != "review_renewal_risk"
+    ):
+        raise ValueError("controlled pilot run did not stop at the expected human gate")
+    return {
+        "run_id": str(response["run_id"]),
+        "workflow_id": WORKFLOW_ID,
+        "workflow_version": WORKFLOW_VERSION,
+        "run_status": "waiting",
+        "current_node": "review_renewal_risk",
+        "input_keys": sorted(pilot_input),
+    }
+
+
+def _pilot_control_plane(
+    repo_root: Path,
+    work_dir: Path,
+    credential_provider,
+    transport=None,
+) -> LocalControlPlane:
+    connector = load_external_connector(
+        repo_root / "examples" / "connectors" / "lark_task_connector.py"
+    )
+    if transport is not None:
+        original = connector
+
+        def execute_with_transport(binding, credential_provider=None, context=None):
+            return original.executor(
+                binding,
+                credential_provider=credential_provider,
+                context=context,
+                transport=transport,
+            )
+
+        connector = ExternalConnector(
+            manifest=original.manifest,
+            executor=execute_with_transport,
+        )
+    runtime = ConnectorRuntime([connector])
+    return LocalControlPlane(
+        work_dir / "state",
+        storage="sqlite",
+        credential_provider=credential_provider,
+        connector_runtime=runtime,
+    )
 
 
 def initialize_pilot(

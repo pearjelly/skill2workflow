@@ -6,11 +6,14 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
+from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.controlled_lark_pilot import (
     initialize_pilot,
     load_pilot_charter,
     load_private_case,
+    start_pilot_run,
 )
+from skill2workflow.credentials import StaticCredentialProvider
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +49,136 @@ def _valid_case():
     }
 
 
+def _write_private_case(path: Path, case_id: str = "case-001") -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "pilot_case_id": case_id,
+                "account_name": "Private Account",
+                "renewal_risk": "Private Risk",
+                "owner_open_id": "ou_private",
+                "due_at": "2026-08-15T09:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    os.chmod(path, 0o600)
+
+
+def _start_waiting_pilot(tmp: str, case_id: str = "case-001"):
+    root = Path(tmp)
+    work_dir = root / "pilot"
+    input_path = root / "case.json"
+    initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+    _write_private_case(input_path, case_id=case_id)
+    started = start_pilot_run(ROOT, work_dir, input_path, now=NOW)
+    return work_dir, started
+
+
 class ControlledLarkPilotTests(TestCase):
+    def test_start_pilot_run_publishes_live_workflow_and_stops_at_gate(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, result = _start_waiting_pilot(tmp)
+            control = LocalControlPlane(work_dir / "state", storage="sqlite")
+            run = control.get_run(result["run_id"])
+            workflow = control.get_workflow(
+                "workflow_controlled_lark_pilot",
+                "0.1.0",
+            )
+            node = next(
+                item for item in workflow["nodes"] if item["id"] == "create_lark_task"
+            )
+            non_sqlite_state = b"".join(
+                path.read_bytes()
+                for path in (work_dir / "state").rglob("*")
+                if path.is_file() and path.suffix != ".sqlite3"
+            )
+            runs_sqlite_exists = (work_dir / "state" / "runs.sqlite3").is_file()
+            runs_dir_exists = (work_dir / "state" / "runs").exists()
+
+        self.assertEqual(
+            set(result),
+            {
+                "current_node",
+                "input_keys",
+                "run_id",
+                "run_status",
+                "workflow_id",
+                "workflow_version",
+            },
+        )
+        self.assertEqual(result["run_status"], "waiting")
+        self.assertEqual(result["current_node"], "review_renewal_risk")
+        self.assertEqual(
+            result["input_keys"],
+            [
+                "account_name",
+                "due_at",
+                "owner_open_id",
+                "pilot_case_id",
+                "renewal_risk",
+            ],
+        )
+        self.assertEqual(run["status"], "waiting")
+        self.assertEqual(run["context"]["input"], _valid_case())
+        self.assertTrue(runs_sqlite_exists)
+        self.assertFalse(runs_dir_exists)
+        self.assertEqual(node["connector"]["mode"], "live")
+        self.assertNotIn("Private Account", json.dumps(result))
+        self.assertNotIn(b"Private Account", non_sqlite_state)
+
+    def test_start_pilot_run_does_not_resolve_credentials_or_call_transport(self):
+        transport_calls = []
+
+        def forbidden_transport(*args, **kwargs):
+            transport_calls.append((args, kwargs))
+            raise AssertionError("start must not call live transport")
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_dir = root / "pilot"
+            input_path = root / "case.json"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            _write_private_case(input_path)
+            with patch.dict(
+                os.environ,
+                {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"},
+            ), patch.object(
+                StaticCredentialProvider,
+                "resolve",
+                side_effect=AssertionError("start must not resolve credentials"),
+            ) as resolve_credential:
+                result = start_pilot_run(
+                    ROOT,
+                    work_dir,
+                    input_path,
+                    now=NOW,
+                    transport=forbidden_transport,
+                )
+
+        self.assertEqual(result["run_status"], "waiting")
+        resolve_credential.assert_not_called()
+        self.assertEqual(transport_calls, [])
+
+    def test_start_pilot_run_rechecks_external_work_dir_before_creating_state(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            work_dir = repo_root / "forged-pilot"
+            private_dir = work_dir / "private"
+            private_dir.mkdir(parents=True)
+            (private_dir / "charter.json").write_text(
+                json.dumps(_valid_charter()),
+                encoding="utf-8",
+            )
+            input_path = root / "case.json"
+            _write_private_case(input_path)
+
+            with self.assertRaisesRegex(ValueError, "outside the repository"):
+                start_pilot_run(repo_root, work_dir, input_path, now=NOW)
+
+            self.assertFalse((work_dir / "state").exists())
+
     def test_initialize_pilot_creates_owner_only_private_workspace(self):
         with TemporaryDirectory() as tmp:
             work_dir = Path(tmp) / "controlled-pilot"
