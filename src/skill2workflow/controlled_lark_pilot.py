@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
+import stat
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 from zoneinfo import ZoneInfo
 
 
@@ -45,15 +47,29 @@ def initialize_pilot(
     now: datetime = None,
 ) -> Dict[str, object]:
     repo_root = Path(repo_root).resolve()
-    work_dir = Path(work_dir).resolve()
-    _require_outside_repository(repo_root, work_dir, "pilot work directory")
+    work_dir = Path(os.path.abspath(os.fspath(work_dir)))
+    _require_outside_repository(
+        repo_root,
+        work_dir.resolve(),
+        "pilot work directory",
+    )
     normalized = _validate_charter(charter, now=now)
 
+    private_dir = work_dir / "private"
+    state_dir = work_dir / "state"
+    evidence_dir = work_dir / "evidence"
+    charter_path = private_dir / "charter.json"
+    _require_directory_or_missing(work_dir)
+    _require_directory_or_missing(private_dir)
+    _require_directory_or_missing(state_dir)
+    _require_directory_or_missing(evidence_dir)
+    _require_regular_file_or_missing(charter_path)
+
     _mkdir_private(work_dir)
-    _mkdir_private(work_dir / "private")
-    _mkdir_private(work_dir / "state")
-    _mkdir_private(work_dir / "evidence")
-    _write_private_json(work_dir / "private" / "charter.json", normalized)
+    _mkdir_private(private_dir)
+    _mkdir_private(state_dir)
+    _mkdir_private(evidence_dir)
+    _write_private_json(charter_path, normalized)
     return {
         "status": "initialized",
         "scenario_id": SCENARIO_ID,
@@ -135,16 +151,88 @@ def _require_outside_repository(repo_root: Path, path: Path, label: str) -> None
 
 
 def _mkdir_private(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(path, 0o700)
+    _require_directory_or_missing(path)
+    try:
+        path.mkdir(parents=True, mode=0o700)
+    except FileExistsError:
+        pass
+    _require_directory_or_missing(path)
+    _chmod_private_directory(path)
 
 
 def _write_private_json(path: Path, value: object) -> None:
-    path.write_text(
-        json.dumps(value, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
-    os.chmod(path, 0o600)
+    _require_regular_file_or_missing(path)
+    serialized = json.dumps(value, ensure_ascii=False, indent=2)
+    temp_path, file_descriptor = _open_private_temp(path)
+    try:
+        handle = os.fdopen(file_descriptor, "w", encoding="utf-8")
+        file_descriptor = None
+        with handle:
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+        _require_regular_file_or_missing(path)
+        os.replace(temp_path, path)
+        temp_path = None
+    finally:
+        if file_descriptor is not None:
+            os.close(file_descriptor)
+        if temp_path is not None:
+            try:
+                temp_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _require_directory_or_missing(path: Path) -> None:
+    if path.is_symlink():
+        raise ValueError(f"pilot workspace node {path.name} must not be a symbolic link")
+    if path.exists() and not path.is_dir():
+        raise ValueError(f"pilot workspace node {path.name} must be a directory")
+
+
+def _require_regular_file_or_missing(path: Path) -> None:
+    if path.is_symlink():
+        raise ValueError(f"pilot workspace node {path.name} must not be a symbolic link")
+    if path.exists() and not path.is_file():
+        raise ValueError(f"pilot workspace node {path.name} must be a regular file")
+
+
+def _chmod_private_directory(path: Path) -> None:
+    if os.name != "posix" or not hasattr(os, "O_DIRECTORY"):
+        os.chmod(path, 0o700)
+        return
+    flags = os.O_RDONLY | os.O_DIRECTORY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    file_descriptor = os.open(path, flags)
+    try:
+        if not stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
+            raise ValueError(f"pilot workspace node {path.name} must be a directory")
+        os.fchmod(file_descriptor, 0o700)
+    finally:
+        os.close(file_descriptor)
+
+
+def _open_private_temp(path: Path) -> Tuple[Path, int]:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    for _attempt in range(16):
+        temp_path = path.parent / f".{path.name}.{secrets.token_hex(8)}.tmp"
+        try:
+            file_descriptor = os.open(temp_path, flags, 0o600)
+        except FileExistsError:
+            continue
+        try:
+            if os.name == "posix":
+                os.fchmod(file_descriptor, 0o600)
+        except BaseException:
+            os.close(file_descriptor)
+            temp_path.unlink()
+            raise
+        return temp_path, file_descriptor
+    raise FileExistsError("could not allocate a private charter temporary file")
 
 
 def _require_owner_only(path: Path) -> None:
