@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -1136,6 +1137,139 @@ class ControlledLarkPilotTests(TestCase):
                     work_dir,
                     now=datetime(2026, 8, 16, 0, 0, tzinfo=timezone.utc),
                 )
+
+    def test_task6_entrypoints_reject_fifo_charter_without_blocking_or_side_effects(self):
+        for operation in ("generate", "finalize", "disabled", "rollback"):
+            with self.subTest(operation=operation), TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                work_dir = root / "pilot"
+                initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+                charter = work_dir / "private" / "charter.json"
+                charter.unlink()
+                os.mkfifo(charter, 0o600)
+                output = root / "output"
+                script = f"""
+from pathlib import Path
+from skill2workflow.controlled_lark_pilot import exercise_disabled_live, exercise_rollback, finalize_pilot, generate_pilot_evidence
+from tests.test_controlled_lark_pilot import NOW
+from tests.test_controlled_lark_pilot_evidence import _valid_decision
+repo = Path({str(ROOT)!r})
+work = Path({str(work_dir)!r})
+output = Path({str(output)!r})
+operation = {operation!r}
+try:
+    if operation == "generate":
+        generate_pilot_evidence(repo, work, output_dir=output, now=NOW)
+    elif operation == "finalize":
+        finalize_pilot(repo, work, _valid_decision(), output_dir=output, now=NOW)
+    elif operation == "disabled":
+        exercise_disabled_live(repo, work, now=NOW)
+    else:
+        exercise_rollback(repo, work, now=NOW)
+except ValueError as error:
+    print(str(error))
+    raise SystemExit(0)
+raise SystemExit(2)
+"""
+                process = subprocess.Popen(
+                    [sys.executable, "-c", script],
+                    cwd=ROOT,
+                    env={
+                        key: value
+                        for key, value in {**os.environ, "PYTHONPATH": "src"}.items()
+                        if key != "SKILL2WORKFLOW_LARK_TASK_LIVE"
+                    },
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                try:
+                    stdout, stderr = process.communicate(timeout=1.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate()
+                    self.fail(f"{operation} blocked on a FIFO charter")
+
+                self.assertEqual(process.returncode, 0, stderr)
+                self.assertIn("regular file", stdout)
+                self.assertFalse(output.exists())
+                self.assertFalse(
+                    (work_dir / "private" / "finalization.json").exists()
+                )
+                self.assertFalse(
+                    (work_dir / "private" / "exercises" / "failure.json").exists()
+                )
+                self.assertFalse(
+                    (work_dir / "private" / "exercises" / "rollback.json").exists()
+                )
+
+    def test_case_entrypoints_reject_fifo_without_blocking_or_side_effects(self):
+        for operation in ("load", "start"):
+            with self.subTest(operation=operation), TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                work_dir = root / "pilot"
+                initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+                case_path = root / "case.json"
+                os.mkfifo(case_path, 0o600)
+                script = f"""
+from pathlib import Path
+from skill2workflow.controlled_lark_pilot import load_private_case, start_pilot_run
+from tests.test_controlled_lark_pilot import NOW
+repo = Path({str(ROOT)!r})
+work = Path({str(work_dir)!r})
+case_path = Path({str(case_path)!r})
+operation = {operation!r}
+try:
+    if operation == "load":
+        load_private_case(repo, case_path)
+    else:
+        start_pilot_run(repo, work, case_path, now=NOW)
+except ValueError as error:
+    print(str(error))
+    raise SystemExit(0)
+raise SystemExit(2)
+"""
+                process = subprocess.Popen(
+                    [sys.executable, "-c", script],
+                    cwd=ROOT,
+                    env={**os.environ, "PYTHONPATH": "src"},
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                try:
+                    stdout, stderr = process.communicate(timeout=1.0)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.communicate()
+                    self.fail(f"{operation} blocked on a FIFO private case")
+
+                self.assertEqual(process.returncode, 0, stderr)
+                self.assertIn("regular file", stdout)
+                self.assertEqual(
+                    list((work_dir / "state").glob("registry/*.json")),
+                    [],
+                )
+
+    def test_load_private_case_rejects_symlink_parent_and_final_component(self):
+        for symlink in ("parent", "final"):
+            with self.subTest(symlink=symlink), TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                actual = root / "actual"
+                actual.mkdir()
+                os.chmod(actual, 0o700)
+                target = actual / "case.json"
+                _write_private_case(target)
+                if symlink == "parent":
+                    alias = root / "alias"
+                    alias.symlink_to(actual, target_is_directory=True)
+                    case_path = alias / "case.json"
+                else:
+                    case_path = root / "case.json"
+                    case_path.symlink_to(target)
+
+                with self.assertRaisesRegex(ValueError, "symbolic link|non-directory"):
+                    load_private_case(ROOT, case_path)
 
     def test_load_private_case_requires_external_owner_only_exact_shape(self):
         payload = _valid_case()

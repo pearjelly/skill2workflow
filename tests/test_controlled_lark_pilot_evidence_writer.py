@@ -21,6 +21,75 @@ from tests.test_controlled_lark_pilot_evidence import _valid_pack
 
 
 class ControlledLarkPilotEvidenceWriterTests(TestCase):
+    def test_write_pack_retries_transient_finish_cleanup_after_durable_commit(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            output = root / "evidence"
+            writer = __import__(
+                "skill2workflow._controlled_lark_pilot_evidence_writer",
+                fromlist=["_remove_tree_at"],
+            )
+            real_remove = writer._remove_tree_at
+            failures = []
+
+            def fail_once(parent_fd, name):
+                if name.endswith(".txn") and not failures:
+                    failures.append(name)
+                    raise OSError("transient finish cleanup failure")
+                return real_remove(parent_fd, name)
+
+            with patch.object(writer, "_remove_tree_at", side_effect=fail_once):
+                result = write_evidence_pack(output, _valid_pack())
+
+            self.assertEqual(
+                result,
+                {
+                    "status": "written",
+                    "file_count": 13,
+                    "output_dir": str(output),
+                },
+            )
+            self.assertEqual(len(failures), 1)
+            self.assertEqual(
+                [path for path in root.iterdir() if path.name.endswith(".txn")],
+                [],
+            )
+            self.assertTrue((output / "evidence-index.json").is_file())
+
+    def test_write_pack_persistent_finish_cleanup_keeps_durable_success(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            output = root / "evidence"
+            writer = __import__(
+                "skill2workflow._controlled_lark_pilot_evidence_writer",
+                fromlist=["_remove_tree_at"],
+            )
+            real_remove = writer._remove_tree_at
+            failures = []
+
+            def fail_transaction_cleanup(parent_fd, name):
+                if name.endswith(".txn"):
+                    failures.append(name)
+                    raise OSError("persistent finish cleanup failure")
+                return real_remove(parent_fd, name)
+
+            with patch.object(
+                writer,
+                "_remove_tree_at",
+                side_effect=fail_transaction_cleanup,
+            ):
+                result = write_evidence_pack(output, _valid_pack())
+
+            residual = [
+                path for path in root.iterdir() if path.name.endswith(".txn")
+            ]
+            self.assertEqual(result["status"], "written")
+            self.assertEqual(result["output_dir"], str(output))
+            self.assertGreaterEqual(len(failures), 2)
+            self.assertEqual(len(residual), 1)
+            self.assertEqual(residual[0].stat().st_mode & 0o077, 0)
+            self.assertTrue((output / "evidence-index.json").is_file())
+
     def test_anchored_json_reader_rejects_fifo_without_blocking(self):
         with TemporaryDirectory() as tmp:
             fifo = Path(tmp).resolve() / "private.json"

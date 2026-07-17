@@ -167,6 +167,7 @@ class EvidencePackTransaction:
         self.reservation_fd = None
         self.transaction_name = ""
         self.initial = None
+        self.published = None
         self.committed = False
         self.closed = False
         self.file_count = 0
@@ -237,8 +238,16 @@ class EvidencePackTransaction:
             self._require_parent_identity()
         published = _open_directory_at(self.io, self.parent_fd, self.output.name)
         try:
-            if not self.io.same_entry(os.fstat(self.stage_fd), os.fstat(published)):
+            expected = (
+                self.published
+                if self.published is not None
+                else os.fstat(self.stage_fd)
+            )
+            observed = os.fstat(published)
+            if not self.io.same_entry(expected, observed):
                 raise ValueError("published evidence output identity is invalid")
+            if self.published is None:
+                self.published = observed
         finally:
             os.close(published)
 
@@ -342,9 +351,13 @@ class EvidencePackTransaction:
     def finish(self) -> None:
         if self.closed:
             return
-        if self.committed:
-            self._require_published_identity()
+        self.validate_durable_commit()
         self._cleanup_uncommitted()
+
+    def validate_durable_commit(self) -> None:
+        if self.closed or not self.committed:
+            raise ValueError("evidence transaction is not durably committed")
+        self._require_published_identity()
 
     def abort(self) -> None:
         if self.closed:
@@ -367,33 +380,82 @@ class EvidencePackTransaction:
         if self.closed:
             return
         first_error = None
-        try:
-            self.io.close_descriptors(
-                self.reservation_fd,
-                self.stage_fd,
-                self.output_fd,
-                self.transaction_fd,
+        for attribute in (
+            "reservation_fd",
+            "stage_fd",
+            "output_fd",
+            "transaction_fd",
+        ):
+            try:
+                self._close_descriptor_attribute(attribute)
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+        transaction_descriptors_closed = all(
+            getattr(self, attribute) is None
+            for attribute in (
+                "reservation_fd",
+                "stage_fd",
+                "output_fd",
+                "transaction_fd",
             )
-        except BaseException as error:
-            first_error = error
-        self.reservation_fd = None
-        self.stage_fd = None
-        self.output_fd = None
-        self.transaction_fd = None
-        try:
-            if self.transaction_name:
+        )
+        if transaction_descriptors_closed and self.transaction_name:
+            try:
                 self.io.remove_tree_at(self.parent_fd, self.transaction_name)
                 os.fsync(self.parent_fd)
-        except BaseException as error:
-            if first_error is None:
-                first_error = error
-        try:
-            self.io.close_descriptors(self.parent_fd, self.root_fd)
-        except BaseException as error:
-            if first_error is None:
-                first_error = error
-        self.parent_fd = None
-        self.root_fd = None
-        self.closed = True
+                self.transaction_name = ""
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+        if not self.transaction_name:
+            for attribute in ("parent_fd", "root_fd"):
+                try:
+                    self._close_descriptor_attribute(attribute)
+                except BaseException as error:
+                    if first_error is None:
+                        first_error = error
+            self.closed = self.parent_fd is None and self.root_fd is None
         if first_error is not None:
             raise first_error
+
+    def _close_descriptor_attribute(self, attribute: str) -> None:
+        descriptor = getattr(self, attribute)
+        if descriptor is None:
+            return
+        try:
+            self.io.close_descriptors(descriptor)
+        except BaseException:
+            try:
+                os.fstat(descriptor)
+            except OSError:
+                setattr(self, attribute, None)
+            raise
+        setattr(self, attribute, None)
+
+    def isolate_cleanup_failure(self) -> None:
+        """Close descriptors while preserving an owner-only hidden residual."""
+        if self.closed:
+            return
+        for attribute in (
+            "reservation_fd",
+            "stage_fd",
+            "output_fd",
+            "transaction_fd",
+            "parent_fd",
+            "root_fd",
+        ):
+            descriptor = getattr(self, attribute)
+            if descriptor is None:
+                continue
+            for _attempt in range(2):
+                try:
+                    os.close(descriptor)
+                    break
+                except OSError:
+                    try:
+                        os.fstat(descriptor)
+                    except OSError:
+                        break
+            setattr(self, attribute, None)
+        self.closed = True

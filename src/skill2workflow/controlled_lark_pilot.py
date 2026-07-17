@@ -39,6 +39,7 @@ from ._controlled_lark_pilot_private_authorization import (
     open_private_session,
 )
 from ._controlled_lark_pilot_evidence_writer import (
+    finish_durable_resources,
     read_json_anchored,
 )
 from .external_connectors import load_external_connector
@@ -159,14 +160,22 @@ def generate_pilot_evidence(
     _require_outside_repository(repo_root, work_dir, "pilot work directory")
     output, repository_export = _evidence_output(repo_root, work_dir, output_dir)
     if repository_export:
-        with open_private_session(work_dir / "private") as private_session:
+        private_session = open_private_session(work_dir / "private")
+        authorization_snapshot = None
+        transaction = None
+        durable_success = False
+        try:
             try:
-                decision = private_session.read_json(Path("decision.json"))
-                marker = private_session.read_json(Path("finalization.json"))
+                authorization_snapshot = (
+                    private_session.authorization_bundle_snapshot()
+                )
             except FileNotFoundError as error:
                 raise ValueError(
                     "successful private finalization is required for repository export"
                 ) from error
+            decision = authorization_snapshot.decision
+            marker = authorization_snapshot.marker
+            authorization_snapshot.validate()
             private_session.check_identity()
             pack = _build_pilot_evidence(
                 repo_root,
@@ -176,19 +185,48 @@ def generate_pilot_evidence(
                 private_session=private_session,
             )
             _require_finalized_export(pack, marker, decision)
+            authorization_snapshot.validate()
             transaction = prepare_evidence_pack_transaction(output, pack)
+            authorization_snapshot.validate()
+            transaction.commit()
+            transaction.validate_durable_commit()
+            private_session.check_identity()
+            authorization_snapshot.validate()
+
+            # Irreversible durable-success commit point for repository export.
+            durable_success = True
+            written = {
+                "status": "written",
+                "file_count": transaction.file_count,
+                "output_dir": str(transaction.output),
+            }
+        except BaseException:
+            cleanup_errors = []
+            if transaction is not None:
+                try:
+                    transaction.abort()
+                except BaseException as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+            if authorization_snapshot is not None:
+                try:
+                    authorization_snapshot.close()
+                except BaseException as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
             try:
-                transaction.commit()
-                private_session.check_identity()
-                written = {
-                    "status": "written",
-                    "file_count": transaction.file_count,
-                    "output_dir": str(transaction.output),
-                }
-                transaction.finish()
-            except BaseException:
-                transaction.abort()
-                raise
+                private_session.close()
+            except BaseException as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+            if cleanup_errors:
+                raise RuntimeError(
+                    "repository evidence export rollback failed"
+                ) from cleanup_errors[0]
+            raise
+        if durable_success:
+            finish_durable_resources(
+                (authorization_snapshot, "close"),
+                (transaction, "finish"),
+                (private_session, "close"),
+            )
     else:
         pack = _build_pilot_evidence(repo_root, work_dir, now=now)
         written = write_evidence_pack(output, pack)
@@ -652,17 +690,19 @@ def initialize_pilot(
 
 
 def load_pilot_charter(work_dir: Path, now: datetime = None) -> Dict[str, object]:
-    path = Path(work_dir).resolve() / "private" / "charter.json"
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    work_dir = Path(os.path.abspath(os.fspath(work_dir)))
+    path = work_dir / "private" / "charter.json"
+    payload = read_json_anchored(path)
     return _validate_charter(payload, now=now)
 
 
 def load_private_case(repo_root: Path, input_path: Path) -> Dict[str, object]:
     repo_root = Path(repo_root).resolve()
-    input_path = Path(input_path).resolve()
+    input_path = Path(os.path.abspath(os.fspath(input_path)))
+    resolved_input = input_path.resolve()
     _require_outside_repository(repo_root, input_path, "private case input")
-    _require_owner_only(input_path)
-    payload = json.loads(input_path.read_text(encoding="utf-8"))
+    _require_outside_repository(repo_root, resolved_input, "private case input")
+    payload = read_json_anchored(input_path, owner_only=True)
     if not isinstance(payload, dict) or set(payload) != REQUIRED_CASE_KEYS:
         raise ValueError("private case input must contain only the approved fields")
     normalized = {

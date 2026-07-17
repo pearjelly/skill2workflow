@@ -59,6 +59,21 @@ def _directory_flags() -> int:
     return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 
 
+def _canonicalize_root_alias(path: Path) -> Path:
+    """Resolve only a root-owned top-level alias such as macOS /var."""
+    if len(path.parts) < 2:
+        return path
+    top_level = Path(path.anchor) / path.parts[1]
+    try:
+        top_level_item = os.stat(top_level, follow_symlinks=False)
+    except OSError:
+        return path
+    if not stat.S_ISLNK(top_level_item.st_mode):
+        return path
+    resolved = top_level.resolve(strict=True)
+    return resolved.joinpath(*path.parts[2:])
+
+
 def _close_descriptors(*descriptors) -> None:
     first_error = None
     for descriptor in descriptors:
@@ -136,9 +151,11 @@ def _read_json_at(parent_fd: int, name: str, *, owner_only: bool = False):
         _close_descriptors(file_descriptor)
 
 
-def read_json_anchored(path: Path):
+def read_json_anchored(path: Path, *, owner_only: bool = False):
     _require_dir_fd_support()
-    absolute = Path(os.path.abspath(os.fspath(path)))
+    absolute = _canonicalize_root_alias(
+        Path(os.path.abspath(os.fspath(path)))
+    )
     if absolute == Path(absolute.anchor):
         raise ValueError("anchored JSON path must not be a filesystem root")
     root_fd = os.open(absolute.anchor, _directory_flags())
@@ -149,7 +166,11 @@ def read_json_anchored(path: Path):
             absolute.parts[1:-1],
             create=False,
         )
-        return _read_json_at(parent_fd, absolute.name)
+        return _read_json_at(
+            parent_fd,
+            absolute.name,
+            owner_only=owner_only,
+        )
     finally:
         _close_descriptors(parent_fd, root_fd)
 
@@ -459,17 +480,40 @@ def prepare_evidence_pack(
     return EvidencePackTransaction(_pack_io(), output_dir, pack)
 
 
+def finish_durable_resources(*resources) -> None:
+    """Best-effort cleanup after the caller's durable commit point."""
+    pending = list(resources)
+    for _attempt in range(2):
+        retry = []
+        for resource, method_name in pending:
+            try:
+                getattr(resource, method_name)()
+            except Exception:
+                retry.append((resource, method_name))
+        pending = retry
+        if not pending:
+            return
+    for resource, _method_name in pending:
+        isolate = getattr(resource, "isolate_cleanup_failure", None)
+        if isolate is None:
+            continue
+        try:
+            isolate()
+        except Exception:
+            pass
+
+
 def write_evidence_pack(output_dir: Path, pack: Dict[str, object]) -> Dict[str, object]:
     transaction = prepare_evidence_pack(output_dir, pack)
     try:
         transaction.commit()
-        result = {
-            "status": "written",
-            "file_count": transaction.file_count,
-            "output_dir": str(transaction.output),
-        }
-        transaction.finish()
-        return result
     except BaseException:
         transaction.abort()
         raise
+    result = {
+        "status": "written",
+        "file_count": transaction.file_count,
+        "output_dir": str(transaction.output),
+    }
+    finish_durable_resources((transaction, "finish"))
+    return result

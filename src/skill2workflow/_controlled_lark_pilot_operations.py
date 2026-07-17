@@ -23,6 +23,7 @@ from ._controlled_lark_pilot_evidence_validation import (
     VERIFICATION_SCHEMA_VERSION,
 )
 from ._controlled_lark_pilot_evidence_writer import (
+    finish_durable_resources,
     write_private_json_anchored,
 )
 
@@ -298,68 +299,98 @@ def finalize_pilot_operation(
         ).isoformat(),
     }
     transactions = []
-    with dependencies.open_private_session(
-        work_dir / "private"
-    ) as private_session:
+    private_session = dependencies.open_private_session(work_dir / "private")
+    bundle = None
+    authorization_snapshot = None
+    durable_success = False
+    try:
         bundle = dependencies.finalization_bundle(private_session)
-        try:
-            pack = dependencies.build_evidence(
-                repo_root,
-                work_dir,
-                decision_override=normalized_decision,
-                now=now,
-                private_session=private_session,
+        pack = dependencies.build_evidence(
+            repo_root,
+            work_dir,
+            decision_override=normalized_decision,
+            now=now,
+            private_session=private_session,
+        )
+        private_session.check_identity()
+        index = pack.get("index")
+        if not isinstance(index, dict):
+            raise ValueError("pilot evidence index is invalid")
+        if index.get("ready_to_finalize") is not True:
+            unmet = index.get("unmet_conditions")
+            if not isinstance(unmet, list) or any(
+                type(item) is not str for item in unmet
+            ):
+                raise ValueError("pilot evidence unmet conditions are invalid")
+            raise ValueError(
+                "pilot evidence is not ready to finalize: " + ", ".join(unmet)
             )
-            private_session.check_identity()
-            index = pack.get("index")
-            if not isinstance(index, dict):
-                raise ValueError("pilot evidence index is invalid")
-            if index.get("ready_to_finalize") is not True:
-                unmet = index.get("unmet_conditions")
-                if not isinstance(unmet, list) or any(
-                    type(item) is not str for item in unmet
-                ):
-                    raise ValueError("pilot evidence unmet conditions are invalid")
-                raise ValueError(
-                    "pilot evidence is not ready to finalize: " + ", ".join(unmet)
-                )
 
+        transactions.append(
+            dependencies.prepare_evidence_pack(private_output, pack)
+        )
+        if output != private_output:
             transactions.append(
-                dependencies.prepare_evidence_pack(private_output, pack)
+                dependencies.prepare_evidence_pack(output, pack)
             )
-            if output != private_output:
-                transactions.append(
-                    dependencies.prepare_evidence_pack(output, pack)
-                )
+        private_session.check_identity()
+        for transaction in transactions:
+            transaction.commit()
             private_session.check_identity()
-            for transaction in transactions:
-                transaction.commit()
-                private_session.check_identity()
-            bundle.publish_decision(normalized_decision)
-            observed_decision, observed_marker = bundle.publish_marker(marker)
-            if observed_decision != normalized_decision or observed_marker != marker:
-                raise ValueError("private finalization bundle verification failed")
-            private_session.check_identity()
-        except BaseException as error:
-            rollback_errors = []
+
+        bundle.publish_decision(normalized_decision)
+        authorization_snapshot = bundle.publish_marker(marker)
+        if (
+            authorization_snapshot.decision != normalized_decision
+            or authorization_snapshot.marker != marker
+        ):
+            raise ValueError("private finalization bundle verification failed")
+        authorization_snapshot.validate()
+        for transaction in transactions:
+            transaction.validate_durable_commit()
+        private_session.check_identity()
+        authorization_snapshot.validate()
+
+        # Irreversible durable-success commit point: authorization, packs,
+        # private directory, and lock identities have all been revalidated.
+        durable_success = True
+    except BaseException:
+        rollback_errors = []
+        if authorization_snapshot is not None:
+            try:
+                authorization_snapshot.close()
+            except BaseException as rollback_error:
+                rollback_errors.append(rollback_error)
+        if bundle is not None:
             try:
                 bundle.rollback()
             except BaseException as rollback_error:
                 rollback_errors.append(rollback_error)
-            for transaction in reversed(transactions):
-                try:
-                    transaction.abort()
-                except BaseException as rollback_error:
-                    rollback_errors.append(rollback_error)
-            if rollback_errors:
-                raise RuntimeError(
-                    "controlled pilot finalization rollback failed"
-                ) from rollback_errors[0]
-            raise error
-        else:
-            bundle.finish()
-            for transaction in transactions:
-                transaction.finish()
+        for transaction in reversed(transactions):
+            try:
+                transaction.abort()
+            except BaseException as rollback_error:
+                rollback_errors.append(rollback_error)
+        try:
+            private_session.close()
+        except BaseException as rollback_error:
+            rollback_errors.append(rollback_error)
+        if rollback_errors:
+            raise RuntimeError(
+                "controlled pilot finalization rollback failed"
+            ) from rollback_errors[0]
+        raise
+    if durable_success:
+        resources = []
+        if authorization_snapshot is not None:
+            resources.append((authorization_snapshot, "close"))
+        if bundle is not None:
+            resources.append((bundle, "finish"))
+        resources.extend(
+            (transaction, "finish") for transaction in transactions
+        )
+        resources.append((private_session, "close"))
+        finish_durable_resources(*resources)
     return {
         "status": "finalized",
         "decision": normalized_decision["decision"],

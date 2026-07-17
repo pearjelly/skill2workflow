@@ -16,7 +16,12 @@ from skill2workflow.controlled_lark_pilot_evidence import (
     prepare_evidence_pack_transaction,
 )
 from skill2workflow._controlled_lark_pilot_private_authorization import (
+    AnchoredPrivateSession,
+    PrivateFinalizationBundle,
     open_private_session,
+)
+from skill2workflow._controlled_lark_pilot_pack_transaction import (
+    EvidencePackTransaction,
 )
 
 from tests.test_controlled_lark_pilot_evidence import (
@@ -50,6 +55,402 @@ def _write_owner_only_json(path, value):
 
 
 class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
+    def test_finalize_retries_every_transient_post_commit_cleanup(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            (work_dir / "private" / "decision.json").unlink()
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            real_bundle_finish = PrivateFinalizationBundle.finish
+            real_pack_finish = EvidencePackTransaction.finish
+            real_session_close = AnchoredPrivateSession.close
+            calls = {"bundle": 0, "session": 0}
+            pack_calls = {}
+
+            def flaky_bundle_finish(bundle):
+                calls["bundle"] += 1
+                if calls["bundle"] == 1:
+                    raise OSError("transient bundle finish failure")
+                return real_bundle_finish(bundle)
+
+            def flaky_pack_finish(transaction):
+                name = str(transaction.output)
+                pack_calls[name] = pack_calls.get(name, 0) + 1
+                if pack_calls[name] == 1:
+                    raise OSError("transient pack finish failure")
+                return real_pack_finish(transaction)
+
+            def flaky_session_close(session):
+                calls["session"] += 1
+                if calls["session"] == 1:
+                    raise OSError("transient session close failure")
+                return real_session_close(session)
+
+            with patch.object(
+                PrivateFinalizationBundle,
+                "finish",
+                new=flaky_bundle_finish,
+            ), patch.object(
+                EvidencePackTransaction,
+                "finish",
+                new=flaky_pack_finish,
+            ), patch.object(
+                AnchoredPrivateSession,
+                "close",
+                new=flaky_session_close,
+            ):
+                result = finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_decision(),
+                    output_dir=requested,
+                    now=NOW,
+                )
+
+            self.assertEqual(
+                result,
+                {
+                    "status": "finalized",
+                    "decision": "continue",
+                    "approved_live_runs": 5,
+                    "distinct_calendar_days": 5,
+                    "distinct_private_cases": 2,
+                    "rejected_runs": 1,
+                    "output_dir": str(requested),
+                },
+            )
+            self.assertEqual(calls, {"bundle": 2, "session": 2})
+            self.assertEqual(
+                pack_calls,
+                {str(work_dir / "evidence"): 2, str(requested): 2},
+            )
+            self.assertEqual(
+                [
+                    path
+                    for base in (work_dir, requested.parent)
+                    for path in base.rglob("*")
+                    if path.name.endswith((".tmp", ".txn"))
+                ],
+                [],
+            )
+
+    def test_finalize_ignores_persistent_post_commit_cleanup_errors(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            (work_dir / "private" / "decision.json").unlink()
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            real_bundle_finish = PrivateFinalizationBundle.finish
+            real_pack_finish = EvidencePackTransaction.finish
+            real_session_close = AnchoredPrivateSession.close
+            calls = {"bundle": 0, "session": 0}
+            pack_calls = {}
+
+            def noisy_bundle_finish(bundle):
+                calls["bundle"] += 1
+                real_bundle_finish(bundle)
+                raise OSError("persistent bundle finish failure")
+
+            def noisy_pack_finish(transaction):
+                name = str(transaction.output)
+                pack_calls[name] = pack_calls.get(name, 0) + 1
+                real_pack_finish(transaction)
+                raise OSError("persistent pack finish failure")
+
+            def noisy_session_close(session):
+                calls["session"] += 1
+                real_session_close(session)
+                raise OSError("persistent session close failure")
+
+            with patch.object(
+                PrivateFinalizationBundle,
+                "finish",
+                new=noisy_bundle_finish,
+            ), patch.object(
+                EvidencePackTransaction,
+                "finish",
+                new=noisy_pack_finish,
+            ), patch.object(
+                AnchoredPrivateSession,
+                "close",
+                new=noisy_session_close,
+            ):
+                result = finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_decision(),
+                    output_dir=requested,
+                    now=NOW,
+                )
+
+            self.assertEqual(result["status"], "finalized")
+            self.assertEqual(result["output_dir"], str(requested))
+            self.assertGreaterEqual(calls["bundle"], 2)
+            self.assertGreaterEqual(calls["session"], 2)
+            self.assertGreaterEqual(pack_calls[str(work_dir / "evidence")], 2)
+            self.assertGreaterEqual(pack_calls[str(requested)], 2)
+            self.assertEqual(
+                _json_bytes_map(work_dir / "evidence"),
+                _json_bytes_map(requested),
+            )
+            self.assertEqual(
+                json.loads(
+                    (work_dir / "private" / "finalization.json").read_text(
+                        encoding="utf-8"
+                    )
+                ),
+                _valid_finalization_marker(),
+            )
+
+    def test_repository_export_rolls_back_when_authorization_entries_change_after_commit(self):
+        mutations = ("decision_replace", "marker_replace", "marker_mode", "marker_content")
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                repo_root, work_dir, _transport = _build_ready_state(root)
+                private = work_dir / "private"
+                decision_path = private / "decision.json"
+                marker_path = private / "finalization.json"
+                _write_owner_only_json(marker_path, _valid_finalization_marker())
+                requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+                real_commit = EvidencePackTransaction.commit
+                mutated = []
+
+                def commit_then_mutate(transaction):
+                    result = real_commit(transaction)
+                    if mutated:
+                        return result
+                    if mutation == "decision_replace":
+                        replacement = _valid_decision()
+                        replacement["rationale"] = "A different public rationale."
+                        temporary = private / "replacement-decision.json"
+                        _write_owner_only_json(temporary, replacement)
+                        os.replace(temporary, decision_path)
+                    elif mutation == "marker_replace":
+                        temporary = private / "replacement-finalization.json"
+                        _write_owner_only_json(
+                            temporary,
+                            _valid_finalization_marker(),
+                        )
+                        os.replace(temporary, marker_path)
+                    elif mutation == "marker_mode":
+                        os.chmod(marker_path, 0o644)
+                    else:
+                        changed = _valid_finalization_marker()
+                        changed["finalized_at"] = "2026-07-23T17:00:01+08:00"
+                        _write_owner_only_json(marker_path, changed)
+                    mutated.append(True)
+                    return result
+
+                with patch.object(
+                    EvidencePackTransaction,
+                    "commit",
+                    new=commit_then_mutate,
+                ), self.assertRaisesRegex(ValueError, "authorization|changed|owner-only"):
+                    generate_pilot_evidence(
+                        repo_root,
+                        work_dir,
+                        output_dir=requested,
+                        now=NOW,
+                    )
+
+                self.assertEqual(mutated, [True])
+                self.assertFalse(requested.exists())
+
+    def test_finalize_rolls_back_when_published_authorization_snapshot_changes(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            private = work_dir / "private"
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            private_before = _json_bytes_map(work_dir / "evidence")
+            real_publish = PrivateFinalizationBundle.publish_marker
+            changed = []
+
+            def publish_then_replace_decision(bundle, marker):
+                observed = real_publish(bundle, marker)
+                replacement = _valid_decision()
+                replacement["rationale"] = "A different public rationale."
+                temporary = private / "replacement-decision.json"
+                _write_owner_only_json(temporary, replacement)
+                os.replace(temporary, private / "decision.json")
+                changed.append(True)
+                return observed
+
+            with patch.object(
+                PrivateFinalizationBundle,
+                "publish_marker",
+                new=publish_then_replace_decision,
+            ), self.assertRaisesRegex(ValueError, "authorization|changed"):
+                finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_decision(),
+                    output_dir=requested,
+                    now=NOW,
+                )
+
+            self.assertEqual(changed, [True])
+            self.assertEqual(_json_bytes_map(work_dir / "evidence"), private_before)
+            self.assertFalse(requested.exists())
+            self.assertFalse((private / "finalization.json").exists())
+
+    def test_invalid_lock_rejections_do_not_leak_file_descriptors(self):
+        for invalid in ("fifo", "non_owner"):
+            with self.subTest(invalid=invalid), TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                repo_root = _prepare_repo(root)
+                work_dir = root / "pilot"
+                initialize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_charter(),
+                    now=NOW,
+                )
+                lock = work_dir / "private" / AnchoredPrivateSession.LOCK_NAME
+                if invalid == "fifo":
+                    os.mkfifo(lock, 0o600)
+                else:
+                    lock.write_text("invalid", encoding="utf-8")
+                    os.chmod(lock, 0o644)
+                before = len(os.listdir("/dev/fd"))
+
+                for _attempt in range(24):
+                    with self.assertRaisesRegex(ValueError, "lock|owner-only|regular"):
+                        open_private_session(work_dir / "private")
+
+                self.assertEqual(len(os.listdir("/dev/fd")), before)
+
+    def test_lock_open_post_flock_failure_closes_descriptor_and_unlocks(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root = _prepare_repo(root)
+            work_dir = root / "pilot"
+            initialize_pilot(repo_root, work_dir, _valid_charter(), now=NOW)
+            before = len(os.listdir("/dev/fd"))
+
+            with patch(
+                "skill2workflow._controlled_lark_pilot_private_authorization.os.fsync",
+                side_effect=OSError("lock fsync failed"),
+            ):
+                for _attempt in range(12):
+                    with self.assertRaisesRegex(OSError, "lock fsync failed"):
+                        open_private_session(work_dir / "private")
+
+            self.assertEqual(len(os.listdir("/dev/fd")), before)
+            session = open_private_session(work_dir / "private")
+            session.close()
+
+    def test_authorization_snapshot_close_retries_without_fd_leak(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            private = work_dir / "private"
+            _write_owner_only_json(
+                private / "finalization.json",
+                _valid_finalization_marker(),
+            )
+            before = len(os.listdir("/dev/fd"))
+            session = open_private_session(private)
+            snapshot = session.authorization_bundle_snapshot()
+            authorization = __import__(
+                "skill2workflow._controlled_lark_pilot_private_authorization",
+                fromlist=["_close_descriptors"],
+            )
+            real_close = authorization._close_descriptors
+            failures = []
+
+            def fail_once(*descriptors):
+                if not failures:
+                    failures.append(descriptors)
+                    raise OSError("transient snapshot close failure")
+                return real_close(*descriptors)
+
+            with patch.object(
+                authorization,
+                "_close_descriptors",
+                side_effect=fail_once,
+            ):
+                with self.assertRaisesRegex(OSError, "snapshot close failure"):
+                    snapshot.close()
+                snapshot.close()
+            session.close()
+
+            self.assertEqual(len(failures), 1)
+            self.assertTrue(snapshot.closed)
+            self.assertEqual(len(os.listdir("/dev/fd")), before)
+
+    def test_lock_unlink_or_replace_invalidates_existing_session(self):
+        for mutation in ("unlink", "replace"):
+            with self.subTest(mutation=mutation), TemporaryDirectory() as tmp:
+                root = Path(tmp).resolve()
+                repo_root = _prepare_repo(root)
+                work_dir = root / "pilot"
+                initialize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_charter(),
+                    now=NOW,
+                )
+                private = work_dir / "private"
+                first = open_private_session(private)
+                second = None
+                try:
+                    lock = private / AnchoredPrivateSession.LOCK_NAME
+                    lock.unlink()
+                    if mutation == "replace":
+                        lock.write_text("replacement", encoding="utf-8")
+                        os.chmod(lock, 0o600)
+
+                    with self.assertRaisesRegex(ValueError, "lock.*changed"):
+                        first.check_identity()
+                    second = open_private_session(private)
+                    second.check_identity()
+                    with self.assertRaisesRegex(ValueError, "lock.*changed"):
+                        first.check_identity()
+                finally:
+                    if second is not None:
+                        second.close()
+                    first.close()
+
+    def test_finalize_rechecks_lock_identity_before_authorization_commit(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            private = work_dir / "private"
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            private_before = _json_bytes_map(work_dir / "evidence")
+            real_commit = EvidencePackTransaction.commit
+            changed = []
+
+            def commit_then_replace_lock(transaction):
+                result = real_commit(transaction)
+                if not changed:
+                    lock = private / AnchoredPrivateSession.LOCK_NAME
+                    lock.unlink()
+                    lock.write_text("replacement", encoding="utf-8")
+                    os.chmod(lock, 0o600)
+                    changed.append(True)
+                return result
+
+            with patch.object(
+                EvidencePackTransaction,
+                "commit",
+                new=commit_then_replace_lock,
+            ), self.assertRaisesRegex(ValueError, "lock.*changed"):
+                finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_decision(),
+                    output_dir=requested,
+                    now=NOW,
+                )
+
+            self.assertEqual(changed, [True])
+            self.assertEqual(_json_bytes_map(work_dir / "evidence"), private_before)
+            self.assertFalse(requested.exists())
+            self.assertFalse((private / "finalization.json").exists())
+
     def test_repository_export_fails_closed_while_private_authorization_is_locked(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
