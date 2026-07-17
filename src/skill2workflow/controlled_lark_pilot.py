@@ -60,6 +60,8 @@ def decide_pilot_run(
     repo_root = Path(repo_root).resolve()
     work_dir = Path(work_dir).resolve()
     _require_outside_repository(repo_root, work_dir, "pilot work directory")
+    if type(approved) is not bool:
+        raise ValueError("approved must be a boolean")
     load_pilot_charter(work_dir, now=now)
 
     preflight = _pilot_control_plane(
@@ -67,14 +69,20 @@ def decide_pilot_run(
         work_dir,
         credential_provider=StaticCredentialProvider({}),
     )
-    current = preflight.get_run(str(run_id))
+    requested_run_id = str(run_id)
+    current = preflight.get_run(requested_run_id)
+    if (
+        not isinstance(current, dict)
+        or current.get("run_id") != requested_run_id
+    ):
+        raise ValueError("controlled pilot run identity is invalid")
     workflow = preflight.get_workflow(WORKFLOW_ID, WORKFLOW_VERSION)
     _validate_controlled_live_binding(workflow, current)
 
     token = ""
     if approved:
-        if not confirmed_live:
-            raise ValueError("live approval requires explicit confirmation")
+        if type(confirmed_live) is not bool or confirmed_live is not True:
+            raise ValueError("live approval requires explicit boolean confirmation")
         if os.environ.get(LIVE_SWITCH) != "1":
             raise ValueError("SKILL2WORKFLOW_LARK_TASK_LIVE=1 is required")
         token = os.environ.get(TOKEN_ENVIRONMENT, "")
@@ -88,8 +96,8 @@ def decide_pilot_run(
         credential_provider=StaticCredentialProvider(credentials),
         transport=transport,
     )
-    state = control.resume_published_run(str(run_id), approved=approved)
-    events = control.list_audit_events(run_id=str(run_id))
+    state = control.resume_published_run(requested_run_id, approved=approved)
+    events = control.list_audit_events(run_id=requested_run_id)
     connector_events = [
         event
         for event in events
@@ -104,7 +112,7 @@ def decide_pilot_run(
             connector_metadata = metadata
             break
     return {
-        "run_id": str(run_id),
+        "run_id": requested_run_id,
         "workflow_id": WORKFLOW_ID,
         "workflow_version": WORKFLOW_VERSION,
         "run_status": str(state.get("status", "")),
@@ -155,35 +163,17 @@ def _validate_controlled_live_binding(
     if run.get("current_node") != "review_renewal_risk":
         raise ValueError(invalid)
 
+    expected_workflow = build_lark_task_pilot_workflow(
+        mode="live",
+        workflow_id=WORKFLOW_ID,
+        workflow_version=WORKFLOW_VERSION,
+        workflow_name="controlled-lark-task-sales-renewal-pilot",
+    )
+    expected_workflow["workflow"]["status"] = "published"
+    if workflow != expected_workflow:
+        raise ValueError(invalid)
     durable_workflow = run.get("workflow")
     if not isinstance(durable_workflow, dict) or durable_workflow != workflow:
-        raise ValueError(invalid)
-    nodes = workflow.get("nodes")
-    if not isinstance(nodes, list):
-        raise ValueError(invalid)
-    connector_nodes = [
-        node
-        for node in nodes
-        if isinstance(node, dict) and node.get("id") == "create_lark_task"
-    ]
-    if len(connector_nodes) != 1:
-        raise ValueError(invalid)
-    connector = connector_nodes[0].get("connector")
-    if not isinstance(connector, dict):
-        raise ValueError(invalid)
-    if (
-        connector.get("id") != "lark_task"
-        or connector.get("operation") != "create_task"
-        or connector.get("mode") != "live"
-    ):
-        raise ValueError(invalid)
-    credentials = connector.get("credentials")
-    if (
-        not isinstance(credentials, list)
-        or len(credentials) != 1
-        or not isinstance(credentials[0], dict)
-        or credentials[0].get("handle") != "lark_bot_access_token"
-    ):
         raise ValueError(invalid)
 
 
