@@ -44,6 +44,147 @@ REQUIRED_CASE_KEYS = {
     "owner_open_id",
     "due_at",
 }
+LIVE_SWITCH = "SKILL2WORKFLOW_LARK_TASK_LIVE"
+TOKEN_ENVIRONMENT = "LARK_BOT_ACCESS_TOKEN"
+
+
+def decide_pilot_run(
+    repo_root: Path,
+    work_dir: Path,
+    run_id: str,
+    approved: bool,
+    confirmed_live: bool = False,
+    now: datetime = None,
+    transport=None,
+) -> Dict[str, object]:
+    repo_root = Path(repo_root).resolve()
+    work_dir = Path(work_dir).resolve()
+    _require_outside_repository(repo_root, work_dir, "pilot work directory")
+    load_pilot_charter(work_dir, now=now)
+
+    preflight = _pilot_control_plane(
+        repo_root,
+        work_dir,
+        credential_provider=StaticCredentialProvider({}),
+    )
+    current = preflight.get_run(str(run_id))
+    workflow = preflight.get_workflow(WORKFLOW_ID, WORKFLOW_VERSION)
+    _validate_controlled_live_binding(workflow, current)
+
+    token = ""
+    if approved:
+        if not confirmed_live:
+            raise ValueError("live approval requires explicit confirmation")
+        if os.environ.get(LIVE_SWITCH) != "1":
+            raise ValueError("SKILL2WORKFLOW_LARK_TASK_LIVE=1 is required")
+        token = os.environ.get(TOKEN_ENVIRONMENT, "")
+        if not token:
+            raise ValueError("LARK_BOT_ACCESS_TOKEN is required")
+
+    credentials = {"lark_bot_access_token": token} if approved else {}
+    control = _pilot_control_plane(
+        repo_root,
+        work_dir,
+        credential_provider=StaticCredentialProvider(credentials),
+        transport=transport,
+    )
+    state = control.resume_published_run(str(run_id), approved=approved)
+    events = control.list_audit_events(run_id=str(run_id))
+    connector_events = [
+        event
+        for event in events
+        if event.get("type")
+        in ("connector_started", "connector_completed", "connector_failed")
+        and event.get("node_id") == "create_lark_task"
+    ]
+    connector_metadata = {}
+    for event in reversed(connector_events):
+        metadata = event.get("connector_metadata")
+        if isinstance(metadata, dict):
+            connector_metadata = metadata
+            break
+    return {
+        "run_id": str(run_id),
+        "workflow_id": WORKFLOW_ID,
+        "workflow_version": WORKFLOW_VERSION,
+        "run_status": str(state.get("status", "")),
+        "gate_decision": "approved" if approved else "rejected",
+        "connector_invoked": bool(connector_events),
+        "connector_status": (
+            str(connector_events[-1].get("connector_status", ""))
+            if connector_events
+            else ""
+        ),
+        "credential_status": (
+            str(connector_events[-1].get("credential_status", ""))
+            if connector_events
+            else ""
+        ),
+        "provider_status": str(connector_metadata.get("provider_status", "")),
+        "idempotency_key_present": bool(
+            connector_metadata.get("idempotency_key_present")
+        ),
+        "lark_task_id_present": bool(
+            connector_metadata.get("lark_task_id_present")
+        ),
+    }
+
+
+def _validate_controlled_live_binding(
+    workflow: Dict[str, object],
+    run: Dict[str, object],
+) -> None:
+    invalid = "controlled pilot live binding is invalid"
+    if not isinstance(workflow, dict) or not isinstance(run, dict):
+        raise ValueError(invalid)
+    if run.get("status") != "waiting":
+        raise ValueError("controlled pilot run is not waiting")
+
+    metadata = workflow.get("workflow")
+    if not isinstance(metadata, dict):
+        raise ValueError(invalid)
+    if (
+        metadata.get("id") != WORKFLOW_ID
+        or metadata.get("version") != WORKFLOW_VERSION
+        or run.get("workflow_id") != WORKFLOW_ID
+        or run.get("workflow_version") != WORKFLOW_VERSION
+    ):
+        raise ValueError(invalid)
+    if not isinstance(run.get("run_id"), str) or not str(run["run_id"]).strip():
+        raise ValueError(invalid)
+    if run.get("current_node") != "review_renewal_risk":
+        raise ValueError(invalid)
+
+    durable_workflow = run.get("workflow")
+    if not isinstance(durable_workflow, dict) or durable_workflow != workflow:
+        raise ValueError(invalid)
+    nodes = workflow.get("nodes")
+    if not isinstance(nodes, list):
+        raise ValueError(invalid)
+    connector_nodes = [
+        node
+        for node in nodes
+        if isinstance(node, dict) and node.get("id") == "create_lark_task"
+    ]
+    if len(connector_nodes) != 1:
+        raise ValueError(invalid)
+    connector = connector_nodes[0].get("connector")
+    if not isinstance(connector, dict):
+        raise ValueError(invalid)
+    if (
+        connector.get("id") != "lark_task"
+        or connector.get("operation") != "create_task"
+        or connector.get("mode") != "live"
+    ):
+        raise ValueError(invalid)
+    credentials = connector.get("credentials")
+    if (
+        not isinstance(credentials, list)
+        or len(credentials) != 1
+        or not isinstance(credentials[0], dict)
+        or credentials[0].get("handle") != "lark_bot_access_token"
+    ):
+        raise ValueError(invalid)
 
 
 def start_pilot_run(

@@ -1,5 +1,6 @@
 import json
 import os
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -8,16 +9,44 @@ from unittest.mock import patch
 
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.controlled_lark_pilot import (
+    _validate_controlled_live_binding,
+    decide_pilot_run,
     initialize_pilot,
     load_pilot_charter,
     load_private_case,
     start_pilot_run,
 )
 from skill2workflow.credentials import StaticCredentialProvider
+from skill2workflow.lark_task_pilot import build_lark_task_pilot_workflow
 
 
 ROOT = Path(__file__).resolve().parents[1]
 NOW = datetime(2026, 7, 18, 9, 0, tzinfo=timezone.utc)
+
+
+class _FakeResponse:
+    status = 200
+
+    def read(self):
+        return json.dumps(
+            {
+                "code": 0,
+                "msg": "success",
+                "data": {"task": {"guid": "private-task-guid"}},
+            }
+        ).encode("utf-8")
+
+    def close(self):
+        return None
+
+
+class _FakeTransport:
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, request, timeout):
+        self.calls.append((request, timeout))
+        return _FakeResponse()
 
 
 def _valid_charter():
@@ -76,6 +105,281 @@ def _start_waiting_pilot(tmp: str, case_id: str = "case-001"):
 
 
 class ControlledLarkPilotTests(TestCase):
+    def test_decide_approve_requires_all_live_guards_and_returns_redacted_summary(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, started = _start_waiting_pilot(tmp)
+            transport = _FakeTransport()
+            environment = {
+                "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                "LARK_BOT_ACCESS_TOKEN": "private-token",
+            }
+            with patch.dict(os.environ, environment, clear=True):
+                result = decide_pilot_run(
+                    ROOT,
+                    work_dir,
+                    started["run_id"],
+                    approved=True,
+                    confirmed_live=True,
+                    now=NOW,
+                    transport=transport,
+                )
+            control = LocalControlPlane(work_dir / "state", storage="sqlite")
+            run = control.get_run(started["run_id"])
+            events = control.list_audit_events(run_id=started["run_id"])
+
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(result["gate_decision"], "approved")
+        self.assertTrue(result["connector_invoked"])
+        self.assertEqual(result["connector_status"], "completed")
+        self.assertEqual(result["credential_status"], "resolved")
+        self.assertEqual(result["provider_status"], "completed")
+        self.assertTrue(result["idempotency_key_present"])
+        self.assertTrue(result["lark_task_id_present"])
+        self.assertEqual(
+            set(result),
+            {
+                "connector_invoked",
+                "connector_status",
+                "credential_status",
+                "gate_decision",
+                "idempotency_key_present",
+                "lark_task_id_present",
+                "provider_status",
+                "run_id",
+                "run_status",
+                "workflow_id",
+                "workflow_version",
+            },
+        )
+        self.assertEqual(run["status"], "completed")
+        self.assertTrue(
+            any(event.get("type") == "run_resumed" for event in events)
+        )
+        self.assertTrue(
+            any(event.get("type") == "connector_completed" for event in events)
+        )
+        self.assertEqual(len(transport.calls), 1)
+        encoded = json.dumps({"result": result, "events": events, "run": run})
+        for forbidden in ("private-token", "private-task-guid"):
+            self.assertNotIn(forbidden, encoded)
+        summary = json.dumps(result)
+        for forbidden in (
+            "Private Account",
+            "Private Risk",
+            "ou_private",
+        ):
+            self.assertNotIn(forbidden, summary)
+
+    def test_decide_reject_needs_no_token_and_never_calls_transport(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, started = _start_waiting_pilot(tmp)
+            transport = _FakeTransport()
+            with patch.dict(os.environ, {}, clear=True):
+                result = decide_pilot_run(
+                    ROOT,
+                    work_dir,
+                    started["run_id"],
+                    approved=False,
+                    now=NOW,
+                    transport=transport,
+                )
+            control = LocalControlPlane(work_dir / "state", storage="sqlite")
+            run = control.get_run(started["run_id"])
+            events = control.list_audit_events(run_id=started["run_id"])
+
+        self.assertEqual(result["run_status"], "failed")
+        self.assertEqual(result["gate_decision"], "rejected")
+        self.assertFalse(result["connector_invoked"])
+        self.assertEqual(run["status"], "failed")
+        self.assertTrue(
+            any(
+                event.get("type") == "run_resumed"
+                and event.get("approved") is False
+                for event in events
+            )
+        )
+        self.assertFalse(
+            any(str(event.get("type", "")).startswith("connector_") for event in events)
+        )
+        self.assertEqual(transport.calls, [])
+
+    def test_decide_approve_fails_before_resume_when_confirmation_switch_or_token_is_missing(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, started = _start_waiting_pilot(tmp)
+            transport = _FakeTransport()
+            cases = [
+                (
+                    {
+                        "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                        "LARK_BOT_ACCESS_TOKEN": "token",
+                    },
+                    False,
+                    "confirmation",
+                ),
+                (
+                    {"LARK_BOT_ACCESS_TOKEN": "token"},
+                    True,
+                    "SKILL2WORKFLOW_LARK_TASK_LIVE=1",
+                ),
+                (
+                    {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"},
+                    True,
+                    "LARK_BOT_ACCESS_TOKEN",
+                ),
+            ]
+            for environment, confirmed, expected in cases:
+                with self.subTest(expected=expected), patch.dict(
+                    os.environ,
+                    environment,
+                    clear=True,
+                ):
+                    with self.assertRaisesRegex(ValueError, expected):
+                        decide_pilot_run(
+                            ROOT,
+                            work_dir,
+                            started["run_id"],
+                            approved=True,
+                            confirmed_live=confirmed,
+                            now=NOW,
+                            transport=transport,
+                        )
+            control = LocalControlPlane(work_dir / "state", storage="sqlite")
+            run = control.get_run(started["run_id"])
+
+        self.assertEqual(run["status"], "waiting")
+        self.assertEqual(transport.calls, [])
+
+    def test_decide_rejects_second_decision_for_terminal_run_without_transport(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, started = _start_waiting_pilot(tmp)
+            transport = _FakeTransport()
+            environment = {
+                "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                "LARK_BOT_ACCESS_TOKEN": "private-token",
+            }
+            with patch.dict(os.environ, environment, clear=True):
+                decide_pilot_run(
+                    ROOT,
+                    work_dir,
+                    started["run_id"],
+                    approved=True,
+                    confirmed_live=True,
+                    now=NOW,
+                    transport=transport,
+                )
+            with patch.dict(os.environ, {}, clear=True):
+                with self.assertRaisesRegex(ValueError, "not waiting"):
+                    decide_pilot_run(
+                        ROOT,
+                        work_dir,
+                        started["run_id"],
+                        approved=True,
+                        confirmed_live=True,
+                        now=NOW,
+                        transport=transport,
+                    )
+
+        self.assertEqual(len(transport.calls), 1)
+
+    def test_validate_controlled_live_binding_rejects_each_fixed_property(self):
+        workflow = build_lark_task_pilot_workflow(
+            mode="live",
+            workflow_id="workflow_controlled_lark_pilot",
+            workflow_version="0.1.0",
+        )
+        run = {
+            "run_id": "run_controlled",
+            "workflow_id": "workflow_controlled_lark_pilot",
+            "workflow_version": "0.1.0",
+            "status": "waiting",
+            "current_node": "review_renewal_risk",
+            "workflow": deepcopy(workflow),
+        }
+        _validate_controlled_live_binding(workflow, run)
+
+        def workflow_meta(target, key, value):
+            target["workflow"][key] = value
+
+        def run_field(target, key, value):
+            target[key] = value
+
+        def connector_field(target, key, value):
+            node = next(
+                item for item in target["nodes"] if item["id"] == "create_lark_task"
+            )
+            node["connector"][key] = value
+
+        def credential_handle(target, _key, value):
+            node = next(
+                item for item in target["nodes"] if item["id"] == "create_lark_task"
+            )
+            node["connector"]["credentials"][0]["handle"] = value
+
+        def connector_node_id(target, _key, value):
+            node = next(
+                item for item in target["nodes"] if item["id"] == "create_lark_task"
+            )
+            node["id"] = value
+
+        cases = [
+            ("workflow id", "workflow", workflow_meta, "id", "workflow_other"),
+            ("workflow version", "workflow", workflow_meta, "version", "9.9.9"),
+            ("run workflow id", "run", run_field, "workflow_id", "workflow_other"),
+            ("run workflow version", "run", run_field, "workflow_version", "9.9.9"),
+            ("current gate", "run", run_field, "current_node", "other_gate"),
+            ("connector id", "workflow", connector_field, "id", "http"),
+            ("operation", "workflow", connector_field, "operation", "delete_task"),
+            ("mode", "workflow", connector_field, "mode", "dry_run"),
+            (
+                "credential handle",
+                "workflow",
+                credential_handle,
+                "handle",
+                "other_secret",
+            ),
+            ("run id", "run", run_field, "run_id", ""),
+            ("node id", "workflow", connector_node_id, "id", "other_node"),
+        ]
+        for label, target_name, mutate, key, value in cases:
+            candidate_workflow = deepcopy(workflow)
+            candidate_run = deepcopy(run)
+            target = candidate_workflow if target_name == "workflow" else candidate_run
+            mutate(target, key, value)
+            if target_name == "workflow":
+                mutate(candidate_run["workflow"], key, value)
+            with self.subTest(property=label), self.assertRaisesRegex(
+                ValueError,
+                "controlled pilot live binding is invalid",
+            ):
+                _validate_controlled_live_binding(candidate_workflow, candidate_run)
+
+    def test_decide_rechecks_external_work_dir_before_charter_or_state_access(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            work_dir = repo_root / "forged-pilot"
+            transport = _FakeTransport()
+            with patch(
+                "skill2workflow.controlled_lark_pilot.load_pilot_charter",
+                side_effect=AssertionError("charter must not be loaded"),
+            ) as load_charter, patch(
+                "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+                side_effect=AssertionError("state must not be accessed"),
+            ) as control_plane:
+                with self.assertRaisesRegex(ValueError, "outside the repository"):
+                    decide_pilot_run(
+                        repo_root,
+                        work_dir,
+                        "run_private",
+                        approved=False,
+                        now=NOW,
+                        transport=transport,
+                    )
+
+            load_charter.assert_not_called()
+            control_plane.assert_not_called()
+            self.assertEqual(transport.calls, [])
+
     def test_start_pilot_run_publishes_live_workflow_and_stops_at_gate(self):
         with TemporaryDirectory() as tmp:
             work_dir, result = _start_waiting_pilot(tmp)
