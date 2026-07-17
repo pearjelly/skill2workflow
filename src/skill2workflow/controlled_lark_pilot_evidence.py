@@ -97,8 +97,6 @@ def _validate_connector_sequence(
 ) -> Dict[str, object]:
     completed = {}
     attempt_open = False
-    seen_failed = False
-    last_type = ""
     for index, event in candidates:
         if event.get("node_id") != "create_lark_task":
             raise ValueError("connector event must target the controlled node")
@@ -135,16 +133,20 @@ def _validate_connector_sequence(
             if not attempt_open:
                 raise ValueError("connector failure must follow a started attempt")
             attempt_open = False
-            seen_failed = True
         else:
-            if last_type == "connector_failed":
-                raise ValueError("connector completion must follow a retry start")
+            if not attempt_open:
+                raise ValueError("connector completion must follow a started attempt")
             attempt_open = False
             completed = event
-        last_type = event_type
     if attempt_open:
         raise ValueError("connector attempt is missing a terminal connector event")
 
+    expected_retry_pairs = {
+        (previous[0], following[0])
+        for previous, following in zip(candidates, candidates[1:])
+        if previous[1].get("type") == "connector_failed"
+        and following[1].get("type") == "connector_started"
+    }
     retry_pairs = set()
     for index, event in retrying:
         if event.get("node_id") != "create_lark_task":
@@ -171,8 +173,8 @@ def _validate_connector_sequence(
         if pair in retry_pairs:
             raise ValueError("connector retry transition must not be duplicated")
         retry_pairs.add(pair)
-    if retrying and not seen_failed:
-        raise ValueError("retry event requires a failed connector attempt")
+    if retry_pairs != expected_retry_pairs:
+        raise ValueError("connector retry events must exactly match retry transitions")
     return completed
 
 

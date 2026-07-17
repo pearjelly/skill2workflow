@@ -246,6 +246,14 @@ def _raw_completed_run_and_audit():
             "timestamp": "2026-07-18T01:01:00+00:00",
         },
         {
+            "type": "connector_started",
+            "run_id": "run_raw",
+            "node_id": "create_lark_task",
+            "connector_id": "lark_task",
+            "connector_status": "running",
+            "timestamp": "2026-07-18T01:01:00+00:00",
+        },
+        {
             "type": "connector_completed",
             "run_id": "run_raw",
             "node_id": "create_lark_task",
@@ -271,6 +279,37 @@ def _raw_completed_run_and_audit():
             "run_id": "run_raw",
             "timestamp": "2026-07-18T01:01:02+00:00",
         },
+    ]
+    return run, audit
+
+
+def _raw_retry_run_and_audit():
+    run, audit = _raw_completed_run_and_audit()
+    completed = audit.pop(3)
+    audit[3:3] = [
+        {
+            "type": "connector_failed",
+            "run_id": "run_raw",
+            "node_id": "create_lark_task",
+            "connector_id": "lark_task",
+            "connector_status": "failed",
+            "timestamp": "2026-07-18T01:01:00+00:00",
+        },
+        {
+            "type": "node_retrying",
+            "run_id": "run_raw",
+            "node_id": "create_lark_task",
+            "timestamp": "2026-07-18T01:01:00+00:00",
+        },
+        {
+            "type": "connector_started",
+            "run_id": "run_raw",
+            "node_id": "create_lark_task",
+            "connector_id": "lark_task",
+            "connector_status": "running",
+            "timestamp": "2026-07-18T01:01:00+00:00",
+        },
+        completed,
     ]
     return run, audit
 
@@ -417,7 +456,7 @@ class ControlledLarkPilotEvidenceTests(TestCase):
         for field in fields:
             for invalid in invalid_values:
                 run, audit = _raw_completed_run_and_audit()
-                audit[2]["connector_metadata"][field] = invalid
+                audit[3]["connector_metadata"][field] = invalid
                 with self.subTest(field=field, value=repr(invalid)), self.assertRaisesRegex(
                     ValueError,
                     "presence",
@@ -493,11 +532,11 @@ class ControlledLarkPilotEvidenceTests(TestCase):
 
     def test_build_run_evidence_requires_success_metadata_on_completed_event(self):
         run, audit = _raw_completed_run_and_audit()
-        audit[2]["type"] = "connector_started"
+        audit[3]["type"] = "connector_started"
         started_spoof = (run, audit)
 
         run, audit = _raw_completed_run_and_audit()
-        metadata = audit[2].pop("connector_metadata")
+        metadata = audit[3].pop("connector_metadata")
         audit.insert(
             -1,
             {
@@ -521,15 +560,15 @@ class ControlledLarkPilotEvidenceTests(TestCase):
         mutations = []
 
         run, audit = _raw_completed_run_and_audit()
-        audit[2]["connector_metadata"]["provider_status"] = "provider_unavailable"
+        audit[3]["connector_metadata"]["provider_status"] = "provider_unavailable"
         mutations.append(("provider status", run, audit))
 
         run, audit = _raw_completed_run_and_audit()
-        audit[2]["connector_metadata"]["lark_task_id_present"] = False
+        audit[3]["connector_metadata"]["lark_task_id_present"] = False
         mutations.append(("task id presence", run, audit))
 
         run, audit = _raw_completed_run_and_audit()
-        audit[2]["credential_status"] = "skipped"
+        audit[3]["credential_status"] = "skipped"
         mutations.append(("credential status", run, audit))
 
         run, audit = _raw_completed_run_and_audit()
@@ -558,12 +597,12 @@ class ControlledLarkPilotEvidenceTests(TestCase):
         mutations.append(("resume before start", run, audit))
 
         run, audit = _raw_completed_run_and_audit()
-        connector = audit.pop(2)
+        connector = audit.pop(3)
         audit.append(connector)
         mutations.append(("connector after terminal", run, audit))
 
         run, audit = _raw_completed_run_and_audit()
-        connector = audit.pop(2)
+        connector = audit.pop(3)
         audit.insert(1, connector)
         mutations.append(("connector before resume", run, audit))
 
@@ -583,132 +622,53 @@ class ControlledLarkPilotEvidenceTests(TestCase):
         mutations.append(("duplicate terminal", run, audit))
 
         run, audit = _raw_completed_run_and_audit()
-        mismatched = deepcopy(audit[2])
+        mismatched = deepcopy(audit[3])
         mismatched["run_id"] = "run_other"
-        audit.insert(2, mismatched)
+        audit.insert(3, mismatched)
         mutations.append(("mismatched connector run", run, audit))
 
         run, audit = _raw_completed_run_and_audit()
-        audit[2]["type"] = "connector_failed"
+        audit[3]["type"] = "connector_failed"
         mutations.append(("failed event with completed status", run, audit))
 
         for label, run, audit in mutations:
             with self.subTest(case=label), self.assertRaises(ValueError):
                 build_run_evidence(run, audit)
 
-    def test_build_run_evidence_rejects_impossible_failure_and_retry_sequences(self):
-        failed_run = {
-            "run_id": "run_failed",
-            "workflow_id": "workflow_controlled_lark_pilot",
-            "workflow_version": "0.1.0",
-            "status": "failed",
-            "context": {"input": {"pilot_case_id": "case-failed"}},
-        }
-        standalone_failure = [
-            {
-                "type": "run_started",
-                "run_id": "run_failed",
-                "timestamp": "2026-07-18T01:00:00+00:00",
-            },
-            {
-                "type": "run_resumed",
-                "run_id": "run_failed",
-                "approved": True,
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-            {
-                "type": "connector_failed",
-                "run_id": "run_failed",
-                "node_id": "create_lark_task",
-                "connector_id": "lark_task",
-                "connector_status": "failed",
-                "timestamp": "2026-07-18T01:01:01+00:00",
-            },
-            {
-                "type": "run_failed",
-                "run_id": "run_failed",
-                "timestamp": "2026-07-18T01:02:00+00:00",
-            },
-        ]
+    def test_build_run_evidence_requires_started_attempt_before_each_terminal(self):
+        run, completion_without_start = _raw_completed_run_and_audit()
+        completion_without_start.pop(2)
 
-        run, retry_audit = _raw_completed_run_and_audit()
-        completed = retry_audit.pop(2)
-        connector_prefix = [
-            {
-                "type": "connector_started",
-                "run_id": "run_raw",
-                "node_id": "create_lark_task",
-                "connector_id": "lark_task",
-                "connector_status": "running",
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-            {
-                "type": "connector_failed",
-                "run_id": "run_raw",
-                "node_id": "create_lark_task",
-                "connector_id": "lark_task",
-                "connector_status": "failed",
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-            {
-                "type": "node_retrying",
-                "run_id": "run_raw",
-                "node_id": "create_lark_task",
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-            {
-                "type": "node_retrying",
-                "run_id": "run_raw",
-                "node_id": "create_lark_task",
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-            {
-                "type": "connector_started",
-                "run_id": "run_raw",
-                "node_id": "create_lark_task",
-                "connector_id": "lark_task",
-                "connector_status": "running",
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-            completed,
-        ]
-        retry_audit[2:2] = connector_prefix
+        failed_run, failure_without_start = _raw_completed_run_and_audit()
+        failed_run["status"] = "failed"
+        failure_without_start[-1]["type"] = "run_failed"
+        failure_without_start[3] = {
+            "type": "connector_failed",
+            "run_id": "run_raw",
+            "node_id": "create_lark_task",
+            "connector_id": "lark_task",
+            "connector_status": "failed",
+            "timestamp": "2026-07-18T01:01:01+00:00",
+        }
+        failure_without_start.pop(2)
 
         for label, candidate_run, audit in (
-            ("failure without start", failed_run, standalone_failure),
-            ("duplicate retry", run, retry_audit),
+            ("completion without start", run, completion_without_start),
+            ("failure without start", failed_run, failure_without_start),
         ):
             with self.subTest(case=label), self.assertRaises(ValueError):
                 build_run_evidence(candidate_run, audit)
 
-    def test_build_run_evidence_accepts_normal_retry_sequence(self):
-        run, audit = _raw_completed_run_and_audit()
-        completed = audit.pop(2)
-        audit[1:1] = []
-        audit.insert(
-            2,
-            {
-                "type": "connector_started",
-                "run_id": "run_raw",
-                "node_id": "create_lark_task",
-                "connector_id": "lark_task",
-                "connector_status": "running",
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-        )
-        audit.insert(
+    def test_build_run_evidence_requires_exact_retry_pair_mapping(self):
+        run, missing_retry = _raw_retry_run_and_audit()
+        missing_retry.pop(4)
+
+        duplicate_run, duplicate_retry = _raw_retry_run_and_audit()
+        duplicate_retry.insert(5, deepcopy(duplicate_retry[4]))
+
+        extra_run, extra_retry = _raw_completed_run_and_audit()
+        extra_retry.insert(
             3,
-            {
-                "type": "connector_failed",
-                "run_id": "run_raw",
-                "node_id": "create_lark_task",
-                "connector_id": "lark_task",
-                "connector_status": "failed",
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-        )
-        audit.insert(
-            4,
             {
                 "type": "node_retrying",
                 "run_id": "run_raw",
@@ -716,18 +676,25 @@ class ControlledLarkPilotEvidenceTests(TestCase):
                 "timestamp": "2026-07-18T01:01:00+00:00",
             },
         )
-        audit.insert(
-            5,
-            {
-                "type": "connector_started",
-                "run_id": "run_raw",
-                "node_id": "create_lark_task",
-                "connector_id": "lark_task",
-                "connector_status": "running",
-                "timestamp": "2026-07-18T01:01:00+00:00",
-            },
-        )
-        audit.insert(6, completed)
+
+        for label, candidate_run, audit in (
+            ("missing retry", run, missing_retry),
+            ("duplicate retry", duplicate_run, duplicate_retry),
+            ("extra retry", extra_run, extra_retry),
+        ):
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(candidate_run, audit)
+
+    def test_build_run_evidence_accepts_no_retry_sequence(self):
+        run, audit = _raw_completed_run_and_audit()
+
+        evidence = build_run_evidence(run, audit)
+
+        self.assertEqual(evidence["connector_status"], "completed")
+        self.assertEqual(evidence["provider_status"], "completed")
+
+    def test_build_run_evidence_accepts_normal_retry_sequence(self):
+        run, audit = _raw_retry_run_and_audit()
 
         evidence = build_run_evidence(run, audit)
 
@@ -779,10 +746,11 @@ class ControlledLarkPilotEvidenceTests(TestCase):
 
         run, audit = rejection()
         _success_run, success_audit = _raw_completed_run_and_audit()
-        connector = deepcopy(success_audit[2])
-        connector["run_id"] = "run_rejected"
-        connector["timestamp"] = "2026-07-18T01:01:30+00:00"
-        audit.insert(2, connector)
+        connectors = deepcopy(success_audit[2:4])
+        for connector in connectors:
+            connector["run_id"] = "run_rejected"
+            connector["timestamp"] = "2026-07-18T01:01:30+00:00"
+        audit[2:2] = connectors
         mutations.append(("rejection with connector", run, audit))
 
         for label, run, audit in mutations:
@@ -873,6 +841,14 @@ class ControlledLarkPilotEvidenceTests(TestCase):
                 "type": "run_resumed",
                 "run_id": "run_001",
                 "approved": True,
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+            {
+                "type": "connector_started",
+                "run_id": "run_001",
+                "node_id": "create_lark_task",
+                "connector_id": "lark_task",
+                "connector_status": "running",
                 "timestamp": "2026-07-18T01:01:00+00:00",
             },
             {
