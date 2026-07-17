@@ -6,12 +6,22 @@ import secrets
 import stat
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 from zoneinfo import ZoneInfo
 
 from .connectors import ConnectorRuntime, ExternalConnector
 from .control_plane import LocalControlPlane
 from .credentials import StaticCredentialProvider
+from .controlled_lark_pilot_evidence import (
+    INDEX_SCHEMA_VERSION,
+    _is_approved_live_run,
+    _rejection_exercise,
+    _run_sort_key,
+    build_acceptance_summary,
+    build_run_evidence,
+    validate_evidence_pack,
+    write_evidence_pack,
+)
 from .external_connectors import load_external_connector
 from .lark_task_pilot import build_lark_task_pilot_workflow
 
@@ -46,6 +56,207 @@ REQUIRED_CASE_KEYS = {
 }
 LIVE_SWITCH = "SKILL2WORKFLOW_LARK_TASK_LIVE"
 TOKEN_ENVIRONMENT = "LARK_BOT_ACCESS_TOKEN"
+FINALIZATION_SCHEMA_VERSION = "controlled-lark-pilot-finalization-0.1.0"
+FINALIZATION_KEYS = {"schema_version", "finalized", "decision", "finalized_at"}
+
+
+def generate_pilot_evidence(
+    repo_root: Path,
+    work_dir: Path,
+    output_dir: Path = None,
+    now: datetime = None,
+) -> Dict[str, object]:
+    repo_root = Path(repo_root).resolve()
+    work_dir = Path(work_dir).resolve()
+    _require_outside_repository(repo_root, work_dir, "pilot work directory")
+    output, repository_export = _evidence_output(repo_root, work_dir, output_dir)
+    pack = _build_pilot_evidence(repo_root, work_dir, now=now)
+    if repository_export:
+        _require_finalized_export(work_dir, pack)
+    written = write_evidence_pack(output, pack)
+    index = pack["index"]
+    return {
+        "status": written["status"],
+        "file_count": written["file_count"],
+        "run_count": len(pack["runs"]),
+        "approved_live_runs": index["approved_live_runs"],
+        "distinct_calendar_days": index["distinct_calendar_days"],
+        "distinct_private_cases": index["distinct_private_cases"],
+        "rejected_runs": index["rejected_runs"],
+        "unmet_conditions": list(index["unmet_conditions"]),
+        "output_dir": written["output_dir"],
+    }
+
+
+def _build_pilot_evidence(
+    repo_root: Path,
+    work_dir: Path,
+    decision_override: Dict[str, object] = None,
+    now: datetime = None,
+) -> Dict[str, object]:
+    repo_root = Path(repo_root).resolve()
+    work_dir = Path(work_dir).resolve()
+    _require_outside_repository(repo_root, work_dir, "pilot work directory")
+    charter = load_pilot_charter(work_dir, now=now)
+    control = _pilot_control_plane(
+        repo_root,
+        work_dir,
+        credential_provider=StaticCredentialProvider({}),
+    )
+    private_runs = []
+    forbidden_values: List[str] = []
+    for summary in control.list_runs():
+        if (
+            not isinstance(summary, dict)
+            or summary.get("workflow_id") != WORKFLOW_ID
+            or summary.get("workflow_version") != WORKFLOW_VERSION
+        ):
+            continue
+        requested_run_id = str(summary.get("run_id", ""))
+        run = control.get_run(requested_run_id)
+        if not isinstance(run, dict) or run.get("run_id") != requested_run_id:
+            raise ValueError("controlled pilot run identity is invalid")
+        audit = control.list_audit_events(run_id=requested_run_id)
+        evidence = build_run_evidence(run, audit)
+        private_runs.append((evidence, run))
+        context = run.get("context", {})
+        trigger_input = context.get("input", {}) if isinstance(context, dict) else {}
+        forbidden_values.extend(_private_string_values(trigger_input))
+    private_runs.sort(key=lambda item: _run_sort_key(item[0]))
+    runs = [item[0] for item in private_runs]
+    private_case_ids = set()
+    for evidence, run in private_runs:
+        if not _is_approved_live_run(evidence):
+            continue
+        context = run.get("context", {})
+        trigger_input = context.get("input", {}) if isinstance(context, dict) else {}
+        case_id = trigger_input.get("pilot_case_id", "") if isinstance(trigger_input, dict) else ""
+        if isinstance(case_id, str) and case_id.strip():
+            private_case_ids.add(case_id)
+    distinct_private_cases = len(private_case_ids)
+    del private_case_ids
+    del private_runs
+
+    private_dir = work_dir / "private"
+    exercises = {
+        "rejection": _rejection_exercise(runs),
+        "failure": _load_optional_private_json(private_dir / "failure.json"),
+        "rollback": _load_optional_private_json(private_dir / "rollback.json"),
+    }
+    verification = _load_optional_private_json(private_dir / "verification.json")
+    decision = (
+        json.loads(json.dumps(decision_override, ensure_ascii=False))
+        if decision_override is not None
+        else _load_optional_private_json(private_dir / "decision.json")
+    )
+    summary = build_acceptance_summary(
+        charter,
+        runs,
+        distinct_private_cases,
+        exercises,
+        verification,
+        decision,
+    )
+    generated = now or datetime.now(timezone.utc)
+    if generated.tzinfo is None or generated.utcoffset() is None:
+        raise ValueError("evidence generation time must include a timezone")
+    index = {
+        "schema_version": INDEX_SCHEMA_VERSION,
+        "generated_at": generated.astimezone(ZoneInfo(PILOT_TIMEZONE)).isoformat(),
+        "workflow_id": WORKFLOW_ID,
+        "workflow_version": WORKFLOW_VERSION,
+        "timezone": PILOT_TIMEZONE,
+        **summary,
+    }
+    token = os.environ.get(TOKEN_ENVIRONMENT, "")
+    if token:
+        forbidden_values.append(token)
+    pack = {
+        "charter": charter,
+        "runs": runs,
+        "exercises": exercises,
+        "verification": verification,
+        "decision": decision,
+        "index": index,
+    }
+    validate_evidence_pack(pack, forbidden_values)
+    return pack
+
+
+def _private_string_values(value: object) -> List[str]:
+    values: List[str] = []
+    if isinstance(value, dict):
+        for item in value.values():
+            values.extend(_private_string_values(item))
+    elif isinstance(value, list):
+        for item in value:
+            values.extend(_private_string_values(item))
+    elif isinstance(value, str) and value:
+        values.append(value)
+    return values
+
+
+def _load_optional_private_json(path: Path):
+    _require_regular_file_or_missing(path)
+    if not path.exists():
+        return None
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError(f"private pilot artifact {path.name} must be an object")
+    return value
+
+
+def _evidence_output(
+    repo_root: Path, work_dir: Path, output_dir: Path
+) -> Tuple[Path, bool]:
+    if output_dir is None:
+        return work_dir / "evidence", False
+    output = Path(os.path.abspath(os.fspath(output_dir)))
+    resolved = output.resolve()
+    in_repository = resolved == repo_root or repo_root in resolved.parents
+    if not in_repository:
+        return output, False
+    allowed = (repo_root / "docs" / "pilot-evidence" / "loop-40").resolve()
+    if resolved != allowed:
+        raise ValueError("repository evidence output must equal docs/pilot-evidence/loop-40")
+    return output, True
+
+
+def _require_finalized_export(work_dir: Path, pack: Dict[str, object]) -> None:
+    path = work_dir / "private" / "finalization.json"
+    _require_regular_file_or_missing(path)
+    if not path.exists():
+        raise ValueError("successful private finalization is required for repository export")
+    marker = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(marker, dict) or set(marker) != FINALIZATION_KEYS:
+        raise ValueError("private finalization marker is invalid")
+    if (
+        marker.get("schema_version") != FINALIZATION_SCHEMA_VERSION
+        or marker.get("finalized") is not True
+        or marker.get("decision") not in ("continue", "harden", "defer")
+    ):
+        raise ValueError("private finalization marker is invalid")
+    _require_aware_iso(marker.get("finalized_at"), "private finalization timestamp")
+    decision = pack.get("decision")
+    index = pack.get("index")
+    if (
+        not isinstance(decision, dict)
+        or marker["decision"] != decision.get("decision")
+        or not isinstance(index, dict)
+        or index.get("ready_to_finalize") is not True
+    ):
+        raise ValueError("private finalization does not authorize this evidence pack")
+
+
+def _require_aware_iso(value: object, label: str) -> None:
+    if type(value) is not str:
+        raise ValueError(f"{label} must be an ISO timestamp with timezone")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError(f"{label} must be an ISO timestamp with timezone") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError(f"{label} must be an ISO timestamp with timezone")
 
 
 def decide_pilot_run(
