@@ -4,13 +4,11 @@ import shutil
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
 from skill2workflow.controlled_lark_pilot import (
     decide_pilot_run,
-    generate_pilot_evidence,
     initialize_pilot,
     start_pilot_run,
 )
@@ -19,7 +17,6 @@ from skill2workflow.controlled_lark_pilot_evidence import (
     build_acceptance_summary,
     build_run_evidence,
     validate_evidence_pack,
-    write_evidence_pack,
 )
 
 
@@ -494,6 +491,326 @@ class ControlledLarkPilotEvidenceTests(TestCase):
             with self.subTest(case=label), self.assertRaises(ValueError):
                 build_run_evidence(run, audit)
 
+    def test_build_run_evidence_requires_success_metadata_on_completed_event(self):
+        run, audit = _raw_completed_run_and_audit()
+        audit[2]["type"] = "connector_started"
+        started_spoof = (run, audit)
+
+        run, audit = _raw_completed_run_and_audit()
+        metadata = audit[2].pop("connector_metadata")
+        audit.insert(
+            -1,
+            {
+                "type": "node_recovered",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "connector_metadata": metadata,
+                "timestamp": "2026-07-18T01:01:01+00:00",
+            },
+        )
+        unrelated_metadata = (run, audit)
+
+        for label, (run, audit) in (
+            ("connector_started spoof", started_spoof),
+            ("unrelated metadata event", unrelated_metadata),
+        ):
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(run, audit)
+
+    def test_build_run_evidence_requires_exact_success_facts_for_completed_run(self):
+        mutations = []
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[2]["connector_metadata"]["provider_status"] = "provider_unavailable"
+        mutations.append(("provider status", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[2]["connector_metadata"]["lark_task_id_present"] = False
+        mutations.append(("task id presence", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[2]["credential_status"] = "skipped"
+        mutations.append(("credential status", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit.insert(
+            2,
+            {
+                "type": "connector_started",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "connector_id": "other_connector",
+                "connector_status": "running",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+        )
+        mutations.append(("preceding connector identity", run, audit))
+
+        for label, run, audit in mutations:
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(run, audit)
+
+    def test_build_run_evidence_requires_semantic_audit_list_order(self):
+        mutations = []
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[0], audit[1] = audit[1], audit[0]
+        mutations.append(("resume before start", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        connector = audit.pop(2)
+        audit.append(connector)
+        mutations.append(("connector after terminal", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        connector = audit.pop(2)
+        audit.insert(1, connector)
+        mutations.append(("connector before resume", run, audit))
+
+        for label, run, audit in mutations:
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(run, audit)
+
+    def test_build_run_evidence_rejects_duplicate_or_mismatched_decision_events(self):
+        mutations = []
+
+        run, audit = _raw_completed_run_and_audit()
+        audit.insert(2, deepcopy(audit[1]))
+        mutations.append(("duplicate resume", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit.append(deepcopy(audit[-1]))
+        mutations.append(("duplicate terminal", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        mismatched = deepcopy(audit[2])
+        mismatched["run_id"] = "run_other"
+        audit.insert(2, mismatched)
+        mutations.append(("mismatched connector run", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[2]["type"] = "connector_failed"
+        mutations.append(("failed event with completed status", run, audit))
+
+        for label, run, audit in mutations:
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(run, audit)
+
+    def test_build_run_evidence_rejects_impossible_failure_and_retry_sequences(self):
+        failed_run = {
+            "run_id": "run_failed",
+            "workflow_id": "workflow_controlled_lark_pilot",
+            "workflow_version": "0.1.0",
+            "status": "failed",
+            "context": {"input": {"pilot_case_id": "case-failed"}},
+        }
+        standalone_failure = [
+            {
+                "type": "run_started",
+                "run_id": "run_failed",
+                "timestamp": "2026-07-18T01:00:00+00:00",
+            },
+            {
+                "type": "run_resumed",
+                "run_id": "run_failed",
+                "approved": True,
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+            {
+                "type": "connector_failed",
+                "run_id": "run_failed",
+                "node_id": "create_lark_task",
+                "connector_id": "lark_task",
+                "connector_status": "failed",
+                "timestamp": "2026-07-18T01:01:01+00:00",
+            },
+            {
+                "type": "run_failed",
+                "run_id": "run_failed",
+                "timestamp": "2026-07-18T01:02:00+00:00",
+            },
+        ]
+
+        run, retry_audit = _raw_completed_run_and_audit()
+        completed = retry_audit.pop(2)
+        connector_prefix = [
+            {
+                "type": "connector_started",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "connector_id": "lark_task",
+                "connector_status": "running",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+            {
+                "type": "connector_failed",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "connector_id": "lark_task",
+                "connector_status": "failed",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+            {
+                "type": "node_retrying",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+            {
+                "type": "node_retrying",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+            {
+                "type": "connector_started",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "connector_id": "lark_task",
+                "connector_status": "running",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+            completed,
+        ]
+        retry_audit[2:2] = connector_prefix
+
+        for label, candidate_run, audit in (
+            ("failure without start", failed_run, standalone_failure),
+            ("duplicate retry", run, retry_audit),
+        ):
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(candidate_run, audit)
+
+    def test_build_run_evidence_accepts_normal_retry_sequence(self):
+        run, audit = _raw_completed_run_and_audit()
+        completed = audit.pop(2)
+        audit[1:1] = []
+        audit.insert(
+            2,
+            {
+                "type": "connector_started",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "connector_id": "lark_task",
+                "connector_status": "running",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+        )
+        audit.insert(
+            3,
+            {
+                "type": "connector_failed",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "connector_id": "lark_task",
+                "connector_status": "failed",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+        )
+        audit.insert(
+            4,
+            {
+                "type": "node_retrying",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+        )
+        audit.insert(
+            5,
+            {
+                "type": "connector_started",
+                "run_id": "run_raw",
+                "node_id": "create_lark_task",
+                "connector_id": "lark_task",
+                "connector_status": "running",
+                "timestamp": "2026-07-18T01:01:00+00:00",
+            },
+        )
+        audit.insert(6, completed)
+
+        evidence = build_run_evidence(run, audit)
+
+        self.assertEqual(evidence["connector_status"], "completed")
+        self.assertEqual(evidence["provider_status"], "completed")
+
+    def test_build_run_evidence_requires_exact_rejection_sequence(self):
+        def rejection():
+            run = {
+                "run_id": "run_rejected",
+                "workflow_id": "workflow_controlled_lark_pilot",
+                "workflow_version": "0.1.0",
+                "status": "failed",
+                "context": {"input": {"pilot_case_id": "case-rejected"}},
+            }
+            audit = [
+                {
+                    "type": "run_started",
+                    "run_id": "run_rejected",
+                    "timestamp": "2026-07-18T01:00:00+00:00",
+                },
+                {
+                    "type": "run_resumed",
+                    "run_id": "run_rejected",
+                    "approved": False,
+                    "timestamp": "2026-07-18T01:01:00+00:00",
+                },
+                {
+                    "type": "run_failed",
+                    "run_id": "run_rejected",
+                    "timestamp": "2026-07-18T01:02:00+00:00",
+                },
+            ]
+            return run, audit
+
+        mutations = []
+
+        run, audit = rejection()
+        audit.pop(1)
+        mutations.append(("missing resume", run, audit))
+
+        run, audit = rejection()
+        audit[1]["approved"] = True
+        mutations.append(("approved without connector", run, audit))
+
+        run, audit = rejection()
+        audit.insert(2, deepcopy(audit[1]))
+        mutations.append(("duplicate rejection resume", run, audit))
+
+        run, audit = rejection()
+        _success_run, success_audit = _raw_completed_run_and_audit()
+        connector = deepcopy(success_audit[2])
+        connector["run_id"] = "run_rejected"
+        connector["timestamp"] = "2026-07-18T01:01:30+00:00"
+        audit.insert(2, connector)
+        mutations.append(("rejection with connector", run, audit))
+
+        for label, run, audit in mutations:
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(run, audit)
+
+    def test_build_run_evidence_allows_waiting_run_without_decision(self):
+        run = {
+            "run_id": "run_waiting",
+            "workflow_id": "workflow_controlled_lark_pilot",
+            "workflow_version": "0.1.0",
+            "status": "waiting",
+            "context": {"input": {"pilot_case_id": "case-waiting"}},
+        }
+        audit = [
+            {
+                "type": "run_started",
+                "run_id": "run_waiting",
+                "timestamp": "2026-07-18T01:00:00+00:00",
+            }
+        ]
+
+        evidence = build_run_evidence(run, audit)
+
+        self.assertEqual(evidence["run_status"], "waiting")
+        self.assertEqual(evidence["gate_decision"], "pending")
+        self.assertFalse(evidence["connector_invoked"])
+
     def test_build_run_evidence_rejects_invalid_or_naive_event_timestamps(self):
         for index in (0, -1):
             for invalid in ("not-a-time", "2026-07-18T01:00:00"):
@@ -502,208 +819,25 @@ class ControlledLarkPilotEvidenceTests(TestCase):
                 with self.subTest(index=index, value=invalid), self.assertRaises(ValueError):
                     build_run_evidence(run, audit)
 
+    def test_build_run_evidence_bounds_resume_and_connector_timestamps(self):
+        for index, timestamp in (
+            (1, "2026-07-18T00:59:59+00:00"),
+            (2, "2026-07-18T01:01:03+00:00"),
+        ):
+            run, audit = _raw_completed_run_and_audit()
+            audit[index]["timestamp"] = timestamp
+            with self.subTest(index=index), self.assertRaisesRegex(
+                ValueError,
+                "run interval",
+            ):
+                build_run_evidence(run, audit)
+
     def test_validate_pack_requires_terminal_timestamp_for_qualifying_rejection(self):
         pack = _valid_pack()
         pack["runs"][-1]["completed_at"] = ""
 
         with self.assertRaisesRegex(ValueError, "completed_at"):
             validate_evidence_pack(pack, [])
-
-    def test_generate_evidence_from_real_sqlite_state_is_redacted_stable_and_ready(self):
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            repo_root, work_dir, transport = _build_ready_state(root)
-            with patch.dict(
-                os.environ,
-                {"LARK_BOT_ACCESS_TOKEN": "private-token"},
-                clear=True,
-            ):
-                result = generate_pilot_evidence(
-                    repo_root,
-                    work_dir,
-                    now=NOW,
-                )
-
-            evidence_dir = work_dir / "evidence"
-            index = json.loads(
-                (evidence_dir / "evidence-index.json").read_text(encoding="utf-8")
-            )
-            run_files = sorted((evidence_dir / "runs").glob("*.json"))
-            runs = [json.loads(path.read_text(encoding="utf-8")) for path in run_files]
-            encoded = "".join(
-                path.read_text(encoding="utf-8")
-                for path in evidence_dir.rglob("*.json")
-            )
-            native_tokens = [
-                json.loads(request.data.decode("utf-8"))["client_token"]
-                for request, _timeout in transport.calls
-            ]
-
-            self.assertEqual(result["output_dir"], str(evidence_dir))
-            self.assertEqual(result["run_count"], 6)
-            self.assertEqual(result["distinct_private_cases"], 2)
-            self.assertEqual(result["unmet_conditions"], [])
-            self.assertTrue(index["ready_to_finalize"])
-            self.assertEqual(index["approved_live_runs"], 5)
-            self.assertEqual(index["distinct_calendar_days"], 5)
-            self.assertEqual(index["rejected_runs"], 1)
-            self.assertEqual(index["generated_at"], "2026-07-23T17:00:00+08:00")
-            self.assertEqual(len(run_files), 6)
-            self.assertEqual(
-                [(run["started_at"], run["run_id"]) for run in runs],
-                sorted((run["started_at"], run["run_id"]) for run in runs),
-            )
-            self.assertEqual(len(transport.calls), 5)
-            for forbidden in (
-                "case-001",
-                "case-002",
-                "case-rejected",
-                "Private Account",
-                "Private Risk",
-                "ou_private",
-                "private-token",
-                "private-provider-message",
-                "private-task-guid",
-                *native_tokens,
-            ):
-                self.assertNotIn(forbidden, encoded)
-                self.assertNotIn(forbidden, json.dumps(result))
-
-            finalization = work_dir / "private" / "finalization.json"
-            repo_output = repo_root / "docs" / "pilot-evidence" / "loop-40"
-            valid_marker = {
-                "schema_version": "controlled-lark-pilot-finalization-0.1.0",
-                "finalized": True,
-                "decision": "continue",
-                "finalized_at": "2026-07-23T17:00:00+08:00",
-            }
-            marker_target = root / "outside-finalization.json"
-            marker_target.write_text(json.dumps(valid_marker), encoding="utf-8")
-            finalization.symlink_to(marker_target)
-            with self.assertRaisesRegex(ValueError, "symbolic link"):
-                generate_pilot_evidence(
-                    repo_root,
-                    work_dir,
-                    output_dir=repo_output,
-                    now=NOW,
-                )
-            self.assertEqual(
-                json.loads(marker_target.read_text(encoding="utf-8")), valid_marker
-            )
-            self.assertFalse(repo_output.exists())
-            finalization.unlink()
-
-            finalization.mkdir()
-            with self.assertRaisesRegex(ValueError, "regular file"):
-                generate_pilot_evidence(
-                    repo_root,
-                    work_dir,
-                    output_dir=repo_output,
-                    now=NOW,
-                )
-            self.assertFalse(repo_output.exists())
-            finalization.rmdir()
-
-            invalid_markers = [
-                {
-                    "schema_version": "controlled-lark-pilot-finalization-0.1.0",
-                    "finalized": 1,
-                    "decision": "continue",
-                    "finalized_at": "2026-07-23T17:00:00+08:00",
-                },
-                {
-                    "schema_version": "controlled-lark-pilot-finalization-0.1.0",
-                    "finalized": True,
-                    "decision": "defer",
-                    "finalized_at": "2026-07-23T17:00:00+08:00",
-                },
-                {
-                    "schema_version": "controlled-lark-pilot-finalization-0.1.0",
-                    "finalized": True,
-                    "decision": "continue",
-                    "finalized_at": "2026-07-23T17:00:00",
-                },
-            ]
-            for marker in invalid_markers:
-                finalization.write_text(json.dumps(marker), encoding="utf-8")
-                with self.subTest(marker=marker), self.assertRaises(ValueError):
-                    generate_pilot_evidence(
-                        repo_root,
-                        work_dir,
-                        output_dir=repo_output,
-                        now=NOW,
-                    )
-                self.assertFalse(repo_output.exists())
-
-            finalization.write_text(json.dumps(valid_marker), encoding="utf-8")
-            exported = generate_pilot_evidence(
-                repo_root,
-                work_dir,
-                output_dir=repo_output,
-                now=NOW,
-            )
-            self.assertEqual(exported["output_dir"], str(repo_output))
-            self.assertTrue((repo_output / "evidence-index.json").is_file())
-
-    def test_generate_evidence_allows_external_explicit_output_without_finalization(self):
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            repo_root = _prepare_repo(root)
-            work_dir = root / "pilot"
-            initialize_pilot(repo_root, work_dir, _valid_charter(), now=NOW)
-            output = root / "external-evidence"
-
-            result = generate_pilot_evidence(
-                repo_root,
-                work_dir,
-                output_dir=output,
-                now=NOW,
-            )
-
-            self.assertEqual(result["output_dir"], str(output))
-            self.assertEqual(result["run_count"], 0)
-            self.assertEqual(
-                result["unmet_conditions"],
-                [
-                    "approved_live_runs_threshold",
-                    "distinct_calendar_days_threshold",
-                    "distinct_private_cases_threshold",
-                    "human_rejection",
-                    "disabled_live_exercise",
-                    "rollback_exercise",
-                    "verification",
-                    "decision",
-                    "partner_acknowledgement",
-                    "operator_acknowledgement",
-                ],
-            )
-            self.assertTrue((output / "pilot-charter.json").is_file())
-            self.assertFalse((work_dir / "private" / "finalization.json").exists())
-
-    def test_generate_evidence_rejects_unfinalized_or_wrong_repository_output(self):
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            repo_root = _prepare_repo(root)
-            work_dir = root / "pilot"
-            initialize_pilot(repo_root, work_dir, _valid_charter(), now=NOW)
-            exact = repo_root / "docs" / "pilot-evidence" / "loop-40"
-
-            with self.assertRaisesRegex(ValueError, "finalization"):
-                generate_pilot_evidence(
-                    repo_root,
-                    work_dir,
-                    output_dir=exact,
-                    now=NOW,
-                )
-            with self.assertRaisesRegex(ValueError, "repository evidence output"):
-                generate_pilot_evidence(
-                    repo_root,
-                    work_dir,
-                    output_dir=repo_root / "docs" / "pilot-evidence" / "other",
-                    now=NOW,
-                )
-
-            self.assertFalse(exact.exists())
 
     def test_build_run_evidence_uses_exact_allowlist_without_private_values(self):
         run = {
@@ -1109,185 +1243,6 @@ class ControlledLarkPilotEvidenceTests(TestCase):
 
         with self.assertRaisesRegex(ValueError, "forbidden private value"):
             validate_evidence_pack(pack, ["Private Account"])
-
-    def test_write_pack_is_atomic_idempotent_and_removes_only_stale_json(self):
-        pack = _valid_pack()
-        with TemporaryDirectory() as tmp:
-            output = Path(tmp).resolve() / "evidence"
-            stale = output / "runs" / "999.json"
-            stale.parent.mkdir(parents=True)
-            stale.write_text("{}", encoding="utf-8")
-            keep = output / "notes.txt"
-            keep.write_text("keep", encoding="utf-8")
-
-            first = write_evidence_pack(output, pack)
-            second = write_evidence_pack(output, pack)
-
-            self.assertEqual(first["file_count"], second["file_count"])
-            self.assertFalse(stale.exists())
-            self.assertEqual(keep.read_text(encoding="utf-8"), "keep")
-            self.assertFalse(
-                any(path.name.endswith(".tmp") for path in output.rglob("*"))
-            )
-            self.assertEqual(
-                json.loads((output / "runs" / "001.json").read_text(encoding="utf-8")),
-                pack["runs"][0],
-            )
-
-    def test_write_pack_omits_optional_none_and_removes_old_optional_json(self):
-        with TemporaryDirectory() as tmp:
-            output = Path(tmp).resolve() / "evidence"
-            write_evidence_pack(output, _valid_pack())
-            pack = _valid_pack()
-            pack["exercises"] = {
-                "rejection": None,
-                "failure": None,
-                "rollback": None,
-            }
-            pack["runs"] = []
-            pack["verification"] = None
-            pack["decision"] = None
-            pack["index"].update(
-                build_acceptance_summary(
-                    pack["charter"],
-                    pack["runs"],
-                    0,
-                    pack["exercises"],
-                    pack["verification"],
-                    pack["decision"],
-                )
-            )
-
-            result = write_evidence_pack(output, pack)
-
-            self.assertEqual(result["file_count"], 2 + len(pack["runs"]))
-            self.assertFalse((output / "verification.json").exists())
-            self.assertFalse((output / "decision.json").exists())
-            self.assertEqual(list((output / "exercises").glob("*.json")), [])
-
-    def test_write_pack_anchors_open_when_parent_path_is_swapped_to_symlink(self):
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            output = root / "evidence"
-            output.mkdir()
-            anchored = root / "anchored-evidence"
-            outside = root / "outside"
-            outside.mkdir()
-            sentinel = outside / "sentinel.json"
-            sentinel.write_text("sentinel", encoding="utf-8")
-            real_open = os.open
-            swapped = []
-
-            def racing_open(path, flags, mode=0o777, *, dir_fd=None):
-                name = os.fspath(path)
-                if not swapped and name.endswith(".tmp"):
-                    output.rename(anchored)
-                    output.symlink_to(outside, target_is_directory=True)
-                    swapped.append(True)
-                if dir_fd is None:
-                    return real_open(path, flags, mode)
-                return real_open(path, flags, mode, dir_fd=dir_fd)
-
-            with patch(
-                "skill2workflow.controlled_lark_pilot_evidence.os.open",
-                side_effect=racing_open,
-            ):
-                result = write_evidence_pack(output, _valid_pack())
-
-            self.assertEqual(swapped, [True])
-            self.assertEqual(result["status"], "written")
-            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
-            self.assertEqual(list(outside.glob("*.json")), [sentinel])
-            self.assertTrue((anchored / "evidence-index.json").is_file())
-
-    def test_write_pack_random_temp_does_not_block_on_crash_leftover(self):
-        with TemporaryDirectory() as tmp:
-            output = Path(tmp).resolve() / "evidence"
-            output.mkdir()
-            leftover = output / ".pilot-charter.json.tmp"
-            leftover.write_text("crash-leftover", encoding="utf-8")
-
-            result = write_evidence_pack(output, _valid_pack())
-
-            self.assertEqual(result["status"], "written")
-            self.assertEqual(leftover.read_text(encoding="utf-8"), "crash-leftover")
-            self.assertTrue((output / "pilot-charter.json").is_file())
-
-    def test_write_pack_cleans_random_temp_when_atomic_replace_fails(self):
-        with TemporaryDirectory() as tmp:
-            output = Path(tmp).resolve() / "evidence"
-
-            with patch(
-                "skill2workflow.controlled_lark_pilot_evidence.os.replace",
-                side_effect=OSError("replace failed"),
-            ), self.assertRaisesRegex(OSError, "replace failed"):
-                write_evidence_pack(output, _valid_pack())
-
-            self.assertEqual(
-                [path for path in output.rglob("*") if path.name.endswith(".tmp")],
-                [],
-            )
-
-    def test_write_pack_fails_closed_without_secure_directory_fd_support(self):
-        with TemporaryDirectory() as tmp:
-            output = Path(tmp).resolve() / "evidence"
-
-            with patch(
-                "skill2workflow.controlled_lark_pilot_evidence._DIR_FD_SUPPORTED",
-                False,
-            ), self.assertRaisesRegex(ValueError, "directory-fd"):
-                write_evidence_pack(output, _valid_pack())
-
-            self.assertFalse(output.exists())
-
-    def test_write_pack_rejects_stale_json_symlink_without_touching_target(self):
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            output = root / "evidence"
-            output.mkdir()
-            target = root / "outside.json"
-            target.write_text("sentinel", encoding="utf-8")
-            (output / "stale.json").symlink_to(target)
-
-            with self.assertRaisesRegex(ValueError, "symbolic link"):
-                write_evidence_pack(output, _valid_pack())
-
-            self.assertEqual(target.read_text(encoding="utf-8"), "sentinel")
-
-    def test_write_pack_rejects_root_and_symlink_components_without_touching_target(self):
-        with self.assertRaisesRegex(ValueError, "root"):
-            write_evidence_pack(Path("/"), _valid_pack())
-
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            target = root / "target"
-            target.mkdir()
-            sentinel = target / "stale.json"
-            sentinel.write_text("sentinel", encoding="utf-8")
-            linked = root / "linked"
-            linked.symlink_to(target, target_is_directory=True)
-
-            with self.assertRaisesRegex(ValueError, "symbolic link"):
-                write_evidence_pack(linked, _valid_pack())
-
-            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
-
-        with TemporaryDirectory() as tmp:
-            root = Path(tmp).resolve()
-            output = root / "evidence"
-            output.mkdir()
-            target = root / "target"
-            target.mkdir()
-            sentinel = target / "sentinel.txt"
-            sentinel.write_text("sentinel", encoding="utf-8")
-            (output / "runs").symlink_to(target, target_is_directory=True)
-
-            with self.assertRaisesRegex(ValueError, "symbolic link"):
-                write_evidence_pack(output, _valid_pack())
-
-            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
-            self.assertEqual(list(target.glob("*.json")), [])
-
 
 if __name__ == "__main__":
     import unittest

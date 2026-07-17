@@ -22,6 +22,7 @@ from .controlled_lark_pilot_evidence import (
     validate_evidence_pack,
     write_evidence_pack,
 )
+from ._controlled_lark_pilot_evidence_writer import read_json_anchored
 from .external_connectors import load_external_connector
 from .lark_task_pilot import build_lark_task_pilot_workflow
 
@@ -224,10 +225,10 @@ def _evidence_output(
 
 def _require_finalized_export(work_dir: Path, pack: Dict[str, object]) -> None:
     path = work_dir / "private" / "finalization.json"
-    _require_regular_file_or_missing(path)
-    if not path.exists():
+    try:
+        marker = read_json_anchored(path)
+    except FileNotFoundError:
         raise ValueError("successful private finalization is required for repository export")
-    marker = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(marker, dict) or set(marker) != FINALIZATION_KEYS:
         raise ValueError("private finalization marker is invalid")
     if (

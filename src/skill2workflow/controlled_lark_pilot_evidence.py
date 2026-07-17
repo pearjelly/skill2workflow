@@ -1,173 +1,63 @@
-"""Strict redacted evidence boundary for the controlled Lark pilot."""
+"""Public facade and pure builders for controlled Lark pilot evidence."""
 
 from __future__ import annotations
 
-import json
-import os
-import secrets
-import stat
 from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, List, Set
 from zoneinfo import ZoneInfo
 
-
-_DIR_FD_SUPPORTED = bool(
-    os.name == "posix"
-    and hasattr(os, "O_DIRECTORY")
-    and hasattr(os, "O_NOFOLLOW")
-    and all(
-        function in os.supports_dir_fd
-        for function in (os.open, os.mkdir, os.stat, os.unlink)
-    )
-    and os.listdir in os.supports_fd
+from ._controlled_lark_pilot_evidence_validation import (
+    CHARTER_KEYS,
+    CONNECTOR_ID,
+    CREDENTIAL_HANDLE,
+    DECISION_KEYS,
+    DECISION_SCHEMA_VERSION,
+    EVIDENCE_SCHEMA_VERSION,
+    EXERCISE_SCHEMA_VERSION,
+    EXERCISE_SLOT_KEYS,
+    FAILURE_EXERCISE_KEYS,
+    INDEX_KEYS,
+    INDEX_SCHEMA_VERSION,
+    MODE,
+    OPERATION,
+    PRESENCE_FIELDS,
+    PROVIDER_STATUSES,
+    REJECTION_EXERCISE_KEYS,
+    ROLLBACK_EXERCISE_KEYS,
+    RUN_EVIDENCE_KEYS,
+    TIMEZONE,
+    TOP_LEVEL_KEYS,
+    UNMET_CONDITIONS,
+    VERIFICATION_COMMAND_IDS,
+    VERIFICATION_COMMAND_KEYS,
+    VERIFICATION_KEYS,
+    VERIFICATION_SCHEMA_VERSION,
+    WORKFLOW_ID,
+    WORKFLOW_VERSION,
+    aware_datetime as _aware_datetime,
+    validate_evidence_pack as _validate_evidence_pack,
+    validate_run as _validate_run,
+)
+from ._controlled_lark_pilot_evidence_writer import (
+    write_evidence_pack as _write_evidence_pack,
 )
 
 
-EVIDENCE_SCHEMA_VERSION = "controlled-lark-pilot-evidence-0.1.0"
-EXERCISE_SCHEMA_VERSION = "controlled-lark-pilot-exercise-0.1.0"
-VERIFICATION_SCHEMA_VERSION = "controlled-lark-pilot-verification-0.1.0"
-DECISION_SCHEMA_VERSION = "controlled-lark-pilot-decision-0.1.0"
-INDEX_SCHEMA_VERSION = "controlled-lark-pilot-index-0.1.0"
-WORKFLOW_ID = "workflow_controlled_lark_pilot"
-WORKFLOW_VERSION = "0.1.0"
-CONNECTOR_ID = "lark_task"
-CREDENTIAL_HANDLE = "lark_bot_access_token"
-OPERATION = "create_task"
-MODE = "live"
-TIMEZONE = "Asia/Shanghai"
-
-def _keys(names: str) -> Set[str]:
-    """Keep large exact allowlists readable without repeating set syntax."""
-    return set(names.split())
-
-
-RUN_EVIDENCE_KEYS = _keys(
-    "schema_version run_id workflow_id workflow_version started_at completed_at "
-    "run_status gate_decision case_id_present connector_invoked connector_id "
-    "connector_status credential_status credential_handles operation mode "
-    "provider_status task_title_present task_description_present assignee_present "
-    "due_at_present idempotency_key_present lark_task_id_present"
+CONNECTOR_EVENT_TYPES = (
+    "connector_started",
+    "connector_failed",
+    "connector_completed",
 )
-CHARTER_KEYS = _keys(
-    "schema_version scenario_id workflow_id workflow_version support_model timezone "
-    "starts_on expires_on team_consent_confirmed assignee_consent_confirmed "
-    "commercial_engagement_confirmed required_approved_runs required_distinct_days "
-    "required_distinct_cases"
-)
-TOP_LEVEL_KEYS = _keys("charter runs exercises verification decision index")
-EXERCISE_SLOT_KEYS = _keys("rejection failure rollback")
-REJECTION_EXERCISE_KEYS = _keys(
-    "schema_version exercise passed run_id gate_decision connector_invoked"
-)
-FAILURE_EXERCISE_KEYS = _keys(
-    "schema_version exercise passed provider_status credential_resolution_attempted "
-    "transport_attempted"
-)
-ROLLBACK_EXERCISE_KEYS = _keys(
-    "schema_version exercise passed live_switch_enabled live_approval_blocked "
-    "dry_run_status"
-)
-VERIFICATION_KEYS = _keys("schema_version all_passed commands")
-VERIFICATION_COMMAND_KEYS = _keys("id exit_code passed duration_ms")
-DECISION_KEYS = _keys(
-    "schema_version decision partner_acknowledged operator_acknowledged "
-    "commercial_engagement_confirmed rationale"
-)
-INDEX_KEYS = _keys(
-    "schema_version generated_at workflow_id workflow_version timezone "
-    "approved_live_runs required_approved_runs distinct_calendar_days "
-    "required_distinct_days distinct_private_cases required_distinct_cases "
-    "rejected_runs rejection_passed failure_passed rollback_passed "
-    "verification_passed decision_recorded decision partner_acknowledged "
-    "operator_acknowledged commercial_engagement_confirmed ready_to_finalize "
-    "unmet_conditions"
-)
-VERIFICATION_COMMAND_IDS = (
-    "focused-tests",
-    "full-tests",
-    "compile",
-    "secret-hygiene",
-    "connector-smoke",
-    "dry-run-pilot-smoke",
-    "diff-check",
-)
-UNMET_CONDITIONS = (
-    "approved_live_runs_threshold",
-    "distinct_calendar_days_threshold",
-    "distinct_private_cases_threshold",
-    "human_rejection",
-    "disabled_live_exercise",
-    "rollback_exercise",
-    "verification",
-    "decision",
-    "partner_acknowledgement",
-    "operator_acknowledgement",
-    "commercial_engagement_confirmation",
-)
-PROVIDER_STATUSES = {
-    "",
-    "authorization_failed",
-    "completed",
-    "credential_failed",
-    "live_disabled",
-    "malformed_response",
-    "provider_unavailable",
-    "validation_failed",
-}
-PRESENCE_FIELDS = (
-    "task_title_present",
-    "task_description_present",
-    "assignee_present",
-    "due_at_present",
-    "idempotency_key_present",
-    "lark_task_id_present",
-)
+TERMINAL_EVENT_TYPES = ("run_completed", "run_failed", "run_rejected")
 
 
-def _scan_event(
-    events: object,
-    event_types: tuple,
-    reverse: bool = False,
-    node_id: str = "",
-) -> Dict[str, object]:
-    if not isinstance(events, list):
-        return {}
-    candidates = reversed(events) if reverse else events
-    for event in candidates:
-        if (
-            isinstance(event, dict)
-            and event.get("type") in event_types
-            and (not node_id or event.get("node_id") == node_id)
-        ):
-            return event
-    return {}
-
-
-def _last_event(events: object, event_type: str) -> Dict[str, object]:
-    return _scan_event(events, (event_type,), reverse=True)
-
-
-def _last_connector_event(events: object) -> Dict[str, object]:
-    return _scan_event(
-        events,
-        ("connector_started", "connector_completed", "connector_failed"),
-        reverse=True,
-        node_id="create_lark_task",
-    )
-
-
-def _last_metadata_event(events: object) -> Dict[str, object]:
-    if not isinstance(events, list):
-        return {}
-    for event in reversed(events):
-        if (
-            isinstance(event, dict)
-            and event.get("node_id") == "create_lark_task"
-            and isinstance(event.get("connector_metadata"), dict)
-        ):
-            return event
-    return {}
+def _indexed_events(events: List[Dict[str, object]], event_types: tuple) -> list:
+    return [
+        (index, event)
+        for index, event in enumerate(events)
+        if isinstance(event, dict) and event.get("type") in event_types
+    ]
 
 
 def _raw_string(value: object, label: str, nonempty: bool = False) -> str:
@@ -183,6 +73,109 @@ def _bound_event(event: object, run_id: str, label: str) -> datetime:
     return _aware_datetime(event.get("timestamp"), f"{label} timestamp")
 
 
+def _bound_event_in_window(
+    event: object,
+    run_id: str,
+    label: str,
+    started_at: datetime,
+    completed_at: datetime,
+) -> datetime:
+    timestamp = _bound_event(event, run_id, label)
+    if timestamp < started_at or timestamp > completed_at:
+        raise ValueError(f"{label} timestamp must be within the run interval")
+    return timestamp
+
+
+def _validate_connector_sequence(
+    candidates: list,
+    retrying: list,
+    run_id: str,
+    resume_index: int,
+    terminal_index: int,
+    started_at: datetime,
+    completed_at: datetime,
+) -> Dict[str, object]:
+    completed = {}
+    attempt_open = False
+    seen_failed = False
+    last_type = ""
+    for index, event in candidates:
+        if event.get("node_id") != "create_lark_task":
+            raise ValueError("connector event must target the controlled node")
+        if not resume_index < index < terminal_index:
+            raise ValueError("connector event is out of semantic audit order")
+        event_type = event["type"]
+        _bound_event_in_window(
+            event,
+            run_id,
+            event_type,
+            started_at,
+            completed_at,
+        )
+        connector_id = _raw_string(event.get("connector_id"), "connector id")
+        if connector_id != CONNECTOR_ID:
+            raise ValueError("connector event identity is invalid")
+        connector_status = _raw_string(
+            event.get("connector_status"), "connector status"
+        )
+        expected_status = {
+            "connector_started": "running",
+            "connector_failed": "failed",
+            "connector_completed": "completed",
+        }[event_type]
+        if connector_status != expected_status:
+            raise ValueError(f"{event_type} has an invalid connector status")
+        if completed:
+            raise ValueError("connector events must not follow connector completion")
+        if event_type == "connector_started":
+            if attempt_open:
+                raise ValueError("connector attempt cannot start twice")
+            attempt_open = True
+        elif event_type == "connector_failed":
+            if not attempt_open:
+                raise ValueError("connector failure must follow a started attempt")
+            attempt_open = False
+            seen_failed = True
+        else:
+            if last_type == "connector_failed":
+                raise ValueError("connector completion must follow a retry start")
+            attempt_open = False
+            completed = event
+        last_type = event_type
+    if attempt_open:
+        raise ValueError("connector attempt is missing a terminal connector event")
+
+    retry_pairs = set()
+    for index, event in retrying:
+        if event.get("node_id") != "create_lark_task":
+            raise ValueError("retry event must target the controlled node")
+        if not resume_index < index < terminal_index:
+            raise ValueError("retry event is out of semantic audit order")
+        _bound_event_in_window(
+            event,
+            run_id,
+            "node_retrying",
+            started_at,
+            completed_at,
+        )
+        previous = [item for item in candidates if item[0] < index]
+        following = [item for item in candidates if item[0] > index]
+        if (
+            not previous
+            or previous[-1][1].get("type") != "connector_failed"
+            or not following
+            or following[0][1].get("type") != "connector_started"
+        ):
+            raise ValueError("node_retrying must separate failed and started attempts")
+        pair = (previous[-1][0], following[0][0])
+        if pair in retry_pairs:
+            raise ValueError("connector retry transition must not be duplicated")
+        retry_pairs.add(pair)
+    if retrying and not seen_failed:
+        raise ValueError("retry event requires a failed connector attempt")
+    return completed
+
+
 def build_run_evidence(
     run: Dict[str, object], audit_events: List[Dict[str, object]]
 ) -> Dict[str, object]:
@@ -194,21 +187,14 @@ def build_run_evidence(
     workflow_id = _raw_string(run.get("workflow_id"), "workflow_id")
     workflow_version = _raw_string(run.get("workflow_version"), "workflow_version")
     run_status = _raw_string(run.get("status"), "run status")
-    started_events = [
-        event
-        for event in audit_events
-        if isinstance(event, dict) and event.get("type") == "run_started"
-    ]
+
+    started_events = _indexed_events(audit_events, ("run_started",))
     if len(started_events) != 1:
         raise ValueError("exactly one run_started event is required")
-    started_event = started_events[0]
+    started_index, started_event = started_events[0]
     started_at = _bound_event(started_event, run_id, "run_started")
-    terminal_events = [
-        event
-        for event in audit_events
-        if isinstance(event, dict)
-        and event.get("type") in ("run_completed", "run_failed", "run_rejected")
-    ]
+
+    terminal_events = _indexed_events(audit_events, TERMINAL_EVENT_TYPES)
     expected_terminal = (
         "run_completed"
         if run_status == "completed"
@@ -217,33 +203,73 @@ def build_run_evidence(
         else ""
     )
     if expected_terminal:
-        if not terminal_events or any(
-            event.get("type") != expected_terminal for event in terminal_events
+        if (
+            len(terminal_events) != 1
+            or terminal_events[0][1].get("type") != expected_terminal
         ):
             raise ValueError("terminal event does not match the run status")
-        terminal_times = [
-            _bound_event(event, run_id, expected_terminal)
-            for event in terminal_events
-        ]
-        if any(item < started_at for item in terminal_times):
+        terminal_index, terminal = terminal_events[0]
+        completed_at = _bound_event(terminal, run_id, expected_terminal)
+        if terminal_index <= started_index or completed_at < started_at:
             raise ValueError("terminal timestamp must not precede run_started")
-        terminal = terminal_events[-1]
     else:
         if terminal_events:
             raise ValueError("nonterminal run must not have a terminal event")
+        terminal_index = len(audit_events)
+        completed_at = started_at
         terminal = {}
-    resumed = _last_event(audit_events, "run_resumed")
-    if resumed:
-        _bound_event(resumed, run_id, "run_resumed")
+
+    resumed_events = _indexed_events(audit_events, ("run_resumed",))
+    connector_events = _indexed_events(audit_events, CONNECTOR_EVENT_TYPES)
+    retrying_events = _indexed_events(audit_events, ("node_retrying",))
+    if expected_terminal:
+        if len(resumed_events) != 1:
+            raise ValueError("exactly one run_resumed event is required")
+        resume_index, resumed = resumed_events[0]
+        _bound_event_in_window(
+            resumed,
+            run_id,
+            "run_resumed",
+            started_at,
+            completed_at,
+        )
+        if not started_index < resume_index < terminal_index:
+            raise ValueError("run_resumed is out of semantic audit order")
         if type(resumed.get("approved")) is not bool:
             raise ValueError("run_resumed approved must be a boolean")
-    connector = _last_connector_event(audit_events)
-    if connector:
-        _bound_event(connector, run_id, "connector event")
-    metadata_event = _last_metadata_event(audit_events) if connector else {}
-    if metadata_event:
-        _bound_event(metadata_event, run_id, "connector metadata event")
-    metadata = metadata_event.get("connector_metadata", {}) if metadata_event else {}
+    else:
+        if resumed_events or connector_events or retrying_events:
+            raise ValueError("waiting run must not contain decision or connector events")
+        resume_index = terminal_index
+        resumed = {}
+
+    completed_connector = (
+        _validate_connector_sequence(
+            connector_events,
+            retrying_events,
+            run_id,
+            resume_index,
+            terminal_index,
+            started_at,
+            completed_at,
+        )
+        if connector_events or retrying_events
+        else {}
+    )
+    if resumed.get("approved") is False:
+        if run_status not in ("failed", "rejected") or connector_events:
+            raise ValueError("rejected run must fail without connector events")
+    elif resumed.get("approved") is True:
+        if run_status == "completed":
+            if not completed_connector:
+                raise ValueError("completed approved run requires connector completion")
+        elif not connector_events or completed_connector:
+            raise ValueError("failed approved run requires connector failure")
+
+    connector = completed_connector or (
+        connector_events[-1][1] if connector_events else {}
+    )
+    metadata = connector.get("connector_metadata", {}) if completed_connector else {}
     context = run.get("context", {})
     if not isinstance(context, dict):
         context = {}
@@ -253,16 +279,14 @@ def build_run_evidence(
     case_id = trigger_input.get("pilot_case_id")
     if type(case_id) is not str or not case_id.strip():
         raise ValueError("pilot_case_id must be a nonempty string")
-    credential_event = (
-        connector
-        if connector and "credential_status" in connector
-        else metadata_event
-    )
-    raw_handles = credential_event.get("credential_handles", []) if connector else []
-    if type(raw_handles) is not list or any(type(item) is not str for item in raw_handles):
+
+    raw_handles = connector.get("credential_handles", []) if connector else []
+    if type(raw_handles) is not list or any(
+        type(item) is not str for item in raw_handles
+    ):
         raise ValueError("credential handles must be a list of strings")
     handles = list(raw_handles)
-    if connector:
+    if completed_connector:
         if not isinstance(metadata, dict):
             raise ValueError("connector metadata must be an object")
         for field in PRESENCE_FIELDS:
@@ -278,11 +302,23 @@ def build_run_evidence(
             connector.get("connector_status"), "connector status"
         )
         credential_status = _raw_string(
-            credential_event.get("credential_status"), "credential status"
+            connector.get("credential_status"), "credential status"
+        )
+    elif connector:
+        operation = mode = provider_status = ""
+        connector_id = _raw_string(connector.get("connector_id"), "connector id")
+        connector_status = _raw_string(
+            connector.get("connector_status"), "connector status"
+        )
+        credential_status = (
+            _raw_string(connector.get("credential_status"), "credential status")
+            if "credential_status" in connector
+            else ""
         )
     else:
         operation = mode = provider_status = ""
         connector_id = connector_status = credential_status = ""
+
     evidence = {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "run_id": run_id,
@@ -308,26 +344,14 @@ def build_run_evidence(
         "mode": mode,
         "provider_status": provider_status,
         **{
-            field: metadata[field] if connector else False
+            field: metadata[field] if completed_connector else False
             for field in PRESENCE_FIELDS
         },
     }
     _validate_run(evidence)
+    if run_status == "completed" and not _is_approved_live_run(evidence):
+        raise ValueError("completed approved run has invalid success facts")
     return evidence
-
-
-def _aware_datetime(value: object, label: str, allow_empty: bool = False) -> datetime:
-    if allow_empty and value == "":
-        return None
-    if type(value) is not str:
-        raise ValueError(f"{label} must be a timestamp string")
-    try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as error:
-        raise ValueError(f"{label} must be an ISO timestamp") from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError(f"{label} must include a timezone")
-    return parsed
 
 
 def _is_approved_live_run(run: object) -> bool:
@@ -397,7 +421,10 @@ def _rejection_exercise(runs: List[Dict[str, object]]):
 
 
 def _run_sort_key(run: Dict[str, object]) -> tuple:
-    return (_aware_datetime(run.get("started_at"), "started_at"), run.get("run_id", ""))
+    return (
+        _aware_datetime(run.get("started_at"), "started_at"),
+        run.get("run_id", ""),
+    )
 
 
 def _qualified_exercise(exercises: object, name: str) -> bool:
@@ -503,443 +530,18 @@ def build_acceptance_summary(
     }
 
 
-def _require_keys(value: object, keys: Set[str], label: str) -> Dict[str, object]:
-    if not isinstance(value, dict) or set(value) != keys:
-        raise ValueError(f"{label} keys do not match the allowlist")
-    return value
-
-
-def _require_bool(value: object, label: str) -> None:
-    if type(value) is not bool:
-        raise ValueError(f"{label} must be a boolean")
-
-
-def _require_nonnegative_int(value: object, label: str) -> None:
-    if type(value) is not int or value < 0:
-        raise ValueError(f"{label} must be a nonnegative integer")
-
-
-def _validate_charter(charter: object) -> None:
-    value = _require_keys(charter, CHARTER_KEYS, "charter")
-    exact = {
-        "schema_version": "controlled-lark-pilot-0.1.0",
-        "scenario_id": "sales_renewal_risk_followup",
-        "workflow_id": WORKFLOW_ID,
-        "workflow_version": WORKFLOW_VERSION,
-        "support_model": "assisted",
-        "timezone": TIMEZONE,
-        "required_approved_runs": 5,
-        "required_distinct_days": 5,
-        "required_distinct_cases": 2,
-    }
-    if any(value.get(key) != expected for key, expected in exact.items()):
-        raise ValueError("charter fixed values are invalid")
-    for key in (
-        "required_approved_runs required_distinct_days required_distinct_cases"
-    ).split():
-        _require_nonnegative_int(value.get(key), f"charter {key}")
-    for key in (
-        "team_consent_confirmed assignee_consent_confirmed "
-        "commercial_engagement_confirmed"
-    ).split():
-        if value.get(key) is not True:
-            raise ValueError(f"charter {key} must be true")
-    if type(value.get("starts_on")) is not str or type(value.get("expires_on")) is not str:
-        raise ValueError("charter dates must be strings")
-    try:
-        starts = date.fromisoformat(value["starts_on"])
-        expires = date.fromisoformat(value["expires_on"])
-    except ValueError as error:
-        raise ValueError("charter dates must be ISO dates") from error
-    if starts > expires:
-        raise ValueError("charter date range is invalid")
-
-
-def _validate_run(run: object) -> None:
-    value = _require_keys(run, RUN_EVIDENCE_KEYS, "run evidence")
-    if value.get("schema_version") != EVIDENCE_SCHEMA_VERSION:
-        raise ValueError("run evidence schema is invalid")
-    for key in ("run_id", "workflow_id", "workflow_version", "run_status", "gate_decision"):
-        if type(value.get(key)) is not str:
-            raise ValueError(f"run evidence {key} must be a string")
-    if not value["run_id"].strip():
-        raise ValueError("run evidence run_id must be nonempty")
-    if value["workflow_id"] != WORKFLOW_ID or value["workflow_version"] != WORKFLOW_VERSION:
-        raise ValueError("run evidence workflow identity is invalid")
-    if value["run_status"] not in ("waiting", "completed", "failed", "rejected"):
-        raise ValueError("run evidence status is invalid")
-    if value["gate_decision"] not in ("pending", "approved", "rejected"):
-        raise ValueError("run evidence gate decision is invalid")
-    started = _aware_datetime(value.get("started_at"), "started_at")
-    completed = _aware_datetime(value.get("completed_at"), "completed_at", allow_empty=True)
-    if value["run_status"] in ("completed", "failed", "rejected"):
-        if completed is None:
-            raise ValueError("completed_at is required for terminal run evidence")
-        if completed < started:
-            raise ValueError("completed_at must not precede started_at")
-    elif completed is not None:
-        raise ValueError("completed_at must be empty for nonterminal run evidence")
-    for key in (
-        "case_id_present connector_invoked task_title_present "
-        "task_description_present assignee_present due_at_present "
-        "idempotency_key_present lark_task_id_present"
-    ).split():
-        _require_bool(value.get(key), f"run evidence {key}")
-    if value.get("connector_id") not in ("", CONNECTOR_ID):
-        raise ValueError("run evidence connector identity is invalid")
-    if value.get("connector_status") not in ("", "running", "completed", "failed"):
-        raise ValueError("run evidence connector status is invalid")
-    if value.get("credential_status") not in ("", "resolved", "failed", "skipped"):
-        raise ValueError("run evidence credential status is invalid")
-    if value.get("credential_handles") not in ([], [CREDENTIAL_HANDLE]):
-        raise ValueError("run evidence credential handles are invalid")
-    if value.get("operation") not in ("", OPERATION) or value.get("mode") not in ("", MODE):
-        raise ValueError("run evidence connector binding is invalid")
-    if value.get("provider_status") not in PROVIDER_STATUSES:
-        raise ValueError("run evidence provider status is invalid")
-    if value["connector_invoked"] is False:
-        empty = all(
-            value[key] in ("", [])
-            for key in (
-                "connector_id connector_status credential_status credential_handles "
-                "operation mode provider_status"
-            ).split()
-        ) and all(value[field] is False for field in PRESENCE_FIELDS)
-        if not empty:
-            raise ValueError("uninvoked connector evidence must be empty")
-
-
-def _validate_exercise(name: str, exercise: object) -> None:
-    if exercise is None:
-        return
-    schemas = {
-        "rejection": REJECTION_EXERCISE_KEYS,
-        "failure": FAILURE_EXERCISE_KEYS,
-        "rollback": ROLLBACK_EXERCISE_KEYS,
-    }
-    value = _require_keys(exercise, schemas[name], f"{name} exercise")
-    if value.get("schema_version") != EXERCISE_SCHEMA_VERSION:
-        raise ValueError(f"{name} exercise schema is invalid")
-    _require_bool(value.get("passed"), f"{name} exercise passed")
-    if name == "rejection":
-        if (
-            value.get("exercise") != "rejection"
-            or type(value.get("run_id")) is not str
-            or not value["run_id"].strip()
-            or value.get("gate_decision") != "rejected"
-            or value.get("connector_invoked") is not False
-        ):
-            raise ValueError("rejection exercise values are invalid")
-        if value["passed"] is not True:
-            raise ValueError("rejection exercise passed contradicts its facts")
-    elif name == "failure":
-        if value.get("exercise") != "disabled_live" or value.get("provider_status") not in PROVIDER_STATUSES:
-            raise ValueError("failure exercise values are invalid")
-        _require_bool(value.get("credential_resolution_attempted"), "failure credential attempt")
-        _require_bool(value.get("transport_attempted"), "failure transport attempt")
-        fact = bool(
-            value["provider_status"] == "live_disabled"
-            and value["credential_resolution_attempted"] is False
-            and value["transport_attempted"] is False
-        )
-        if value["passed"] is not fact:
-            raise ValueError("failure exercise passed contradicts its facts")
-    else:
-        if value.get("exercise") != "rollback" or value.get("dry_run_status") not in ("", "completed", "failed"):
-            raise ValueError("rollback exercise values are invalid")
-        _require_bool(value.get("live_switch_enabled"), "rollback live switch")
-        _require_bool(value.get("live_approval_blocked"), "rollback approval")
-        fact = bool(
-            value["live_switch_enabled"] is False
-            and value["live_approval_blocked"] is True
-            and value["dry_run_status"] == "completed"
-        )
-        if value["passed"] is not fact:
-            raise ValueError("rollback exercise passed contradicts its facts")
-
-
-def _validate_verification(verification: object) -> None:
-    if verification is None:
-        return
-    value = _require_keys(verification, VERIFICATION_KEYS, "verification")
-    if value.get("schema_version") != VERIFICATION_SCHEMA_VERSION:
-        raise ValueError("verification schema is invalid")
-    _require_bool(value.get("all_passed"), "verification all_passed")
-    commands = value.get("commands")
-    if not isinstance(commands, list):
-        raise ValueError("verification commands must be a list")
-    seen = []
-    for command in commands:
-        item = _require_keys(command, VERIFICATION_COMMAND_KEYS, "verification command")
-        if item.get("id") not in VERIFICATION_COMMAND_IDS:
-            raise ValueError("verification command identity is invalid")
-        seen.append(item["id"])
-        _require_nonnegative_int(item.get("exit_code"), "verification exit code")
-        _require_nonnegative_int(item.get("duration_ms"), "verification duration")
-        _require_bool(item.get("passed"), "verification command passed")
-        if item["passed"] != (item["exit_code"] == 0):
-            raise ValueError("verification command result is inconsistent")
-    if tuple(seen) != VERIFICATION_COMMAND_IDS:
-        raise ValueError("verification must contain the exact seven commands in order")
-    aggregate = all(command["passed"] for command in commands)
-    if value["all_passed"] != aggregate:
-        raise ValueError("verification aggregate is inconsistent")
-
-
-def _validate_decision(decision: object) -> None:
-    if decision is None:
-        return
-    value = _require_keys(decision, DECISION_KEYS, "decision")
-    if value.get("schema_version") != DECISION_SCHEMA_VERSION:
-        raise ValueError("decision schema is invalid")
-    if value.get("decision") not in ("continue", "harden", "defer"):
-        raise ValueError("decision value is invalid")
-    for key in (
-        "partner_acknowledged operator_acknowledged commercial_engagement_confirmed"
-    ).split():
-        _require_bool(value.get(key), f"decision {key}")
-    if type(value.get("rationale")) is not str or not value["rationale"].strip():
-        raise ValueError("decision rationale must be a nonempty string")
-
-
-def _validate_index(index: object) -> None:
-    value = _require_keys(index, INDEX_KEYS, "evidence index")
-    if (
-        value.get("schema_version") != INDEX_SCHEMA_VERSION
-        or value.get("workflow_id") != WORKFLOW_ID
-        or value.get("workflow_version") != WORKFLOW_VERSION
-        or value.get("timezone") != TIMEZONE
-    ):
-        raise ValueError("evidence index identity is invalid")
-    _aware_datetime(value.get("generated_at"), "generated_at")
-    for key in (
-        "approved_live_runs required_approved_runs distinct_calendar_days "
-        "required_distinct_days distinct_private_cases required_distinct_cases "
-        "rejected_runs"
-    ).split():
-        _require_nonnegative_int(value.get(key), f"evidence index {key}")
-    for key in (
-        "rejection_passed failure_passed rollback_passed verification_passed "
-        "decision_recorded partner_acknowledged operator_acknowledged "
-        "commercial_engagement_confirmed ready_to_finalize"
-    ).split():
-        _require_bool(value.get(key), f"evidence index {key}")
-    if value.get("decision") not in ("", "continue", "harden", "defer"):
-        raise ValueError("evidence index decision is invalid")
-    unmet = value.get("unmet_conditions")
-    if not isinstance(unmet, list) or any(type(item) is not str for item in unmet):
-        raise ValueError("evidence index unmet conditions must be strings")
-    if unmet != [item for item in UNMET_CONDITIONS if item in unmet]:
-        raise ValueError("evidence index unmet conditions are invalid")
-    if value["ready_to_finalize"] != (unmet == []):
-        raise ValueError("evidence index readiness is inconsistent")
-
-
-def _all_string_leaves(value: object) -> Set[str]:
-    leaves: Set[str] = set()
-    if isinstance(value, dict):
-        for item in value.values():
-            leaves.update(_all_string_leaves(item))
-    elif isinstance(value, list):
-        for item in value:
-            leaves.update(_all_string_leaves(item))
-    elif isinstance(value, str):
-        leaves.add(value)
-    return leaves
-
-
-def validate_evidence_pack(pack: Dict[str, object], forbidden_values: List[str]) -> None:
-    value = _require_keys(pack, TOP_LEVEL_KEYS, "evidence pack")
-    _validate_charter(value["charter"])
-    if not isinstance(value["runs"], list):
-        raise ValueError("evidence pack runs must be a list")
-    for run in value["runs"]:
-        _validate_run(run)
-    if value["runs"] != sorted(value["runs"], key=_run_sort_key):
-        raise ValueError("evidence pack runs are not in stable order")
-    exercises = _require_keys(value["exercises"], EXERCISE_SLOT_KEYS, "exercises")
-    for name in ("rejection", "failure", "rollback"):
-        _validate_exercise(name, exercises[name])
-    _validate_verification(value["verification"])
-    _validate_decision(value["decision"])
-    _validate_index(value["index"])
-    if exercises["rejection"] != _rejection_exercise(value["runs"]):
-        raise ValueError("rejection exercise does not match the first rejected run")
-    expected_summary = build_acceptance_summary(
-        value["charter"],
-        value["runs"],
-        value["index"]["distinct_private_cases"],
-        exercises,
-        value["verification"],
-        value["decision"],
-    )
-    if any(value["index"].get(key) != item for key, item in expected_summary.items()):
-        raise ValueError("evidence index does not match the acceptance summary")
-    if not isinstance(forbidden_values, list):
-        raise ValueError("forbidden values must be a list")
-    leaf_strings = _all_string_leaves(value)
-    for forbidden in forbidden_values:
-        if not isinstance(forbidden, str) or not forbidden:
-            continue
-        if any(forbidden in leaf for leaf in leaf_strings):
-            raise ValueError("evidence pack contains a forbidden private value")
-
-
-def _require_dir_fd_support() -> None:
-    if not _DIR_FD_SUPPORTED:
-        raise ValueError("secure directory-fd evidence writes are not supported")
-
-
-def _directory_flags() -> int:
-    return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-
-
-def _open_child_directory(parent_fd: int, name: str, create: bool) -> int:
-    try:
-        return os.open(name, _directory_flags(), dir_fd=parent_fd)
-    except FileNotFoundError:
-        if not create:
-            raise
-        try:
-            os.mkdir(name, 0o700, dir_fd=parent_fd)
-        except FileExistsError:
-            pass
-        try:
-            return os.open(name, _directory_flags(), dir_fd=parent_fd)
-        except OSError as error:
-            raise ValueError(
-                "evidence output component must not be a symbolic link or non-directory"
-            ) from error
-    except OSError as error:
-        raise ValueError(
-            "evidence output component must not be a symbolic link or non-directory"
-        ) from error
-
-
-def _open_output_directory(output_dir: Path) -> tuple:
-    _require_dir_fd_support()
-    path = Path(os.path.abspath(os.fspath(output_dir)))
-    if path == Path(path.anchor):
-        raise ValueError("evidence output must not be a filesystem root")
-    descriptor = os.open(path.anchor, _directory_flags())
-    try:
-        for component in path.parts[1:]:
-            child = _open_child_directory(descriptor, component, create=True)
-            os.close(descriptor)
-            descriptor = child
-        return path, descriptor
-    except BaseException:
-        os.close(descriptor)
-        raise
-
-
-def _open_relative_directory(root_fd: int, components: tuple, create: bool) -> int:
-    descriptor = os.dup(root_fd)
-    try:
-        for component in components:
-            child = _open_child_directory(descriptor, component, create=create)
-            os.close(descriptor)
-            descriptor = child
-        return descriptor
-    except BaseException:
-        os.close(descriptor)
-        raise
-
-
-def _write_json_atomic(parent_fd: int, name: str, value: object) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    flags |= os.O_NOFOLLOW
-    descriptor = None
-    temporary = ""
-    try:
-        for _attempt in range(16):
-            temporary = f".{name}.{secrets.token_hex(8)}.tmp"
-            try:
-                descriptor = os.open(
-                    temporary,
-                    flags,
-                    0o600,
-                    dir_fd=parent_fd,
-                )
-                break
-            except FileExistsError:
-                continue
-        if descriptor is None:
-            raise FileExistsError("could not allocate an evidence temporary file")
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            descriptor = None
-            json.dump(value, handle, ensure_ascii=False, indent=2)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(
-            temporary,
-            name,
-            src_dir_fd=parent_fd,
-            dst_dir_fd=parent_fd,
-        )
-        os.fsync(parent_fd)
-    finally:
-        if descriptor is not None:
-            os.close(descriptor)
-        if temporary:
-            try:
-                os.unlink(temporary, dir_fd=parent_fd)
-            except FileNotFoundError:
-                pass
-
-
-def _remove_stale_json_files(
-    directory_fd: int,
-    expected: Set[str],
-    prefix: tuple = (),
+def validate_evidence_pack(
+    pack: Dict[str, object], forbidden_values: List[str]
 ) -> None:
-    for name in os.listdir(directory_fd):
-        item = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-        relative = "/".join(prefix + (name,))
-        if stat.S_ISLNK(item.st_mode):
-            raise ValueError("evidence output descendants must not be symbolic links")
-        if stat.S_ISDIR(item.st_mode):
-            child = _open_child_directory(directory_fd, name, create=False)
-            try:
-                _remove_stale_json_files(child, expected, prefix + (name,))
-            finally:
-                os.close(child)
-            continue
-        if not stat.S_ISREG(item.st_mode):
-            raise ValueError("evidence output descendants must be regular files")
-        if name.endswith(".json") and relative not in expected:
-            os.unlink(name, dir_fd=directory_fd)
+    _validate_evidence_pack(
+        pack,
+        forbidden_values,
+        _run_sort_key,
+        _rejection_exercise,
+        build_acceptance_summary,
+    )
 
 
 def write_evidence_pack(output_dir: Path, pack: Dict[str, object]) -> Dict[str, object]:
     validate_evidence_pack(pack, [])
-    output = Path(os.path.abspath(os.fspath(output_dir)))
-    files = {
-        ((), "pilot-charter.json"): pack["charter"],
-        ((), "evidence-index.json"): pack["index"],
-    }
-    for sequence, run in enumerate(pack["runs"], start=1):
-        files[(("runs",), f"{sequence:03d}.json")] = run
-    for name in ("rejection", "failure", "rollback"):
-        exercise = pack["exercises"][name]
-        if exercise is not None:
-            files[(("exercises",), f"{name}.json")] = exercise
-    if pack["verification"] is not None:
-        files[((), "verification.json")] = pack["verification"]
-    if pack["decision"] is not None:
-        files[((), "decision.json")] = pack["decision"]
-    output, output_fd = _open_output_directory(output)
-    expected = {
-        "/".join(components + (name,)) for components, name in files
-    }
-    try:
-        for (components, name), item in files.items():
-            parent_fd = _open_relative_directory(output_fd, components, create=True)
-            try:
-                _write_json_atomic(parent_fd, name, item)
-            finally:
-                os.close(parent_fd)
-        _remove_stale_json_files(output_fd, expected)
-    finally:
-        os.close(output_fd)
-    return {"status": "written", "file_count": len(files), "output_dir": str(output)}
+    return _write_evidence_pack(output_dir, pack)
