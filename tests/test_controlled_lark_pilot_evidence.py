@@ -228,6 +228,56 @@ def _valid_pack():
     }
 
 
+def _raw_completed_run_and_audit():
+    run = {
+        "run_id": "run_raw",
+        "workflow_id": "workflow_controlled_lark_pilot",
+        "workflow_version": "0.1.0",
+        "status": "completed",
+        "context": {"input": {"pilot_case_id": "case-raw"}},
+    }
+    audit = [
+        {
+            "type": "run_started",
+            "run_id": "run_raw",
+            "timestamp": "2026-07-18T01:00:00+00:00",
+        },
+        {
+            "type": "run_resumed",
+            "run_id": "run_raw",
+            "approved": True,
+            "timestamp": "2026-07-18T01:01:00+00:00",
+        },
+        {
+            "type": "connector_completed",
+            "run_id": "run_raw",
+            "node_id": "create_lark_task",
+            "connector_id": "lark_task",
+            "connector_status": "completed",
+            "credential_status": "resolved",
+            "credential_handles": ["lark_bot_access_token"],
+            "connector_metadata": {
+                "operation": "create_task",
+                "mode": "live",
+                "provider_status": "completed",
+                "task_title_present": True,
+                "task_description_present": True,
+                "assignee_present": True,
+                "due_at_present": True,
+                "idempotency_key_present": True,
+                "lark_task_id_present": True,
+            },
+            "timestamp": "2026-07-18T01:01:01+00:00",
+        },
+        {
+            "type": "run_completed",
+            "run_id": "run_raw",
+            "timestamp": "2026-07-18T01:01:02+00:00",
+        },
+    ]
+    return run, audit
+
+
 def _prepare_repo(root):
     repo_root = root / "repo"
     connector_dir = repo_root / "examples" / "connectors"
@@ -284,12 +334,16 @@ def _build_ready_state(root):
         _write_case(input_path, case_id)
         started_at = f"2026-07-{18 + sequence:02d}T00:59:00+00:00"
         completed_at = f"2026-07-{18 + sequence:02d}T01:00:00+00:00"
-        with patch("skill2workflow.control_plane._now", return_value=started_at):
+        with patch(
+            "skill2workflow.control_plane._now", return_value=started_at
+        ), patch("skill2workflow.executor._now", return_value=started_at):
             started = start_pilot_run(
                 repo_root, work_dir, input_path, now=NOW, transport=transport
             )
         with patch.dict(os.environ, environment, clear=True), patch(
             "skill2workflow.control_plane._now", return_value=completed_at
+        ), patch(
+            "skill2workflow.executor._now", return_value=completed_at
         ):
             decide_pilot_run(
                 repo_root,
@@ -305,12 +359,18 @@ def _build_ready_state(root):
     with patch(
         "skill2workflow.control_plane._now",
         return_value="2026-07-23T00:59:00+00:00",
+    ), patch(
+        "skill2workflow.executor._now",
+        return_value="2026-07-23T00:59:00+00:00",
     ):
         rejected = start_pilot_run(
             repo_root, work_dir, rejected_path, now=NOW, transport=transport
         )
     with patch.dict(os.environ, {}, clear=True), patch(
         "skill2workflow.control_plane._now",
+        return_value="2026-07-23T01:00:00+00:00",
+    ), patch(
+        "skill2workflow.executor._now",
         return_value="2026-07-23T01:00:00+00:00",
     ):
         decide_pilot_run(
@@ -326,6 +386,129 @@ def _build_ready_state(root):
 
 
 class ControlledLarkPilotEvidenceTests(TestCase):
+    def test_forbidden_scan_checks_raw_substrings_in_each_unescaped_leaf(self):
+        forbidden_values = ("C1", 'line\n"quote"\\tail')
+        for forbidden in forbidden_values:
+            pack = _valid_pack()
+            pack["decision"]["rationale"] = f"prefix {forbidden} suffix"
+            with self.subTest(forbidden=repr(forbidden)), self.assertRaisesRegex(
+                ValueError,
+                "forbidden private value",
+            ):
+                validate_evidence_pack(pack, [forbidden])
+
+    def test_build_run_evidence_requires_nonempty_exact_string_case_id(self):
+        for invalid in ("", " ", 1, [], {}):
+            run, audit = _raw_completed_run_and_audit()
+            run["context"]["input"]["pilot_case_id"] = invalid
+            with self.subTest(value=repr(invalid)), self.assertRaisesRegex(
+                ValueError,
+                "pilot_case_id",
+            ):
+                build_run_evidence(run, audit)
+
+    def test_build_run_evidence_requires_exact_boolean_presence_metadata(self):
+        fields = (
+            "task_title_present",
+            "task_description_present",
+            "assignee_present",
+            "due_at_present",
+            "idempotency_key_present",
+            "lark_task_id_present",
+        )
+        invalid_values = ("false", 1, {})
+        for field in fields:
+            for invalid in invalid_values:
+                run, audit = _raw_completed_run_and_audit()
+                audit[2]["connector_metadata"][field] = invalid
+                with self.subTest(field=field, value=repr(invalid)), self.assertRaisesRegex(
+                    ValueError,
+                    "presence",
+                ):
+                    build_run_evidence(run, audit)
+
+    def test_build_run_evidence_binds_terminal_events_to_run_status_and_time_order(self):
+        mutations = []
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[0]["run_id"] = "run_other"
+        mutations.append(("mismatched start", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[-1]["run_id"] = "run_other"
+        mutations.append(("mismatched terminal", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit.pop()
+        mutations.append(("missing terminal", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[-1]["type"] = "run_failed"
+        mutations.append(("wrong terminal type", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit[-1]["timestamp"] = "2026-07-18T00:59:59+00:00"
+        mutations.append(("terminal before start", run, audit))
+
+        for label, run, audit in mutations:
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(run, audit)
+
+    def test_build_run_evidence_rejects_any_conflicting_start_or_terminal_event(self):
+        mutations = []
+
+        run, audit = _raw_completed_run_and_audit()
+        audit.insert(
+            1,
+            {
+                "type": "run_started",
+                "run_id": "run_other",
+                "timestamp": "2026-07-18T01:00:01+00:00",
+            },
+        )
+        mutations.append(("extra mismatched start", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit.insert(
+            -1,
+            {
+                "type": "run_completed",
+                "run_id": "run_other",
+                "timestamp": "2026-07-18T01:01:01+00:00",
+            },
+        )
+        mutations.append(("extra mismatched terminal", run, audit))
+
+        run, audit = _raw_completed_run_and_audit()
+        audit.insert(
+            -1,
+            {
+                "type": "run_completed",
+                "run_id": "run_raw",
+                "timestamp": "not-a-time",
+            },
+        )
+        mutations.append(("extra invalid terminal time", run, audit))
+
+        for label, run, audit in mutations:
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(run, audit)
+
+    def test_build_run_evidence_rejects_invalid_or_naive_event_timestamps(self):
+        for index in (0, -1):
+            for invalid in ("not-a-time", "2026-07-18T01:00:00"):
+                run, audit = _raw_completed_run_and_audit()
+                audit[index]["timestamp"] = invalid
+                with self.subTest(index=index, value=invalid), self.assertRaises(ValueError):
+                    build_run_evidence(run, audit)
+
+    def test_validate_pack_requires_terminal_timestamp_for_qualifying_rejection(self):
+        pack = _valid_pack()
+        pack["runs"][-1]["completed_at"] = ""
+
+        with self.assertRaisesRegex(ValueError, "completed_at"):
+            validate_evidence_pack(pack, [])
+
     def test_generate_evidence_from_real_sqlite_state_is_redacted_stable_and_ready(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
@@ -387,6 +570,40 @@ class ControlledLarkPilotEvidenceTests(TestCase):
                 self.assertNotIn(forbidden, json.dumps(result))
 
             finalization = work_dir / "private" / "finalization.json"
+            repo_output = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            valid_marker = {
+                "schema_version": "controlled-lark-pilot-finalization-0.1.0",
+                "finalized": True,
+                "decision": "continue",
+                "finalized_at": "2026-07-23T17:00:00+08:00",
+            }
+            marker_target = root / "outside-finalization.json"
+            marker_target.write_text(json.dumps(valid_marker), encoding="utf-8")
+            finalization.symlink_to(marker_target)
+            with self.assertRaisesRegex(ValueError, "symbolic link"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=repo_output,
+                    now=NOW,
+                )
+            self.assertEqual(
+                json.loads(marker_target.read_text(encoding="utf-8")), valid_marker
+            )
+            self.assertFalse(repo_output.exists())
+            finalization.unlink()
+
+            finalization.mkdir()
+            with self.assertRaisesRegex(ValueError, "regular file"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=repo_output,
+                    now=NOW,
+                )
+            self.assertFalse(repo_output.exists())
+            finalization.rmdir()
+
             invalid_markers = [
                 {
                     "schema_version": "controlled-lark-pilot-finalization-0.1.0",
@@ -407,7 +624,6 @@ class ControlledLarkPilotEvidenceTests(TestCase):
                     "finalized_at": "2026-07-23T17:00:00",
                 },
             ]
-            repo_output = repo_root / "docs" / "pilot-evidence" / "loop-40"
             for marker in invalid_markers:
                 finalization.write_text(json.dumps(marker), encoding="utf-8")
                 with self.subTest(marker=marker), self.assertRaises(ValueError):
@@ -419,17 +635,7 @@ class ControlledLarkPilotEvidenceTests(TestCase):
                     )
                 self.assertFalse(repo_output.exists())
 
-            finalization.write_text(
-                json.dumps(
-                    {
-                        "schema_version": "controlled-lark-pilot-finalization-0.1.0",
-                        "finalized": True,
-                        "decision": "continue",
-                        "finalized_at": "2026-07-23T17:00:00+08:00",
-                    }
-                ),
-                encoding="utf-8",
-            )
+            finalization.write_text(json.dumps(valid_marker), encoding="utf-8")
             exported = generate_pilot_evidence(
                 repo_root,
                 work_dir,
@@ -591,13 +797,22 @@ class ControlledLarkPilotEvidenceTests(TestCase):
             "context": {"input": {"pilot_case_id": "case-rejected"}},
         }
         audit = [
-            {"type": "run_started", "timestamp": "2026-07-18T01:00:00+00:00"},
+            {
+                "type": "run_started",
+                "run_id": "run_rejected",
+                "timestamp": "2026-07-18T01:00:00+00:00",
+            },
             {
                 "type": "run_resumed",
+                "run_id": "run_rejected",
                 "approved": False,
                 "timestamp": "2026-07-18T01:01:00+00:00",
             },
-            {"type": "run_failed", "timestamp": "2026-07-18T01:02:00+00:00"},
+            {
+                "type": "run_failed",
+                "run_id": "run_rejected",
+                "timestamp": "2026-07-18T01:02:00+00:00",
+            },
         ]
 
         evidence = build_run_evidence(run, audit)
@@ -757,6 +972,69 @@ class ControlledLarkPilotEvidenceTests(TestCase):
         with self.assertRaisesRegex(ValueError, "rejection exercise"):
             validate_evidence_pack(pack, [])
 
+    def test_validate_pack_requires_all_seven_verification_commands_even_on_failure(self):
+        pack = _valid_pack()
+        pack["verification"]["commands"].pop()
+        pack["verification"]["all_passed"] = False
+        pack["index"].update(
+            build_acceptance_summary(
+                pack["charter"],
+                pack["runs"],
+                2,
+                pack["exercises"],
+                pack["verification"],
+                pack["decision"],
+            )
+        )
+
+        with self.assertRaisesRegex(ValueError, "seven commands"):
+            validate_evidence_pack(pack, [])
+
+    def test_validate_pack_requires_exercise_passed_to_equal_fact_predicate(self):
+        mutations = (
+            ("rejection", "passed", False),
+            ("failure", "passed", False),
+            ("failure", "provider_status", "provider_unavailable"),
+            ("rollback", "passed", False),
+            ("rollback", "live_switch_enabled", True),
+        )
+        for name, field, value in mutations:
+            pack = _valid_pack()
+            pack["exercises"][name][field] = value
+            pack["index"].update(
+                build_acceptance_summary(
+                    pack["charter"],
+                    pack["runs"],
+                    2,
+                    pack["exercises"],
+                    pack["verification"],
+                    pack["decision"],
+                )
+            )
+            with self.subTest(exercise=name, field=field), self.assertRaisesRegex(
+                ValueError,
+                "passed",
+            ):
+                validate_evidence_pack(pack, [])
+
+    def test_validate_pack_requires_all_connector_presence_false_when_not_invoked(self):
+        fields = (
+            "task_title_present",
+            "task_description_present",
+            "assignee_present",
+            "due_at_present",
+            "idempotency_key_present",
+            "lark_task_id_present",
+        )
+        for field in fields:
+            pack = _valid_pack()
+            pack["runs"][-1][field] = True
+            with self.subTest(field=field), self.assertRaisesRegex(
+                ValueError,
+                "uninvoked connector evidence",
+            ):
+                validate_evidence_pack(pack, [])
+
     def test_validate_pack_rejects_unknown_keys_in_every_artifact_category(self):
         paths = (
             ("top-level", ()),
@@ -886,6 +1164,95 @@ class ControlledLarkPilotEvidenceTests(TestCase):
             self.assertFalse((output / "verification.json").exists())
             self.assertFalse((output / "decision.json").exists())
             self.assertEqual(list((output / "exercises").glob("*.json")), [])
+
+    def test_write_pack_anchors_open_when_parent_path_is_swapped_to_symlink(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            output = root / "evidence"
+            output.mkdir()
+            anchored = root / "anchored-evidence"
+            outside = root / "outside"
+            outside.mkdir()
+            sentinel = outside / "sentinel.json"
+            sentinel.write_text("sentinel", encoding="utf-8")
+            real_open = os.open
+            swapped = []
+
+            def racing_open(path, flags, mode=0o777, *, dir_fd=None):
+                name = os.fspath(path)
+                if not swapped and name.endswith(".tmp"):
+                    output.rename(anchored)
+                    output.symlink_to(outside, target_is_directory=True)
+                    swapped.append(True)
+                if dir_fd is None:
+                    return real_open(path, flags, mode)
+                return real_open(path, flags, mode, dir_fd=dir_fd)
+
+            with patch(
+                "skill2workflow.controlled_lark_pilot_evidence.os.open",
+                side_effect=racing_open,
+            ):
+                result = write_evidence_pack(output, _valid_pack())
+
+            self.assertEqual(swapped, [True])
+            self.assertEqual(result["status"], "written")
+            self.assertEqual(sentinel.read_text(encoding="utf-8"), "sentinel")
+            self.assertEqual(list(outside.glob("*.json")), [sentinel])
+            self.assertTrue((anchored / "evidence-index.json").is_file())
+
+    def test_write_pack_random_temp_does_not_block_on_crash_leftover(self):
+        with TemporaryDirectory() as tmp:
+            output = Path(tmp).resolve() / "evidence"
+            output.mkdir()
+            leftover = output / ".pilot-charter.json.tmp"
+            leftover.write_text("crash-leftover", encoding="utf-8")
+
+            result = write_evidence_pack(output, _valid_pack())
+
+            self.assertEqual(result["status"], "written")
+            self.assertEqual(leftover.read_text(encoding="utf-8"), "crash-leftover")
+            self.assertTrue((output / "pilot-charter.json").is_file())
+
+    def test_write_pack_cleans_random_temp_when_atomic_replace_fails(self):
+        with TemporaryDirectory() as tmp:
+            output = Path(tmp).resolve() / "evidence"
+
+            with patch(
+                "skill2workflow.controlled_lark_pilot_evidence.os.replace",
+                side_effect=OSError("replace failed"),
+            ), self.assertRaisesRegex(OSError, "replace failed"):
+                write_evidence_pack(output, _valid_pack())
+
+            self.assertEqual(
+                [path for path in output.rglob("*") if path.name.endswith(".tmp")],
+                [],
+            )
+
+    def test_write_pack_fails_closed_without_secure_directory_fd_support(self):
+        with TemporaryDirectory() as tmp:
+            output = Path(tmp).resolve() / "evidence"
+
+            with patch(
+                "skill2workflow.controlled_lark_pilot_evidence._DIR_FD_SUPPORTED",
+                False,
+            ), self.assertRaisesRegex(ValueError, "directory-fd"):
+                write_evidence_pack(output, _valid_pack())
+
+            self.assertFalse(output.exists())
+
+    def test_write_pack_rejects_stale_json_symlink_without_touching_target(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            output = root / "evidence"
+            output.mkdir()
+            target = root / "outside.json"
+            target.write_text("sentinel", encoding="utf-8")
+            (output / "stale.json").symlink_to(target)
+
+            with self.assertRaisesRegex(ValueError, "symbolic link"):
+                write_evidence_pack(output, _valid_pack())
+
+            self.assertEqual(target.read_text(encoding="utf-8"), "sentinel")
 
     def test_write_pack_rejects_root_and_symlink_components_without_touching_target(self):
         with self.assertRaisesRegex(ValueError, "root"):

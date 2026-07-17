@@ -4,10 +4,24 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
+import stat
 from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, List, Set
 from zoneinfo import ZoneInfo
+
+
+_DIR_FD_SUPPORTED = bool(
+    os.name == "posix"
+    and hasattr(os, "O_DIRECTORY")
+    and hasattr(os, "O_NOFOLLOW")
+    and all(
+        function in os.supports_dir_fd
+        for function in (os.open, os.mkdir, os.stat, os.unlink)
+    )
+    and os.listdir in os.supports_fd
+)
 
 
 EVIDENCE_SCHEMA_VERSION = "controlled-lark-pilot-evidence-0.1.0"
@@ -101,6 +115,14 @@ PROVIDER_STATUSES = {
     "provider_unavailable",
     "validation_failed",
 }
+PRESENCE_FIELDS = (
+    "task_title_present",
+    "task_description_present",
+    "assignee_present",
+    "due_at_present",
+    "idempotency_key_present",
+    "lark_task_id_present",
+)
 
 
 def _scan_event(
@@ -122,10 +144,6 @@ def _scan_event(
     return {}
 
 
-def _first_event(events: object, event_type: str) -> Dict[str, object]:
-    return _scan_event(events, (event_type,))
-
-
 def _last_event(events: object, event_type: str) -> Dict[str, object]:
     return _scan_event(events, (event_type,), reverse=True)
 
@@ -139,10 +157,30 @@ def _last_connector_event(events: object) -> Dict[str, object]:
     )
 
 
-def _terminal_event(events: object) -> Dict[str, object]:
-    return _scan_event(
-        events, ("run_completed", "run_failed", "run_rejected"), reverse=True
-    )
+def _last_metadata_event(events: object) -> Dict[str, object]:
+    if not isinstance(events, list):
+        return {}
+    for event in reversed(events):
+        if (
+            isinstance(event, dict)
+            and event.get("node_id") == "create_lark_task"
+            and isinstance(event.get("connector_metadata"), dict)
+        ):
+            return event
+    return {}
+
+
+def _raw_string(value: object, label: str, nonempty: bool = False) -> str:
+    if type(value) is not str or (nonempty and not value.strip()):
+        suffix = " nonempty" if nonempty else ""
+        raise ValueError(f"{label} must be a{suffix} string")
+    return value
+
+
+def _bound_event(event: object, run_id: str, label: str) -> datetime:
+    if not isinstance(event, dict) or event.get("run_id") != run_id:
+        raise ValueError(f"{label} must be bound to the controlled run")
+    return _aware_datetime(event.get("timestamp"), f"{label} timestamp")
 
 
 def build_run_evidence(
@@ -150,27 +188,109 @@ def build_run_evidence(
 ) -> Dict[str, object]:
     if not isinstance(run, dict):
         raise ValueError("run must be an object")
+    if not isinstance(audit_events, list):
+        raise ValueError("audit events must be a list")
+    run_id = _raw_string(run.get("run_id"), "run_id", nonempty=True)
+    workflow_id = _raw_string(run.get("workflow_id"), "workflow_id")
+    workflow_version = _raw_string(run.get("workflow_version"), "workflow_version")
+    run_status = _raw_string(run.get("status"), "run status")
+    started_events = [
+        event
+        for event in audit_events
+        if isinstance(event, dict) and event.get("type") == "run_started"
+    ]
+    if len(started_events) != 1:
+        raise ValueError("exactly one run_started event is required")
+    started_event = started_events[0]
+    started_at = _bound_event(started_event, run_id, "run_started")
+    terminal_events = [
+        event
+        for event in audit_events
+        if isinstance(event, dict)
+        and event.get("type") in ("run_completed", "run_failed", "run_rejected")
+    ]
+    expected_terminal = (
+        "run_completed"
+        if run_status == "completed"
+        else "run_failed"
+        if run_status in ("failed", "rejected")
+        else ""
+    )
+    if expected_terminal:
+        if not terminal_events or any(
+            event.get("type") != expected_terminal for event in terminal_events
+        ):
+            raise ValueError("terminal event does not match the run status")
+        terminal_times = [
+            _bound_event(event, run_id, expected_terminal)
+            for event in terminal_events
+        ]
+        if any(item < started_at for item in terminal_times):
+            raise ValueError("terminal timestamp must not precede run_started")
+        terminal = terminal_events[-1]
+    else:
+        if terminal_events:
+            raise ValueError("nonterminal run must not have a terminal event")
+        terminal = {}
     resumed = _last_event(audit_events, "run_resumed")
+    if resumed:
+        _bound_event(resumed, run_id, "run_resumed")
+        if type(resumed.get("approved")) is not bool:
+            raise ValueError("run_resumed approved must be a boolean")
     connector = _last_connector_event(audit_events)
-    metadata = connector.get("connector_metadata", {}) if connector else {}
-    if not isinstance(metadata, dict):
-        metadata = {}
+    if connector:
+        _bound_event(connector, run_id, "connector event")
+    metadata_event = _last_metadata_event(audit_events) if connector else {}
+    if metadata_event:
+        _bound_event(metadata_event, run_id, "connector metadata event")
+    metadata = metadata_event.get("connector_metadata", {}) if metadata_event else {}
     context = run.get("context", {})
     if not isinstance(context, dict):
         context = {}
     trigger_input = context.get("input", {})
     if not isinstance(trigger_input, dict):
         trigger_input = {}
-    raw_handles = connector.get("credential_handles", []) if connector else []
-    handles = list(raw_handles) if isinstance(raw_handles, list) else []
+    case_id = trigger_input.get("pilot_case_id")
+    if type(case_id) is not str or not case_id.strip():
+        raise ValueError("pilot_case_id must be a nonempty string")
+    credential_event = (
+        connector
+        if connector and "credential_status" in connector
+        else metadata_event
+    )
+    raw_handles = credential_event.get("credential_handles", []) if connector else []
+    if type(raw_handles) is not list or any(type(item) is not str for item in raw_handles):
+        raise ValueError("credential handles must be a list of strings")
+    handles = list(raw_handles)
+    if connector:
+        if not isinstance(metadata, dict):
+            raise ValueError("connector metadata must be an object")
+        for field in PRESENCE_FIELDS:
+            if type(metadata.get(field)) is not bool:
+                raise ValueError(f"connector presence field {field} must be a boolean")
+        operation = _raw_string(metadata.get("operation"), "connector operation")
+        mode = _raw_string(metadata.get("mode"), "connector mode")
+        provider_status = _raw_string(
+            metadata.get("provider_status"), "provider status"
+        )
+        connector_id = _raw_string(connector.get("connector_id"), "connector id")
+        connector_status = _raw_string(
+            connector.get("connector_status"), "connector status"
+        )
+        credential_status = _raw_string(
+            credential_event.get("credential_status"), "credential status"
+        )
+    else:
+        operation = mode = provider_status = ""
+        connector_id = connector_status = credential_status = ""
     evidence = {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
-        "run_id": str(run.get("run_id", "")),
-        "workflow_id": str(run.get("workflow_id", "")),
-        "workflow_version": str(run.get("workflow_version", "")),
-        "started_at": str(_first_event(audit_events, "run_started").get("timestamp", "")),
-        "completed_at": str(_terminal_event(audit_events).get("timestamp", "")),
-        "run_status": str(run.get("status", "")),
+        "run_id": run_id,
+        "workflow_id": workflow_id,
+        "workflow_version": workflow_version,
+        "started_at": started_event["timestamp"],
+        "completed_at": terminal.get("timestamp", ""),
+        "run_status": run_status,
         "gate_decision": (
             "approved"
             if resumed.get("approved") is True
@@ -178,21 +298,19 @@ def build_run_evidence(
             if resumed.get("approved") is False
             else "pending"
         ),
-        "case_id_present": bool(str(trigger_input.get("pilot_case_id", "")).strip()),
+        "case_id_present": True,
         "connector_invoked": bool(connector),
-        "connector_id": str(connector.get("connector_id", "")) if connector else "",
-        "connector_status": str(connector.get("connector_status", "")) if connector else "",
-        "credential_status": str(connector.get("credential_status", "")) if connector else "",
+        "connector_id": connector_id,
+        "connector_status": connector_status,
+        "credential_status": credential_status,
         "credential_handles": handles,
-        "operation": str(metadata.get("operation", "")),
-        "mode": str(metadata.get("mode", "")),
-        "provider_status": str(metadata.get("provider_status", "")),
-        "task_title_present": bool(metadata.get("task_title_present")),
-        "task_description_present": bool(metadata.get("task_description_present")),
-        "assignee_present": bool(metadata.get("assignee_present")),
-        "due_at_present": bool(metadata.get("due_at_present")),
-        "idempotency_key_present": bool(metadata.get("idempotency_key_present")),
-        "lark_task_id_present": bool(metadata.get("lark_task_id_present")),
+        "operation": operation,
+        "mode": mode,
+        "provider_status": provider_status,
+        **{
+            field: metadata[field] if connector else False
+            for field in PRESENCE_FIELDS
+        },
     }
     _validate_run(evidence)
     return evidence
@@ -247,14 +365,21 @@ def _is_approved_live_run(run: object) -> bool:
 
 
 def _is_human_rejection(run: object) -> bool:
-    return bool(
+    if not (
         isinstance(run, dict)
         and run.get("workflow_id") == WORKFLOW_ID
         and run.get("workflow_version") == WORKFLOW_VERSION
         and run.get("run_status") in ("failed", "rejected")
         and run.get("gate_decision") == "rejected"
         and run.get("connector_invoked") is False
-    )
+    ):
+        return False
+    try:
+        started = _aware_datetime(run.get("started_at"), "started_at")
+        completed = _aware_datetime(run.get("completed_at"), "completed_at")
+    except ValueError:
+        return False
+    return completed >= started
 
 
 def _rejection_exercise(runs: List[Dict[str, object]]):
@@ -445,8 +570,15 @@ def _validate_run(run: object) -> None:
         raise ValueError("run evidence status is invalid")
     if value["gate_decision"] not in ("pending", "approved", "rejected"):
         raise ValueError("run evidence gate decision is invalid")
-    _aware_datetime(value.get("started_at"), "started_at")
-    _aware_datetime(value.get("completed_at"), "completed_at", allow_empty=True)
+    started = _aware_datetime(value.get("started_at"), "started_at")
+    completed = _aware_datetime(value.get("completed_at"), "completed_at", allow_empty=True)
+    if value["run_status"] in ("completed", "failed", "rejected"):
+        if completed is None:
+            raise ValueError("completed_at is required for terminal run evidence")
+        if completed < started:
+            raise ValueError("completed_at must not precede started_at")
+    elif completed is not None:
+        raise ValueError("completed_at must be empty for nonterminal run evidence")
     for key in (
         "case_id_present connector_invoked task_title_present "
         "task_description_present assignee_present due_at_present "
@@ -472,7 +604,7 @@ def _validate_run(run: object) -> None:
                 "connector_id connector_status credential_status credential_handles "
                 "operation mode provider_status"
             ).split()
-        )
+        ) and all(value[field] is False for field in PRESENCE_FIELDS)
         if not empty:
             raise ValueError("uninvoked connector evidence must be empty")
 
@@ -498,16 +630,32 @@ def _validate_exercise(name: str, exercise: object) -> None:
             or value.get("connector_invoked") is not False
         ):
             raise ValueError("rejection exercise values are invalid")
+        if value["passed"] is not True:
+            raise ValueError("rejection exercise passed contradicts its facts")
     elif name == "failure":
         if value.get("exercise") != "disabled_live" or value.get("provider_status") not in PROVIDER_STATUSES:
             raise ValueError("failure exercise values are invalid")
         _require_bool(value.get("credential_resolution_attempted"), "failure credential attempt")
         _require_bool(value.get("transport_attempted"), "failure transport attempt")
+        fact = bool(
+            value["provider_status"] == "live_disabled"
+            and value["credential_resolution_attempted"] is False
+            and value["transport_attempted"] is False
+        )
+        if value["passed"] is not fact:
+            raise ValueError("failure exercise passed contradicts its facts")
     else:
         if value.get("exercise") != "rollback" or value.get("dry_run_status") not in ("", "completed", "failed"):
             raise ValueError("rollback exercise values are invalid")
         _require_bool(value.get("live_switch_enabled"), "rollback live switch")
         _require_bool(value.get("live_approval_blocked"), "rollback approval")
+        fact = bool(
+            value["live_switch_enabled"] is False
+            and value["live_approval_blocked"] is True
+            and value["dry_run_status"] == "completed"
+        )
+        if value["passed"] is not fact:
+            raise ValueError("rollback exercise passed contradicts its facts")
 
 
 def _validate_verification(verification: object) -> None:
@@ -531,13 +679,10 @@ def _validate_verification(verification: object) -> None:
         _require_bool(item.get("passed"), "verification command passed")
         if item["passed"] != (item["exit_code"] == 0):
             raise ValueError("verification command result is inconsistent")
-    expected_prefix = [item for item in VERIFICATION_COMMAND_IDS if item in seen]
-    if seen != expected_prefix or len(seen) != len(set(seen)):
-        raise ValueError("verification command order is invalid")
-    complete = tuple(seen) == VERIFICATION_COMMAND_IDS and all(
-        command["passed"] for command in commands
-    )
-    if value["all_passed"] != complete:
+    if tuple(seen) != VERIFICATION_COMMAND_IDS:
+        raise ValueError("verification must contain the exact seven commands in order")
+    aggregate = all(command["passed"] for command in commands)
+    if value["all_passed"] != aggregate:
         raise ValueError("verification aggregate is inconsistent")
 
 
@@ -632,88 +777,169 @@ def validate_evidence_pack(pack: Dict[str, object], forbidden_values: List[str])
         raise ValueError("evidence index does not match the acceptance summary")
     if not isinstance(forbidden_values, list):
         raise ValueError("forbidden values must be a list")
-    encoded = json.dumps(value, ensure_ascii=False, sort_keys=True)
     leaf_strings = _all_string_leaves(value)
     for forbidden in forbidden_values:
         if not isinstance(forbidden, str) or not forbidden:
             continue
-        if (len(forbidden) >= 4 and forbidden in encoded) or forbidden in leaf_strings:
+        if any(forbidden in leaf for leaf in leaf_strings):
             raise ValueError("evidence pack contains a forbidden private value")
 
 
-def _safe_output_path(output_dir: Path) -> Path:
+def _require_dir_fd_support() -> None:
+    if not _DIR_FD_SUPPORTED:
+        raise ValueError("secure directory-fd evidence writes are not supported")
+
+
+def _directory_flags() -> int:
+    return os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+
+
+def _open_child_directory(parent_fd: int, name: str, create: bool) -> int:
+    try:
+        return os.open(name, _directory_flags(), dir_fd=parent_fd)
+    except FileNotFoundError:
+        if not create:
+            raise
+        try:
+            os.mkdir(name, 0o700, dir_fd=parent_fd)
+        except FileExistsError:
+            pass
+        try:
+            return os.open(name, _directory_flags(), dir_fd=parent_fd)
+        except OSError as error:
+            raise ValueError(
+                "evidence output component must not be a symbolic link or non-directory"
+            ) from error
+    except OSError as error:
+        raise ValueError(
+            "evidence output component must not be a symbolic link or non-directory"
+        ) from error
+
+
+def _open_output_directory(output_dir: Path) -> tuple:
+    _require_dir_fd_support()
     path = Path(os.path.abspath(os.fspath(output_dir)))
     if path == Path(path.anchor):
         raise ValueError("evidence output must not be a filesystem root")
-    for component in reversed((path,) + tuple(path.parents)):
-        if component.is_symlink():
-            raise ValueError("evidence output must not contain a symbolic link")
-    if path.exists() and not path.is_dir():
-        raise ValueError("evidence output must be a directory")
-    return path
-
-
-def _write_json_atomic(path: Path, value: object) -> None:
-    parent = _safe_output_path(path.parent)
-    parent.mkdir(parents=True, exist_ok=True)
-    _safe_output_path(parent)
-    temporary = path.with_name(f".{path.name}.tmp")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    descriptor = None
+    descriptor = os.open(path.anchor, _directory_flags())
     try:
-        descriptor = os.open(temporary, flags, 0o600)
+        for component in path.parts[1:]:
+            child = _open_child_directory(descriptor, component, create=True)
+            os.close(descriptor)
+            descriptor = child
+        return path, descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _open_relative_directory(root_fd: int, components: tuple, create: bool) -> int:
+    descriptor = os.dup(root_fd)
+    try:
+        for component in components:
+            child = _open_child_directory(descriptor, component, create=create)
+            os.close(descriptor)
+            descriptor = child
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _write_json_atomic(parent_fd: int, name: str, value: object) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    flags |= os.O_NOFOLLOW
+    descriptor = None
+    temporary = ""
+    try:
+        for _attempt in range(16):
+            temporary = f".{name}.{secrets.token_hex(8)}.tmp"
+            try:
+                descriptor = os.open(
+                    temporary,
+                    flags,
+                    0o600,
+                    dir_fd=parent_fd,
+                )
+                break
+            except FileExistsError:
+                continue
+        if descriptor is None:
+            raise FileExistsError("could not allocate an evidence temporary file")
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             descriptor = None
             json.dump(value, handle, ensure_ascii=False, indent=2)
             handle.flush()
             os.fsync(handle.fileno())
-        os.replace(str(temporary), str(path))
+        os.replace(
+            temporary,
+            name,
+            src_dir_fd=parent_fd,
+            dst_dir_fd=parent_fd,
+        )
+        os.fsync(parent_fd)
     finally:
         if descriptor is not None:
             os.close(descriptor)
-        try:
-            temporary.unlink()
-        except FileNotFoundError:
-            pass
+        if temporary:
+            try:
+                os.unlink(temporary, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
 
 
-def _remove_stale_json_files(output_dir: Path, expected: Set[Path]) -> None:
-    output = _safe_output_path(output_dir)
-    if not output.exists():
-        return
-    expected_paths = {path.absolute() for path in expected}
-    for path in output.rglob("*.json"):
-        if path.is_symlink() or not path.is_file():
+def _remove_stale_json_files(
+    directory_fd: int,
+    expected: Set[str],
+    prefix: tuple = (),
+) -> None:
+    for name in os.listdir(directory_fd):
+        item = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        relative = "/".join(prefix + (name,))
+        if stat.S_ISLNK(item.st_mode):
+            raise ValueError("evidence output descendants must not be symbolic links")
+        if stat.S_ISDIR(item.st_mode):
+            child = _open_child_directory(directory_fd, name, create=False)
+            try:
+                _remove_stale_json_files(child, expected, prefix + (name,))
+            finally:
+                os.close(child)
             continue
-        candidate = path.absolute()
-        if output not in candidate.parents:
-            raise ValueError("stale evidence path escapes the output directory")
-        if candidate not in expected_paths:
-            path.unlink()
+        if not stat.S_ISREG(item.st_mode):
+            raise ValueError("evidence output descendants must be regular files")
+        if name.endswith(".json") and relative not in expected:
+            os.unlink(name, dir_fd=directory_fd)
 
 
 def write_evidence_pack(output_dir: Path, pack: Dict[str, object]) -> Dict[str, object]:
     validate_evidence_pack(pack, [])
-    output = _safe_output_path(output_dir)
+    output = Path(os.path.abspath(os.fspath(output_dir)))
     files = {
-        output / "pilot-charter.json": pack["charter"],
-        output / "evidence-index.json": pack["index"],
+        ((), "pilot-charter.json"): pack["charter"],
+        ((), "evidence-index.json"): pack["index"],
     }
     for sequence, run in enumerate(pack["runs"], start=1):
-        files[output / "runs" / f"{sequence:03d}.json"] = run
+        files[(("runs",), f"{sequence:03d}.json")] = run
     for name in ("rejection", "failure", "rollback"):
         exercise = pack["exercises"][name]
         if exercise is not None:
-            files[output / "exercises" / f"{name}.json"] = exercise
+            files[(("exercises",), f"{name}.json")] = exercise
     if pack["verification"] is not None:
-        files[output / "verification.json"] = pack["verification"]
+        files[((), "verification.json")] = pack["verification"]
     if pack["decision"] is not None:
-        files[output / "decision.json"] = pack["decision"]
-    for path in files:
-        _safe_output_path(path.parent)
-    for path, item in files.items():
-        _write_json_atomic(path, item)
-    _remove_stale_json_files(output, set(files))
+        files[((), "decision.json")] = pack["decision"]
+    output, output_fd = _open_output_directory(output)
+    expected = {
+        "/".join(components + (name,)) for components, name in files
+    }
+    try:
+        for (components, name), item in files.items():
+            parent_fd = _open_relative_directory(output_fd, components, create=True)
+            try:
+                _write_json_atomic(parent_fd, name, item)
+            finally:
+                os.close(parent_fd)
+        _remove_stale_json_files(output_fd, expected)
+    finally:
+        os.close(output_fd)
     return {"status": "written", "file_count": len(files), "output_dir": str(output)}
