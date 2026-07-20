@@ -68,7 +68,24 @@ Create each case file below an owner-controlled location such as `$PRIVATE_PILOT
 }
 ```
 
-`case-001` is an opaque pilot identifier, not an account name. On the fourth approved calendar date, use the same schema with opaque id `case-002` so the acceptance evidence represents at least two private cases. Put real partner-approved values only in the private file; do not put them in shell arguments, documentation, tickets, or repository files.
+`case-001` is an opaque pilot identifier, not an account name. For the fourth approved calendar date, use the Day 4 exact schema below. It differs only in the required opaque id:
+
+```json
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pilot_case_id", "account_name", "renewal_risk", "owner_open_id", "due_at"],
+  "properties": {
+    "pilot_case_id": {"type": "string", "const": "case-002"},
+    "account_name": {"type": "string", "minLength": 1},
+    "renewal_risk": {"type": "string", "minLength": 1},
+    "owner_open_id": {"type": "string", "minLength": 1},
+    "due_at": {"type": "string", "format": "date-time"}
+  }
+}
+```
+
+This exact second schema ensures the acceptance evidence represents at least two private cases. Put real partner-approved values only in the private file; do not put them in shell arguments, documentation, tickets, or repository files.
 
 Protect the case before start:
 

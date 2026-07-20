@@ -694,9 +694,6 @@ def _build_pilot_evidence(
         "timezone": PILOT_TIMEZONE,
         **summary,
     }
-    token = os.environ.get(TOKEN_ENVIRONMENT, "")
-    if token:
-        forbidden_values.append(token)
     pack = {
         "charter": charter,
         "runs": runs,

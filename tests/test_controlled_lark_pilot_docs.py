@@ -452,6 +452,58 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
         self.assertEqual(stderr, "controlled pilot command failed\n")
         self.assertNotIn(private_error, stderr)
 
+    def test_start_invalid_utf8_uses_fixed_redacted_stderr_without_traceback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            work_dir = root / "pilot"
+            invalid_input = root / "invalid-case.json"
+            invalid_input.write_bytes(b'\xff{"account_name":"private"}')
+            os.chmod(invalid_input, 0o600)
+            self.assertEqual(self._init(work_dir)[0], 0)
+
+            result, stdout, stderr = self._invoke(
+                [
+                    "start",
+                    "--work-dir",
+                    str(work_dir),
+                    "--input",
+                    str(invalid_input),
+                ]
+            )
+
+        self.assertNotEqual(result, 0)
+        self.assertEqual(stdout, "")
+        self.assertEqual(stderr, "controlled pilot command failed\n")
+        self.assertNotIn("Traceback", stderr)
+        self.assertNotIn("account_name", stderr)
+
+    def test_finalize_invalid_utf8_uses_fixed_redacted_stderr_without_traceback(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            decision = root / "invalid-decision.json"
+            decision.write_bytes(b'\xff{"rationale":"private"}')
+            os.chmod(decision, 0o600)
+
+            with patch(
+                "skill2workflow.controlled_lark_pilot.finalize_pilot"
+            ) as finalize:
+                result, stdout, stderr = self._invoke(
+                    [
+                        "finalize",
+                        "--work-dir",
+                        str(root / "pilot"),
+                        "--decision-file",
+                        str(decision),
+                    ]
+                )
+
+        self.assertNotEqual(result, 0)
+        self.assertEqual(stdout, "")
+        self.assertEqual(stderr, "controlled pilot command failed\n")
+        self.assertNotIn("Traceback", stderr)
+        self.assertNotIn("rationale", stderr)
+        finalize.assert_not_called()
+
 
 class ControlledLarkPilotDocumentationTests(unittest.TestCase):
     def test_controlled_pilot_runbook_documents_every_safe_phase(self):
@@ -476,6 +528,8 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         self.assertIn("Asia/Shanghai", runbook)
         self.assertIn("case-001", runbook)
         self.assertIn("case-002", runbook)
+        self.assertIn('"const": "case-002"', runbook)
+        self.assertIn("Day 4 exact schema", runbook)
         self.assertIn("docs/pilot-evidence/loop-40", runbook)
         self.assertIn("continue", runbook)
         self.assertIn("harden", runbook)

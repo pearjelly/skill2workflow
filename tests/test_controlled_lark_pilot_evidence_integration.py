@@ -31,6 +31,7 @@ from tests.test_controlled_lark_pilot_evidence import (
     _valid_charter,
     _valid_decision,
 )
+from tests.test_controlled_lark_pilot import _TokenValueReadSpy
 
 
 def _json_bytes_map(directory):
@@ -65,6 +66,34 @@ def _write_owner_only_json(path, value):
 
 
 class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
+    def test_finalize_never_reads_or_mutates_injected_token_value(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            (work_dir / "private" / "decision.json").unlink()
+            spy = _TokenValueReadSpy(
+                {
+                    "LARK_BOT_ACCESS_TOKEN": "injected-private-token",
+                    "KEEP_ME": "yes",
+                }
+            )
+            with patch.object(os, "environ", spy):
+                result = finalize_pilot(
+                    repo_root,
+                    work_dir,
+                    _valid_decision(),
+                    output_dir=root / "requested",
+                    now=NOW,
+                )
+
+        self.assertEqual(result["status"], "finalized")
+        self.assertEqual(spy.token_value_reads, 0)
+        self.assertEqual(spy.token_mutations, 0)
+        self.assertEqual(
+            spy.peek("LARK_BOT_ACCESS_TOKEN"),
+            "injected-private-token",
+        )
+
     def test_finalize_retries_every_transient_post_commit_cleanup(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()

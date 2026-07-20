@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from collections.abc import Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -53,21 +54,46 @@ class Task6Dependencies:
 
 @contextmanager
 def live_environment_removed():
-    """Remove the two live variables temporarily and restore their exact state."""
-    previous = {
-        name: (name in os.environ, os.environ.get(name, ""))
-        for name in (LIVE_SWITCH, TOKEN_ENVIRONMENT)
-    }
-    for name in previous:
-        os.environ.pop(name, None)
+    """Remove only the live switch without accessing the injected token."""
+    existed = LIVE_SWITCH in os.environ
+    previous = os.environ.get(LIVE_SWITCH, "")
+    os.environ.pop(LIVE_SWITCH, None)
     try:
         yield
     finally:
-        for name, (existed, value) in previous.items():
-            if existed:
-                os.environ[name] = value
-            else:
-                os.environ.pop(name, None)
+        if existed:
+            os.environ[LIVE_SWITCH] = previous
+        else:
+            os.environ.pop(LIVE_SWITCH, None)
+
+
+class _SanitizedEnvironment(Mapping):
+    """Read safe environment values lazily without touching excluded values."""
+
+    def __init__(self, source, *, excluded, overrides):
+        excluded_keys = frozenset(excluded)
+        self._source = source
+        self._overrides = dict(overrides)
+        self._source_keys = tuple(
+            key
+            for key in source
+            if key not in excluded_keys and key not in self._overrides
+        )
+        self._source_key_set = frozenset(self._source_keys)
+
+    def __getitem__(self, key):
+        if key in self._overrides:
+            return self._overrides[key]
+        if key not in self._source_key_set:
+            raise KeyError(key)
+        return self._source[key]
+
+    def __iter__(self):
+        yield from self._source_keys
+        yield from self._overrides
+
+    def __len__(self):
+        return len(self._source_keys) + len(self._overrides)
 
 
 class CredentialResolutionSpy:
@@ -487,10 +513,11 @@ def run_fixed_verification(
     if tuple(command_id for command_id, _arguments in commands) != VERIFICATION_COMMAND_IDS:
         raise ValueError("fixed verification command identity is invalid")
 
-    environment = dict(os.environ)
-    environment.pop(LIVE_SWITCH, None)
-    environment.pop(TOKEN_ENVIRONMENT, None)
-    environment["PYTHONPATH"] = "src"
+    environment = _SanitizedEnvironment(
+        os.environ,
+        excluded=(LIVE_SWITCH, TOKEN_ENVIRONMENT),
+        overrides={"PYTHONPATH": "src"},
+    )
     runner = command_runner or subprocess.run
     records = []
     verification_path = work_dir / "private" / "verification.json"
@@ -500,7 +527,7 @@ def run_fixed_verification(
         completed = runner(
             arguments,
             cwd=repo_root,
-            env=dict(environment),
+            env=environment,
             capture_output=True,
         )
         duration_ms = max(0, (time.monotonic_ns() - started) // 1_000_000)

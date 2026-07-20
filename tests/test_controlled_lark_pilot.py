@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import sys
+from collections.abc import MutableMapping
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
@@ -79,6 +80,43 @@ class _FakeCommandRunner:
         return _FakeCommandResult(self.exit_codes[len(self.arguments) - 1])
 
 
+class _TokenValueReadSpy(MutableMapping):
+    def __init__(self, values, allow_token_read=False):
+        self._values = dict(values)
+        self.allow_token_read = allow_token_read
+        self.token_value_reads = 0
+        self.token_mutations = 0
+
+    def __getitem__(self, key):
+        if key == "LARK_BOT_ACCESS_TOKEN":
+            self.token_value_reads += 1
+            if not self.allow_token_read:
+                raise AssertionError("non-approval path read the injected token value")
+        return self._values[key]
+
+    def __setitem__(self, key, value):
+        if key == "LARK_BOT_ACCESS_TOKEN":
+            self.token_mutations += 1
+        self._values[key] = value
+
+    def __delitem__(self, key):
+        if key == "LARK_BOT_ACCESS_TOKEN":
+            self.token_mutations += 1
+        del self._values[key]
+
+    def __iter__(self):
+        return iter(self._values)
+
+    def __len__(self):
+        return len(self._values)
+
+    def __contains__(self, key):
+        return key in self._values
+
+    def peek(self, key):
+        return self._values[key]
+
+
 def _valid_charter():
     return {
         "schema_version": "controlled-lark-pilot-0.1.0",
@@ -146,6 +184,114 @@ def _published_controlled_workflow():
 
 
 class ControlledLarkPilotTests(TestCase):
+    def test_non_approval_operations_never_read_or_mutate_injected_token(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            work_dir = root / "pilot"
+            input_path = root / "case.json"
+            spy = _TokenValueReadSpy(
+                {
+                    "LARK_BOT_ACCESS_TOKEN": "injected-private-token",
+                    "KEEP_ME": "yes",
+                }
+            )
+            runner = _FakeCommandRunner()
+
+            def without_token_access(label, operation):
+                before = (spy.token_value_reads, spy.token_mutations)
+                with self.subTest(operation=label):
+                    result = operation()
+                    self.assertEqual(
+                        (spy.token_value_reads, spy.token_mutations),
+                        before,
+                    )
+                    self.assertEqual(
+                        spy.peek("LARK_BOT_ACCESS_TOKEN"),
+                        "injected-private-token",
+                    )
+                    return result
+
+            with patch.object(os, "environ", spy):
+                without_token_access(
+                    "init",
+                    lambda: initialize_pilot(
+                        ROOT,
+                        work_dir,
+                        _valid_charter(),
+                        now=NOW,
+                    ),
+                )
+                _write_private_case(input_path)
+                started = without_token_access(
+                    "start",
+                    lambda: start_pilot_run(
+                        ROOT,
+                        work_dir,
+                        input_path,
+                        now=NOW,
+                    ),
+                )
+                without_token_access(
+                    "reject",
+                    lambda: decide_pilot_run(
+                        ROOT,
+                        work_dir,
+                        started["run_id"],
+                        approved=False,
+                        now=NOW,
+                    ),
+                )
+                without_token_access(
+                    "evidence",
+                    lambda: generate_pilot_evidence(ROOT, work_dir, now=NOW),
+                )
+                without_token_access(
+                    "exercise-failure",
+                    lambda: exercise_disabled_live(ROOT, work_dir, now=NOW),
+                )
+                without_token_access(
+                    "exercise-rollback",
+                    lambda: exercise_rollback(ROOT, work_dir, now=NOW),
+                )
+                without_token_access(
+                    "verify",
+                    lambda: verify_pilot(
+                        ROOT,
+                        work_dir,
+                        command_runner=runner,
+                    ),
+                )
+
+            for environment in runner.environments:
+                self.assertNotIn("LARK_BOT_ACCESS_TOKEN", environment)
+                self.assertNotIn("SKILL2WORKFLOW_LARK_TASK_LIVE", environment)
+                self.assertEqual(environment["KEEP_ME"], "yes")
+
+    def test_approval_remains_the_only_path_that_reads_injected_token(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, started = _start_waiting_pilot(tmp)
+            spy = _TokenValueReadSpy(
+                {
+                    "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                    "LARK_BOT_ACCESS_TOKEN": "injected-private-token",
+                },
+                allow_token_read=True,
+            )
+            with patch.object(os, "environ", spy):
+                result = decide_pilot_run(
+                    ROOT,
+                    work_dir,
+                    started["run_id"],
+                    approved=True,
+                    confirmed_live=True,
+                    now=NOW,
+                    transport=_FakeTransport(),
+                )
+
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(spy.token_value_reads, 1)
+        self.assertEqual(spy.token_mutations, 0)
+
     def test_exercise_disabled_live_uses_real_boundary_without_credentials_or_transport(self):
         expected = {
             "exercise": "disabled_live",
