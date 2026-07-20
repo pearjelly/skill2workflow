@@ -58,7 +58,7 @@
 - Consumes: existing `_lark_task_pilot_workflow()` implementation.
 - Produces: `build_lark_task_pilot_workflow(mode: str = "dry_run", workflow_id: str = "workflow_lark_task_pilot", workflow_version: str = "0.1.0", workflow_name: str = "lark-task-sales-renewal-pilot") -> Dict[str, object]`.
 
-- [ ] **Step 1: Write failing template and regression tests**
+- [x] **Step 1: Write failing template and regression tests**
 
 Add the import and tests:
 
@@ -99,7 +99,7 @@ def test_lark_task_pilot_workflow_builder_rejects_unknown_mode(self):
         build_lark_task_pilot_workflow(mode="other")
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -109,7 +109,7 @@ PYTHONPATH=src python3 -m unittest tests.test_lark_task_pilot -v
 
 Expected: import failure because `build_lark_task_pilot_workflow` does not exist.
 
-- [ ] **Step 3: Expose and parameterize the existing builder**
+- [x] **Step 3: Expose and parameterize the existing builder**
 
 Apply these exact edits to the existing dictionary so every unchanged node and edge remains in place:
 
@@ -160,7 +160,7 @@ Apply these exact edits to the existing dictionary so every unchanged node and e
 +                    "mode": mode,
 ```
 
-- [ ] **Step 4: Run focused and fixture tests and verify GREEN**
+- [x] **Step 4: Run focused and fixture tests and verify GREEN**
 
 Run:
 
@@ -170,7 +170,7 @@ PYTHONPATH=src python3 -m unittest tests.test_lark_task_pilot tests.test_example
 
 Expected: all tests pass; the existing smoke still emits `mode: dry_run`.
 
-- [ ] **Step 5: Commit the reusable template**
+- [x] **Step 5: Commit the reusable template**
 
 ```bash
 git add src/skill2workflow/lark_task_pilot.py tests/test_lark_task_pilot.py
@@ -193,7 +193,7 @@ git commit -m "refactor: expose lark pilot workflow template"
   - `load_private_case(repo_root: Path, input_path: Path) -> Dict[str, object]`
   - constants `PILOT_SCHEMA_VERSION`, `WORKFLOW_ID`, `WORKFLOW_VERSION`, `PILOT_TIMEZONE`.
 
-- [ ] **Step 1: Write failing charter, path, permission, and case tests**
+- [x] **Step 1: Write failing charter, path, permission, and case tests**
 
 Create `tests/test_controlled_lark_pilot.py` with:
 
@@ -298,7 +298,7 @@ class ControlledLarkPilotTests(TestCase):
                 load_private_case(ROOT, path)
 ```
 
-- [ ] **Step 2: Run the new test and verify RED**
+- [x] **Step 2: Run the new test and verify RED**
 
 Run:
 
@@ -308,7 +308,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot -v
 
 Expected: import failure because `skill2workflow.controlled_lark_pilot` does not exist.
 
-- [ ] **Step 3: Implement charter validation and secure workspace helpers**
+- [x] **Step 3: Implement charter validation and secure workspace helpers**
 
 Create `src/skill2workflow/controlled_lark_pilot.py` with these constants and core helpers:
 
@@ -441,7 +441,7 @@ def _require_owner_only(path: Path) -> None:
         raise ValueError("private case input must use owner-only permissions")
 ```
 
-- [ ] **Step 4: Run charter tests and verify GREEN**
+- [x] **Step 4: Run charter tests and verify GREEN**
 
 Run:
 
@@ -451,7 +451,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot -v
 
 Expected: all charter, path, permission, and input-shape tests pass.
 
-- [ ] **Step 5: Commit the private workspace boundary**
+- [x] **Step 5: Commit the private workspace boundary**
 
 ```bash
 git add src/skill2workflow/controlled_lark_pilot.py tests/test_controlled_lark_pilot.py
@@ -472,7 +472,7 @@ git commit -m "feat: add controlled pilot charter boundary"
   - `start_pilot_run(repo_root: Path, work_dir: Path, input_path: Path, now: datetime = None, transport=None) -> Dict[str, object]`
   - `_pilot_control_plane(repo_root: Path, work_dir: Path, credential_provider, transport=None) -> LocalControlPlane`.
 
-- [ ] **Step 1: Write the failing durable-start test**
+- [x] **Step 1: Write the failing durable-start test**
 
 Add:
 
@@ -523,7 +523,7 @@ def test_start_pilot_run_publishes_live_workflow_and_stops_at_gate(self):
 
 Add imports for `LocalControlPlane` and `start_pilot_run`.
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run:
 
@@ -533,7 +533,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot.ControlledLa
 
 Expected: import failure because `start_pilot_run` does not exist.
 
-- [ ] **Step 3: Implement fixed workflow publication and trigger**
+- [x] **Step 3: Implement fixed workflow publication and trigger**
 
 Add:
 
@@ -621,7 +621,7 @@ def _pilot_control_plane(
 
 Do not print or return `pilot_input`.
 
-- [ ] **Step 4: Run start and existing pilot tests and verify GREEN**
+- [x] **Step 4: Run start and existing pilot tests and verify GREEN**
 
 Run:
 
@@ -631,7 +631,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot tests.test_l
 
 Expected: all tests pass and no transport is called during `start`.
 
-- [ ] **Step 5: Commit durable start**
+- [x] **Step 5: Commit durable start**
 
 ```bash
 git add src/skill2workflow/controlled_lark_pilot.py tests/test_controlled_lark_pilot.py
@@ -652,7 +652,7 @@ git commit -m "feat: start controlled lark pilot runs"
   - `decide_pilot_run(repo_root: Path, work_dir: Path, run_id: str, approved: bool, confirmed_live: bool = False, now: datetime = None, transport=None) -> Dict[str, object]`.
   - `_validate_controlled_live_binding(workflow: Dict[str, object], run: Dict[str, object]) -> None`.
 
-- [ ] **Step 1: Write failing approval, rejection, guard, repeat, and redaction tests**
+- [x] **Step 1: Write failing approval, rejection, guard, repeat, and redaction tests**
 
 Add a fake transport that records calls and returns a compact successful provider response:
 
@@ -777,7 +777,7 @@ Import `patch` from `unittest.mock` and `decide_pilot_run` from the new module.
 
 Add a table-driven unit test for `_validate_controlled_live_binding` that mutates each fixed property in turn—workflow id/version, current gate, connector id, operation, mode, credential handle, run id, and node id—and asserts a stable `ValueError` before any credential provider or transport can be constructed.
 
-- [ ] **Step 2: Run decision tests and verify RED**
+- [x] **Step 2: Run decision tests and verify RED**
 
 Run:
 
@@ -787,7 +787,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot -v
 
 Expected: failure because `decide_pilot_run` does not exist.
 
-- [ ] **Step 3: Implement explicit decision guards and compact summaries**
+- [x] **Step 3: Implement explicit decision guards and compact summaries**
 
 Add:
 
@@ -867,7 +867,7 @@ def decide_pilot_run(
 
 Do not include `token`, context, task values, provider payloads, or provider messages in raised errors or summaries.
 
-- [ ] **Step 4: Run controlled and connector tests and verify GREEN**
+- [x] **Step 4: Run controlled and connector tests and verify GREEN**
 
 Run:
 
@@ -877,7 +877,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot tests.test_l
 
 Expected: all tests pass; fake approval makes exactly one transport call; rejection makes none.
 
-- [ ] **Step 5: Commit explicit decision control**
+- [x] **Step 5: Commit explicit decision control**
 
 ```bash
 git add src/skill2workflow/controlled_lark_pilot.py tests/test_controlled_lark_pilot.py
@@ -902,7 +902,7 @@ git commit -m "feat: add controlled lark pilot decisions"
   - `write_evidence_pack(output_dir: Path, pack: Dict[str, object]) -> Dict[str, object]`
   - `generate_pilot_evidence(repo_root: Path, work_dir: Path, output_dir: Path = None, now: datetime = None) -> Dict[str, object]`.
 
-- [ ] **Step 1: Write failing run-evidence allowlist and leakage tests**
+- [x] **Step 1: Write failing run-evidence allowlist and leakage tests**
 
 Create `tests/test_controlled_lark_pilot_evidence.py` with synthetic full state that includes forbidden raw values and audit that includes only compact connector metadata:
 
@@ -994,7 +994,7 @@ class ControlledLarkPilotEvidenceTests(TestCase):
 
 Add rejection coverage that expects `gate_decision: rejected`, `connector_invoked: false`, and empty connector status fields.
 
-- [ ] **Step 2: Write failing five-day aggregation and atomic-write tests**
+- [x] **Step 2: Write failing five-day aggregation and atomic-write tests**
 
 Use five synthetic redacted records with `completed_at` values on July 18–22 in `Asia/Shanghai`; supply only the already-counted private-case cardinality, and assert:
 
@@ -1032,7 +1032,7 @@ with TemporaryDirectory() as tmp:
     self.assertFalse(any(path.name.endswith(".tmp") for path in output.rglob("*")))
 ```
 
-- [ ] **Step 3: Run evidence tests and verify RED**
+- [x] **Step 3: Run evidence tests and verify RED**
 
 Run:
 
@@ -1042,7 +1042,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot_evidence -v
 
 Expected: import failure because the evidence module does not exist.
 
-- [ ] **Step 4: Implement pure run evidence and acceptance aggregation**
+- [x] **Step 4: Implement pure run evidence and acceptance aggregation**
 
 Create the new module with exact allowlisted keys:
 
@@ -1126,7 +1126,7 @@ Implement `_first_event`, `_last_event`, `_last_connector_event`, and `_terminal
 - require both exercises, complete verification, valid decision, both acknowledgements, and commercial confirmation;
 - return every failed predicate as a stable string in `unmet_conditions`.
 
-- [ ] **Step 5: Implement evidence validation and atomic per-file replacement**
+- [x] **Step 5: Implement evidence validation and atomic per-file replacement**
 
 Use a fixed output map and `os.replace`:
 
@@ -1175,7 +1175,7 @@ Define `_all_string_leaves` as a recursive read-only traversal of dictionaries a
 
 `_remove_stale_json_files` may delete only `.json` descendants of the exact `output_dir` passed to it that are absent from the new fixed map. Before scanning, it must reject a filesystem root, an existing symlink, or any path containing a symlink component. This writer never decides whether a repository export path is authorized.
 
-- [ ] **Step 6: Implement orchestration from private SQLite state**
+- [x] **Step 6: Implement orchestration from private SQLite state**
 
 In `controlled_lark_pilot.py`, add the exact public signature and one private in-memory builder shared with finalization:
 
@@ -1213,7 +1213,7 @@ Implement it so that it:
 12. permits an explicit repository-contained output only after `private/finalization.json` records a successful finalization and only when the resolved path equals `repo_root/docs/pilot-evidence/loop-40`; rejects every other repository-contained output;
 13. writes the validated pack and returns only status, counts, unmet conditions, and the output directory.
 
-- [ ] **Step 7: Run evidence and controlled tests and verify GREEN**
+- [x] **Step 7: Run evidence and controlled tests and verify GREEN**
 
 Run:
 
@@ -1223,7 +1223,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot_evidence tes
 
 Expected: all tests pass; encoded evidence contains no synthetic private values.
 
-- [ ] **Step 8: Commit the evidence boundary**
+- [x] **Step 8: Commit the evidence boundary**
 
 ```bash
 git add src/skill2workflow/controlled_lark_pilot.py src/skill2workflow/controlled_lark_pilot_evidence.py tests/test_controlled_lark_pilot.py tests/test_controlled_lark_pilot_evidence.py
@@ -1247,7 +1247,7 @@ git commit -m "feat: add redacted controlled pilot evidence"
   - `verify_pilot(repo_root: Path, work_dir: Path, command_runner=None) -> Dict[str, object]`
   - `finalize_pilot(repo_root: Path, work_dir: Path, decision: Dict[str, object], output_dir: Path = None, now: datetime = None) -> Dict[str, object]`.
 
-- [ ] **Step 1: Write failing disabled-live and rollback exercise tests**
+- [x] **Step 1: Write failing disabled-live and rollback exercise tests**
 
 Use a credential spy whose `resolve()` records calls and a transport spy. Assert that `exercise_disabled_live` returns exactly:
 
@@ -1273,7 +1273,7 @@ self.assertEqual(result["live_approval_blocked"], True)
 self.assertEqual(result["dry_run_status"], "completed")
 ```
 
-- [ ] **Step 2: Write failing fixed-verification tests**
+- [x] **Step 2: Write failing fixed-verification tests**
 
 Inject a fake runner that records argument arrays. Assert:
 
@@ -1298,7 +1298,7 @@ self.assertNotIn("SKILL2WORKFLOW_LARK_TASK_LIVE", fake_runner.environments[0])
 
 The verification result may contain command ids, exit codes, and durations only; it must not persist stdout/stderr.
 
-- [ ] **Step 3: Write failing finalization tests**
+- [x] **Step 3: Write failing finalization tests**
 
 Build an incomplete pack and assert `finalize_pilot` raises with the stable unmet condition list. Build a complete synthetic pack and decision:
 
@@ -1315,7 +1315,7 @@ decision = {
 
 Use a fully temporary synthetic repository root and work directory for export tests; never write test evidence into the checkout. Assert invalid decision values, false acknowledgements, false commercial status, empty rationale, and rationale containing any private case value fail before export. For every failure, assert `private/finalization.json` and the requested repository export are absent. For a complete case, assert both the private evidence pack and requested exact repository export are byte-for-byte equivalent JSON maps, the owner-only finalization marker exists, and a subsequent `generate_pilot_evidence` may replace only that exact repository target. Also assert any other repository-contained output path fails closed.
 
-- [ ] **Step 4: Run exercise/finalization tests and verify RED**
+- [x] **Step 4: Run exercise/finalization tests and verify RED**
 
 Run:
 
@@ -1325,7 +1325,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot tests.test_c
 
 Expected: failures because exercise, verification, and finalization functions do not exist.
 
-- [ ] **Step 5: Implement disabled-live exercise with spies**
+- [x] **Step 5: Implement disabled-live exercise with spies**
 
 Build a synthetic private case inside the private work directory, start the normal controlled workflow, and ensure the live switch is absent for the exercise. Construct the control plane with a connector wrapper that records transport access and a credential provider that records `resolve()` calls, then call `LocalControlPlane.resume_published_run` directly; do not call `decide_pilot_run`, whose operator guard intentionally rejects the missing switch before the connector boundary is exercised. Persist only the exact compact result above. The exercise passes only when:
 
@@ -1339,7 +1339,7 @@ passed = (
 
 The exercise must restore the caller's environment after execution.
 
-- [ ] **Step 6: Implement rollback through a blocked live approval and the unchanged dry-run helper**
+- [x] **Step 6: Implement rollback through a blocked live approval and the unchanged dry-run helper**
 
 With both live environment variables removed, start a fresh synthetic private controlled case and run this exact guard probe with a transport spy:
 
@@ -1382,7 +1382,7 @@ result = {
 
 The public rollback command must fail before this helper if the live switch is still exactly `1`; the operator removes it, then runs the exercise.
 
-- [ ] **Step 7: Implement the fixed offline verification command set**
+- [x] **Step 7: Implement the fixed offline verification command set**
 
 Use exact argument arrays, `cwd=repo_root`, a sanitized environment with both live variables removed, and `capture_output=True`. The fixed commands are:
 
@@ -1400,7 +1400,7 @@ commands = [
 
 Set `PYTHONPATH=src` in the sanitized environment for Python commands. Persist one compact record per command with `id`, `exit_code`, and `passed`. Set `all_passed` only when every exit code is zero.
 
-- [ ] **Step 8: Implement fail-closed finalization and safe export**
+- [x] **Step 8: Implement fail-closed finalization and safe export**
 
 Validate the decision exact schema and allowlisted keys. Pass it as `decision_override` to `_build_pilot_evidence` without first persisting it, require `ready_to_finalize: true`, and validate the complete candidate pack against all private values. Always atomically replace the private derived pack in `work_dir/evidence`; when `output_dir` is provided, also require that any repository-contained destination resolves exactly to `repo_root/docs/pilot-evidence/loop-40` before writing the same validated pack there. Only after every requested write succeeds, atomically persist `private/decision.json` and an owner-only `private/finalization.json` marker with exact keys `schema_version`, `finalized`, `decision`, and `finalized_at`. Ordinary `generate_pilot_evidence` may subsequently regenerate the repository export only when that marker is valid. A failed candidate or write leaves no finalization marker and never advances the Roadmap.
 
@@ -1418,7 +1418,7 @@ The return value is:
 }
 ```
 
-- [ ] **Step 9: Run focused tests and verify GREEN**
+- [x] **Step 9: Run focused tests and verify GREEN**
 
 Run:
 
@@ -1428,7 +1428,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot tests.test_c
 
 Expected: all exercise, verification, finalization, and leakage tests pass.
 
-- [ ] **Step 10: Commit exercises and finalization**
+- [x] **Step 10: Commit exercises and finalization**
 
 ```bash
 git add src/skill2workflow/controlled_lark_pilot.py src/skill2workflow/controlled_lark_pilot_evidence.py tests/test_controlled_lark_pilot.py tests/test_controlled_lark_pilot_evidence.py
@@ -1452,7 +1452,7 @@ git commit -m "feat: finalize controlled lark pilot evidence"
 - Consumes: all Task 2–6 public functions.
 - Produces: `main(argv=None) -> int` with `init`, `start`, `decide`, `evidence`, `exercise-failure`, `exercise-rollback`, `verify`, and `finalize` subcommands; one complete operator runbook.
 
-- [ ] **Step 1: Write failing CLI and documentation contract tests**
+- [x] **Step 1: Write failing CLI and documentation contract tests**
 
 Create tests that assert:
 
@@ -1509,7 +1509,7 @@ self.assertEqual(main(init_args), 0)
 self.assertEqual(main(reject_args), 0)
 ```
 
-- [ ] **Step 2: Run CLI/docs tests and verify RED**
+- [x] **Step 2: Run CLI/docs tests and verify RED**
 
 Run:
 
@@ -1519,7 +1519,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot_docs -v
 
 Expected: failure because the script and runbook do not exist.
 
-- [ ] **Step 3: Implement the thin CLI wrapper**
+- [x] **Step 3: Implement the thin CLI wrapper**
 
 The wrapper adds `src` to `sys.path` exactly like existing scripts and imports `main` from `skill2workflow.controlled_lark_pilot`. In the module, build subparsers with these safe inputs:
 
@@ -1539,7 +1539,7 @@ finalize --work-dir PATH --decision-file PATH [--output-dir PATH]
 
 Every successful command prints one compact JSON summary. Every expected operator error exits nonzero with fixed text that does not contain private input.
 
-- [ ] **Step 4: Write the full operator runbook**
+- [x] **Step 4: Write the full operator runbook**
 
 Document:
 
@@ -1561,7 +1561,7 @@ Document:
 - incident stop conditions and `defer` behavior;
 - the explicit statement that implementation readiness must not advance Loop 40.
 
-- [ ] **Step 5: Link the runbook without advancing maturity**
+- [x] **Step 5: Link the runbook without advancing maturity**
 
 Add the script command to `AGENTS.md`, a narrow link in `docs/connectors.md`, a dry-run/live distinction in `docs/examples.md`, and one runbook link in `README.md`. Keep these exact status statements unchanged:
 
@@ -1571,7 +1571,7 @@ Completed delivery loops: 1-39
 Active loop: Loop 40, Controlled Live Connector Pilot
 ```
 
-- [ ] **Step 6: Run CLI/docs and Roadmap tests and verify GREEN**
+- [x] **Step 6: Run CLI/docs and Roadmap tests and verify GREEN**
 
 Run:
 
@@ -1581,7 +1581,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot_docs tests.t
 
 Expected: all pass; Loop 40 remains active and incomplete.
 
-- [ ] **Step 7: Commit CLI and runbook**
+- [x] **Step 7: Commit CLI and runbook**
 
 ```bash
 git add AGENTS.md README.md docs/connectors.md docs/examples.md docs/controlled-live-pilot.md scripts/controlled_lark_pilot.py src/skill2workflow/controlled_lark_pilot.py tests/test_controlled_lark_pilot_docs.py
@@ -1599,7 +1599,7 @@ git commit -m "docs: add controlled lark pilot runbook"
 - Consumes: Tasks 1–7.
 - Produces: implementation-ready controlled Pilot tooling with no claim of real-pilot completion.
 
-- [ ] **Step 1: Run all focused controlled-pilot tests**
+- [x] **Step 1: Run all focused controlled-pilot tests**
 
 ```bash
 PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot tests.test_controlled_lark_pilot_evidence tests.test_controlled_lark_pilot_docs tests.test_lark_task_pilot tests.test_lark_task_connector tests.test_lark_task_live_validation -v
@@ -1607,7 +1607,7 @@ PYTHONPATH=src python3 -m unittest tests.test_controlled_lark_pilot tests.test_c
 
 Expected: all pass.
 
-- [ ] **Step 2: Run the full test suite in an environment that permits local loopback ports**
+- [x] **Step 2: Run the full test suite in an environment that permits local loopback ports**
 
 ```bash
 PYTHONPATH=src python3 -m unittest discover -s tests -v
@@ -1615,7 +1615,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 
 Expected: all tests pass. If the sandbox blocks `127.0.0.1` binding, rerun the identical command with the required sandbox escalation; do not reinterpret permission errors as code failures.
 
-- [ ] **Step 3: Run complete offline safety verification**
+- [x] **Step 3: Run complete offline safety verification**
 
 ```bash
 python3 -m py_compile src/skill2workflow/*.py examples/connectors/lark_task_connector.py
@@ -1627,7 +1627,7 @@ git diff --check
 
 Expected: every command exits 0; no live provider call occurs.
 
-- [ ] **Step 4: Run final code review**
+- [x] **Step 4: Run final code review**
 
 Use `superpowers:requesting-code-review`. Review against the approved design, with special attention to:
 
@@ -1642,7 +1642,7 @@ Use `superpowers:requesting-code-review`. Review against the approved design, wi
 
 Expected: no unresolved critical, important, or minor finding.
 
-- [ ] **Step 5: Record implementation readiness without advancing Loop 40**
+- [x] **Step 5: Record implementation readiness without advancing Loop 40**
 
 Check Tasks 1–8 in this plan and add a dated verification note containing only command names, pass/fail status, and test count. State explicitly:
 
@@ -1650,12 +1650,27 @@ Check Tasks 1–8 in this plan and add a dated verification note containing only
 Controlled Pilot tooling is implementation-ready. Loop 40 remains incomplete until the five-day paid real-team evidence gate finalizes.
 ```
 
-- [ ] **Step 6: Commit the implementation verification record**
+- [x] **Step 6: Commit the implementation verification record**
 
 ```bash
 git add docs/superpowers/plans/2026-07-17-controlled-live-pilot.md
 git commit -m "docs: verify controlled pilot tooling"
 ```
+
+#### Verification note — 2026-07-20
+
+| Command | Status | Test count |
+|---|---|---:|
+| `expanded-focused-tests` | PASS | 174/174 |
+| `full-tests` | PASS | 319/319 |
+| `compile` | PASS | 33 files |
+| `secret-hygiene` | PASS | 12 fixtures, 0 findings |
+| `connector-smoke` | PASS | 1 |
+| `dry-run-pilot-smoke` | PASS | 1 |
+| `diff-check` | PASS | — |
+| `controlled-pilot-verify` | PASS | 7/7 |
+
+Controlled Pilot tooling is implementation-ready. Loop 40 remains incomplete until the five-day paid real-team evidence gate finalizes.
 
 ---
 
