@@ -1757,7 +1757,7 @@ Expected: `run_status: completed`, `provider_status: completed`, and `lark_task_
 
 - [ ] **Step 5: Complete the human rejection evidence**
 
-Create `$HOME/.local/share/skill2workflow/pilots/loop-40/private/cases/rejection.json` from the same exact schema as Step 3, using opaque id `case-rejection-001` and partner-approved private values. Protect it, start it, inspect the waiting summary, and record the returned run id privately as `REJECTION_RUN_ID`:
+Create `$HOME/.local/share/skill2workflow/pilots/loop-40/private/cases/rejection.json` with the same five-field shape as Step 3, changing only `pilot_case_id` to the opaque id `case-rejection-001`, and use partner-approved private values. Protect it, start it, inspect the waiting summary, and record the returned run id privately as `REJECTION_RUN_ID`:
 
 ```bash
 chmod 600 "$HOME/.local/share/skill2workflow/pilots/loop-40/private/cases/rejection.json"
