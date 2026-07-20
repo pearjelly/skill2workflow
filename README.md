@@ -510,6 +510,7 @@ See:
 - `ROADMAP.md`
 - `docs/authoring.md`
 - `docs/connectors.md`
+- `docs/controlled-live-pilot.md`
 - `docs/credential-boundary.md`
 - `docs/examples.md`
 - `docs/pilot-playbook.md`

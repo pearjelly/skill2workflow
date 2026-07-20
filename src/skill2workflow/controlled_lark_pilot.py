@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import secrets
 import stat
+import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -75,6 +77,336 @@ REQUIRED_CASE_KEYS = {
     "owner_open_id",
     "due_at",
 }
+
+SOURCE_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+_OPERATOR_ERROR = "controlled pilot command failed"
+_REJECT_CONFIRMATION_ERROR = (
+    "controlled pilot rejection does not use live confirmation"
+)
+
+
+class _OperatorCLIError(Exception):
+    def __init__(self, message: str = _OPERATOR_ERROR):
+        super().__init__(message)
+        self.message = message
+
+
+class _RedactedArgumentParser(argparse.ArgumentParser):
+    def __init__(self, *args, **kwargs):
+        kwargs["allow_abbrev"] = False
+        super().__init__(*args, **kwargs)
+
+    def error(self, message):
+        del message
+        raise _OperatorCLIError()
+
+
+def _build_controlled_pilot_parser() -> argparse.ArgumentParser:
+    parser = _RedactedArgumentParser(
+        prog="controlled_lark_pilot.py",
+        description="Operate the fixed controlled Lark/Feishu pilot.",
+    )
+    commands = parser.add_subparsers(
+        dest="command",
+        required=True,
+        parser_class=_RedactedArgumentParser,
+    )
+
+    initialize = commands.add_parser("init")
+    initialize.add_argument("--work-dir", type=Path, required=True)
+    initialize.add_argument("--starts-on", required=True)
+    initialize.add_argument("--expires-on", required=True)
+    initialize.add_argument(
+        "--confirm-team-consent",
+        action="store_true",
+        required=True,
+    )
+    initialize.add_argument(
+        "--confirm-assignee-consent",
+        action="store_true",
+        required=True,
+    )
+    initialize.add_argument(
+        "--confirm-commercial-engagement",
+        action="store_true",
+        required=True,
+    )
+
+    start = commands.add_parser("start")
+    start.add_argument("--work-dir", type=Path, required=True)
+    start.add_argument("--input", type=Path, required=True)
+
+    decide = commands.add_parser("decide")
+    decide.add_argument("--work-dir", type=Path, required=True)
+    decide.add_argument("--run-id", required=True)
+    decision = decide.add_mutually_exclusive_group(required=True)
+    decision.add_argument("--approve", action="store_true")
+    decision.add_argument("--reject", action="store_true")
+    decide.add_argument("--confirm-live-create", action="store_true")
+
+    evidence = commands.add_parser("evidence")
+    evidence.add_argument("--work-dir", type=Path, required=True)
+    evidence.add_argument("--output-dir", type=Path)
+
+    failure = commands.add_parser("exercise-failure")
+    failure.add_argument("--work-dir", type=Path, required=True)
+
+    rollback = commands.add_parser("exercise-rollback")
+    rollback.add_argument("--work-dir", type=Path, required=True)
+
+    verify = commands.add_parser("verify")
+    verify.add_argument("--work-dir", type=Path, required=True)
+
+    finalize = commands.add_parser("finalize")
+    finalize.add_argument("--work-dir", type=Path, required=True)
+    finalize.add_argument("--decision-file", type=Path, required=True)
+    finalize.add_argument("--output-dir", type=Path)
+    return parser
+
+
+def _fixed_charter(arguments) -> Dict[str, object]:
+    return {
+        "schema_version": PILOT_SCHEMA_VERSION,
+        "scenario_id": SCENARIO_ID,
+        "workflow_id": WORKFLOW_ID,
+        "workflow_version": WORKFLOW_VERSION,
+        "support_model": "assisted",
+        "timezone": PILOT_TIMEZONE,
+        "starts_on": arguments.starts_on,
+        "expires_on": arguments.expires_on,
+        "team_consent_confirmed": arguments.confirm_team_consent,
+        "assignee_consent_confirmed": arguments.confirm_assignee_consent,
+        "commercial_engagement_confirmed": (
+            arguments.confirm_commercial_engagement
+        ),
+        "required_approved_runs": 5,
+        "required_distinct_days": 5,
+        "required_distinct_cases": 2,
+    }
+
+
+def _select_summary_fields(
+    result: object,
+    fields: Tuple[str, ...],
+) -> Dict[str, object]:
+    if not isinstance(result, dict):
+        raise ValueError("controlled pilot operation returned an invalid summary")
+    return {key: result[key] for key in fields if key in result}
+
+
+def _command_summary(
+    command: str,
+    result: object,
+    charter: Dict[str, object] = None,
+) -> Dict[str, object]:
+    if command == "init":
+        summary = _select_summary_fields(
+            result,
+            (
+                "status",
+                "scenario_id",
+                "workflow_id",
+                "workflow_version",
+            ),
+        )
+        summary.update(
+            {
+                "team_consent_confirmed": charter["team_consent_confirmed"],
+                "assignee_consent_confirmed": charter[
+                    "assignee_consent_confirmed"
+                ],
+                "commercial_engagement_confirmed": charter[
+                    "commercial_engagement_confirmed"
+                ],
+            }
+        )
+        return summary
+    if command == "start":
+        return _select_summary_fields(
+            result,
+            (
+                "run_id",
+                "workflow_id",
+                "workflow_version",
+                "run_status",
+                "current_node",
+                "input_keys",
+            ),
+        )
+    if command == "decide":
+        return _select_summary_fields(
+            result,
+            (
+                "run_id",
+                "workflow_id",
+                "workflow_version",
+                "run_status",
+                "gate_decision",
+                "connector_invoked",
+                "connector_status",
+                "credential_status",
+                "provider_status",
+                "idempotency_key_present",
+                "lark_task_id_present",
+            ),
+        )
+    if command == "evidence":
+        return _select_summary_fields(
+            result,
+            (
+                "status",
+                "file_count",
+                "run_count",
+                "approved_live_runs",
+                "distinct_calendar_days",
+                "distinct_private_cases",
+                "rejected_runs",
+                "unmet_conditions",
+            ),
+        )
+    if command == "exercise-failure":
+        return _select_summary_fields(
+            result,
+            (
+                "exercise",
+                "passed",
+                "provider_status",
+                "credential_resolution_attempted",
+                "transport_attempted",
+            ),
+        )
+    if command == "exercise-rollback":
+        return _select_summary_fields(
+            result,
+            (
+                "exercise",
+                "passed",
+                "live_switch_enabled",
+                "live_approval_blocked",
+                "dry_run_status",
+            ),
+        )
+    if command == "verify":
+        summary = _select_summary_fields(result, ("all_passed",))
+        commands = result.get("commands", [])
+        if not isinstance(commands, list):
+            raise ValueError("controlled pilot verification summary is invalid")
+        summary["commands"] = [
+            _select_summary_fields(
+                item,
+                ("id", "exit_code", "passed", "duration_ms"),
+            )
+            for item in commands
+        ]
+        return summary
+    if command == "finalize":
+        return _select_summary_fields(
+            result,
+            (
+                "status",
+                "decision",
+                "approved_live_runs",
+                "distinct_calendar_days",
+                "distinct_private_cases",
+                "rejected_runs",
+            ),
+        )
+    raise ValueError("controlled pilot command is invalid")
+
+
+def _load_private_decision(decision_file: Path) -> Dict[str, object]:
+    declared = Path(os.path.abspath(os.fspath(decision_file)))
+    _require_outside_repository(
+        SOURCE_REPOSITORY_ROOT,
+        declared,
+        "private decision file",
+    )
+    _require_outside_repository(
+        SOURCE_REPOSITORY_ROOT,
+        declared.resolve(),
+        "private decision file",
+    )
+    value = read_json_anchored(declared, owner_only=True)
+    if not isinstance(value, dict):
+        raise ValueError("private decision file must contain a JSON object")
+    return value
+
+
+def _dispatch_controlled_pilot(arguments) -> Tuple[Dict[str, object], object]:
+    command = arguments.command
+    if command == "init":
+        charter = _fixed_charter(arguments)
+        result = initialize_pilot(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+            charter,
+        )
+        return _command_summary(command, result, charter=charter), result
+    if command == "start":
+        result = start_pilot_run(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+            arguments.input,
+        )
+    elif command == "decide":
+        if arguments.reject and arguments.confirm_live_create:
+            raise _OperatorCLIError(_REJECT_CONFIRMATION_ERROR)
+        result = decide_pilot_run(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+            arguments.run_id,
+            approved=bool(arguments.approve),
+            confirmed_live=bool(arguments.confirm_live_create),
+        )
+    elif command == "evidence":
+        result = generate_pilot_evidence(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+            output_dir=arguments.output_dir,
+        )
+    elif command == "exercise-failure":
+        result = exercise_disabled_live(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+        )
+    elif command == "exercise-rollback":
+        result = exercise_rollback(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+        )
+    elif command == "verify":
+        result = verify_pilot(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+        )
+    elif command == "finalize":
+        decision = _load_private_decision(arguments.decision_file)
+        result = finalize_pilot(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+            decision,
+            output_dir=arguments.output_dir,
+        )
+    else:
+        raise _OperatorCLIError()
+    return _command_summary(command, result), result
+
+
+def main(argv=None) -> int:
+    try:
+        arguments = _build_controlled_pilot_parser().parse_args(argv)
+        summary, _result = _dispatch_controlled_pilot(arguments)
+    except _OperatorCLIError as error:
+        print(error.message, file=sys.stderr)
+        return 2
+    except (OSError, RuntimeError, ValueError):
+        print(_OPERATOR_ERROR, file=sys.stderr)
+        return 1
+    print(
+        json.dumps(summary, ensure_ascii=False, separators=(",", ":")),
+        flush=True,
+    )
+    return 0
 
 
 def _task6_dependencies() -> Task6Dependencies:

@@ -311,6 +311,8 @@ python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-tas
 
 The pilot uses the same explicitly loaded package inside a workflow that starts through the local webhook trigger boundary, waits at a manual gate, resumes with approval, and then invokes the connector. It proves business handoff and operator evidence, not live Lark/Feishu task creation.
 
+For the one approved controlled real-team pilot, follow `docs/controlled-live-pilot.md`. The dry-run remains the default; that runbook permits only the fixed Feishu domestic `create_task` action behind the existing explicit live guards.
+
 HTTP connector bindings may also reference local credential handles:
 
 ```json
