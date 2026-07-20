@@ -3,8 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import secrets
-import stat
 import sys
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -42,8 +40,10 @@ from ._controlled_lark_pilot_private_authorization import (
     open_private_session,
 )
 from ._controlled_lark_pilot_evidence_writer import (
+    ensure_private_directory_anchored,
     finish_durable_resources,
     read_json_anchored,
+    write_private_json_anchored,
 )
 from .external_connectors import load_external_connector
 from .lark_task_pilot import build_lark_task_pilot_workflow
@@ -1022,17 +1022,9 @@ def initialize_pilot(
     state_dir = work_dir / "state"
     evidence_dir = work_dir / "evidence"
     charter_path = private_dir / "charter.json"
-    _require_directory_or_missing(work_dir)
-    _require_directory_or_missing(private_dir)
-    _require_directory_or_missing(state_dir)
-    _require_directory_or_missing(evidence_dir)
-    _require_regular_file_or_missing(charter_path)
-
-    _mkdir_private(work_dir)
-    _mkdir_private(private_dir)
-    _mkdir_private(state_dir)
-    _mkdir_private(evidence_dir)
-    _write_private_json(charter_path, normalized)
+    for directory in (work_dir, private_dir, state_dir, evidence_dir):
+        ensure_private_directory_anchored(directory)
+    write_private_json_anchored(charter_path, normalized)
     return {
         "status": "initialized",
         "scenario_id": SCENARIO_ID,
@@ -1058,11 +1050,26 @@ def load_private_case(repo_root: Path, input_path: Path) -> Dict[str, object]:
     payload = read_json_anchored(input_path, owner_only=True)
     if not isinstance(payload, dict) or set(payload) != REQUIRED_CASE_KEYS:
         raise ValueError("private case input must contain only the approved fields")
-    normalized = {
-        key: str(payload.get(key) or "").strip() for key in sorted(REQUIRED_CASE_KEYS)
-    }
-    if not all(normalized.values()):
+    if any(
+        type(payload.get(key)) is not str or not payload[key].strip()
+        for key in REQUIRED_CASE_KEYS
+    ):
         raise ValueError("private case input fields must be non-empty strings")
+    normalized = {
+        key: payload[key].strip() for key in sorted(REQUIRED_CASE_KEYS)
+    }
+    try:
+        due_at = datetime.fromisoformat(
+            normalized["due_at"].replace("Z", "+00:00")
+        )
+    except ValueError as error:
+        raise ValueError(
+            "private case due_at must be an ISO timestamp with timezone"
+        ) from error
+    if due_at.tzinfo is None or due_at.utcoffset() is None:
+        raise ValueError(
+            "private case due_at must be an ISO timestamp with timezone"
+        )
     if any(
         token in normalized["pilot_case_id"].lower()
         for token in ("account", "customer", "@", " ")
@@ -1158,93 +1165,3 @@ def _validate_historical_repository_charter(
 def _require_outside_repository(repo_root: Path, path: Path, label: str) -> None:
     if path == repo_root or repo_root in path.parents:
         raise ValueError(f"{label} must be outside the repository")
-
-
-def _mkdir_private(path: Path) -> None:
-    _require_directory_or_missing(path)
-    try:
-        path.mkdir(parents=True, mode=0o700)
-    except FileExistsError:
-        pass
-    _require_directory_or_missing(path)
-    _chmod_private_directory(path)
-
-
-def _write_private_json(path: Path, value: object) -> None:
-    _require_regular_file_or_missing(path)
-    serialized = json.dumps(value, ensure_ascii=False, indent=2)
-    temp_path, file_descriptor = _open_private_temp(path)
-    try:
-        handle = os.fdopen(file_descriptor, "w", encoding="utf-8")
-        file_descriptor = None
-        with handle:
-            handle.write(serialized)
-            handle.flush()
-            os.fsync(handle.fileno())
-        _require_regular_file_or_missing(path)
-        os.replace(temp_path, path)
-        temp_path = None
-    finally:
-        if file_descriptor is not None:
-            os.close(file_descriptor)
-        if temp_path is not None:
-            try:
-                temp_path.unlink()
-            except FileNotFoundError:
-                pass
-
-
-def _require_directory_or_missing(path: Path) -> None:
-    if path.is_symlink():
-        raise ValueError(f"pilot workspace node {path.name} must not be a symbolic link")
-    if path.exists() and not path.is_dir():
-        raise ValueError(f"pilot workspace node {path.name} must be a directory")
-
-
-def _require_regular_file_or_missing(path: Path) -> None:
-    if path.is_symlink():
-        raise ValueError(f"pilot workspace node {path.name} must not be a symbolic link")
-    if path.exists() and not path.is_file():
-        raise ValueError(f"pilot workspace node {path.name} must be a regular file")
-
-
-def _chmod_private_directory(path: Path) -> None:
-    if os.name != "posix" or not hasattr(os, "O_DIRECTORY"):
-        os.chmod(path, 0o700)
-        return
-    flags = os.O_RDONLY | os.O_DIRECTORY
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    file_descriptor = os.open(path, flags)
-    try:
-        if not stat.S_ISDIR(os.fstat(file_descriptor).st_mode):
-            raise ValueError(f"pilot workspace node {path.name} must be a directory")
-        os.fchmod(file_descriptor, 0o700)
-    finally:
-        os.close(file_descriptor)
-
-
-def _open_private_temp(path: Path) -> Tuple[Path, int]:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    for _attempt in range(16):
-        temp_path = path.parent / f".{path.name}.{secrets.token_hex(8)}.tmp"
-        try:
-            file_descriptor = os.open(temp_path, flags, 0o600)
-        except FileExistsError:
-            continue
-        try:
-            if os.name == "posix":
-                os.fchmod(file_descriptor, 0o600)
-        except BaseException:
-            os.close(file_descriptor)
-            temp_path.unlink()
-            raise
-        return temp_path, file_descriptor
-    raise FileExistsError("could not allocate a private charter temporary file")
-
-
-def _require_owner_only(path: Path) -> None:
-    if os.name == "posix" and path.stat().st_mode & 0o077:
-        raise ValueError("private case input must use owner-only permissions")

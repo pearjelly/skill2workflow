@@ -7,7 +7,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
 from skill2workflow.compiler import validate_workflow
@@ -1322,6 +1322,23 @@ class ControlledLarkPilotTests(TestCase):
                 self.assertEqual(target.stat().st_mode & 0o777, 0o755)
                 self.assertEqual(list(target.iterdir()), [])
 
+    @skipUnless(os.name == "posix", "symlink checks require POSIX")
+    def test_initialize_pilot_rejects_intermediate_symlink_without_writing_target(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            declared_parent = root / "declared"
+            target_parent = root / "target"
+            declared_parent.mkdir()
+            target_parent.mkdir()
+            alias = declared_parent / "alias"
+            alias.symlink_to(target_parent, target_is_directory=True)
+            work_dir = alias / "pilot"
+
+            with self.assertRaisesRegex(ValueError, "symbolic link|non-directory"):
+                initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+
+            self.assertEqual(list(target_parent.iterdir()), [])
+
     def test_initialize_pilot_rejects_charter_symlink_without_changing_target(self):
         with TemporaryDirectory() as tmp:
             work_dir = Path(tmp) / "pilot"
@@ -1353,15 +1370,25 @@ class ControlledLarkPilotTests(TestCase):
     def test_initialize_pilot_uses_private_temp_and_cleans_up_replace_failure(self):
         observed = {}
 
-        def fail_replace(source, destination):
-            observed["mode"] = Path(source).stat().st_mode & 0o777
+        def fail_replace(
+            source,
+            destination,
+            *,
+            src_dir_fd=None,
+            dst_dir_fd=None,
+        ):
+            del dst_dir_fd
+            observed["mode"] = (
+                os.stat(source, dir_fd=src_dir_fd, follow_symlinks=False).st_mode
+                & 0o777
+            )
             observed["destination"] = Path(destination).name
             raise OSError("replace failed")
 
         with TemporaryDirectory() as tmp:
             work_dir = Path(tmp) / "pilot"
             with patch(
-                "skill2workflow.controlled_lark_pilot.os.replace",
+                "skill2workflow._controlled_lark_pilot_evidence_writer.os.replace",
                 side_effect=fail_replace,
             ):
                 with self.assertRaisesRegex(OSError, "replace failed"):
@@ -1573,6 +1600,52 @@ raise SystemExit(2)
             payload[key] = " "
             with self.subTest(key=key):
                 self._assert_private_case_rejected(payload, "non-empty strings")
+
+    def test_load_private_case_rejects_non_string_fields_before_control_plane(self):
+        invalid_values = (1, 1.5, True, None, [], {})
+        for key in _valid_case():
+            for value in invalid_values:
+                payload = _valid_case()
+                payload[key] = value
+                with self.subTest(key=key, value=value), patch(
+                    "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+                    side_effect=AssertionError("control plane must not be created"),
+                ) as control_plane, TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    work_dir = root / "pilot"
+                    input_path = root / "case.json"
+                    initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+                    input_path.write_text(json.dumps(payload), encoding="utf-8")
+                    os.chmod(input_path, 0o600)
+
+                    with self.assertRaisesRegex(ValueError, "non-empty strings"):
+                        start_pilot_run(ROOT, work_dir, input_path, now=NOW)
+
+                    control_plane.assert_not_called()
+                    self.assertFalse((work_dir / "state" / "runs.sqlite3").exists())
+
+    def test_load_private_case_requires_timezone_aware_due_at(self):
+        for due_at in (
+            "not-a-time",
+            "2026-08-15T09:00:00",
+            "2026-08-15",
+        ):
+            payload = _valid_case()
+            payload["due_at"] = due_at
+            with self.subTest(due_at=due_at):
+                self._assert_private_case_rejected(payload, "due_at")
+
+        for due_at in (
+            "2026-08-15T09:00:00Z",
+            "2026-08-15T09:00:00+08:00",
+        ):
+            payload = _valid_case()
+            payload["due_at"] = due_at
+            with self.subTest(due_at=due_at), TemporaryDirectory() as tmp:
+                path = Path(tmp) / "case.json"
+                path.write_text(json.dumps(payload), encoding="utf-8")
+                os.chmod(path, 0o600)
+                self.assertEqual(load_private_case(ROOT, path), payload)
 
     def test_load_private_case_rejects_non_opaque_case_ids(self):
         for pilot_case_id in (

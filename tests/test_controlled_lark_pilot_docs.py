@@ -268,6 +268,41 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
                 },
             )
 
+    def test_start_rejects_non_string_or_naive_case_values_with_fixed_error(self):
+        invalid_cases = (
+            ("account_name", 42),
+            ("renewal_risk", ["private"]),
+            ("owner_open_id", {"private": True}),
+            ("pilot_case_id", False),
+            ("due_at", None),
+            ("due_at", "2026-08-15T09:00:00"),
+        )
+        for key, value in invalid_cases:
+            with self.subTest(key=key, value=value), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                work_dir = root / "pilot"
+                case_path = root / "case.json"
+                case = {
+                    "pilot_case_id": "case-opaque-001",
+                    "account_name": "PRIVATE ACCOUNT VALUE",
+                    "renewal_risk": "PRIVATE RISK VALUE",
+                    "owner_open_id": "ou_private_assignee",
+                    "due_at": "2026-08-15T09:00:00+08:00",
+                }
+                case[key] = value
+                case_path.write_text(json.dumps(case), encoding="utf-8")
+                os.chmod(case_path, 0o600)
+                self.assertEqual(self._init(work_dir)[0], 0)
+
+                result, stdout, stderr = self._invoke(
+                    ["start", "--work-dir", str(work_dir), "--input", str(case_path)]
+                )
+
+                self.assertNotEqual(result, 0)
+                self.assertEqual(stdout, "")
+                self.assertEqual(stderr, "controlled pilot command failed\n")
+                self.assertFalse((work_dir / "state" / "runs.sqlite3").exists())
+
     def test_approve_summary_and_parser_errors_do_not_echo_token_or_unknown_input(self):
         token = "vault-injected-secret-token"
         raw_provider_value = "raw-provider-task-value"

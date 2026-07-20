@@ -4,6 +4,7 @@ import shutil
 from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
@@ -18,6 +19,7 @@ from skill2workflow.controlled_lark_pilot_evidence import (
     build_run_evidence,
     validate_evidence_pack,
 )
+from skill2workflow.control_plane import LocalControlPlane
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -47,6 +49,18 @@ class _FakeTransport:
     def __call__(self, request, timeout):
         self.calls.append((request, timeout))
         return _FakeResponse()
+
+
+class _PermissionDeniedResponse:
+    status = 403
+
+    def read(self):
+        return json.dumps(
+            {"code": 1470403, "msg": "private-provider-message"}
+        ).encode("utf-8")
+
+    def close(self):
+        return None
 
 
 def _valid_charter():
@@ -314,6 +328,72 @@ def _raw_retry_run_and_audit():
     return run, audit
 
 
+def _raw_failed_run_and_audit(provider_status="permission_denied"):
+    run = {
+        "run_id": "run_failed_raw",
+        "workflow_id": "workflow_controlled_lark_pilot",
+        "workflow_version": "0.1.0",
+        "status": "failed",
+        "context": {"input": {"pilot_case_id": "case-failed-raw"}},
+    }
+    metadata = {
+        "operation": "create_task",
+        "mode": "live",
+        "provider_status": provider_status,
+        "credential_status": "resolved",
+        "task_title_present": True,
+        "task_description_present": True,
+        "assignee_present": True,
+        "due_at_present": True,
+        "idempotency_key_present": True,
+        "lark_task_id_present": False,
+    }
+    audit = [
+        {
+            "type": "run_started",
+            "run_id": "run_failed_raw",
+            "timestamp": "2026-07-18T01:00:00+00:00",
+        },
+        {
+            "type": "run_resumed",
+            "run_id": "run_failed_raw",
+            "approved": True,
+            "timestamp": "2026-07-18T01:01:00+00:00",
+        },
+        {
+            "type": "connector_started",
+            "run_id": "run_failed_raw",
+            "node_id": "create_lark_task",
+            "connector_id": "lark_task",
+            "connector_status": "running",
+            "timestamp": "2026-07-18T01:01:00+00:00",
+        },
+        {
+            "type": "connector_failed",
+            "run_id": "run_failed_raw",
+            "node_id": "create_lark_task",
+            "connector_id": "lark_task",
+            "connector_status": "failed",
+            "timestamp": "2026-07-18T01:01:01+00:00",
+        },
+        {
+            "type": "node_failed",
+            "run_id": "run_failed_raw",
+            "node_id": "create_lark_task",
+            "credential_status": "resolved",
+            "credential_handles": ["lark_bot_access_token"],
+            "connector_metadata": metadata,
+            "timestamp": "2026-07-18T01:01:01+00:00",
+        },
+        {
+            "type": "run_failed",
+            "run_id": "run_failed_raw",
+            "timestamp": "2026-07-18T01:01:02+00:00",
+        },
+    ]
+    return run, audit
+
+
 def _prepare_repo(root):
     repo_root = root / "repo"
     connector_dir = repo_root / "examples" / "connectors"
@@ -470,6 +550,148 @@ class ControlledLarkPilotEvidenceTests(TestCase):
                     "presence",
                 ):
                     build_run_evidence(run, audit)
+
+    def test_build_run_evidence_preserves_strict_failed_node_metadata(self):
+        normalized_statuses = (
+            "permission_denied",
+            "resource_not_found",
+            "idempotency_conflict",
+            "rate_limited",
+            "timeout",
+        )
+        for provider_status in normalized_statuses:
+            run, audit = _raw_failed_run_and_audit(provider_status)
+
+            evidence = build_run_evidence(run, audit)
+
+            with self.subTest(provider_status=provider_status):
+                self.assertEqual(evidence["run_status"], "failed")
+                self.assertEqual(evidence["gate_decision"], "approved")
+                self.assertEqual(evidence["connector_id"], "lark_task")
+                self.assertEqual(evidence["connector_status"], "failed")
+                self.assertEqual(evidence["credential_status"], "resolved")
+                self.assertEqual(
+                    evidence["credential_handles"],
+                    ["lark_bot_access_token"],
+                )
+                self.assertEqual(evidence["operation"], "create_task")
+                self.assertEqual(evidence["mode"], "live")
+                self.assertEqual(evidence["provider_status"], provider_status)
+                self.assertTrue(evidence["idempotency_key_present"])
+                self.assertFalse(evidence["lark_task_id_present"])
+
+    def test_build_run_evidence_rejects_unbound_or_ambiguous_failed_node_facts(self):
+        mutations = []
+
+        run, audit = _raw_failed_run_and_audit()
+        audit.pop(4)
+        mutations.append(("missing node_failed", run, audit))
+
+        run, audit = _raw_failed_run_and_audit()
+        audit.insert(5, deepcopy(audit[4]))
+        mutations.append(("duplicate node_failed", run, audit))
+
+        run, audit = _raw_failed_run_and_audit()
+        node_failed = audit.pop(4)
+        audit.insert(3, node_failed)
+        mutations.append(("node_failed before connector_failed", run, audit))
+
+        run, audit = _raw_failed_run_and_audit()
+        audit[4]["run_id"] = "run_other"
+        mutations.append(("wrong run", run, audit))
+
+        run, audit = _raw_failed_run_and_audit()
+        audit[4]["node_id"] = "other_node"
+        mutations.append(("wrong node", run, audit))
+
+        run, audit = _raw_failed_run_and_audit()
+        audit[4]["timestamp"] = "2026-07-18T01:00:59+00:00"
+        mutations.append(("timestamp before connector failure", run, audit))
+
+        run, audit = _raw_failed_run_and_audit()
+        audit[4]["connector_metadata"]["raw_provider_message"] = "private"
+        mutations.append(("unknown metadata", run, audit))
+
+        run, audit = _raw_failed_run_and_audit("arbitrary_status")
+        mutations.append(("unknown provider status", run, audit))
+
+        run, audit = _raw_failed_run_and_audit()
+        run["status"] = "rejected"
+        mutations.append(("approved rejected status", run, audit))
+
+        for label, candidate_run, candidate_audit in mutations:
+            with self.subTest(case=label), self.assertRaises(ValueError):
+                build_run_evidence(candidate_run, candidate_audit)
+
+    def test_real_sqlite_failed_live_run_retains_redacted_failure_facts(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_dir = root / "pilot"
+            input_path = root / "case.json"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            _write_case(input_path, "case-failed-integration")
+            started = start_pilot_run(ROOT, work_dir, input_path, now=NOW)
+
+            transport_calls = []
+
+            def permission_denied_transport(request, timeout):
+                transport_calls.append((request, timeout))
+                return _PermissionDeniedResponse()
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                    "LARK_BOT_ACCESS_TOKEN": "private-token",
+                },
+                clear=True,
+            ):
+                decision = decide_pilot_run(
+                    ROOT,
+                    work_dir,
+                    started["run_id"],
+                    approved=True,
+                    confirmed_live=True,
+                    now=NOW,
+                    transport=permission_denied_transport,
+                )
+
+            control = LocalControlPlane(work_dir / "state", storage="sqlite")
+            run = control.get_run(started["run_id"])
+            events = control.list_audit_events(run_id=started["run_id"])
+            evidence = build_run_evidence(run, events)
+
+        connector_failure = next(
+            event for event in events if event["type"] == "connector_failed"
+        )
+        node_failure = next(
+            event for event in events if event["type"] == "node_failed"
+        )
+        self.assertNotIn("connector_metadata", connector_failure)
+        self.assertIn("connector_metadata", node_failure)
+        self.assertEqual(decision["run_status"], "failed")
+        self.assertEqual(len(transport_calls), 1)
+        self.assertEqual(evidence["run_status"], "failed")
+        self.assertEqual(evidence["gate_decision"], "approved")
+        self.assertEqual(evidence["connector_status"], "failed")
+        self.assertEqual(evidence["provider_status"], "permission_denied")
+        self.assertEqual(evidence["credential_status"], "resolved")
+        self.assertEqual(
+            evidence["credential_handles"], ["lark_bot_access_token"]
+        )
+        self.assertTrue(evidence["idempotency_key_present"])
+        self.assertFalse(evidence["lark_task_id_present"])
+        self.assertEqual(
+            build_acceptance_summary(
+                _valid_charter(),
+                [evidence],
+                1,
+                {},
+                None,
+                None,
+            )["approved_live_runs"],
+            0,
+        )
 
     def test_build_run_evidence_binds_terminal_events_to_run_status_and_time_order(self):
         mutations = []

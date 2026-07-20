@@ -36,6 +36,11 @@ class LarkTaskPilotTests(TestCase):
         self.assertEqual(node["connector"]["mode"], "live")
         self.assertNotIn("dry-run", node["description"])
 
+    def test_lark_task_pilot_workflow_builder_propagates_non_default_version(self):
+        workflow = build_lark_task_pilot_workflow(workflow_version="9.8.7")
+
+        self.assertEqual(workflow["workflow"]["version"], "9.8.7")
+
     def test_lark_task_pilot_workflow_builder_rejects_unknown_mode(self):
         with self.assertRaisesRegex(ValueError, "mode must be dry_run or live"):
             build_lark_task_pilot_workflow(mode="other")

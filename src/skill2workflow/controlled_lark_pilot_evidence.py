@@ -51,6 +51,12 @@ CONNECTOR_EVENT_TYPES = (
     "connector_completed",
 )
 TERMINAL_EVENT_TYPES = ("run_completed", "run_failed", "run_rejected")
+FAILED_METADATA_KEYS = set(PRESENCE_FIELDS) | {
+    "operation",
+    "mode",
+    "provider_status",
+    "credential_status",
+}
 
 
 def _indexed_events(events: List[Dict[str, object]], event_types: tuple) -> list:
@@ -179,6 +185,66 @@ def _validate_connector_sequence(
     return completed
 
 
+def _validate_failed_node_facts(
+    candidates: list,
+    connector_events: list,
+    run_id: str,
+    terminal_index: int,
+    started_at: datetime,
+    completed_at: datetime,
+) -> Dict[str, object]:
+    if len(candidates) != 1:
+        raise ValueError("approved connector failure requires one node_failed event")
+    index, event = candidates[0]
+    if event.get("node_id") != "create_lark_task":
+        raise ValueError("node_failed must target the controlled node")
+    timestamp = _bound_event_in_window(
+        event,
+        run_id,
+        "node_failed",
+        started_at,
+        completed_at,
+    )
+    if not connector_events:
+        raise ValueError("node_failed requires a connector failure")
+    connector_index, connector_failure = connector_events[-1]
+    if (
+        connector_failure.get("type") != "connector_failed"
+        or index != connector_index + 1
+        or not index < terminal_index
+    ):
+        raise ValueError("node_failed must follow the final connector failure")
+    connector_timestamp = _bound_event_in_window(
+        connector_failure,
+        run_id,
+        "connector_failed",
+        started_at,
+        completed_at,
+    )
+    if timestamp < connector_timestamp:
+        raise ValueError("node_failed must not precede connector failure")
+
+    metadata = event.get("connector_metadata")
+    if not isinstance(metadata, dict) or set(metadata) != FAILED_METADATA_KEYS:
+        raise ValueError("failed connector metadata keys do not match the allowlist")
+    for field in PRESENCE_FIELDS:
+        if type(metadata.get(field)) is not bool:
+            raise ValueError(f"connector presence field {field} must be a boolean")
+    for key in ("operation", "mode", "provider_status", "credential_status"):
+        _raw_string(metadata.get(key), f"failed connector {key}")
+
+    credential_status = _raw_string(
+        event.get("credential_status"),
+        "failed connector credential status",
+    )
+    if credential_status != metadata["credential_status"]:
+        raise ValueError("failed connector credential status is inconsistent")
+    handles = event.get("credential_handles")
+    if type(handles) is not list or any(type(item) is not str for item in handles):
+        raise ValueError("credential handles must be a list of strings")
+    return event
+
+
 def build_run_evidence(
     run: Dict[str, object], audit_events: List[Dict[str, object]]
 ) -> Dict[str, object]:
@@ -225,6 +291,7 @@ def build_run_evidence(
     resumed_events = _indexed_events(audit_events, ("run_resumed",))
     connector_events = _indexed_events(audit_events, CONNECTOR_EVENT_TYPES)
     retrying_events = _indexed_events(audit_events, ("node_retrying",))
+    node_failed_events = _indexed_events(audit_events, ("node_failed",))
     if expected_terminal:
         if len(resumed_events) != 1:
             raise ValueError("exactly one run_resumed event is required")
@@ -241,7 +308,7 @@ def build_run_evidence(
         if type(resumed.get("approved")) is not bool:
             raise ValueError("run_resumed approved must be a boolean")
     else:
-        if resumed_events or connector_events or retrying_events:
+        if resumed_events or connector_events or retrying_events or node_failed_events:
             raise ValueError("waiting run must not contain decision or connector events")
         resume_index = terminal_index
         resumed = {}
@@ -260,19 +327,36 @@ def build_run_evidence(
         else {}
     )
     if resumed.get("approved") is False:
-        if run_status not in ("failed", "rejected") or connector_events:
+        if (
+            run_status not in ("failed", "rejected")
+            or connector_events
+            or node_failed_events
+        ):
             raise ValueError("rejected run must fail without connector events")
     elif resumed.get("approved") is True:
         if run_status == "completed":
-            if not completed_connector:
+            if not completed_connector or node_failed_events:
                 raise ValueError("completed approved run requires connector completion")
-        elif not connector_events or completed_connector:
-            raise ValueError("failed approved run requires connector failure")
+        elif run_status == "failed":
+            if not connector_events or completed_connector:
+                raise ValueError("failed approved run requires connector failure")
+        else:
+            raise ValueError("approved run status is invalid")
 
     connector = completed_connector or (
         connector_events[-1][1] if connector_events else {}
     )
-    metadata = connector.get("connector_metadata", {}) if completed_connector else {}
+    facts_event = completed_connector
+    if resumed.get("approved") is True and run_status == "failed":
+        facts_event = _validate_failed_node_facts(
+            node_failed_events,
+            connector_events,
+            run_id,
+            terminal_index,
+            started_at,
+            completed_at,
+        )
+    metadata = facts_event.get("connector_metadata", {}) if facts_event else {}
     context = run.get("context", {})
     if not isinstance(context, dict):
         context = {}
@@ -283,13 +367,13 @@ def build_run_evidence(
     if type(case_id) is not str or not case_id.strip():
         raise ValueError("pilot_case_id must be a nonempty string")
 
-    raw_handles = connector.get("credential_handles", []) if connector else []
+    raw_handles = facts_event.get("credential_handles", []) if facts_event else []
     if type(raw_handles) is not list or any(
         type(item) is not str for item in raw_handles
     ):
         raise ValueError("credential handles must be a list of strings")
     handles = list(raw_handles)
-    if completed_connector:
+    if facts_event:
         if not isinstance(metadata, dict):
             raise ValueError("connector metadata must be an object")
         for field in PRESENCE_FIELDS:
@@ -305,7 +389,7 @@ def build_run_evidence(
             connector.get("connector_status"), "connector status"
         )
         credential_status = _raw_string(
-            connector.get("credential_status"), "credential status"
+            facts_event.get("credential_status"), "credential status"
         )
     elif connector:
         operation = mode = provider_status = ""
@@ -347,7 +431,7 @@ def build_run_evidence(
         "mode": mode,
         "provider_status": provider_status,
         **{
-            field: metadata[field] if completed_connector else False
+            field: metadata[field] if facts_event else False
             for field in PRESENCE_FIELDS
         },
     }

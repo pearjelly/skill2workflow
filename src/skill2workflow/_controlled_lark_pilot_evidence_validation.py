@@ -92,9 +92,14 @@ PROVIDER_STATUSES = {
     "authorization_failed",
     "completed",
     "credential_failed",
+    "idempotency_conflict",
     "live_disabled",
     "malformed_response",
+    "permission_denied",
     "provider_unavailable",
+    "rate_limited",
+    "resource_not_found",
+    "timeout",
     "validation_failed",
 }
 PRESENCE_FIELDS = (

@@ -70,6 +70,8 @@ def _canonicalize_root_alias(path: Path) -> Path:
         return path
     if not stat.S_ISLNK(top_level_item.st_mode):
         return path
+    if hasattr(top_level_item, "st_uid") and top_level_item.st_uid != 0:
+        return path
     resolved = top_level.resolve(strict=True)
     return resolved.joinpath(*path.parts[2:])
 
@@ -227,7 +229,9 @@ def _same_entry(first, second) -> bool:
 
 def _open_private_parent(path: Path, create: bool) -> tuple:
     _require_dir_fd_support()
-    absolute = Path(os.path.abspath(os.fspath(path)))
+    absolute = _canonicalize_root_alias(
+        Path(os.path.abspath(os.fspath(path)))
+    )
     if absolute == Path(absolute.anchor) or not absolute.name:
         raise ValueError("private JSON path must not be a filesystem root")
     root_fd = os.open(absolute.anchor, _directory_flags())
@@ -247,6 +251,37 @@ def _open_private_parent(path: Path, create: bool) -> tuple:
     except BaseException:
         _close_descriptors(parent_fd, root_fd)
         raise
+
+
+def ensure_private_directory_anchored(path: Path) -> None:
+    """Create one owner-only directory through no-follow directory descriptors."""
+    _require_dir_fd_support()
+    absolute = _canonicalize_root_alias(
+        Path(os.path.abspath(os.fspath(path)))
+    )
+    if absolute == Path(absolute.anchor):
+        raise ValueError("private directory must not be a filesystem root")
+    root_fd = os.open(absolute.anchor, _directory_flags())
+    directory_fd = None
+    try:
+        directory_fd = _open_relative_directory(
+            root_fd,
+            absolute.parts[1:],
+            create=True,
+        )
+        item = os.fstat(directory_fd)
+        if not stat.S_ISDIR(item.st_mode):
+            raise ValueError("private workspace node must be a directory")
+        if os.name == "posix":
+            os.fchmod(directory_fd, 0o700)
+        _require_declared_directory_identity(
+            root_fd,
+            absolute,
+            directory_fd,
+            "private",
+        )
+    finally:
+        _close_descriptors(directory_fd, root_fd)
 
 
 def require_private_json_target(path: Path) -> None:
