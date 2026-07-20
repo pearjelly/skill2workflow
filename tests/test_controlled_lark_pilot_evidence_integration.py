@@ -40,6 +40,16 @@ def _json_bytes_map(directory):
     }
 
 
+def _all_bytes_map(directory):
+    if not directory.exists():
+        return {}
+    return {
+        str(path.relative_to(directory)): path.read_bytes()
+        for path in sorted(directory.rglob("*"))
+        if path.is_file()
+    }
+
+
 def _valid_finalization_marker():
     return {
         "schema_version": "controlled-lark-pilot-finalization-0.1.0",
@@ -852,6 +862,16 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
             repo_root, work_dir, _transport = _build_ready_state(root)
             (work_dir / "private" / "decision.json").unlink()
             requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            (work_dir / "evidence" / "notes.txt").write_text(
+                "old private note", encoding="utf-8"
+            )
+            requested.mkdir(parents=True)
+            (requested / ".old-note").write_text(
+                "old repository note", encoding="utf-8"
+            )
+            nested_note = requested / "archive" / "notes.txt"
+            nested_note.parent.mkdir()
+            nested_note.write_text("old nested note", encoding="utf-8")
             decision = _valid_decision()
 
             result = finalize_pilot(
@@ -864,6 +884,8 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
 
             private_pack = _json_bytes_map(work_dir / "evidence")
             requested_pack = _json_bytes_map(requested)
+            private_all = _all_bytes_map(work_dir / "evidence")
+            requested_all = _all_bytes_map(requested)
             persisted_decision = json.loads(
                 (work_dir / "private" / "decision.json").read_text(
                     encoding="utf-8"
@@ -878,6 +900,8 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
             encoded = b"".join(requested_pack.values()) + json.dumps(result).encode()
 
             self.assertEqual(private_pack, requested_pack)
+            self.assertEqual(private_all, private_pack)
+            self.assertEqual(requested_all, requested_pack)
             self.assertEqual(persisted_decision, decision)
             self.assertEqual(
                 marker,
@@ -931,6 +955,97 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                 ),
                 decision,
             )
+
+    def test_repository_regeneration_allows_only_successfully_finalized_expired_charter(self):
+        expired_now = NOW + timedelta(days=25)
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root, work_dir, _transport = _build_ready_state(root)
+            (work_dir / "private" / "decision.json").unlink()
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+            finalize_pilot(
+                repo_root,
+                work_dir,
+                _valid_decision(),
+                output_dir=requested,
+                now=NOW,
+            )
+            (requested / "notes.txt").write_text(
+                "must not survive regeneration", encoding="utf-8"
+            )
+
+            regenerated = generate_pilot_evidence(
+                repo_root,
+                work_dir,
+                output_dir=requested,
+                now=expired_now,
+            )
+
+            self.assertEqual(regenerated["output_dir"], str(requested))
+            self.assertEqual(regenerated["unmet_conditions"], [])
+            self.assertFalse((requested / "notes.txt").exists())
+            with self.assertRaisesRegex(ValueError, "expired"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    now=expired_now,
+                )
+            with self.assertRaisesRegex(ValueError, "expired"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=root / "external-evidence",
+                    now=expired_now,
+                )
+
+            before = _all_bytes_map(requested)
+            marker = work_dir / "private" / "finalization.json"
+            valid_marker = json.loads(marker.read_text(encoding="utf-8"))
+            marker.unlink()
+            with self.assertRaisesRegex(ValueError, "finalization"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=requested,
+                    now=expired_now,
+                )
+            self.assertEqual(_all_bytes_map(requested), before)
+
+            invalid_marker = dict(valid_marker)
+            invalid_marker["finalized_at"] = "2026-08-16T09:00:00+08:00"
+            _write_owner_only_json(marker, invalid_marker)
+            with self.assertRaisesRegex(ValueError, "finalization|expired"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=requested,
+                    now=expired_now,
+                )
+            self.assertEqual(_all_bytes_map(requested), before)
+
+    def test_expired_incomplete_pack_cannot_borrow_repository_authorization(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            repo_root = _prepare_repo(root)
+            work_dir = root / "pilot"
+            initialize_pilot(repo_root, work_dir, _valid_charter(), now=NOW)
+            private = work_dir / "private"
+            _write_owner_only_json(private / "decision.json", _valid_decision())
+            _write_owner_only_json(
+                private / "finalization.json",
+                _valid_finalization_marker(),
+            )
+            requested = repo_root / "docs" / "pilot-evidence" / "loop-40"
+
+            with self.assertRaisesRegex(ValueError, "does not authorize"):
+                generate_pilot_evidence(
+                    repo_root,
+                    work_dir,
+                    output_dir=requested,
+                    now=NOW + timedelta(days=25),
+                )
+
+            self.assertFalse(requested.exists())
 
     def test_finalize_allows_external_export_but_rejects_other_repository_path(self):
         with TemporaryDirectory() as tmp:
@@ -1005,6 +1120,13 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
             repo_root, work_dir, _transport = _build_ready_state(root)
             (work_dir / "private" / "decision.json").unlink()
             requested = root / "requested-evidence"
+            private_note = work_dir / "evidence" / "notes.txt"
+            private_note.write_text("old private note", encoding="utf-8")
+            requested.mkdir()
+            requested_note = requested / "notes.txt"
+            requested_note.write_text("old requested note", encoding="utf-8")
+            private_before = _all_bytes_map(work_dir / "evidence")
+            requested_before = _all_bytes_map(requested)
             writes = []
 
             def failing_second_write(output_dir, pack):
@@ -1029,8 +1151,8 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                 )
 
             self.assertEqual(writes, [work_dir / "evidence", requested])
-            self.assertEqual(list((work_dir / "evidence").iterdir()), [])
-            self.assertFalse(requested.exists())
+            self.assertEqual(_all_bytes_map(work_dir / "evidence"), private_before)
+            self.assertEqual(_all_bytes_map(requested), requested_before)
             self.assertFalse((work_dir / "private" / "decision.json").exists())
             self.assertFalse(
                 (work_dir / "private" / "finalization.json").exists()

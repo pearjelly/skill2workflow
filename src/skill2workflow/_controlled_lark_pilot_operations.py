@@ -24,6 +24,7 @@ from ._controlled_lark_pilot_evidence_validation import (
 )
 from ._controlled_lark_pilot_evidence_writer import (
     finish_durable_resources,
+    invalidate_private_json_anchored,
     write_private_json_anchored,
 )
 
@@ -492,6 +493,8 @@ def run_fixed_verification(
     environment["PYTHONPATH"] = "src"
     runner = command_runner or subprocess.run
     records = []
+    verification_path = work_dir / "private" / "verification.json"
+    invalidate_private_json_anchored(verification_path)
     for command_id, arguments in commands:
         started = time.monotonic_ns()
         completed = runner(
@@ -502,8 +505,10 @@ def run_fixed_verification(
         )
         duration_ms = max(0, (time.monotonic_ns() - started) // 1_000_000)
         exit_code = getattr(completed, "returncode", None)
-        if type(exit_code) is not int or exit_code < 0:
+        if type(exit_code) is not int:
             raise ValueError("verification runner returned an invalid exit code")
+        if exit_code < 0:
+            exit_code = 128 + abs(exit_code)
         records.append(
             {
                 "id": command_id,
@@ -518,7 +523,7 @@ def run_fixed_verification(
         "commands": records,
     }
     write_private_json_anchored(
-        work_dir / "private" / "verification.json",
+        verification_path,
         result,
     )
     return result

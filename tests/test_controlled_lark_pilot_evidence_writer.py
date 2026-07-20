@@ -326,7 +326,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
                 any(item.name.endswith(".tmp") for item in private.iterdir())
             )
 
-    def test_write_pack_is_atomic_idempotent_and_removes_only_stale_json(self):
+    def test_write_pack_is_atomic_idempotent_and_replaces_with_exact_allowlist(self):
         pack = _valid_pack()
         with TemporaryDirectory() as tmp:
             output = Path(tmp).resolve() / "evidence"
@@ -335,13 +335,21 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
             stale.write_text("{}", encoding="utf-8")
             keep = output / "notes.txt"
             keep.write_text("keep", encoding="utf-8")
+            hidden = output / ".private-note"
+            hidden.write_text("hidden", encoding="utf-8")
+            nested = output / "archive" / "notes.txt"
+            nested.parent.mkdir()
+            nested.write_text("nested", encoding="utf-8")
 
             first = write_evidence_pack(output, pack)
             second = write_evidence_pack(output, pack)
 
             self.assertEqual(first["file_count"], second["file_count"])
             self.assertFalse(stale.exists())
-            self.assertEqual(keep.read_text(encoding="utf-8"), "keep")
+            self.assertFalse(keep.exists())
+            self.assertFalse(hidden.exists())
+            self.assertFalse(nested.exists())
+            self.assertFalse((output / "archive").exists())
             self.assertFalse(
                 any(path.name.endswith(".tmp") for path in output.rglob("*"))
             )
@@ -378,6 +386,13 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
         with TemporaryDirectory() as tmp:
             output = Path(tmp).resolve() / "evidence"
             write_evidence_pack(output, _valid_pack())
+            notes = output / "notes.txt"
+            notes.write_text("pre-call private note", encoding="utf-8")
+            hidden = output / ".sentinel"
+            hidden.write_text("pre-call hidden note", encoding="utf-8")
+            nested = output / "archive" / "notes.txt"
+            nested.parent.mkdir()
+            nested.write_text("pre-call nested note", encoding="utf-8")
             before = {
                 str(path.relative_to(output)): path.read_bytes()
                 for path in sorted(output.rglob("*"))
@@ -566,7 +581,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
                 [],
             )
 
-    def test_write_pack_random_temp_does_not_block_on_crash_leftover(self):
+    def test_write_pack_removes_crash_leftover_from_exact_new_pack(self):
         with TemporaryDirectory() as tmp:
             output = Path(tmp).resolve() / "evidence"
             output.mkdir()
@@ -576,7 +591,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
             result = write_evidence_pack(output, _valid_pack())
 
             self.assertEqual(result["status"], "written")
-            self.assertEqual(leftover.read_text(encoding="utf-8"), "crash-leftover")
+            self.assertFalse(leftover.exists())
             self.assertTrue((output / "pilot-charter.json").is_file())
 
     def test_write_pack_cleans_random_temp_when_atomic_replace_fails(self):

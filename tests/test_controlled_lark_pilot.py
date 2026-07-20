@@ -16,6 +16,7 @@ from skill2workflow.controlled_lark_pilot import (
     decide_pilot_run,
     exercise_disabled_live,
     exercise_rollback,
+    generate_pilot_evidence,
     initialize_pilot,
     load_pilot_charter,
     load_private_case,
@@ -467,6 +468,128 @@ class ControlledLarkPilotTests(TestCase):
         self.assertEqual(len(runner.arguments), 7)
         self.assertEqual(result["commands"][0]["exit_code"], 1)
         self.assertFalse(result["commands"][0]["passed"])
+
+    def test_verify_pilot_normalizes_negative_exit_and_runs_all_commands(self):
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            runner = _FakeCommandRunner([-9, 0, 0, 0, 0, 0, 0])
+
+            result = verify_pilot(ROOT, work_dir, command_runner=runner)
+            persisted = json.loads(
+                (work_dir / "private" / "verification.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+
+        self.assertEqual(len(runner.arguments), 7)
+        self.assertEqual(result, persisted)
+        self.assertFalse(result["all_passed"])
+        self.assertEqual(result["commands"][0]["exit_code"], 137)
+        self.assertFalse(result["commands"][0]["passed"])
+
+    def test_verify_pilot_invalidates_old_success_before_runner_exception(self):
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            verify_pilot(
+                ROOT,
+                work_dir,
+                command_runner=_FakeCommandRunner(),
+            )
+            verification = work_dir / "private" / "verification.json"
+            self.assertTrue(verification.exists())
+
+            calls = []
+
+            def interrupted_runner(arguments, *, cwd, env, capture_output):
+                calls.append(list(arguments))
+                raise RuntimeError("verification interrupted")
+
+            with self.assertRaisesRegex(RuntimeError, "verification interrupted"):
+                verify_pilot(
+                    ROOT,
+                    work_dir,
+                    command_runner=interrupted_runner,
+                )
+
+            self.assertEqual(len(calls), 1)
+            self.assertFalse(verification.exists())
+            generated = generate_pilot_evidence(ROOT, work_dir, now=NOW)
+            persisted_evidence = json.loads(
+                (work_dir / "evidence" / "evidence-index.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            self.assertFalse(
+                (work_dir / "evidence" / "verification.json").exists()
+            )
+            self.assertFalse(persisted_evidence["verification_passed"])
+            self.assertFalse(persisted_evidence["ready_to_finalize"])
+            self.assertIn("verification", generated["unmet_conditions"])
+
+    def test_verify_pilot_rejects_symlink_or_changed_stale_result_before_commands(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            work_dir = root / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            verification = work_dir / "private" / "verification.json"
+            outside = root / "outside-verification.json"
+            outside.write_text("sentinel", encoding="utf-8")
+            os.chmod(outside, 0o600)
+            verification.symlink_to(outside)
+            runner = _FakeCommandRunner()
+
+            with self.assertRaisesRegex(ValueError, "symbolic link"):
+                verify_pilot(ROOT, work_dir, command_runner=runner)
+
+            self.assertEqual(runner.arguments, [])
+            self.assertEqual(outside.read_text(encoding="utf-8"), "sentinel")
+            self.assertTrue(verification.is_symlink())
+            verification.unlink()
+
+            verify_pilot(ROOT, work_dir, command_runner=_FakeCommandRunner())
+            replacement = work_dir / "private" / "replacement.json"
+            replacement.write_text("{}", encoding="utf-8")
+            os.chmod(replacement, 0o600)
+            real_rename = os.rename
+            changed = []
+
+            def replace_before_invalidation(
+                source,
+                target,
+                *,
+                src_dir_fd=None,
+                dst_dir_fd=None,
+            ):
+                if (
+                    os.fspath(source) == "verification.json"
+                    and os.fspath(target) == "stale"
+                    and not changed
+                ):
+                    os.replace(
+                        replacement,
+                        verification,
+                    )
+                    changed.append(True)
+                return real_rename(
+                    source,
+                    target,
+                    src_dir_fd=src_dir_fd,
+                    dst_dir_fd=dst_dir_fd,
+                )
+
+            runner = _FakeCommandRunner()
+            with patch.object(
+                os,
+                "rename",
+                side_effect=replace_before_invalidation,
+            ), self.assertRaisesRegex(ValueError, "changed during invalidation"):
+                verify_pilot(ROOT, work_dir, command_runner=runner)
+
+            self.assertEqual(changed, [True])
+            self.assertEqual(runner.arguments, [])
+            self.assertFalse(verification.exists())
 
     def test_decide_approve_requires_all_live_guards_and_returns_redacted_summary(self):
         with TemporaryDirectory() as tmp:

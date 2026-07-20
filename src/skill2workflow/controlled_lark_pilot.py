@@ -21,6 +21,7 @@ from ._controlled_lark_pilot_operations import (
     exercise_disabled_live_operation,
     exercise_rollback_operation,
     finalize_pilot_operation,
+    validate_final_decision,
     verify_pilot_operation,
 )
 from .controlled_lark_pilot_evidence import (
@@ -183,6 +184,7 @@ def generate_pilot_evidence(
                 decision_override=decision,
                 now=now,
                 private_session=private_session,
+                historical_authorization=(decision, marker),
             )
             _require_finalized_export(pack, marker, decision)
             authorization_snapshot.validate()
@@ -250,11 +252,25 @@ def _build_pilot_evidence(
     decision_override: Dict[str, object] = None,
     now: datetime = None,
     private_session=None,
+    historical_authorization=None,
 ) -> Dict[str, object]:
     repo_root = Path(repo_root).resolve()
     work_dir = Path(work_dir).resolve()
     _require_outside_repository(repo_root, work_dir, "pilot work directory")
-    charter = load_pilot_charter(work_dir, now=now)
+    if historical_authorization is None:
+        charter = load_pilot_charter(work_dir, now=now)
+    else:
+        if private_session is None:
+            raise ValueError("historical charter requires private authorization")
+        authorization_decision, authorization_marker = historical_authorization
+        private_session.check_identity()
+        charter = _validate_historical_repository_charter(
+            private_session.read_json(Path("charter.json")),
+            authorization_decision,
+            authorization_marker,
+            now=now,
+        )
+        private_session.check_identity()
     control = _pilot_control_plane(
         repo_root,
         work_dir,
@@ -406,15 +422,7 @@ def _require_finalized_export(
     marker: object,
     decision: object,
 ) -> None:
-    if not isinstance(marker, dict) or set(marker) != FINALIZATION_KEYS:
-        raise ValueError("private finalization marker is invalid")
-    if (
-        marker.get("schema_version") != FINALIZATION_SCHEMA_VERSION
-        or marker.get("finalized") is not True
-        or marker.get("decision") not in ("continue", "harden", "defer")
-    ):
-        raise ValueError("private finalization marker is invalid")
-    _require_aware_iso(marker.get("finalized_at"), "private finalization timestamp")
+    _validate_finalization_marker(marker)
     pack_decision = pack.get("decision")
     index = pack.get("index")
     if (
@@ -427,7 +435,22 @@ def _require_finalized_export(
         raise ValueError("private finalization does not authorize this evidence pack")
 
 
-def _require_aware_iso(value: object, label: str) -> None:
+def _validate_finalization_marker(marker: object) -> datetime:
+    if not isinstance(marker, dict) or set(marker) != FINALIZATION_KEYS:
+        raise ValueError("private finalization marker is invalid")
+    if (
+        marker.get("schema_version") != FINALIZATION_SCHEMA_VERSION
+        or marker.get("finalized") is not True
+        or marker.get("decision") not in ("continue", "harden", "defer")
+    ):
+        raise ValueError("private finalization marker is invalid")
+    return _require_aware_iso(
+        marker.get("finalized_at"),
+        "private finalization timestamp",
+    )
+
+
+def _require_aware_iso(value: object, label: str) -> datetime:
     if type(value) is not str:
         raise ValueError(f"{label} must be an ISO timestamp with timezone")
     try:
@@ -436,6 +459,7 @@ def _require_aware_iso(value: object, label: str) -> None:
         raise ValueError(f"{label} must be an ISO timestamp with timezone") from error
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError(f"{label} must be an ISO timestamp with timezone")
+    return parsed
 
 
 def decide_pilot_run(
@@ -719,6 +743,12 @@ def load_private_case(repo_root: Path, input_path: Path) -> Dict[str, object]:
 
 
 def _validate_charter(charter: object, now: datetime = None) -> Dict[str, object]:
+    normalized = _validate_charter_schema_and_range(charter)
+    _require_active_charter_window(normalized, now=now)
+    return normalized
+
+
+def _validate_charter_schema_and_range(charter: object) -> Dict[str, object]:
     if not isinstance(charter, dict):
         raise ValueError("pilot charter must be a JSON object")
     if set(charter) != REQUIRED_CHARTER_KEYS:
@@ -747,6 +777,17 @@ def _validate_charter(charter: object, now: datetime = None) -> Dict[str, object
             raise ValueError(f"pilot charter {key} must be true")
     starts_on = date.fromisoformat(str(normalized.get("starts_on", "")))
     expires_on = date.fromisoformat(str(normalized.get("expires_on", "")))
+    if starts_on > expires_on:
+        raise ValueError("pilot charter date range is invalid")
+    return normalized
+
+
+def _require_active_charter_window(
+    charter: Dict[str, object],
+    now: datetime = None,
+) -> None:
+    starts_on = date.fromisoformat(charter["starts_on"])
+    expires_on = date.fromisoformat(charter["expires_on"])
     current = (now or datetime.now(timezone.utc)).astimezone(
         ZoneInfo(PILOT_TIMEZONE)
     ).date()
@@ -754,6 +795,34 @@ def _validate_charter(charter: object, now: datetime = None) -> Dict[str, object
         raise ValueError("pilot charter has not started")
     if current > expires_on:
         raise ValueError("pilot charter expired")
+
+
+def _validate_historical_repository_charter(
+    charter: object,
+    decision: object,
+    marker: object,
+    now: datetime = None,
+) -> Dict[str, object]:
+    normalized = _validate_charter_schema_and_range(charter)
+    starts_on = date.fromisoformat(normalized["starts_on"])
+    expires_on = date.fromisoformat(normalized["expires_on"])
+    current = (now or datetime.now(timezone.utc)).astimezone(
+        ZoneInfo(PILOT_TIMEZONE)
+    ).date()
+    if current < starts_on:
+        raise ValueError("pilot charter has not started")
+    if current <= expires_on:
+        return normalized
+
+    normalized_decision = validate_final_decision(decision)
+    finalized_at = _validate_finalization_marker(marker)
+    if marker["decision"] != normalized_decision["decision"]:
+        raise ValueError("private finalization marker is invalid")
+    finalized_on = finalized_at.astimezone(ZoneInfo(PILOT_TIMEZONE)).date()
+    if not starts_on <= finalized_on <= expires_on:
+        raise ValueError(
+            "private finalization does not authorize an expired pilot charter"
+        )
     return normalized
 
 

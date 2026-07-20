@@ -6,7 +6,7 @@ import os
 import stat
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, Set
+from typing import Callable, Dict
 
 
 @dataclass(frozen=True)
@@ -22,33 +22,23 @@ class PackTransactionIO:
     allocate_transaction_directory: Callable
 
 
-def _remove_stale_json_files(
+def _validate_directory_tree(
     io: PackTransactionIO,
     directory_fd: int,
-    expected: Set[str],
-    prefix: tuple = (),
 ) -> None:
     for name in os.listdir(directory_fd):
         item = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-        relative = "/".join(prefix + (name,))
         if stat.S_ISLNK(item.st_mode):
             raise ValueError("evidence output descendants must not be symbolic links")
         if stat.S_ISDIR(item.st_mode):
             child = _open_directory_at(io, directory_fd, name)
             try:
-                _remove_stale_json_files(
-                    io,
-                    child,
-                    expected,
-                    prefix + (name,),
-                )
+                _validate_directory_tree(io, child)
             finally:
                 os.close(child)
             continue
         if not stat.S_ISREG(item.st_mode):
             raise ValueError("evidence output descendants must be regular files")
-        if name.endswith(".json") and relative not in expected:
-            os.unlink(name, dir_fd=directory_fd)
 
 
 def _pack_files(pack: Dict[str, object]) -> Dict[tuple, object]:
@@ -111,42 +101,6 @@ def _open_directory_at(
         raise ValueError("evidence output must remain a directory") from error
 
 
-def _clone_directory(
-    io: PackTransactionIO,
-    source_fd: int,
-    destination_fd: int,
-) -> None:
-    for name in os.listdir(source_fd):
-        source_stat = os.stat(name, dir_fd=source_fd, follow_symlinks=False)
-        if stat.S_ISLNK(source_stat.st_mode):
-            raise ValueError("evidence output descendants must not be symbolic links")
-        if stat.S_ISDIR(source_stat.st_mode):
-            os.mkdir(name, 0o700, dir_fd=destination_fd)
-            source_child = _open_directory_at(io, source_fd, name)
-            destination_child = _open_directory_at(io, destination_fd, name)
-            try:
-                _clone_directory(io, source_child, destination_child)
-                os.fsync(destination_child)
-            finally:
-                io.close_descriptors(destination_child, source_child)
-            continue
-        if not stat.S_ISREG(source_stat.st_mode):
-            raise ValueError("evidence output descendants must be regular files")
-        os.link(
-            name,
-            name,
-            src_dir_fd=source_fd,
-            dst_dir_fd=destination_fd,
-            follow_symlinks=False,
-        )
-        cloned_stat = os.stat(name, dir_fd=destination_fd, follow_symlinks=False)
-        if not stat.S_ISREG(cloned_stat.st_mode) or not io.same_entry(
-            source_stat,
-            cloned_stat,
-        ):
-            raise ValueError("evidence output descendant changed during staging")
-
-
 class EvidencePackTransaction:
     """Prepare and atomically exchange one complete evidence directory."""
 
@@ -181,6 +135,7 @@ class EvidencePackTransaction:
                 )
                 if not io.same_entry(self.initial, os.fstat(self.output_fd)):
                     raise ValueError("evidence output changed during transaction setup")
+                _validate_directory_tree(io, self.output_fd)
             self.transaction_name, self.transaction_fd = (
                 io.allocate_transaction_directory(
                     self.parent_fd,
@@ -189,13 +144,7 @@ class EvidencePackTransaction:
             )
             os.mkdir("stage", 0o700, dir_fd=self.transaction_fd)
             self.stage_fd = _open_directory_at(io, self.transaction_fd, "stage")
-            if self.output_fd is not None:
-                _clone_directory(io, self.output_fd, self.stage_fd)
             files = _pack_files(pack)
-            expected = {
-                "/".join(components + (name,))
-                for components, name in files
-            }
             for (components, name), item in files.items():
                 parent_fd = io.open_relative_directory(
                     self.stage_fd,
@@ -206,7 +155,6 @@ class EvidencePackTransaction:
                     io.write_json_atomic(parent_fd, name, item)
                 finally:
                     os.close(parent_fd)
-            _remove_stale_json_files(io, self.stage_fd, expected)
             os.fsync(self.stage_fd)
             self.file_count = len(files)
             self._require_initial_identity()

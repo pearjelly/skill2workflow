@@ -264,6 +264,67 @@ def require_private_json_target(path: Path) -> None:
         _close_descriptors(parent_fd, root_fd)
 
 
+def invalidate_private_json_anchored(path: Path) -> None:
+    """Atomically remove a stale private JSON result through anchored descriptors."""
+    absolute, root_fd, parent_fd = _open_private_parent(path, create=True)
+    transaction_name = ""
+    transaction_fd = None
+    try:
+        initial = _private_target_stat(parent_fd, absolute.name)
+        if initial is not None:
+            transaction_name, transaction_fd = _allocate_transaction_directory(
+                parent_fd,
+                f"{absolute.name}-invalidation",
+            )
+            try:
+                os.rename(
+                    absolute.name,
+                    "stale",
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=transaction_fd,
+                )
+            except FileNotFoundError as error:
+                raise ValueError(
+                    "private JSON target changed during invalidation"
+                ) from error
+            moved = os.stat(
+                "stale",
+                dir_fd=transaction_fd,
+                follow_symlinks=False,
+            )
+            if not _same_entry(initial, moved):
+                raise ValueError("private JSON target changed during invalidation")
+            os.fsync(parent_fd)
+        if _private_target_stat(parent_fd, absolute.name) is not None:
+            raise ValueError("private JSON target changed during invalidation")
+        _require_declared_directory_identity(
+            root_fd,
+            absolute.parent,
+            parent_fd,
+            "private",
+        )
+    finally:
+        first_error = None
+        try:
+            _close_descriptors(transaction_fd)
+        except BaseException as error:
+            first_error = error
+        if transaction_name:
+            try:
+                _remove_tree_at(parent_fd, transaction_name)
+                os.fsync(parent_fd)
+            except BaseException as error:
+                if first_error is None:
+                    first_error = error
+        try:
+            _close_descriptors(parent_fd, root_fd)
+        except BaseException as error:
+            if first_error is None:
+                first_error = error
+        if first_error is not None:
+            raise first_error
+
+
 def _write_private_json_at(
     parent_fd: int,
     name: str,
