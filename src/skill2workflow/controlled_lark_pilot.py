@@ -849,10 +849,28 @@ def decide_pilot_run(
         and event.get("node_id") == "create_lark_task"
     ]
     connector_metadata = {}
+    terminal_connector_event = connector_events[-1] if connector_events else {}
+    failure_facts_event = terminal_connector_event
     for event in reversed(connector_events):
         metadata = event.get("connector_metadata")
         if isinstance(metadata, dict):
             connector_metadata = metadata
+            break
+    if terminal_connector_event.get("type") == "connector_failed":
+        for index, event in enumerate(events):
+            if event is not terminal_connector_event:
+                continue
+            if index + 1 >= len(events):
+                break
+            failure = events[index + 1]
+            if (
+                failure.get("type") == "node_failed"
+                and failure.get("node_id") == "create_lark_task"
+            ):
+                metadata = failure.get("connector_metadata")
+                if isinstance(metadata, dict):
+                    connector_metadata = metadata
+                failure_facts_event = failure
             break
     return {
         "run_id": requested_run_id,
@@ -862,12 +880,12 @@ def decide_pilot_run(
         "gate_decision": "approved" if approved else "rejected",
         "connector_invoked": bool(connector_events),
         "connector_status": (
-            str(connector_events[-1].get("connector_status", ""))
+            str(terminal_connector_event.get("connector_status", ""))
             if connector_events
             else ""
         ),
         "credential_status": (
-            str(connector_events[-1].get("credential_status", ""))
+            str(failure_facts_event.get("credential_status", ""))
             if connector_events
             else ""
         ),
