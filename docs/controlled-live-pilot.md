@@ -11,10 +11,10 @@ The operator phases are: init preflight start decide evidence exercise-failure e
 Use an owner-controlled directory outside the source repository. This runbook uses:
 
 ```bash
-export PRIVATE_PILOT="$HOME/.local/share/skill2workflow/pilots/loop-40"
+export PRIVATE_PILOT="$HOME/.local/share/skill2workflow/pilots/loop-40-new-engagement"
 ```
 
-Do not place the private workspace, case files, decision draft, credentials, provider diagnostics, or terminal captures in the repository. The tool rejects a work directory inside the repository and creates pilot directories with owner-only permissions where the platform supports them.
+Do not place the private workspace, case files, decision draft, credentials, provider diagnostics, or terminal captures in the repository. Use a new opaque directory for every separately authorized Pilot; never reuse a deferred or finalized workspace. `init` never replaces an existing Charter, and `start` or `decide` fail closed once the workspace records a decision or finalization marker; create a new work directory for the separately authorized Pilot. The tool rejects a work directory inside the repository and creates pilot directories with owner-only permissions where the platform supports them.
 
 Before proceeding, the operator must verify all three facts directly with the partner:
 
@@ -215,6 +215,6 @@ After the engagement, rotate or delete the pilot token according to the partner'
 
 ## Incident Stop And Deferral
 
-Stop immediately if a run exposes a forbidden value, bypasses the human gate, creates an unexpected duplicate, targets the wrong assignee, encounters a permission or redaction anomaly, uses a non-normalized provider result, or deviates from the fixed domestic endpoint and action. Remove the live switch, do not approve another run, retain authoritative private state, record a `defer` candidate decision, and return with a failing regression test. Never hide or replace the failed run.
+Stop immediately if a run exposes a forbidden value, bypasses the human gate, creates an unexpected duplicate, targets the wrong assignee, encounters a permission or redaction anomaly, uses a non-normalized provider result, or deviates from the fixed domestic endpoint and action. Remove the live switch, do not approve another run, retain authoritative private state, record a `defer` candidate decision, and return with a failing regression test. A recorded decision closes that workspace to further starts and decisions; never hide, replace, or retry the failed run.
 
 Offline tests, fake transport, an empty evidence skeleton, and implementation readiness must not advance Loop 40. A deferred Pilot remains at Local Evaluation; any replacement Pilot requires a fresh authorization boundary and must successfully finalize the paid five-day real-team evidence gate before the separate Roadmap completion task may run.

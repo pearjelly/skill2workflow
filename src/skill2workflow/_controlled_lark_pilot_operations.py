@@ -215,62 +215,66 @@ def exercise_rollback_operation(
     if os.environ.get(LIVE_SWITCH) == "1":
         raise ValueError("remove the live switch before running rollback exercise")
     charter = dependencies.load_charter(work_dir, now=now)
-    probe_work = work_dir / "private" / "rollback-live-probe"
     transport = TransportSpy()
     with live_environment_removed():
-        dependencies.initialize(repo_root, probe_work, charter, now=now)
-        case_path = probe_work / "private" / "rollback-case.json"
-        write_private_json_anchored(
-            case_path,
-            {
-                "pilot_case_id": "rollback-proof-001",
-                "account_name": "Rollback Exercise Account",
-                "renewal_risk": "Rollback Exercise Risk",
-                "owner_open_id": "ou_rollback_exercise",
-                "due_at": "2026-08-15T09:00:00Z",
-            },
-        )
-        started = dependencies.start(
-            repo_root,
-            probe_work,
-            case_path,
-            now=now,
-        )
-        live_approval_blocked = False
-        try:
-            dependencies.decide(
+        with tempfile.TemporaryDirectory(
+            dir=str(work_dir / "private"),
+            prefix=".rollback-live-probe-",
+        ) as temporary:
+            probe_work = Path(temporary) / "pilot"
+            dependencies.initialize(repo_root, probe_work, charter, now=now)
+            case_path = probe_work / "private" / "rollback-case.json"
+            write_private_json_anchored(
+                case_path,
+                {
+                    "pilot_case_id": "rollback-proof-001",
+                    "account_name": "Rollback Exercise Account",
+                    "renewal_risk": "Rollback Exercise Risk",
+                    "owner_open_id": "ou_rollback_exercise",
+                    "due_at": "2026-08-15T09:00:00Z",
+                },
+            )
+            started = dependencies.start(
                 repo_root,
                 probe_work,
-                started["run_id"],
-                approved=True,
-                confirmed_live=True,
+                case_path,
                 now=now,
-                transport=transport,
             )
-        except ValueError as error:
-            live_approval_blocked = (
-                str(error) == "SKILL2WORKFLOW_LARK_TASK_LIVE=1 is required"
+            live_approval_blocked = False
+            try:
+                dependencies.decide(
+                    repo_root,
+                    probe_work,
+                    started["run_id"],
+                    approved=True,
+                    confirmed_live=True,
+                    now=now,
+                    transport=transport,
+                )
+            except ValueError as error:
+                live_approval_blocked = (
+                    str(error) == "SKILL2WORKFLOW_LARK_TASK_LIVE=1 is required"
+                )
+            if not live_approval_blocked or transport.calls:
+                raise ValueError("rollback did not prove the disabled live boundary")
+
+            from .lark_task_pilot import run_lark_task_pilot
+
+            dry_run = run_lark_task_pilot(
+                repo_root=repo_root,
+                work_dir=work_dir / "private" / "rollback-dry-run",
+                reset=True,
             )
-        if not live_approval_blocked or transport.calls:
-            raise ValueError("rollback did not prove the disabled live boundary")
-
-        from .lark_task_pilot import run_lark_task_pilot
-
-        dry_run = run_lark_task_pilot(
-            repo_root=repo_root,
-            work_dir=work_dir / "private" / "rollback-dry-run",
-            reset=True,
-        )
-        result = {
-            "exercise": "rollback",
-            "passed": (
-                live_approval_blocked
-                and dry_run.get("run_status") == "completed"
-            ),
-            "live_switch_enabled": os.environ.get(LIVE_SWITCH) == "1",
-            "live_approval_blocked": live_approval_blocked,
-            "dry_run_status": str(dry_run.get("run_status", "")),
-        }
+            result = {
+                "exercise": "rollback",
+                "passed": (
+                    live_approval_blocked
+                    and dry_run.get("run_status") == "completed"
+                ),
+                "live_switch_enabled": os.environ.get(LIVE_SWITCH) == "1",
+                "live_approval_blocked": live_approval_blocked,
+                "dry_run_status": str(dry_run.get("run_status", "")),
+            }
     persist_exercise(work_dir, "rollback", result)
     return result
 

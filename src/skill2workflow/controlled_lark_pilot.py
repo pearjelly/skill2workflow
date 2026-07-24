@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -832,6 +833,27 @@ def decide_pilot_run(
     if type(approved) is not bool:
         raise ValueError("approved must be a boolean")
     load_pilot_charter(work_dir, now=now)
+    with _open_unclosed_pilot_session(work_dir):
+        return _decide_pilot_run_open(
+            repo_root,
+            work_dir,
+            run_id,
+            approved=approved,
+            confirmed_live=confirmed_live,
+            transport=transport,
+        )
+
+
+def _decide_pilot_run_open(
+    repo_root: Path,
+    work_dir: Path,
+    run_id: str,
+    *,
+    approved: bool,
+    confirmed_live: bool,
+    transport=None,
+) -> Dict[str, object]:
+    """Resume one waiting run while the private Pilot decision lock is held."""
 
     preflight = _pilot_control_plane(
         repo_root,
@@ -975,6 +997,23 @@ def start_pilot_run(
     work_dir = Path(work_dir).resolve()
     _require_outside_repository(repo_root, work_dir, "pilot work directory")
     load_pilot_charter(work_dir, now=now)
+    with _open_unclosed_pilot_session(work_dir):
+        return _start_pilot_run_open(
+            repo_root,
+            work_dir,
+            input_path,
+            transport=transport,
+        )
+
+
+def _start_pilot_run_open(
+    repo_root: Path,
+    work_dir: Path,
+    input_path: Path,
+    *,
+    transport=None,
+) -> Dict[str, object]:
+    """Create one waiting run while the private Pilot decision lock is held."""
     pilot_input = load_private_case(repo_root, input_path)
     preflight = _preflight_pilot_input(repo_root, pilot_input)
     if preflight["status"] != "ready":
@@ -1072,7 +1111,7 @@ def initialize_pilot(
     charter_path = private_dir / "charter.json"
     for directory in (work_dir, private_dir, state_dir, evidence_dir):
         ensure_private_directory_anchored(directory)
-    write_private_json_anchored(charter_path, normalized)
+    write_private_json_anchored(charter_path, normalized, require_missing=True)
     return {
         "status": "initialized",
         "scenario_id": SCENARIO_ID,
@@ -1087,6 +1126,19 @@ def load_pilot_charter(work_dir: Path, now: datetime = None) -> Dict[str, object
     path = work_dir / "private" / "charter.json"
     payload = read_json_anchored(path)
     return _validate_charter(payload, now=now)
+
+
+@contextmanager
+def _open_unclosed_pilot_session(work_dir: Path):
+    """Hold the private decision lock and reject any closed Pilot workspace."""
+    with open_private_session(Path(work_dir) / "private") as session:
+        decision = session.read_json(Path("decision.json"), required=False)
+        marker = session.read_json(Path("finalization.json"), required=False)
+        if decision is not None or marker is not None:
+            raise ValueError("controlled pilot is closed; use a new work directory")
+        session.check_identity()
+        yield
+        session.check_identity()
 
 
 def load_private_case(repo_root: Path, input_path: Path) -> Dict[str, object]:

@@ -148,6 +148,17 @@ def _valid_case():
     }
 
 
+def _recorded_defer_decision():
+    return {
+        "schema_version": "controlled-lark-pilot-decision-0.1.0",
+        "decision": "defer",
+        "partner_acknowledged": True,
+        "operator_acknowledged": True,
+        "commercial_engagement_confirmed": True,
+        "rationale": "Recorded private defer decision.",
+    }
+
+
 def _write_private_case(path: Path, case_id: str = "case-001") -> None:
     path.write_text(
         json.dumps(
@@ -524,11 +535,6 @@ class ControlledLarkPilotTests(TestCase):
             )
             persisted = json.loads(persisted_path.read_text(encoding="utf-8"))
             persisted_mode = persisted_path.stat().st_mode & 0o077
-            proof_control = LocalControlPlane(
-                work_dir / "private" / "rollback-live-probe" / "state",
-                storage="sqlite",
-            )
-            proof_runs = proof_control.list_runs()
             dry_run_artifact_exists = (
                 work_dir
                 / "private"
@@ -550,9 +556,26 @@ class ControlledLarkPilotTests(TestCase):
         self.assertEqual(restored_token, "private-token")
         self.assertEqual({key: persisted[key] for key in result}, result)
         self.assertEqual(persisted_mode, 0)
-        self.assertEqual(len(proof_runs), 1)
-        self.assertEqual(proof_runs[0]["status"], "waiting")
+        self.assertFalse((work_dir / "private" / "rollback-live-probe").exists())
         self.assertTrue(dry_run_artifact_exists)
+
+    def test_exercise_rollback_can_be_repeated_without_reinitializing_probe(self):
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            with patch.dict(
+                os.environ,
+                {"LARK_BOT_ACCESS_TOKEN": "private-token"},
+                clear=True,
+            ):
+                first = exercise_rollback(ROOT, work_dir, now=NOW)
+                second = exercise_rollback(ROOT, work_dir, now=NOW)
+
+            self.assertEqual(first["passed"], True)
+            self.assertEqual(second["passed"], True)
+            self.assertFalse(
+                any((work_dir / "private").glob(".rollback-live-probe-*"))
+            )
 
     def test_verify_pilot_runs_exact_offline_commands_and_persists_compact_results(self):
         with TemporaryDirectory() as tmp:
@@ -1337,6 +1360,52 @@ class ControlledLarkPilotTests(TestCase):
 
         control_plane.assert_not_called()
 
+    def test_recorded_decision_blocks_new_runs_and_live_decisions(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, started = _start_waiting_pilot(tmp)
+            case_path = Path(tmp) / "next-case.json"
+            _write_private_case(case_path, case_id="case-002")
+            decision_path = work_dir / "private" / "decision.json"
+            decision_path.write_text(
+                json.dumps(_recorded_defer_decision()),
+                encoding="utf-8",
+            )
+            os.chmod(decision_path, 0o600)
+            original_get = os.environ.get
+
+            def prohibit_token_read(key, default=None):
+                if key == "LARK_BOT_ACCESS_TOKEN":
+                    raise AssertionError("closed pilot must not read the token")
+                return original_get(key, default)
+
+            with patch(
+                "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+                side_effect=AssertionError("closed pilot must not access the control plane"),
+            ) as control_plane, patch.object(
+                os.environ,
+                "get",
+                side_effect=prohibit_token_read,
+            ):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "controlled pilot is closed; use a new work directory",
+                ):
+                    start_pilot_run(ROOT, work_dir, case_path, now=NOW)
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "controlled pilot is closed; use a new work directory",
+                ):
+                    decide_pilot_run(
+                        ROOT,
+                        work_dir,
+                        started["run_id"],
+                        approved=True,
+                        confirmed_live=True,
+                        now=NOW,
+                    )
+
+        control_plane.assert_not_called()
+
     def test_start_pilot_run_rechecks_external_work_dir_before_creating_state(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1370,6 +1439,21 @@ class ControlledLarkPilotTests(TestCase):
             )
             self.assertTrue((work_dir / "state").is_dir())
             self.assertTrue((work_dir / "evidence").is_dir())
+
+    def test_initialize_pilot_refuses_to_replace_an_existing_charter(self):
+        with TemporaryDirectory() as tmp:
+            work_dir = Path(tmp) / "controlled-pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            charter_path = work_dir / "private" / "charter.json"
+            original = charter_path.read_bytes()
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "private JSON target must not already exist",
+            ):
+                initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+
+            self.assertEqual(charter_path.read_bytes(), original)
 
     def test_initialize_pilot_rejects_repository_work_dir(self):
         with self.assertRaisesRegex(ValueError, "outside the repository"):
@@ -1439,31 +1523,32 @@ class ControlledLarkPilotTests(TestCase):
 
             self.assertEqual(state_path.read_text(encoding="utf-8"), "sentinel")
 
-    def test_initialize_pilot_uses_private_temp_and_cleans_up_replace_failure(self):
+    def test_initialize_pilot_uses_private_temp_and_cleans_up_publish_failure(self):
         observed = {}
 
-        def fail_replace(
+        def fail_link(
             source,
             destination,
             *,
             src_dir_fd=None,
             dst_dir_fd=None,
+            follow_symlinks=True,
         ):
-            del dst_dir_fd
+            del dst_dir_fd, follow_symlinks
             observed["mode"] = (
                 os.stat(source, dir_fd=src_dir_fd, follow_symlinks=False).st_mode
                 & 0o777
             )
             observed["destination"] = Path(destination).name
-            raise OSError("replace failed")
+            raise OSError("publish failed")
 
         with TemporaryDirectory() as tmp:
             work_dir = Path(tmp) / "pilot"
             with patch(
-                "skill2workflow._controlled_lark_pilot_evidence_writer.os.replace",
-                side_effect=fail_replace,
+                "skill2workflow._controlled_lark_pilot_evidence_writer.os.link",
+                side_effect=fail_link,
             ):
-                with self.assertRaisesRegex(OSError, "replace failed"):
+                with self.assertRaisesRegex(OSError, "publish failed"):
                     initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
 
             self.assertEqual(

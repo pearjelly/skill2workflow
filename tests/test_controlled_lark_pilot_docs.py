@@ -610,6 +610,7 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         self.assertIn("does not resolve Vault credentials", runbook)
         self.assertIn("does not make a network request", runbook)
         self.assertIn("runs the same no-network preflight", runbook)
+        self.assertIn("new work directory", runbook)
         self.assertIn("rotate or delete", runbook)
         self.assertIn("stop", runbook.lower())
 
