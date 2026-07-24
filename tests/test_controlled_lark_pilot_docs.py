@@ -621,10 +621,28 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         self.assertIn("docs/controlled-live-pilot.md", connectors)
         self.assertIn("dry-run remains the default", connectors)
         self.assertIn("controlled real-team pilot", examples)
+        self.assertIn("docs/controlled-pilot-deferral-review.md", readme)
         self.assertIn("docs/controlled-live-pilot.md", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("Current maturity: Local Evaluation", readme)
         self.assertIn("Delivery Loops 1-39 are complete", readme)
+
+    def test_deferral_review_records_only_supported_findings_and_reentry_gate(self):
+        review = (ROOT / "docs" / "controlled-pilot-deferral-review.md").read_text(
+            encoding="utf-8"
+        )
+        normalized = " ".join(review.split())
+
+        self.assertIn("# Controlled Pilot Deferral Review", normalized)
+        self.assertIn("`validation_failed`", normalized)
+        self.assertIn("cannot attribute", normalized)
+        self.assertIn("raw provider message", normalized)
+        self.assertIn("no retry", normalized)
+        self.assertIn("fresh partner and operator authorization", normalized)
+        self.assertIn("new private work directory", normalized)
+        self.assertIn("no-network `preflight`", normalized)
+        self.assertIn("five approved live runs", normalized)
+        self.assertNotIn("root cause was", normalized.lower())
 
 
 if __name__ == "__main__":

@@ -29,6 +29,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("- Completed delivery loops: 1-39", roadmap)
         self.assertIn("- Active loop: None; Loop 40 is deferred pending a new partner-approved pilot", roadmap)
         self.assertIn("- Next maturity gate: Controlled Live Pilot", roadmap)
+        self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
         self.assertIn("**Status:** Achieved.", roadmap)

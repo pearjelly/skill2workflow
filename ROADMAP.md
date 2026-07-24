@@ -58,6 +58,8 @@ Candidate evidence includes backup and restore, upgrade and migration policy, ca
 
 **Safety outcome:** The failed run remains in owner-only Pilot state. No retry was issued, no subsequent live run was approved, and no raw provider message, task data, identifier, or credential was exported. A recorded Pilot decision now closes that workspace to subsequent starts and decisions, and initialization never replaces its Charter. The connector also provides a no-Vault, no-network `preflight` check that constructs the fixed request shape before a future human-gated run.
 
+**Deferral review:** [`docs/controlled-pilot-deferral-review.md`](docs/controlled-pilot-deferral-review.md) records the supported facts, the intentionally unconfirmed provider root cause, and the fresh-authorization re-entry gate.
+
 **Re-entry boundary:** A new Pilot requires fresh partner and operator authorization, a new valid charter, a new private case, a successful local `preflight`, and a separate explicit approval for each real create. The old failed run must never be retried or replaced. Live behavior remains limited to the fixed `create_task` action; any broader Lark/Feishu API behavior requires another readiness review.
 
 The dry-run behavioral baseline remains available through:
