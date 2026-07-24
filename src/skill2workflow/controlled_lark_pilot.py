@@ -136,6 +136,9 @@ def _build_controlled_pilot_parser() -> argparse.ArgumentParser:
     start.add_argument("--work-dir", type=Path, required=True)
     start.add_argument("--input", type=Path, required=True)
 
+    preflight = commands.add_parser("preflight")
+    preflight.add_argument("--input", type=Path, required=True)
+
     decide = commands.add_parser("decide")
     decide.add_argument("--work-dir", type=Path, required=True)
     decide.add_argument("--run-id", required=True)
@@ -231,6 +234,23 @@ def _command_summary(
                 "run_status",
                 "current_node",
                 "input_keys",
+            ),
+        )
+    if command == "preflight":
+        return _select_summary_fields(
+            result,
+            (
+                "status",
+                "connector_id",
+                "operation",
+                "mode",
+                "task_title_present",
+                "task_description_present",
+                "assignee_present",
+                "due_at_present",
+                "provider_payload_constructed",
+                "credential_resolution_attempted",
+                "network_called",
             ),
         )
     if command == "decide":
@@ -346,6 +366,11 @@ def _dispatch_controlled_pilot(arguments) -> Tuple[Dict[str, object], object]:
         result = start_pilot_run(
             SOURCE_REPOSITORY_ROOT,
             arguments.work_dir,
+            arguments.input,
+        )
+    elif command == "preflight":
+        result = preflight_pilot_case(
+            SOURCE_REPOSITORY_ROOT,
             arguments.input,
         )
     elif command == "decide":
@@ -1094,6 +1119,80 @@ def load_private_case(repo_root: Path, input_path: Path) -> Dict[str, object]:
     ):
         raise ValueError("pilot_case_id must be an opaque identifier")
     return normalized
+
+
+def preflight_pilot_case(repo_root: Path, input_path: Path) -> Dict[str, object]:
+    """Validate one private case through the exact live payload builder only."""
+    repo_root = Path(repo_root).resolve()
+    pilot_input = load_private_case(repo_root, input_path)
+    workflow = build_lark_task_pilot_workflow(
+        mode="live",
+        workflow_id=WORKFLOW_ID,
+        workflow_version=WORKFLOW_VERSION,
+        workflow_name="controlled-lark-task-sales-renewal-pilot",
+    )
+    workflow["workflow"]["status"] = "published"
+    _validate_controlled_live_binding(
+        workflow,
+        {
+            "status": "waiting",
+            "workflow_id": WORKFLOW_ID,
+            "workflow_version": WORKFLOW_VERSION,
+            "run_id": "preflight",
+            "current_node": "review_renewal_risk",
+            "workflow": workflow,
+        },
+    )
+    node = next(
+        item
+        for item in workflow.get("nodes", [])
+        if isinstance(item, dict) and item.get("id") == "create_lark_task"
+    )
+    binding = node.get("connector")
+    connector = load_external_connector(
+        repo_root / "examples" / "connectors" / "lark_task_connector.py"
+    )
+    if not callable(connector.preflight):
+        raise ValueError("controlled pilot connector does not provide a local preflight")
+    raw_result = connector.preflight(
+        binding,
+        context={
+            "input": pilot_input,
+            "_execution": {
+                "workflow_id": WORKFLOW_ID,
+                "workflow_version": WORKFLOW_VERSION,
+                "run_id": "preflight",
+                "node_id": "create_lark_task",
+            },
+        },
+    )
+    if not isinstance(raw_result, dict):
+        raise ValueError("controlled pilot connector preflight result is invalid")
+    output = raw_result.get("output", {})
+    audit = raw_result.get("audit", {})
+    if (
+        not isinstance(output, dict)
+        or not isinstance(audit, dict)
+        or raw_result.get("status") not in ("ready", "invalid")
+    ):
+        raise ValueError("controlled pilot connector preflight result is invalid")
+    return {
+        "status": str(raw_result["status"]),
+        "connector_id": "lark_task",
+        "operation": str(output.get("operation", "")),
+        "mode": str(output.get("mode", "")),
+        "task_title_present": bool(audit.get("task_title_present")),
+        "task_description_present": bool(audit.get("task_description_present")),
+        "assignee_present": bool(audit.get("assignee_present")),
+        "due_at_present": bool(audit.get("due_at_present")),
+        "provider_payload_constructed": bool(
+            output.get("provider_payload_constructed")
+        ),
+        "credential_resolution_attempted": bool(
+            output.get("credential_resolution_attempted")
+        ),
+        "network_called": bool(output.get("network_called")),
+    }
 
 
 def _validate_charter(charter: object, now: datetime = None) -> Dict[str, object]:

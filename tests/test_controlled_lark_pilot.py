@@ -7,6 +7,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
@@ -21,6 +22,7 @@ from skill2workflow.controlled_lark_pilot import (
     initialize_pilot,
     load_pilot_charter,
     load_private_case,
+    preflight_pilot_case,
     start_pilot_run,
     verify_pilot,
 )
@@ -184,6 +186,48 @@ def _published_controlled_workflow():
 
 
 class ControlledLarkPilotTests(TestCase):
+    def test_preflight_uses_private_case_without_vault_or_network_access(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            case_path = root / "case.json"
+            _write_private_case(case_path)
+
+            result = preflight_pilot_case(ROOT, case_path)
+
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["connector_id"], "lark_task")
+        self.assertEqual(result["operation"], "create_task")
+        self.assertEqual(result["mode"], "live")
+        self.assertTrue(result["provider_payload_constructed"])
+        self.assertFalse(result["credential_resolution_attempted"])
+        self.assertFalse(result["network_called"])
+        self.assertTrue(result["task_title_present"])
+        self.assertTrue(result["task_description_present"])
+        self.assertTrue(result["assignee_present"])
+        self.assertTrue(result["due_at_present"])
+        encoded = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn("Private Account", encoded)
+        self.assertNotIn("Private Risk", encoded)
+        self.assertNotIn("ou_private", encoded)
+        self.assertNotIn("2026-08-15T09:00:00Z", encoded)
+
+    def test_preflight_rejects_a_non_object_connector_result(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            case_path = root / "case.json"
+            _write_private_case(case_path)
+            malformed_connector = SimpleNamespace(preflight=lambda *_args, **_kwargs: None)
+
+            with patch(
+                "skill2workflow.controlled_lark_pilot.load_external_connector",
+                return_value=malformed_connector,
+            ):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "controlled pilot connector preflight result is invalid",
+                ):
+                    preflight_pilot_case(ROOT, case_path)
+
     def test_non_approval_operations_never_read_or_mutate_injected_token(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp).resolve()
@@ -222,6 +266,10 @@ class ControlledLarkPilotTests(TestCase):
                     ),
                 )
                 _write_private_case(input_path)
+                without_token_access(
+                    "preflight",
+                    lambda: preflight_pilot_case(ROOT, input_path),
+                )
                 started = without_token_access(
                     "start",
                     lambda: start_pilot_run(

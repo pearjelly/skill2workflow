@@ -180,6 +180,53 @@ def execute(binding: Dict[str, object], credential_provider=None, context=None, 
     }
 
 
+def preflight(binding: Dict[str, object], context=None) -> Dict[str, object]:
+    """Construct the fixed live payload without resolving a credential or using transport."""
+    audit = {
+        "operation": "",
+        "mode": "",
+        "task_title_present": False,
+        "task_description_present": False,
+        "assignee_present": False,
+        "due_at_present": False,
+    }
+    mapping_summary = {"status": "not_applied", "input_keys": []}
+    ready = False
+    try:
+        if not isinstance(binding, dict):
+            raise ConnectorExecutionError("lark_task connector binding must be an object")
+        operation = str(binding.get("operation") or "")
+        if operation != "create_task":
+            raise ConnectorExecutionError("lark_task connector only supports operation create_task")
+        mode = str(binding.get("mode") or "")
+        if mode != "live":
+            raise ConnectorExecutionError("lark_task preflight requires mode live")
+        request = binding.get("request", {})
+        if request is None:
+            request = {}
+        if not isinstance(request, dict):
+            raise ConnectorExecutionError("lark_task connector.request must be an object")
+        body, mapping_summary = _mapped_body(request, context)
+        audit = _task_audit_metadata(operation, mode, body)
+        _provider_request_body(body, context)
+        ready = True
+    except ConnectorExecutionError:
+        pass
+    return {
+        "status": "ready" if ready else "invalid",
+        "connector": {"id": "lark_task", "kind": "lark_task"},
+        "output": {
+            "operation": audit["operation"],
+            "mode": audit["mode"],
+            "provider_payload_constructed": ready,
+            "credential_resolution_attempted": False,
+            "network_called": False,
+        },
+        "audit": audit,
+        "input_mapping": mapping_summary,
+    }
+
+
 def _task_audit_metadata(operation: str, mode: str, body: Dict[str, object]) -> Dict[str, object]:
     return {
         "operation": operation,
@@ -229,6 +276,8 @@ def _provider_request_body(body: Dict[str, object], context: object) -> Dict[str
     title = body.get("title")
     if not isinstance(title, str) or not title.strip():
         raise ConnectorExecutionError("lark_task connector task title is required")
+    if len(title) > 3000:
+        raise ConnectorExecutionError("lark_task connector task title exceeds the provider limit")
 
     payload: Dict[str, object] = {
         "summary": title,

@@ -48,7 +48,7 @@ class FirstProductConnectorCandidateDocsTests(TestCase):
         self.assertIn("| Loop 37: Product Connector Pilot Scenario | Complete |", roadmap)
         self.assertIn("| Loop 38: Live Connector Readiness Review | Complete |", roadmap)
         self.assertIn("| Loop 39: Scoped Live Lark Task Connector | Complete |", roadmap)
-        self.assertIn("| Loop 40: Controlled Live Connector Pilot | Next |", roadmap)
+        self.assertIn("| Loop 40: Controlled Live Connector Pilot | Deferred |", roadmap)
         self.assertIn("Lark/Feishu task connector", roadmap)
         self.assertIn("package-level and pilot-workflow dry-run evidence", roadmap)
 

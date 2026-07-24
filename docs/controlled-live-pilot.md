@@ -4,7 +4,7 @@ This runbook operates Loop 40 as a paid assisted engagement for one consenting r
 
 The dry-run remains the default. Controlled live behavior is limited to one `create_task` action through the explicitly loaded `lark_task` connector and the fixed Feishu domestic Task API host. Do not adapt these commands to another action, host, API, connector, or provider.
 
-The operator phases are: init start decide evidence exercise-failure exercise-rollback verify finalize . Each successful phase prints one compact redacted JSON line. Keep run ids and all private working material in the owner-controlled operating environment.
+The operator phases are: init preflight start decide evidence exercise-failure exercise-rollback verify finalize . Each successful phase prints one compact redacted JSON line. Keep run ids and all private working material in the owner-controlled operating environment.
 
 ## 1. Prerequisites And Private Workspace
 
@@ -91,10 +91,14 @@ Protect the case before start:
 
 ```bash
 chmod 600 "$PRIVATE_PILOT/private/cases/day-1.json"
+python3 scripts/controlled_lark_pilot.py preflight \
+  --input "$PRIVATE_PILOT/private/cases/day-1.json"
 python3 scripts/controlled_lark_pilot.py start \
   --work-dir "$PRIVATE_PILOT" \
   --input "$PRIVATE_PILOT/private/cases/day-1.json"
 ```
+
+`preflight` constructs the exact fixed Task v2 request body locally and returns only compact presence and readiness fields. It does not resolve Vault credentials, enable live mode, does not make a network request, and does not create a Feishu task. A `ready` result is a local contract check only; it does not replace the human review, the explicit approval, or a real provider result. An `invalid` result stops the case before `start`; correct the owner-only case file and run preflight again.
 
 The start result must show `run_status: waiting` and `current_node: review_renewal_risk`. Record the opaque run id privately. Before any decision, the designated operator must inspect the compact waiting summary and the owner-only case file, confirm the intended assignee and task contents, and verify that the run is still waiting at that exact human gate.
 
@@ -213,4 +217,4 @@ After the engagement, rotate or delete the pilot token according to the partner'
 
 Stop immediately if a run exposes a forbidden value, bypasses the human gate, creates an unexpected duplicate, targets the wrong assignee, encounters a permission or redaction anomaly, uses a non-normalized provider result, or deviates from the fixed domestic endpoint and action. Remove the live switch, do not approve another run, retain authoritative private state, record a `defer` candidate decision, and return with a failing regression test. Never hide or replace the failed run.
 
-Offline tests, fake transport, an empty evidence skeleton, and implementation readiness must not advance Loop 40. Loop 40 remains active and the maturity remains Local Evaluation until the paid five-day real-team evidence gate successfully finalizes and the separate Roadmap completion task is performed.
+Offline tests, fake transport, an empty evidence skeleton, and implementation readiness must not advance Loop 40. A deferred Pilot remains at Local Evaluation; any replacement Pilot requires a fresh authorization boundary and must successfully finalize the paid five-day real-team evidence gate before the separate Roadmap completion task may run.

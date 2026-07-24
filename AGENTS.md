@@ -56,6 +56,7 @@ This repository is the `skill2workflow` open-source harness.
 - First-run demo: `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
 - Pilot smoke: `python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot`
 - Controlled Lark pilot: `python3 scripts/controlled_lark_pilot.py --help`
+- Controlled Lark preflight: `python3 scripts/controlled_lark_pilot.py preflight --input /tmp/skill2workflow-private-case.json`
 - Schedule smoke: `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
 - Package smoke: `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
 - Secret hygiene: `python3 scripts/secret_hygiene.py examples/workflows`

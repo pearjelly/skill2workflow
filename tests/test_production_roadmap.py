@@ -27,7 +27,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Local Evaluation", roadmap)
         self.assertIn("- Completed delivery loops: 1-39", roadmap)
-        self.assertIn("- Active loop: Loop 40, Controlled Live Connector Pilot", roadmap)
+        self.assertIn("- Active loop: None; Loop 40 is deferred pending a new partner-approved pilot", roadmap)
         self.assertIn("- Next maturity gate: Controlled Live Pilot", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
@@ -44,7 +44,7 @@ class ProductionRoadmapTests(TestCase):
             roadmap,
         )
         self.assertIn(
-            "| Loop 40: Controlled Live Connector Pilot | Next |",
+            "| Loop 40: Controlled Live Connector Pilot | Deferred |",
             roadmap,
         )
         self.assertIn(
@@ -150,6 +150,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)
+        self.assertIn("Loop 40 is deferred", readme)
         candidate_loop_titles = [
             "Loop 41: Self-hosted Runtime Service Boundary",
             "Loop 42: Authenticated Ingress And Production Credentials",

@@ -113,6 +113,65 @@ class LarkTaskConnectorTests(TestCase):
 
         self.assertEqual(transport.calls, [])
 
+    def test_lark_task_preflight_constructs_the_live_payload_without_credentials_or_transport(self):
+        connector = _load_lark_task_connector()
+        preflight = connector.preflight
+
+        result = preflight(
+            _lark_task_node(mode="live")["connector"],
+            context=_execution_context(),
+        )
+
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["connector"], {"id": "lark_task", "kind": "lark_task"})
+        self.assertEqual(
+            result["output"],
+            {
+                "operation": "create_task",
+                "mode": "live",
+                "provider_payload_constructed": True,
+                "credential_resolution_attempted": False,
+                "network_called": False,
+            },
+        )
+        self.assertEqual(
+            result["audit"],
+            {
+                "operation": "create_task",
+                "mode": "live",
+                "task_title_present": True,
+                "task_description_present": True,
+                "assignee_present": True,
+                "due_at_present": True,
+            },
+        )
+
+        encoded = json.dumps(result, ensure_ascii=False)
+        for forbidden in (
+            "Renewal risk follow-up",
+            "Customer ACME needs executive review",
+            "ou_123456",
+            "2026-07-09T09:00:00Z",
+        ):
+            self.assertNotIn(forbidden, encoded)
+
+    def test_lark_task_preflight_rejects_provider_invalid_title_without_leaking_it(self):
+        connector = _load_lark_task_connector()
+        context = _execution_context()
+        invalid_title = "private-title-" + ("x" * 3000)
+        context["input"]["title"] = invalid_title
+
+        result = connector.preflight(
+            _lark_task_node(mode="live")["connector"],
+            context=context,
+        )
+
+        self.assertEqual(result["status"], "invalid")
+        self.assertFalse(result["output"]["provider_payload_constructed"])
+        self.assertFalse(result["output"]["credential_resolution_attempted"])
+        self.assertFalse(result["output"]["network_called"])
+        self.assertNotIn(invalid_title, json.dumps(result, ensure_ascii=False))
+
     def test_lark_task_live_mode_sends_fixed_redacted_idempotent_request(self):
         transport = _FakeTransport()
         runtime = ConnectorRuntime([_load_lark_task_connector(transport)])

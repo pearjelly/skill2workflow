@@ -89,7 +89,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
         )
         os.chmod(path, mode)
 
-    def test_parser_dispatches_all_eight_commands_and_prints_only_compact_summaries(self):
+    def test_parser_dispatches_all_nine_commands_and_prints_only_compact_summaries(self):
         secret = "SHOULD-NOT-REACH-STDOUT"
         common = {
             "status": "ok",
@@ -99,6 +99,15 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             "run_status": "waiting",
             "current_node": "review_renewal_risk",
             "input_keys": ["pilot_case_id"],
+            "connector_id": "lark_task",
+            "operation": "create_task",
+            "mode": "live",
+            "task_title_present": True,
+            "task_description_present": True,
+            "assignee_present": True,
+            "due_at_present": True,
+            "provider_payload_constructed": True,
+            "network_called": False,
             "gate_decision": "rejected",
             "connector_invoked": False,
             "connector_status": "",
@@ -150,6 +159,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
                     "--confirm-commercial-engagement",
                 ],
                 ["start", "--work-dir", str(work_dir), "--input", str(case_path)],
+                ["preflight", "--input", str(case_path)],
                 [
                     "decide",
                     "--work-dir",
@@ -173,6 +183,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             targets = (
                 "initialize_pilot",
                 "start_pilot_run",
+                "preflight_pilot_case",
                 "decide_pilot_run",
                 "generate_pilot_evidence",
                 "exercise_disabled_live",
@@ -547,6 +558,7 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         )
         for command in (
             " init ",
+            " preflight ",
             " start ",
             " decide ",
             " evidence ",
@@ -593,6 +605,8 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         self.assertIn("fixed Feishu domestic", runbook)
         self.assertIn("one `create_task` action", runbook)
         self.assertIn("dry-run remains the default", runbook)
+        self.assertIn("does not resolve Vault credentials", runbook)
+        self.assertIn("does not make a network request", runbook)
         self.assertIn("rotate or delete", runbook)
         self.assertIn("stop", runbook.lower())
 
