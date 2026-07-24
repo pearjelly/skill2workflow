@@ -1254,6 +1254,7 @@ class ControlledLarkPilotTests(TestCase):
             {
                 "current_node",
                 "input_keys",
+                "preflight_ready",
                 "run_id",
                 "run_status",
                 "workflow_id",
@@ -1262,6 +1263,7 @@ class ControlledLarkPilotTests(TestCase):
         )
         self.assertEqual(result["run_status"], "waiting")
         self.assertEqual(result["current_node"], "review_renewal_risk")
+        self.assertTrue(result["preflight_ready"])
         self.assertEqual(
             result["input_keys"],
             [
@@ -1312,6 +1314,28 @@ class ControlledLarkPilotTests(TestCase):
         self.assertEqual(result["run_status"], "waiting")
         resolve_credential.assert_not_called()
         self.assertEqual(transport_calls, [])
+
+    def test_start_pilot_run_requires_local_preflight_before_control_plane_access(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            work_dir = root / "pilot"
+            input_path = root / "case.json"
+            invalid_case = _valid_case()
+            invalid_case["renewal_risk"] = "private-risk-" + ("x" * 3000)
+            input_path.write_text(json.dumps(invalid_case), encoding="utf-8")
+            os.chmod(input_path, 0o600)
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+
+            with patch(
+                "skill2workflow.controlled_lark_pilot._pilot_control_plane"
+            ) as control_plane:
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "controlled pilot preflight did not pass",
+                ):
+                    start_pilot_run(ROOT, work_dir, input_path, now=NOW)
+
+        control_plane.assert_not_called()
 
     def test_start_pilot_run_rechecks_external_work_dir_before_creating_state(self):
         with TemporaryDirectory() as tmp:

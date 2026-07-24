@@ -234,6 +234,7 @@ def _command_summary(
                 "run_status",
                 "current_node",
                 "input_keys",
+                "preflight_ready",
             ),
         )
     if command == "preflight":
@@ -975,6 +976,9 @@ def start_pilot_run(
     _require_outside_repository(repo_root, work_dir, "pilot work directory")
     load_pilot_charter(work_dir, now=now)
     pilot_input = load_private_case(repo_root, input_path)
+    preflight = _preflight_pilot_input(repo_root, pilot_input)
+    if preflight["status"] != "ready":
+        raise ValueError("controlled pilot preflight did not pass")
     control = _pilot_control_plane(
         repo_root,
         work_dir,
@@ -1010,6 +1014,7 @@ def start_pilot_run(
         "run_status": "waiting",
         "current_node": "review_renewal_risk",
         "input_keys": sorted(pilot_input),
+        "preflight_ready": True,
     }
 
 
@@ -1125,6 +1130,14 @@ def preflight_pilot_case(repo_root: Path, input_path: Path) -> Dict[str, object]
     """Validate one private case through the exact live payload builder only."""
     repo_root = Path(repo_root).resolve()
     pilot_input = load_private_case(repo_root, input_path)
+    return _preflight_pilot_input(repo_root, pilot_input)
+
+
+def _preflight_pilot_input(
+    repo_root: Path,
+    pilot_input: Dict[str, object],
+) -> Dict[str, object]:
+    """Construct the exact live payload from an already validated private input."""
     workflow = build_lark_task_pilot_workflow(
         mode="live",
         workflow_id=WORKFLOW_ID,

@@ -99,6 +99,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             "run_status": "waiting",
             "current_node": "review_renewal_risk",
             "input_keys": ["pilot_case_id"],
+            "preflight_ready": True,
             "connector_id": "lark_task",
             "operation": "create_task",
             "mode": "live",
@@ -224,6 +225,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             self.assertEqual(started_stderr, "")
             started = self._assert_compact_json_line(started_stdout)
             self.assertEqual(started["run_status"], "waiting")
+            self.assertTrue(started["preflight_ready"])
 
             original_get = os.environ.get
 
@@ -607,6 +609,7 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         self.assertIn("dry-run remains the default", runbook)
         self.assertIn("does not resolve Vault credentials", runbook)
         self.assertIn("does not make a network request", runbook)
+        self.assertIn("runs the same no-network preflight", runbook)
         self.assertIn("rotate or delete", runbook)
         self.assertIn("stop", runbook.lower())
 

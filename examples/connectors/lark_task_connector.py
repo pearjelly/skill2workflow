@@ -287,6 +287,10 @@ def _provider_request_body(body: Dict[str, object], context: object) -> Dict[str
     if description is not None:
         if not isinstance(description, str):
             raise ConnectorExecutionError("lark_task connector description must be a string")
+        if len(description) > 3000:
+            raise ConnectorExecutionError(
+                "lark_task connector description exceeds the provider limit"
+            )
         payload["description"] = description
 
     assignee = body.get("assignee_open_id")

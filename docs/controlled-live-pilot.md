@@ -98,9 +98,9 @@ python3 scripts/controlled_lark_pilot.py start \
   --input "$PRIVATE_PILOT/private/cases/day-1.json"
 ```
 
-`preflight` constructs the exact fixed Task v2 request body locally and returns only compact presence and readiness fields. It does not resolve Vault credentials, enable live mode, does not make a network request, and does not create a Feishu task. A `ready` result is a local contract check only; it does not replace the human review, the explicit approval, or a real provider result. An `invalid` result stops the case before `start`; correct the owner-only case file and run preflight again.
+`preflight` constructs the exact fixed Task v2 request body locally and returns only compact presence and readiness fields. It checks the locally verifiable Task contract, including non-empty title, RFC 3339 deadline, and the 3,000 UTF-8-character limits for title and description. It does not resolve Vault credentials, enable live mode, does not make a network request, or create a Feishu task. A `ready` result is a local contract check only; it does not replace the human review, the explicit approval, or a real provider result. An `invalid` result stops the case before `start`; correct the owner-only case file and run preflight again.
 
-The start result must show `run_status: waiting` and `current_node: review_renewal_risk`. Record the opaque run id privately. Before any decision, the designated operator must inspect the compact waiting summary and the owner-only case file, confirm the intended assignee and task contents, and verify that the run is still waiting at that exact human gate.
+`start` runs the same no-network preflight again and fails before it accesses the control plane if it is not `ready`; it cannot be used to bypass the check. The start result must show `preflight_ready: true`, `run_status: waiting`, and `current_node: review_renewal_risk`. Record the opaque run id privately. Before any decision, the designated operator must inspect the compact waiting summary and the owner-only case file, confirm the intended assignee and task contents, and verify that the run is still waiting at that exact human gate.
 
 ## 4. Make The Explicit Human Decision
 

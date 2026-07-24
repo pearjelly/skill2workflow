@@ -155,22 +155,24 @@ class LarkTaskConnectorTests(TestCase):
         ):
             self.assertNotIn(forbidden, encoded)
 
-    def test_lark_task_preflight_rejects_provider_invalid_title_without_leaking_it(self):
+    def test_lark_task_preflight_rejects_provider_invalid_text_without_leaking_it(self):
         connector = _load_lark_task_connector()
-        context = _execution_context()
-        invalid_title = "private-title-" + ("x" * 3000)
-        context["input"]["title"] = invalid_title
+        for field in ("title", "description"):
+            with self.subTest(field=field):
+                context = _execution_context()
+                invalid_text = "private-text-" + ("x" * 3000)
+                context["input"][field] = invalid_text
 
-        result = connector.preflight(
-            _lark_task_node(mode="live")["connector"],
-            context=context,
-        )
+                result = connector.preflight(
+                    _lark_task_node(mode="live")["connector"],
+                    context=context,
+                )
 
-        self.assertEqual(result["status"], "invalid")
-        self.assertFalse(result["output"]["provider_payload_constructed"])
-        self.assertFalse(result["output"]["credential_resolution_attempted"])
-        self.assertFalse(result["output"]["network_called"])
-        self.assertNotIn(invalid_title, json.dumps(result, ensure_ascii=False))
+                self.assertEqual(result["status"], "invalid")
+                self.assertFalse(result["output"]["provider_payload_constructed"])
+                self.assertFalse(result["output"]["credential_resolution_attempted"])
+                self.assertFalse(result["output"]["network_called"])
+                self.assertNotIn(invalid_text, json.dumps(result, ensure_ascii=False))
 
     def test_lark_task_live_mode_sends_fixed_redacted_idempotent_request(self):
         transport = _FakeTransport()
