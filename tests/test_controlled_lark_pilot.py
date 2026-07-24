@@ -15,6 +15,7 @@ from skill2workflow.compiler import validate_workflow
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.controlled_lark_pilot import (
     _validate_controlled_live_binding,
+    create_private_case_template,
     decide_pilot_run,
     exercise_disabled_live,
     exercise_rollback,
@@ -197,6 +198,114 @@ def _published_controlled_workflow():
 
 
 class ControlledLarkPilotTests(TestCase):
+    def test_case_template_creates_owner_only_empty_private_case_once(self):
+        with TemporaryDirectory() as temporary:
+            work_dir = Path(temporary) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+
+            result = create_private_case_template(
+                ROOT,
+                work_dir,
+                "day-1",
+                "case-001",
+                now=NOW,
+            )
+
+            case_path = work_dir / "private" / "cases" / "day-1.json"
+            payload = json.loads(case_path.read_text(encoding="utf-8"))
+            original = case_path.read_bytes()
+            mode = case_path.stat().st_mode & 0o077
+            with self.assertRaisesRegex(
+                ValueError,
+                "private JSON target must not already exist",
+            ):
+                create_private_case_template(
+                    ROOT,
+                    work_dir,
+                    "day-1",
+                    "case-001",
+                    now=NOW,
+                )
+
+            unchanged = case_path.read_bytes()
+
+        self.assertEqual(result, {"status": "template_written", "field_count": 5})
+        self.assertEqual(
+            payload,
+            {
+                "pilot_case_id": "case-001",
+                "account_name": "",
+                "renewal_risk": "",
+                "owner_open_id": "",
+                "due_at": "",
+            },
+        )
+        self.assertEqual(mode, 0)
+        self.assertEqual(unchanged, original)
+
+    def test_case_template_rejects_closed_workspaces_and_unsafe_identifiers(self):
+        with TemporaryDirectory() as temporary:
+            work_dir = Path(temporary) / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            decision_path = work_dir / "private" / "decision.json"
+            decision_path.write_text(
+                json.dumps(_recorded_defer_decision()),
+                encoding="utf-8",
+            )
+            os.chmod(decision_path, 0o600)
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "controlled pilot is closed; use a new work directory",
+            ):
+                create_private_case_template(
+                    ROOT,
+                    work_dir,
+                    "day-1",
+                    "case-001",
+                    now=NOW,
+                )
+            for name, case_id in (
+                ("../day-1", "case-001"),
+                ("day-1", "account-001"),
+            ):
+                with self.subTest(name=name, case_id=case_id), self.assertRaisesRegex(
+                    ValueError,
+                    "template name|opaque identifier",
+                ):
+                    create_private_case_template(
+                        ROOT,
+                        work_dir,
+                        name,
+                        case_id,
+                        now=NOW,
+                    )
+
+            self.assertFalse((work_dir / "private" / "cases").exists())
+
+    def test_case_template_rejects_a_cases_directory_symlink_without_writing_target(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            work_dir = root / "pilot"
+            initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
+            target = root / "cases-target"
+            target.mkdir()
+            (work_dir / "private" / "cases").symlink_to(
+                target,
+                target_is_directory=True,
+            )
+
+            with self.assertRaisesRegex(ValueError, "symbolic link|directory"):
+                create_private_case_template(
+                    ROOT,
+                    work_dir,
+                    "day-1",
+                    "case-001",
+                    now=NOW,
+                )
+
+            self.assertEqual(list(target.iterdir()), [])
+
     def test_preflight_uses_private_case_without_vault_or_network_access(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

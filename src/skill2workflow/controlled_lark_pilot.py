@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
@@ -78,6 +79,7 @@ REQUIRED_CASE_KEYS = {
     "owner_open_id",
     "due_at",
 }
+_CASE_TEMPLATE_NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,63}")
 
 SOURCE_REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _OPERATOR_ERROR = "controlled pilot command failed"
@@ -132,6 +134,11 @@ def _build_controlled_pilot_parser() -> argparse.ArgumentParser:
         action="store_true",
         required=True,
     )
+
+    case_template = commands.add_parser("case-template")
+    case_template.add_argument("--work-dir", type=Path, required=True)
+    case_template.add_argument("--name", required=True)
+    case_template.add_argument("--case-id", required=True)
 
     start = commands.add_parser("start")
     start.add_argument("--work-dir", type=Path, required=True)
@@ -238,6 +245,8 @@ def _command_summary(
                 "preflight_ready",
             ),
         )
+    if command == "case-template":
+        return _select_summary_fields(result, ("status", "field_count"))
     if command == "preflight":
         return _select_summary_fields(
             result,
@@ -364,7 +373,14 @@ def _dispatch_controlled_pilot(arguments) -> Tuple[Dict[str, object], object]:
             charter,
         )
         return _command_summary(command, result, charter=charter), result
-    if command == "start":
+    if command == "case-template":
+        result = create_private_case_template(
+            SOURCE_REPOSITORY_ROOT,
+            arguments.work_dir,
+            arguments.name,
+            arguments.case_id,
+        )
+    elif command == "start":
         result = start_pilot_run(
             SOURCE_REPOSITORY_ROOT,
             arguments.work_dir,
@@ -1121,6 +1137,37 @@ def initialize_pilot(
     }
 
 
+def create_private_case_template(
+    repo_root: Path,
+    work_dir: Path,
+    name: str,
+    case_id: str,
+    now: datetime = None,
+) -> Dict[str, object]:
+    """Create one blank, owner-only Pilot case without shell-supplied business data."""
+    repo_root = Path(repo_root).resolve()
+    work_dir = Path(os.path.abspath(os.fspath(work_dir)))
+    _require_outside_repository(repo_root, work_dir.resolve(), "pilot work directory")
+    normalized_name = _validate_case_template_name(name)
+    normalized_case_id = _validate_opaque_case_id(case_id)
+    load_pilot_charter(work_dir, now=now)
+    with _open_unclosed_pilot_session(work_dir):
+        cases_dir = work_dir / "private" / "cases"
+        ensure_private_directory_anchored(cases_dir)
+        write_private_json_anchored(
+            cases_dir / f"{normalized_name}.json",
+            {
+                "pilot_case_id": normalized_case_id,
+                "account_name": "",
+                "renewal_risk": "",
+                "owner_open_id": "",
+                "due_at": "",
+            },
+            require_missing=True,
+        )
+    return {"status": "template_written", "field_count": len(REQUIRED_CASE_KEYS)}
+
+
 def load_pilot_charter(work_dir: Path, now: datetime = None) -> Dict[str, object]:
     work_dir = Path(os.path.abspath(os.fspath(work_dir)))
     path = work_dir / "private" / "charter.json"
@@ -1139,6 +1186,24 @@ def _open_unclosed_pilot_session(work_dir: Path):
         session.check_identity()
         yield
         session.check_identity()
+
+
+def _validate_case_template_name(value: object) -> str:
+    if type(value) is not str or not _CASE_TEMPLATE_NAME.fullmatch(value):
+        raise ValueError("private case template name is invalid")
+    return value
+
+
+def _validate_opaque_case_id(value: object) -> str:
+    if type(value) is not str or not value.strip():
+        raise ValueError("pilot_case_id must be an opaque identifier")
+    normalized = value.strip()
+    if any(
+        token in normalized.lower()
+        for token in ("account", "customer", "@", " ")
+    ):
+        raise ValueError("pilot_case_id must be an opaque identifier")
+    return normalized
 
 
 def load_private_case(repo_root: Path, input_path: Path) -> Dict[str, object]:
@@ -1170,11 +1235,9 @@ def load_private_case(repo_root: Path, input_path: Path) -> Dict[str, object]:
         raise ValueError(
             "private case due_at must be an ISO timestamp with timezone"
         )
-    if any(
-        token in normalized["pilot_case_id"].lower()
-        for token in ("account", "customer", "@", " ")
-    ):
-        raise ValueError("pilot_case_id must be an opaque identifier")
+    normalized["pilot_case_id"] = _validate_opaque_case_id(
+        normalized["pilot_case_id"]
+    )
     return normalized
 
 

@@ -89,7 +89,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
         )
         os.chmod(path, mode)
 
-    def test_parser_dispatches_all_nine_commands_and_prints_only_compact_summaries(self):
+    def test_parser_dispatches_all_ten_commands_and_prints_only_compact_summaries(self):
         secret = "SHOULD-NOT-REACH-STDOUT"
         common = {
             "status": "ok",
@@ -133,6 +133,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             "all_passed": True,
             "commands": [],
             "decision": "defer",
+            "field_count": 5,
             "raw_private_value": secret,
             "rationale": secret,
             "token": secret,
@@ -159,6 +160,15 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
                     "--confirm-assignee-consent",
                     "--confirm-commercial-engagement",
                 ],
+                [
+                    "case-template",
+                    "--work-dir",
+                    str(work_dir),
+                    "--name",
+                    "day-1",
+                    "--case-id",
+                    "case-opaque-001",
+                ],
                 ["start", "--work-dir", str(work_dir), "--input", str(case_path)],
                 ["preflight", "--input", str(case_path)],
                 [
@@ -183,6 +193,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             )
             targets = (
                 "initialize_pilot",
+                "create_private_case_template",
                 "start_pilot_run",
                 "preflight_pilot_case",
                 "decide_pilot_run",
@@ -280,6 +291,49 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
                     "required_distinct_cases",
                 },
             )
+
+    def test_case_template_never_reads_vault_and_refuses_overwrite(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            work_dir = root / "pilot"
+            result, stdout, stderr = self._init(work_dir)
+            self.assertEqual(result, 0)
+            self.assertEqual(stderr, "")
+            self._assert_compact_json_line(stdout)
+
+            original_get = os.environ.get
+
+            def reject_token_read(key, default=None):
+                if key == "LARK_BOT_ACCESS_TOKEN":
+                    raise AssertionError("case template must not read the token")
+                return original_get(key, default)
+
+            arguments = [
+                "case-template",
+                "--work-dir",
+                str(work_dir),
+                "--name",
+                "day-1",
+                "--case-id",
+                "case-opaque-001",
+            ]
+            with patch.object(os.environ, "get", side_effect=reject_token_read):
+                result, stdout, stderr = self._invoke(arguments)
+            self.assertEqual(result, 0)
+            self.assertEqual(stderr, "")
+            summary = self._assert_compact_json_line(stdout)
+            self.assertEqual(summary, {"status": "template_written", "field_count": 5})
+
+            case_path = work_dir / "private" / "cases" / "day-1.json"
+            original = case_path.read_bytes()
+            self.assertEqual(case_path.stat().st_mode & 0o077, 0)
+            self.assertNotIn("LARK_BOT_ACCESS_TOKEN", stdout)
+
+            result, stdout, stderr = self._invoke(arguments)
+            self.assertEqual(result, 1)
+            self.assertEqual(stdout, "")
+            self.assertEqual(stderr, "controlled pilot command failed\n")
+            self.assertEqual(case_path.read_bytes(), original)
 
     def test_start_rejects_non_string_or_naive_case_values_with_fixed_error(self):
         invalid_cases = (
@@ -560,6 +614,7 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         )
         for command in (
             " init ",
+            " case-template ",
             " preflight ",
             " start ",
             " decide ",

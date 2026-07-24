@@ -4,7 +4,7 @@ This runbook operates Loop 40 as a paid assisted engagement for one consenting r
 
 The dry-run remains the default. Controlled live behavior is limited to one `create_task` action through the explicitly loaded `lark_task` connector and the fixed Feishu domestic Task API host. Do not adapt these commands to another action, host, API, connector, or provider.
 
-The operator phases are: init preflight start decide evidence exercise-failure exercise-rollback verify finalize . Each successful phase prints one compact redacted JSON line. Keep run ids and all private working material in the owner-controlled operating environment.
+The operator phases are: init case-template preflight start decide evidence exercise-failure exercise-rollback verify finalize . Each successful phase prints one compact redacted JSON line. Keep run ids and all private working material in the owner-controlled operating environment.
 
 ## 1. Prerequisites And Private Workspace
 
@@ -51,7 +51,22 @@ The rehearsal must complete in `dry_run` mode. A dry-run failure stops the pilot
 
 ## 3. Prepare One Private Case
 
-Create each case file below an owner-controlled location such as `$PRIVATE_PILOT/private/cases/`. The file must conform to this exact schema:
+Create the owner-only empty template without placing business values on the command line:
+
+```bash
+python3 scripts/controlled_lark_pilot.py case-template \
+  --work-dir "$PRIVATE_PILOT" \
+  --name day-1 \
+  --case-id case-001
+```
+
+It creates `$PRIVATE_PILOT/private/cases/day-1.json` once with the exact five
+keys and blank business fields. It never overwrites an existing file and is
+blocked for a deferred or finalized workspace. Open that owner-only file
+locally, replace only the blank values with partner-approved content, and do
+not put those values in shell arguments.
+
+Each case file must then conform to this exact schema:
 
 ```json
 {
