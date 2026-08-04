@@ -26,20 +26,26 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Local Evaluation", roadmap)
-        self.assertIn("- Active loop: Loop 39, Scoped Live Lark Task Connector", roadmap)
+        self.assertIn("- Completed delivery loops: 1-39", roadmap)
+        self.assertIn("- Active loop: None; Loop 40 is deferred pending a new partner-approved pilot", roadmap)
         self.assertIn("- Next maturity gate: Controlled Live Pilot", roadmap)
+        self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Controlled Live Pilot", roadmap)
-        self.assertIn("**Target loops:** 39-40.", roadmap)
+        self.assertIn("**Target loops:** 40.", roadmap)
         self.assertIn("### Self-hosted Beta", roadmap)
         self.assertIn("**Target loops:** 41-43.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn("**Status:** Directional; no loop numbers assigned.", roadmap)
 
         self.assertIn(
-            "| Loop 40: Controlled Live Connector Pilot | Candidate |",
+            "| Loop 39: Scoped Live Lark Task Connector | Complete |",
+            roadmap,
+        )
+        self.assertIn(
+            "| Loop 40: Controlled Live Connector Pilot | Deferred |",
             roadmap,
         )
         self.assertIn(
@@ -114,6 +120,7 @@ class ProductionRoadmapTests(TestCase):
             "| Loop 36: First Product Connector Package Smoke | Complete | Lark/Feishu task connector dry-run package fixture, explicit-loading smoke, credential-handle evidence, and compact connector metadata |",
             "| Loop 37: Product Connector Pilot Scenario | Complete | Sales renewal risk workflow using the Lark/Feishu task dry-run connector after a manual gate, with webhook trigger, audit, snapshot, and LiteGraph overlay artifacts |",
             "| Loop 38: Live Connector Readiness Review | Complete | Decision note approving only scoped live Lark/Feishu `create_task` follow-up, with credential, idempotency, failure, audit, test, and rollback boundaries |",
+            "| Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |",
         ]
 
         for row in history_rows:
@@ -124,7 +131,15 @@ class ProductionRoadmapTests(TestCase):
         roadmap = _read("ROADMAP.md")
 
         self.assertIn(
-            "The project can create one live Lark/Feishu task through an explicitly enabled local connector path.",
+            "docs/lark-live-connector-validation.md",
+            roadmap,
+        )
+        self.assertIn(
+            "Live behavior remains limited to the fixed `create_task` action.",
+            roadmap,
+        )
+        self.assertIn(
+            "The one scoped live connector validation is not the controlled real-team business-workflow pilot required for Loop 40.",
             roadmap,
         )
 
@@ -132,12 +147,12 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Local Evaluation", readme)
-        self.assertIn("Delivery Loops 1-38 are complete", readme)
-        self.assertIn("Loop 39", readme)
+        self.assertIn("Delivery Loops 1-39 are complete", readme)
+        self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)
+        self.assertIn("Loop 40 is deferred", readme)
         candidate_loop_titles = [
-            "Loop 40: Controlled Live Connector Pilot",
             "Loop 41: Self-hosted Runtime Service Boundary",
             "Loop 42: Authenticated Ingress And Production Credentials",
             "Loop 43: Durable Recurring Scheduling And Safe Dispatch",

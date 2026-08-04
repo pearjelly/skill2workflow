@@ -256,6 +256,45 @@ class ExecutorTests(TestCase):
         self.assertIn("node_retrying", event_types)
         self.assertIn("node_recovered", event_types)
 
+    def test_connector_receives_ephemeral_execution_identity_without_persisting_it(self):
+        runtime = _CapturingConnectorRuntime()
+        original_context = {
+            "input": {"title": "Durable title"},
+            "_execution": {"workflow_id": "forged"},
+        }
+
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp), connector_runtime=runtime)
+            state = executor.run(_http_connector_workflow("https://unused.invalid"), context=original_context)
+            persisted = executor.get_run(state["run_id"])
+
+        self.assertEqual(len(runtime.contexts), 1)
+        self.assertEqual(
+            runtime.contexts[0]["_execution"],
+            {
+                "workflow_id": "workflow_connector",
+                "workflow_version": "0.1.0",
+                "run_id": state["run_id"],
+                "node_id": "call_api",
+            },
+        )
+        self.assertEqual(runtime.contexts[0]["input"], {"title": "Durable title"})
+        self.assertEqual(state["context"], original_context)
+        self.assertEqual(persisted["context"], original_context)
+
+
+class _CapturingConnectorRuntime:
+    def __init__(self):
+        self.contexts = []
+
+    def execute_connector(self, node, credential_provider=None, context=None):
+        self.contexts.append(context)
+        return {
+            "status": "completed",
+            "connector": {"id": "http", "kind": "http"},
+            "output": {},
+        }
+
 
 def _approval_workflow():
     return {

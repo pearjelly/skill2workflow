@@ -45,7 +45,7 @@ def run_lark_task_pilot(
     runtime = ConnectorRuntime([external_connector])
     connector_ids = [manifest["id"] for manifest in runtime.list_connectors()]
 
-    workflow = _lark_task_pilot_workflow()
+    workflow = build_lark_task_pilot_workflow()
     errors = validate_workflow(workflow)
     if errors:
         raise ValueError("; ".join(errors))
@@ -158,14 +158,26 @@ def _pilot_trigger_input() -> Dict[str, object]:
     }
 
 
-def _lark_task_pilot_workflow() -> Dict[str, object]:
+def build_lark_task_pilot_workflow(
+    mode: str = "dry_run",
+    workflow_id: str = "workflow_lark_task_pilot",
+    workflow_version: str = "0.1.0",
+    workflow_name: str = "lark-task-sales-renewal-pilot",
+) -> Dict[str, object]:
+    if mode not in ("dry_run", "live"):
+        raise ValueError("mode must be dry_run or live")
+    live = mode == "live"
     return {
         "schema_version": "0.1.0",
         "workflow": {
-            "id": "workflow_lark_task_pilot",
-            "name": "lark-task-sales-renewal-pilot",
-            "description": "Local sales renewal risk pilot using the Lark/Feishu task dry-run connector.",
-            "version": "0.1.0",
+            "id": workflow_id,
+            "name": workflow_name,
+            "description": (
+                "Controlled sales renewal risk pilot using the scoped live Lark/Feishu task connector."
+                if live
+                else "Local sales renewal risk pilot using the Lark/Feishu task dry-run connector."
+            ),
+            "version": workflow_version,
             "status": "draft",
         },
         "entry": "start",
@@ -194,17 +206,25 @@ def _lark_task_pilot_workflow() -> Dict[str, object]:
                 "id": "create_lark_task",
                 "type": "tool_call",
                 "title": "Create owner follow-up task",
-                "description": "Validate a Lark/Feishu owner follow-up task request without calling the live API.",
+                "description": (
+                    "Create the approved Lark/Feishu owner follow-up task through the scoped live connector."
+                    if live
+                    else "Validate a Lark/Feishu owner follow-up task request without calling the live API."
+                ),
                 "action": {
                     "kind": "tool_call",
-                    "instruction": "Create a dry-run Lark/Feishu task for the account owner.",
+                    "instruction": (
+                        "Create the approved live Lark/Feishu task for the account owner."
+                        if live
+                        else "Create a dry-run Lark/Feishu task for the account owner."
+                    ),
                 },
                 "retry": {"max_attempts": 0},
                 "connector": {
                     "id": "lark_task",
                     "kind": "lark_task",
                     "operation": "create_task",
-                    "mode": "dry_run",
+                    "mode": mode,
                     "request": {
                         "body": {
                             "source": "skill2workflow-lark-task-pilot",

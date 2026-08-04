@@ -23,9 +23,12 @@ def load_external_connector(path: Path) -> ExternalConnector:
 
     manifest = getattr(module, "MANIFEST", None)
     executor = getattr(module, "execute", None)
+    preflight = getattr(module, "preflight", None)
     if manifest is None:
         raise ValueError(f"external connector fixture must define MANIFEST: {path}")
     if executor is None:
         raise ValueError(f"external connector fixture must define execute: {path}")
+    if preflight is not None and not callable(preflight):
+        raise ValueError(f"external connector fixture preflight must be callable: {path}")
 
-    return ExternalConnector(manifest=manifest, executor=executor)
+    return ExternalConnector(manifest=manifest, executor=executor, preflight=preflight)

@@ -498,9 +498,9 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Local Evaluation. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-38 are complete.
+Current maturity: Local Evaluation. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-39 are complete.
 
-The active priority is Loop 39: implement only the readiness-approved Lark/Feishu `create_task` live action behind explicit opt-in while keeping dry-run behavior as the default.
+Loop 40 is deferred after a normalized real Pilot failure; no further live calls are authorized under that Pilot. A future controlled real-team Pilot requires fresh authorization and the local no-network preflight before its separate human approval.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
@@ -510,6 +510,8 @@ See:
 - `ROADMAP.md`
 - `docs/authoring.md`
 - `docs/connectors.md`
+- `docs/controlled-pilot-deferral-review.md`
+- `docs/controlled-live-pilot.md`
 - `docs/credential-boundary.md`
 - `docs/examples.md`
 - `docs/pilot-playbook.md`

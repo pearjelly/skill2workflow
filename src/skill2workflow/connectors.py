@@ -16,6 +16,7 @@ from .credentials import CredentialResolutionError
 ConnectorBinding = Dict[str, object]
 ConnectorResult = Dict[str, object]
 ExternalConnectorExecutor = Callable[..., ConnectorResult]
+ExternalConnectorPreflight = Callable[..., ConnectorResult]
 
 CONNECTOR_MANIFEST_VERSION = "skill2workflow-connector-0.1.0"
 CONNECTOR_EXECUTION_CONTRACT_VERSION = "skill2workflow-connector-execution-0.1.0"
@@ -103,6 +104,7 @@ class ExternalConnector:
 
     manifest: Dict[str, object]
     executor: ExternalConnectorExecutor
+    preflight: ExternalConnectorPreflight = None
 
 
 class ConnectorRuntime:
@@ -132,6 +134,7 @@ class ConnectorRuntime:
         self._external_connectors[connector_id] = ExternalConnector(
             manifest=copy.deepcopy(connector.manifest),
             executor=connector.executor,
+            preflight=connector.preflight,
         )
 
     def list_connectors(self) -> List[Dict[str, object]]:

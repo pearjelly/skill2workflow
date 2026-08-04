@@ -3,10 +3,48 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.lark_task_pilot import run_lark_task_pilot
+from skill2workflow.lark_task_pilot import (
+    build_lark_task_pilot_workflow,
+    run_lark_task_pilot,
+)
 
 
 class LarkTaskPilotTests(TestCase):
+    def test_lark_task_pilot_workflow_builder_keeps_dry_run_default(self):
+        workflow = build_lark_task_pilot_workflow()
+        node = next(item for item in workflow["nodes"] if item["id"] == "create_lark_task")
+
+        self.assertEqual(workflow["workflow"]["id"], "workflow_lark_task_pilot")
+        self.assertEqual(workflow["workflow"]["version"], "0.1.0")
+        self.assertEqual(node["connector"]["mode"], "dry_run")
+        self.assertEqual(
+            node["description"],
+            "Validate a Lark/Feishu owner follow-up task request without calling the live API.",
+        )
+
+    def test_lark_task_pilot_workflow_builder_can_create_separate_live_artifact(self):
+        workflow = build_lark_task_pilot_workflow(
+            mode="live",
+            workflow_id="workflow_controlled_lark_pilot",
+            workflow_version="0.1.0",
+            workflow_name="controlled-lark-task-sales-renewal-pilot",
+        )
+        node = next(item for item in workflow["nodes"] if item["id"] == "create_lark_task")
+
+        self.assertEqual(workflow["workflow"]["id"], "workflow_controlled_lark_pilot")
+        self.assertEqual(workflow["workflow"]["name"], "controlled-lark-task-sales-renewal-pilot")
+        self.assertEqual(node["connector"]["mode"], "live")
+        self.assertNotIn("dry-run", node["description"])
+
+    def test_lark_task_pilot_workflow_builder_propagates_non_default_version(self):
+        workflow = build_lark_task_pilot_workflow(workflow_version="9.8.7")
+
+        self.assertEqual(workflow["workflow"]["version"], "9.8.7")
+
+    def test_lark_task_pilot_workflow_builder_rejects_unknown_mode(self):
+        with self.assertRaisesRegex(ValueError, "mode must be dry_run or live"):
+            build_lark_task_pilot_workflow(mode="other")
+
     def test_lark_task_pilot_runs_sales_renewal_flow_with_control_gate(self):
         repo_root = Path(__file__).resolve().parents[1]
 

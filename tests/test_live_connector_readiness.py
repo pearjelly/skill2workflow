@@ -72,13 +72,54 @@ class LiveConnectorReadinessTests(TestCase):
         self.assertIn("default remains dry-run", decision)
         self.assertIn("revert Loop 39 without changing Workflow DSL compatibility", decision)
 
+        self.assertIn("https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id", decision)
+        self.assertIn("native `client_token`", decision)
+        self.assertIn("SKILL2WORKFLOW_LARK_TASK_LIVE=1", decision)
+        self.assertIn("run.context.input", decision)
+        self.assertIn("must not copy raw task values into connector-produced state", decision)
+        self.assertIn("python3 scripts/lark_task_live_validation.py", decision)
+        self.assertIn("fixed 10-second timeout", decision)
+        self.assertIn("either `task:task:write` or `task:task:writeonly`", decision)
+        self.assertIn("10 create requests per second", decision)
+        self.assertIn(
+            "Retries may still invoke transport; the stable native `client_token` and unchanged request parameters let Feishu perform provider-side deduplication",
+            decision,
+        )
+        self.assertNotIn("idempotency key blocks duplicate task creation attempts", decision)
+        self.assertIn(
+            "Recognized Feishu provider codes take precedence over generic HTTP status classification",
+            decision,
+        )
+        self.assertIn(
+            "Normalized `provider_status` values are exactly: `live_disabled`, `validation_failed`, `credential_failed`, `authorization_failed`, `permission_denied`, `rate_limited`, `resource_not_found`, `idempotency_conflict`, `provider_unavailable`, `timeout`, `malformed_response`, and `completed`.",
+            decision,
+        )
+
         self.assertIn("docs/lark-live-connector-readiness.md", connectors)
         self.assertIn("Loop 38 readiness review approved only a scoped live `create_task` follow-up", connectors)
+        self.assertIn("mode: live", connectors)
+        self.assertIn("SKILL2WORKFLOW_LARK_TASK_LIVE=1", connectors)
+        self.assertIn("provider_status", connectors)
+        self.assertIn("LARK_BOT_ACCESS_TOKEN", connectors)
+        vault_command = (
+            "vibe vault run --env LARK_BOT_ACCESS_TOKEN -- env "
+            "SKILL2WORKFLOW_LARK_TASK_LIVE=1 python3 scripts/lark_task_live_validation.py"
+        )
+        self.assertIn(vault_command, decision)
+        self.assertIn(vault_command, connectors)
+        self.assertIn("Never paste the token into the command or shell history", decision)
+        self.assertIn("Never paste the token into the command or shell history", connectors)
 
         self.assertIn("| Loop 38: Live Connector Readiness Review | Complete |", roadmap)
-        self.assertIn("Active loop: Loop 39, Scoped Live Lark Task Connector", roadmap)
-        self.assertIn("| Loop 39: Scoped Live Lark Task Connector | Next |", roadmap)
-        self.assertIn("Loop 38 approved only scoped live `create_task` work", roadmap)
+        self.assertIn("Active loop: None; Loop 40 is deferred pending a new partner-approved pilot", roadmap)
+        self.assertIn("| Loop 39: Scoped Live Lark Task Connector | Complete |", roadmap)
+        self.assertIn("| Loop 40: Controlled Live Connector Pilot | Deferred |", roadmap)
+        self.assertIn("docs/lark-live-connector-validation.md", roadmap)
+        self.assertIn("Live behavior remains limited to the fixed `create_task` action.", roadmap)
+        self.assertIn(
+            "The one scoped live connector validation is not the controlled real-team business-workflow pilot required for Loop 40.",
+            roadmap,
+        )
 
 
 def _read(path: str) -> str:

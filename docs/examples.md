@@ -112,6 +112,8 @@ python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-tas
 
 The pilot writes workflow, trigger response, run state, audit, connector list, control-plane snapshot, and LiteGraph overlay artifacts. Use it to inspect whether a product connector package remains understandable in a business workflow with a control point. It is still dry-run only and does not create live Lark/Feishu tasks.
 
+This local example is the dry-run baseline, not evidence from the controlled real-team pilot. Operators running the separately approved paid engagement must use `docs/controlled-live-pilot.md`; dry-run remains the default and controlled live execution remains limited to one fixed action.
+
 ### Local Pilot Scenario Pack
 
 The pilot scenario pack is generated at runtime rather than committed as static fixtures. It runs customer support escalation, sales renewal follow-up, and risk exception review through local-only workflows and HTTP receivers:
