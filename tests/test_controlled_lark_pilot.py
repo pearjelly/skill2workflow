@@ -60,6 +60,56 @@ class _FakeTransport:
         return _FakeResponse()
 
 
+class _ValidationFailureResponse:
+    status = 400
+
+    def read(self):
+        return b"{}"
+
+    def close(self):
+        return None
+
+
+class _ValidationFailureTransport:
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, request, timeout):
+        self.calls.append((request, timeout))
+        return _ValidationFailureResponse()
+
+
+class _FakeTokenResponse:
+    status = 200
+
+    def __init__(self, payload):
+        self._payload = payload
+        self.closed = False
+
+    def read(self):
+        return json.dumps(self._payload).encode("utf-8")
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeTokenTransport:
+    def __init__(self, payload=None):
+        self.payload = payload or {
+            "code": 0,
+            "tenant_access_token": "fresh-private-tenant-token",
+            "expire": 7200,
+        }
+        self.calls = []
+        self.responses = []
+
+    def __call__(self, request, timeout):
+        self.calls.append((request, timeout))
+        response = _FakeTokenResponse(self.payload)
+        self.responses.append(response)
+        return response
+
+
 class _FakeCommandResult:
     def __init__(self, returncode=0):
         self.returncode = returncode
@@ -89,22 +139,32 @@ class _TokenValueReadSpy(MutableMapping):
         self.allow_token_read = allow_token_read
         self.token_value_reads = 0
         self.token_mutations = 0
+        self.app_secret_value_reads = 0
+        self.app_secret_mutations = 0
 
     def __getitem__(self, key):
         if key == "LARK_BOT_ACCESS_TOKEN":
             self.token_value_reads += 1
             if not self.allow_token_read:
                 raise AssertionError("non-approval path read the injected token value")
+        if key == "LARK_APP_SECRET":
+            self.app_secret_value_reads += 1
+            if not self.allow_token_read:
+                raise AssertionError("non-approval path read the injected app secret")
         return self._values[key]
 
     def __setitem__(self, key, value):
         if key == "LARK_BOT_ACCESS_TOKEN":
             self.token_mutations += 1
+        if key == "LARK_APP_SECRET":
+            self.app_secret_mutations += 1
         self._values[key] = value
 
     def __delitem__(self, key):
         if key == "LARK_BOT_ACCESS_TOKEN":
             self.token_mutations += 1
+        if key == "LARK_APP_SECRET":
+            self.app_secret_mutations += 1
         del self._values[key]
 
     def __iter__(self):
@@ -356,22 +416,38 @@ class ControlledLarkPilotTests(TestCase):
             spy = _TokenValueReadSpy(
                 {
                     "LARK_BOT_ACCESS_TOKEN": "injected-private-token",
+                    "LARK_APP_ID": "cli_test",
+                    "LARK_APP_SECRET": "injected-private-app-secret",
                     "KEEP_ME": "yes",
                 }
             )
             runner = _FakeCommandRunner()
 
             def without_token_access(label, operation):
-                before = (spy.token_value_reads, spy.token_mutations)
+                before = (
+                    spy.token_value_reads,
+                    spy.token_mutations,
+                    spy.app_secret_value_reads,
+                    spy.app_secret_mutations,
+                )
                 with self.subTest(operation=label):
                     result = operation()
                     self.assertEqual(
-                        (spy.token_value_reads, spy.token_mutations),
+                        (
+                            spy.token_value_reads,
+                            spy.token_mutations,
+                            spy.app_secret_value_reads,
+                            spy.app_secret_mutations,
+                        ),
                         before,
                     )
                     self.assertEqual(
                         spy.peek("LARK_BOT_ACCESS_TOKEN"),
                         "injected-private-token",
+                    )
+                    self.assertEqual(
+                        spy.peek("LARK_APP_SECRET"),
+                        "injected-private-app-secret",
                     )
                     return result
 
@@ -432,6 +508,8 @@ class ControlledLarkPilotTests(TestCase):
 
             for environment in runner.environments:
                 self.assertNotIn("LARK_BOT_ACCESS_TOKEN", environment)
+                self.assertNotIn("LARK_APP_ID", environment)
+                self.assertNotIn("LARK_APP_SECRET", environment)
                 self.assertNotIn("SKILL2WORKFLOW_LARK_TASK_LIVE", environment)
                 self.assertEqual(environment["KEEP_ME"], "yes")
 
@@ -459,6 +537,87 @@ class ControlledLarkPilotTests(TestCase):
         self.assertEqual(result["run_status"], "completed")
         self.assertEqual(spy.token_value_reads, 1)
         self.assertEqual(spy.token_mutations, 0)
+        self.assertEqual(spy.app_secret_value_reads, 0)
+        self.assertEqual(spy.app_secret_mutations, 0)
+
+    def test_approved_live_decision_exchanges_vault_app_secret_in_memory(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, started = _start_waiting_pilot(tmp)
+            task_transport = _FakeTransport()
+            token_transport = _FakeTokenTransport()
+            environment = {
+                "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                "LARK_APP_ID": "cli_test",
+                "LARK_APP_SECRET": "vault-private-app-secret",
+            }
+            with patch.dict(os.environ, environment, clear=True):
+                result = decide_pilot_run(
+                    ROOT,
+                    work_dir,
+                    started["run_id"],
+                    approved=True,
+                    confirmed_live=True,
+                    now=NOW,
+                    transport=task_transport,
+                    token_transport=token_transport,
+                )
+            control = LocalControlPlane(work_dir / "state", storage="sqlite")
+            run = control.get_run(started["run_id"])
+            events = control.list_audit_events(run_id=started["run_id"])
+
+        self.assertEqual(result["run_status"], "completed")
+        self.assertEqual(len(task_transport.calls), 1)
+        self.assertEqual(len(token_transport.calls), 1)
+        request, timeout = token_transport.calls[0]
+        self.assertEqual(timeout, 20)
+        self.assertEqual(
+            request.full_url,
+            "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
+        )
+        self.assertEqual(request.get_method(), "POST")
+        self.assertEqual(
+            json.loads(request.data.decode("utf-8")),
+            {"app_id": "cli_test", "app_secret": "vault-private-app-secret"},
+        )
+        self.assertTrue(token_transport.responses[0].closed)
+        connector_request, _connector_timeout = task_transport.calls[0]
+        self.assertIsInstance(connector_request.get_header("Authorization"), str)
+        encoded = json.dumps({"result": result, "events": events, "run": run})
+        self.assertNotIn("vault-private-app-secret", encoded)
+        self.assertNotIn("fresh-private-tenant-token", encoded)
+
+    def test_approved_live_decision_fails_closed_when_token_exchange_fails(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, started = _start_waiting_pilot(tmp)
+            task_transport = _FakeTransport()
+            token_transport = _FakeTokenTransport({"code": 99991663})
+            environment = {
+                "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                "LARK_APP_ID": "cli_test",
+                "LARK_APP_SECRET": "vault-private-app-secret",
+            }
+            with patch.dict(os.environ, environment, clear=True):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "Lark tenant token exchange failed",
+                ):
+                    decide_pilot_run(
+                        ROOT,
+                        work_dir,
+                        started["run_id"],
+                        approved=True,
+                        confirmed_live=True,
+                        now=NOW,
+                        transport=task_transport,
+                        token_transport=token_transport,
+                    )
+            control = LocalControlPlane(work_dir / "state", storage="sqlite")
+            run = control.get_run(started["run_id"])
+
+        self.assertEqual(run["status"], "waiting")
+        self.assertEqual(task_transport.calls, [])
+        self.assertEqual(len(token_transport.calls), 1)
+        self.assertTrue(token_transport.responses[0].closed)
 
     def test_exercise_disabled_live_uses_real_boundary_without_credentials_or_transport(self):
         expected = {
@@ -1019,6 +1178,70 @@ class ControlledLarkPilotTests(TestCase):
         )
         self.assertEqual(transport.calls, [])
 
+    def test_live_connector_failure_requires_a_new_work_directory_for_approval(self):
+        with TemporaryDirectory() as tmp:
+            work_dir, first = _start_waiting_pilot(tmp)
+            failed_transport = _ValidationFailureTransport()
+            environment = {
+                "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                "LARK_BOT_ACCESS_TOKEN": "private-token",
+            }
+            with patch.dict(os.environ, environment, clear=True):
+                first_result = decide_pilot_run(
+                    ROOT,
+                    work_dir,
+                    first["run_id"],
+                    approved=True,
+                    confirmed_live=True,
+                    now=NOW,
+                    transport=failed_transport,
+                )
+
+            second_case = Path(tmp) / "second-case.json"
+            _write_private_case(second_case, case_id="case-002")
+            second = start_pilot_run(ROOT, work_dir, second_case, now=NOW)
+            spy = _TokenValueReadSpy(
+                {
+                    "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                    "LARK_APP_ID": "cli_test",
+                    "LARK_APP_SECRET": "private-app-secret",
+                }
+            )
+            blocked_transport = _FakeTransport()
+            blocked_token_transport = _FakeTokenTransport()
+            with patch.object(os, "environ", spy):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "new work directory after a live connector failure",
+                ):
+                    decide_pilot_run(
+                        ROOT,
+                        work_dir,
+                        second["run_id"],
+                        approved=True,
+                        confirmed_live=True,
+                        now=NOW,
+                        transport=blocked_transport,
+                        token_transport=blocked_token_transport,
+                    )
+                rejected = decide_pilot_run(
+                    ROOT,
+                    work_dir,
+                    second["run_id"],
+                    approved=False,
+                    now=NOW,
+                    transport=blocked_transport,
+                )
+
+        self.assertEqual(first_result["provider_status"], "validation_failed")
+        self.assertEqual(len(failed_transport.calls), 1)
+        self.assertEqual(spy.token_value_reads, 0)
+        self.assertEqual(spy.app_secret_value_reads, 0)
+        self.assertEqual(blocked_transport.calls, [])
+        self.assertEqual(blocked_token_transport.calls, [])
+        self.assertEqual(rejected["gate_decision"], "rejected")
+        self.assertFalse(rejected["connector_invoked"])
+
     def test_decide_approve_fails_before_resume_when_confirmation_switch_or_token_is_missing(self):
         with TemporaryDirectory() as tmp:
             work_dir, started = _start_waiting_pilot(tmp)
@@ -1041,6 +1264,24 @@ class ControlledLarkPilotTests(TestCase):
                     {"SKILL2WORKFLOW_LARK_TASK_LIVE": "1"},
                     True,
                     "LARK_BOT_ACCESS_TOKEN",
+                ),
+                (
+                    {
+                        "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                        "LARK_APP_SECRET": "private-app-secret",
+                    },
+                    True,
+                    "LARK_APP_ID",
+                ),
+                (
+                    {
+                        "SKILL2WORKFLOW_LARK_TASK_LIVE": "1",
+                        "LARK_APP_ID": "cli_test",
+                        "LARK_APP_SECRET": "",
+                        "LARK_BOT_ACCESS_TOKEN": "legacy-token",
+                    },
+                    True,
+                    "LARK_APP_SECRET",
                 ),
                 (
                     {

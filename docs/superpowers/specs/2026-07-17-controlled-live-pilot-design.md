@@ -89,7 +89,7 @@ The private directory contains:
 - local execution configuration;
 - any operator-only diagnostic material that contains raw values.
 
-The runner must reject a private work directory inside the repository. Newly created private directories and files use owner-only permissions where the platform supports them. The tool must not accept the bot token as a command-line argument. The token is injected into the child process by Vault or an equivalent secret manager as `LARK_BOT_ACCESS_TOKEN` and immediately wrapped by the existing credential-provider interface.
+The runner must reject a private work directory inside the repository. Newly created private directories and files use owner-only permissions where the platform supports them. The tool must not accept a credential as a command-line argument. The preferred live path injects `LARK_APP_SECRET` through Vault or an equivalent secret manager and accepts the non-secret `LARK_APP_ID` from the process environment. Only after every live guard passes, it exchanges those values in memory for one short-lived tenant access token and immediately wraps that token in the existing credential-provider interface. The App Secret, issued token, and token-exchange response must not be persisted or printed. `LARK_BOT_ACCESS_TOKEN` remains a legacy fallback only when no App Secret is injected.
 
 The current durable run-context contract permits user-supplied business values in private run state. It does not permit credentials in trigger input or persisted state.
 
@@ -118,12 +118,13 @@ An approved live decision requires all of these conditions in the same process:
 - the run is currently waiting at the expected human gate;
 - the operator passes an explicit live-confirmation flag;
 - `SKILL2WORKFLOW_LARK_TASK_LIVE=1` is exact;
-- `LARK_BOT_ACCESS_TOKEN` is present through process injection;
+- `LARK_APP_ID` and Vault-injected `LARK_APP_SECRET` are present and the in-memory tenant-token exchange succeeds, or (legacy fallback only) `LARK_BOT_ACCESS_TOKEN` is present through process injection;
 - the workflow connector is `lark_task` with operation `create_task` and mode `live`;
 - the credential handle is exactly `lark_bot_access_token`;
 - the workflow id, version, run id, and node id needed for provider idempotency are present;
 - the pilot charter is valid and has not expired;
 - the run has not already reached a terminal state.
+- no previous approved live `create_task` connector attempt in the same private work directory has failed; such a failure requires a fresh work directory and authorization boundary.
 
 Missing gates fail closed. A rejection never requires the live switch or credential. Re-running approval for a completed run must not create another provider request.
 

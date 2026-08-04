@@ -119,12 +119,13 @@ python3 scripts/controlled_lark_pilot.py start \
 
 ## 4. Make The Explicit Human Decision
 
-### Approval: Vault injection only
+### Approval: Vault-issued short-lived tenant token
 
-Only an approved, inspected waiting run may receive the live switch and token. Use this exact approve-only command shape:
+Only an approved, inspected waiting run may receive the live switch and App Secret. Export the non-secret App ID for the approved Feishu app, and let Vault inject only `LARK_APP_SECRET`. The runner exchanges it in memory for one short-lived tenant access token only after every live guard passes; it never writes the App Secret, issued token, or token-exchange response to private state, audit, evidence, or command output. Use this exact approve-only command shape:
 
 ```bash
-vibe vault run --env LARK_BOT_ACCESS_TOKEN -- \
+export LARK_APP_ID="your-approved-feishu-app-id"
+vibe vault run --env LARK_APP_SECRET -- \
   env SKILL2WORKFLOW_LARK_TASK_LIVE=1 \
   python3 scripts/controlled_lark_pilot.py decide \
     --work-dir "$PRIVATE_PILOT" \
@@ -133,14 +134,14 @@ vibe vault run --env LARK_BOT_ACCESS_TOKEN -- \
     --confirm-live-create
 ```
 
-Never paste a token into the command, a file, or shell history. Approval must fail closed unless the run is waiting, the explicit confirmation is present, the live switch is exactly `1`, the Vault-injected `LARK_BOT_ACCESS_TOKEN` exists, and the fixed live workflow binding is unchanged. Success reports normalized status and presence booleans only; it must not print task values, provider messages, provider task ids, token material, or request/response bodies.
+Never paste an App Secret or token into the command, a file, or shell history. Approval must fail closed unless the run is waiting, the explicit confirmation is present, the live switch is exactly `1`, `LARK_APP_ID` and the Vault-injected `LARK_APP_SECRET` exist, the token exchange succeeds, and the fixed live workflow binding is unchanged. `LARK_BOT_ACCESS_TOKEN` remains a legacy compatibility fallback only when no App Secret is injected; it is not the recommended Pilot path. Success reports normalized status and presence booleans only; it must not print task values, provider messages, provider task ids, App Secret or token material, or request/response bodies.
 
 ### Rejection: no Vault
 
 Rejection neither needs nor permits live confirmation. After inspecting a separate waiting run, run without Vault and without either live environment variable:
 
 ```bash
-env -u SKILL2WORKFLOW_LARK_TASK_LIVE -u LARK_BOT_ACCESS_TOKEN \
+env -u SKILL2WORKFLOW_LARK_TASK_LIVE -u LARK_BOT_ACCESS_TOKEN -u LARK_APP_ID -u LARK_APP_SECRET \
   python3 scripts/controlled_lark_pilot.py decide \
     --work-dir "$PRIVATE_PILOT" \
     --run-id "$REJECTED_RUN_ID" \
@@ -167,11 +168,11 @@ Complete at least five approved live runs across five distinct calendar days in 
 Run both safe exercises with live variables removed:
 
 ```bash
-env -u SKILL2WORKFLOW_LARK_TASK_LIVE -u LARK_BOT_ACCESS_TOKEN \
+env -u SKILL2WORKFLOW_LARK_TASK_LIVE -u LARK_BOT_ACCESS_TOKEN -u LARK_APP_ID -u LARK_APP_SECRET \
   python3 scripts/controlled_lark_pilot.py exercise-failure \
     --work-dir "$PRIVATE_PILOT"
 
-env -u SKILL2WORKFLOW_LARK_TASK_LIVE -u LARK_BOT_ACCESS_TOKEN \
+env -u SKILL2WORKFLOW_LARK_TASK_LIVE -u LARK_BOT_ACCESS_TOKEN -u LARK_APP_ID -u LARK_APP_SECRET \
   python3 scripts/controlled_lark_pilot.py exercise-rollback \
     --work-dir "$PRIVATE_PILOT"
 ```
@@ -226,10 +227,10 @@ python3 scripts/controlled_lark_pilot.py finalize \
 
 Finalization must fail while any threshold, rejection, exercise, verification, commercial confirmation, acknowledgement, or decision condition is missing. The only permitted repository export target is exactly `docs/pilot-evidence/loop-40`. Review the generated allowlisted JSON before committing; never commit private state, raw payloads, provider values, or credentials.
 
-After the engagement, rotate or delete the pilot token according to the partner's credential policy, remove the live switch, and retain only the agreed private retention set and validated redacted repository evidence.
+After the engagement, rotate or delete the Pilot App Secret (or legacy static token, if used) according to the partner's credential policy, remove the live switch, and retain only the agreed private retention set and validated redacted repository evidence.
 
 ## Incident Stop And Deferral
 
-Stop immediately if a run exposes a forbidden value, bypasses the human gate, creates an unexpected duplicate, targets the wrong assignee, encounters a permission or redaction anomaly, uses a non-normalized provider result, or deviates from the fixed domestic endpoint and action. Remove the live switch, do not approve another run, retain authoritative private state, record a `defer` candidate decision, and return with a failing regression test. A recorded decision closes that workspace to further starts and decisions; never hide, replace, or retry the failed run.
+Stop immediately if a run exposes a forbidden value, bypasses the human gate, creates an unexpected duplicate, targets the wrong assignee, encounters a permission or redaction anomaly, uses a non-normalized provider result, or deviates from the fixed domestic endpoint and action. Remove the live switch, do not approve another run, retain authoritative private state, record a `defer` candidate decision, and return with a failing regression test. The runner also rejects every later `--approve` in that workspace before it reads a credential or calls a transport; a fresh work directory and authorization boundary are required. A recorded decision closes that workspace to further starts and decisions; never hide, replace, or retry the failed run.
 
 Offline tests, fake transport, an empty evidence skeleton, and implementation readiness must not advance Loop 40. A deferred Pilot remains at Local Evaluation; any replacement Pilot requires a fresh authorization boundary and must successfully finalize the paid five-day real-team evidence gate before the separate Roadmap completion task may run.

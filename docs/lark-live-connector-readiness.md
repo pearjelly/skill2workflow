@@ -79,7 +79,7 @@ Normal connector execution resolves only that approved handle through the config
 
 ## Idempotency And Duplicate Prevention
 
-Live `create_task` requires all four runtime-owned identity values from `workflow_id + version + run_id + node_id` before making a request. The connector canonicalizes those values and hashes them into the provider's native `client_token`. This native token is the provider idempotency key: it is stable for retries of the same execution identity and changes for a different version, run, or node.
+Live `create_task` requires all four runtime-owned identity values from `workflow_id + version + run_id + node_id` before making a request. The connector canonicalizes those values into a deterministic UUID v5 for the provider's native `client_token`. This native token is the provider idempotency key: it is stable for retries of the same execution identity and changes for a different version, run, or node.
 
 Retries may still invoke transport; the stable native `client_token` and unchanged request parameters let Feishu perform provider-side deduplication. This provider mechanism controls duplicate task creation: the connector does not locally block retry transport calls and Loop 39 adds no local idempotency database. Connector-produced state records only `idempotency_key_present`, never the token digest. A provider-reported idempotency conflict becomes a safe failure with compact metadata instead of a guessed retry.
 
@@ -92,7 +92,8 @@ Loop 39 maps expected live failures into normalized connector results rather tha
 | Live switch absent | `live_disabled` | Fail before credential or transport access. |
 | Invalid local input or execution identity | `validation_failed` | Fail before transport access. |
 | Missing credential | `credential_failed` | Preserve only the handle and compact status. |
-| HTTP `401 or 403` | `authorization_failed` or `permission_denied` | Fixed error text with no token echo. |
+| HTTP `401` or provider code `99991663` | `authorization_failed` | Fixed error text with no token echo. |
+| HTTP `403` | `permission_denied` | Fixed error text with no token echo. |
 | HTTP 429 / `rate limit` | `rate_limited` | Existing retry policy decides whether to retry. |
 | Provider validation, missing resource, or idempotency conflict | `validation_failed`, `resource_not_found`, or `idempotency_conflict` | Do not retain provider messages or identifiers. |
 | HTTP 5xx/provider unavailable | `provider_unavailable` | A retry reuses the same `client_token`. |

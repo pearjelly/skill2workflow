@@ -32,6 +32,8 @@ from ._controlled_lark_pilot_evidence_writer import (
 
 LIVE_SWITCH = "SKILL2WORKFLOW_LARK_TASK_LIVE"
 TOKEN_ENVIRONMENT = "LARK_BOT_ACCESS_TOKEN"
+APP_ID_ENVIRONMENT = "LARK_APP_ID"
+APP_SECRET_ENVIRONMENT = "LARK_APP_SECRET"
 FINALIZATION_SCHEMA_VERSION = "controlled-lark-pilot-finalization-0.1.0"
 FINALIZATION_KEYS = {"schema_version", "finalized", "decision", "finalized_at"}
 
@@ -519,7 +521,12 @@ def run_fixed_verification(
 
     environment = _SanitizedEnvironment(
         os.environ,
-        excluded=(LIVE_SWITCH, TOKEN_ENVIRONMENT),
+        excluded=(
+            LIVE_SWITCH,
+            TOKEN_ENVIRONMENT,
+            APP_ID_ENVIRONMENT,
+            APP_SECRET_ENVIRONMENT,
+        ),
         overrides={"PYTHONPATH": "src"},
     )
     runner = command_runner or subprocess.run

@@ -5,6 +5,7 @@ import json
 import os
 import re
 import sys
+import urllib.request
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -15,6 +16,8 @@ from .connectors import ConnectorRuntime, ExternalConnector
 from .control_plane import LocalControlPlane
 from .credentials import StaticCredentialProvider
 from ._controlled_lark_pilot_operations import (
+    APP_ID_ENVIRONMENT,
+    APP_SECRET_ENVIRONMENT,
     FINALIZATION_KEYS,
     FINALIZATION_SCHEMA_VERSION,
     LIVE_SWITCH,
@@ -86,6 +89,10 @@ _OPERATOR_ERROR = "controlled pilot command failed"
 _REJECT_CONFIRMATION_ERROR = (
     "controlled pilot rejection does not use live confirmation"
 )
+_LARK_TENANT_TOKEN_URL = (
+    "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+)
+_LARK_TENANT_TOKEN_TIMEOUT = 20
 
 
 class _OperatorCLIError(Exception):
@@ -834,6 +841,96 @@ def _require_aware_iso(value: object, label: str) -> datetime:
     return parsed
 
 
+def _issue_lark_tenant_access_token(
+    app_id: str,
+    app_secret: str,
+    *,
+    token_transport=None,
+) -> str:
+    """Issue one short-lived tenant token without persisting provider output."""
+
+    payload = json.dumps(
+        {"app_id": app_id, "app_secret": app_secret},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        _LARK_TENANT_TOKEN_URL,
+        data=payload,
+        headers={"Content-Type": "application/json; charset=utf-8"},
+        method="POST",
+    )
+    requester = token_transport or urllib.request.urlopen
+    try:
+        response = requester(request, timeout=_LARK_TENANT_TOKEN_TIMEOUT)
+        try:
+            raw_response = response.read()
+        finally:
+            close = getattr(response, "close", None)
+            if callable(close):
+                close()
+    except Exception:
+        raise ValueError("Lark tenant token exchange failed") from None
+
+    try:
+        decoded = json.loads(raw_response.decode("utf-8"))
+        token = decoded.get("tenant_access_token")
+    except (AttributeError, TypeError, UnicodeDecodeError, ValueError):
+        raise ValueError("Lark tenant token exchange failed") from None
+    if (
+        type(decoded) is not dict
+        or type(decoded.get("code")) is not int
+        or decoded.get("code") != 0
+        or type(token) is not str
+        or not token
+    ):
+        raise ValueError("Lark tenant token exchange failed")
+    return token
+
+
+def _resolve_live_lark_token(*, token_transport=None) -> str:
+    """Resolve the approved live credential only after every live guard passes."""
+
+    if APP_SECRET_ENVIRONMENT in os.environ:
+        app_secret = os.environ[APP_SECRET_ENVIRONMENT]
+        app_id = os.environ.get(APP_ID_ENVIRONMENT, "")
+        if not app_id:
+            raise ValueError("LARK_APP_ID is required with LARK_APP_SECRET")
+        if not app_secret:
+            raise ValueError("LARK_APP_SECRET is required with LARK_APP_ID")
+        return _issue_lark_tenant_access_token(
+            app_id,
+            app_secret,
+            token_transport=token_transport,
+        )
+    token = os.environ.get(TOKEN_ENVIRONMENT, "")
+    if not token:
+        raise ValueError("LARK_BOT_ACCESS_TOKEN is required")
+    return token
+
+
+def _has_prior_live_connector_failure(control, requested_run_id: str) -> bool:
+    """Fail closed when this Pilot has a prior approved live connector failure."""
+
+    for event in control.list_audit_events():
+        if (
+            not isinstance(event, dict)
+            or event.get("run_id") == requested_run_id
+            or event.get("type") != "node_failed"
+            or event.get("node_id") != "create_lark_task"
+        ):
+            continue
+        metadata = event.get("connector_metadata")
+        if (
+            isinstance(metadata, dict)
+            and metadata.get("operation") == "create_task"
+            and metadata.get("mode") == "live"
+            and metadata.get("provider_status") != "completed"
+        ):
+            return True
+    return False
+
+
 def decide_pilot_run(
     repo_root: Path,
     work_dir: Path,
@@ -842,6 +939,7 @@ def decide_pilot_run(
     confirmed_live: bool = False,
     now: datetime = None,
     transport=None,
+    token_transport=None,
 ) -> Dict[str, object]:
     repo_root = Path(repo_root).resolve()
     work_dir = Path(work_dir).resolve()
@@ -857,6 +955,7 @@ def decide_pilot_run(
             approved=approved,
             confirmed_live=confirmed_live,
             transport=transport,
+            token_transport=token_transport,
         )
 
 
@@ -868,6 +967,7 @@ def _decide_pilot_run_open(
     approved: bool,
     confirmed_live: bool,
     transport=None,
+    token_transport=None,
 ) -> Dict[str, object]:
     """Resume one waiting run while the private Pilot decision lock is held."""
 
@@ -888,13 +988,15 @@ def _decide_pilot_run_open(
 
     token = ""
     if approved:
+        if _has_prior_live_connector_failure(preflight, requested_run_id):
+            raise ValueError(
+                "controlled pilot requires a new work directory after a live connector failure"
+            )
         if type(confirmed_live) is not bool or confirmed_live is not True:
             raise ValueError("live approval requires explicit boolean confirmation")
         if os.environ.get(LIVE_SWITCH) != "1":
             raise ValueError("SKILL2WORKFLOW_LARK_TASK_LIVE=1 is required")
-        token = os.environ.get(TOKEN_ENVIRONMENT, "")
-        if not token:
-            raise ValueError("LARK_BOT_ACCESS_TOKEN is required")
+        token = _resolve_live_lark_token(token_transport=token_transport)
 
     credentials = {"lark_bot_access_token": token} if approved else {}
     control = _pilot_control_plane(

@@ -142,7 +142,7 @@ Live mode requires all four runtime-owned execution fields:
 - run id
 - node id
 
-The connector serializes those four strings as a canonical JSON array and computes a SHA-256 hex digest. The 64-character digest becomes Feishu `client_token`.
+The connector serializes those four strings as a canonical JSON array and derives a deterministic UUID v5. The canonical UUID becomes Feishu `client_token`.
 
 Properties:
 
@@ -233,7 +233,7 @@ Expected failures become connector failed results with fixed, provider-independe
 | Live environment switch absent | `live_disabled` | Fail before credential or transport access |
 | Missing/invalid local input or execution identity | `validation_failed` | Fail before transport access |
 | Missing credential | `credential_failed` | Existing compact credential error path; no token |
-| HTTP 401 | `authorization_failed` | Fixed error text |
+| HTTP 401 or code `99991663` | `authorization_failed` | Fixed error text |
 | HTTP 403 or code `1470403` | `permission_denied` | Fixed error text |
 | HTTP 429 | `rate_limited` | Failed result compatible with existing retry policy |
 | code `1470400` | `validation_failed` | Do not retain provider message |

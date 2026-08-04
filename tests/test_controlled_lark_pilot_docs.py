@@ -626,7 +626,8 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         ):
             self.assertIn(command, runbook)
         self.assertIn("paid assisted engagement", runbook)
-        self.assertIn("vibe vault run --env LARK_BOT_ACCESS_TOKEN", runbook)
+        self.assertIn("vibe vault run --env LARK_APP_SECRET", runbook)
+        self.assertIn("LARK_APP_ID", runbook)
         self.assertIn("chmod 600", runbook)
         self.assertIn("five distinct calendar days", runbook)
         self.assertIn("Asia/Shanghai", runbook)
@@ -666,6 +667,7 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         self.assertIn("does not make a network request", runbook)
         self.assertIn("runs the same no-network preflight", runbook)
         self.assertIn("new work directory", runbook)
+        self.assertIn("rejects every later `--approve`", runbook)
         self.assertIn("rotate or delete", runbook)
         self.assertIn("stop", runbook.lower())
 

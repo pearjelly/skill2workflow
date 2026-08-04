@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
 import os
 import socket
+import uuid
 from datetime import datetime
 from typing import Dict, List, Tuple
 from urllib import error as urllib_error
@@ -25,6 +25,7 @@ LIVE_URL = "https://open.feishu.cn/open-apis/task/v2/tasks?user_id_type=open_id"
 LIVE_TIMEOUT_SECONDS = 10.0
 REQUIRED_CREDENTIAL_HANDLE = "lark_bot_access_token"
 PROVIDER_CODE_STATUS = {
+    99991663: "authorization_failed",
     1470400: "validation_failed",
     1470403: "permission_denied",
     1470404: "resource_not_found",
@@ -269,7 +270,7 @@ def _client_token(context: object) -> str:
     if not identity:
         raise ConnectorExecutionError("lark_task live execution identity is required")
     canonical = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, "skill2workflow:lark_task:" + canonical))
 
 
 def _provider_request_body(body: Dict[str, object], context: object) -> Dict[str, object]:

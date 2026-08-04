@@ -2,6 +2,7 @@ import io
 import json
 import os
 import socket
+import uuid
 from datetime import datetime
 from pathlib import Path
 from unittest import TestCase
@@ -208,7 +209,8 @@ class LarkTaskConnectorTests(TestCase):
             [{"id": "ou_123456", "type": "user", "role": "assignee"}],
         )
         self.assertEqual(request_body["due"], {"timestamp": expected_due, "is_all_day": False})
-        self.assertEqual(len(request_body["client_token"]), 64)
+        self.assertEqual(len(request_body["client_token"]), 36)
+        self.assertEqual(str(uuid.UUID(request_body["client_token"])), request_body["client_token"])
         self.assertNotIn("source", request_body)
         self.assertEqual(call["timeout"], 10.0)
         self.assertEqual(result["audit"]["provider_status"], "completed")
@@ -263,6 +265,7 @@ class LarkTaskConnectorTests(TestCase):
     def test_lark_task_live_mode_normalizes_provider_failures_without_leakage(self):
         cases = [
             (401, {"code": 999, "msg": "raw-auth-detail"}, "authorization_failed"),
+            (400, {"code": 99991663, "msg": "raw-token-detail"}, "authorization_failed"),
             (403, {"code": 1470403, "msg": "raw-permission-detail"}, "permission_denied"),
             (429, {"code": 999, "msg": "raw-rate-detail"}, "rate_limited"),
             (400, {"code": 1470400, "msg": "raw-validation-detail"}, "validation_failed"),
@@ -687,6 +690,8 @@ class LarkTaskConnectorTests(TestCase):
         self.assertEqual(tokens[0], tokens[1])
         self.assertNotEqual(tokens[0], tokens[2])
         self.assertNotEqual(tokens[0], tokens[3])
+        for token in tokens:
+            self.assertEqual(str(uuid.UUID(token)), token)
 
     def test_lark_task_missing_mode_remains_dry_run(self):
         node = _lark_task_node()
