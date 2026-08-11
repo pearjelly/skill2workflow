@@ -55,6 +55,9 @@ readiness review.
 
 ## Current Status
 
-Loop 40 remains deferred at Local Evaluation. The next external prerequisite
-is a separately authorized paid assisted engagement; repository tests and
-dry-runs do not satisfy it.
+This original workspace remains deferred and closed. It is a historical
+incident record, not evidence for another write. A separately authorized
+Pilot subsequently satisfied Loop 40 under a new workspace and authorization
+boundary; its finalized redacted evidence is in
+[`docs/pilot-evidence/loop-40/`](pilot-evidence/loop-40/). Repository tests
+and dry-runs remain insufficient on their own for any future paid engagement.

@@ -1,0 +1,8 @@
+{
+  "schema_version": "controlled-lark-pilot-decision-0.1.0",
+  "decision": "continue",
+  "partner_acknowledged": true,
+  "operator_acknowledged": true,
+  "commercial_engagement_confirmed": true,
+  "rationale": "The controlled evidence supports continuation within the approved boundary."
+}

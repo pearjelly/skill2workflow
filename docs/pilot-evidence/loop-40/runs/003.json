@@ -1,0 +1,27 @@
+{
+  "schema_version": "controlled-lark-pilot-evidence-0.1.0",
+  "run_id": "run_ebe72c27f2ad",
+  "workflow_id": "workflow_controlled_lark_pilot",
+  "workflow_version": "0.1.0",
+  "started_at": "2026-08-07T01:28:35.765792+00:00",
+  "completed_at": "2026-08-07T01:39:39.287810+00:00",
+  "run_status": "completed",
+  "gate_decision": "approved",
+  "case_id_present": true,
+  "connector_invoked": true,
+  "connector_id": "lark_task",
+  "connector_status": "completed",
+  "credential_status": "resolved",
+  "credential_handles": [
+    "lark_bot_access_token"
+  ],
+  "operation": "create_task",
+  "mode": "live",
+  "provider_status": "completed",
+  "task_title_present": true,
+  "task_description_present": true,
+  "assignee_present": true,
+  "due_at_present": true,
+  "idempotency_key_present": true,
+  "lark_task_id_present": true
+}

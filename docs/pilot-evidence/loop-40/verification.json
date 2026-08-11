@@ -1,0 +1,48 @@
+{
+  "schema_version": "controlled-lark-pilot-verification-0.1.0",
+  "all_passed": true,
+  "commands": [
+    {
+      "id": "focused-tests",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 1473
+    },
+    {
+      "id": "full-tests",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 17526
+    },
+    {
+      "id": "compile",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 110
+    },
+    {
+      "id": "secret-hygiene",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 50
+    },
+    {
+      "id": "connector-smoke",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 70
+    },
+    {
+      "id": "dry-run-pilot-smoke",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 75
+    },
+    {
+      "id": "diff-check",
+      "exit_code": 0,
+      "passed": true,
+      "duration_ms": 13
+    }
+  ]
+}

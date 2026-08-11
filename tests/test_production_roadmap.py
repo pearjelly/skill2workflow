@@ -25,10 +25,10 @@ class ProductionRoadmapTests(TestCase):
         self.assertEqual(positions, sorted(positions))
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
-        self.assertIn("- Current maturity: Local Evaluation", roadmap)
-        self.assertIn("- Completed delivery loops: 1-39", roadmap)
-        self.assertIn("- Active loop: None; Loop 40 is deferred pending a new partner-approved pilot", roadmap)
-        self.assertIn("- Next maturity gate: Controlled Live Pilot", roadmap)
+        self.assertIn("- Current maturity: Controlled Live Pilot", roadmap)
+        self.assertIn("- Completed delivery loops: 1-40", roadmap)
+        self.assertIn("- Active loop: None; Loop 40 is complete with validated redacted evidence", roadmap)
+        self.assertIn("- Next maturity gate: Self-hosted Beta", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
@@ -45,7 +45,7 @@ class ProductionRoadmapTests(TestCase):
             roadmap,
         )
         self.assertIn(
-            "| Loop 40: Controlled Live Connector Pilot | Deferred |",
+            "| Loop 40: Controlled Live Connector Pilot | Complete |",
             roadmap,
         )
         self.assertIn(
@@ -121,6 +121,7 @@ class ProductionRoadmapTests(TestCase):
             "| Loop 37: Product Connector Pilot Scenario | Complete | Sales renewal risk workflow using the Lark/Feishu task dry-run connector after a manual gate, with webhook trigger, audit, snapshot, and LiteGraph overlay artifacts |",
             "| Loop 38: Live Connector Readiness Review | Complete | Decision note approving only scoped live Lark/Feishu `create_task` follow-up, with credential, idempotency, failure, audit, test, and rollback boundaries |",
             "| Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |",
+            "| Loop 40: Controlled Live Connector Pilot | Complete | Paid assisted five-day, five-run Pilot with two private cases, a human rejection, safety exercises, fixed verification, a `continue` decision, and finalized redacted evidence |",
         ]
 
         for row in history_rows:
@@ -146,12 +147,12 @@ class ProductionRoadmapTests(TestCase):
     def test_readme_summarizes_without_copying_the_rolling_queue(self):
         readme = _read("README.md")
 
-        self.assertIn("Current maturity: Local Evaluation", readme)
-        self.assertIn("Delivery Loops 1-39 are complete", readme)
+        self.assertIn("Current maturity: Controlled Live Pilot", readme)
+        self.assertIn("Delivery Loops 1-40 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)
-        self.assertIn("Loop 40 is deferred", readme)
+        self.assertIn("Loop 40 completed a paid assisted Pilot", readme)
         candidate_loop_titles = [
             "Loop 41: Self-hosted Runtime Service Boundary",
             "Loop 42: Authenticated Ingress And Production Credentials",

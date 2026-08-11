@@ -1,0 +1,8 @@
+{
+  "schema_version": "controlled-lark-pilot-exercise-0.1.0",
+  "exercise": "disabled_live",
+  "passed": true,
+  "provider_status": "live_disabled",
+  "credential_resolution_attempted": false,
+  "transport_attempted": false
+}
