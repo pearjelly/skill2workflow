@@ -1,0 +1,8 @@
+{
+  "schema_version": "controlled-lark-pilot-exercise-0.1.0",
+  "exercise": "rollback",
+  "passed": true,
+  "live_switch_enabled": false,
+  "live_approval_blocked": true,
+  "dry_run_status": "completed"
+}

@@ -1,0 +1,8 @@
+{
+  "schema_version": "controlled-lark-pilot-exercise-0.1.0",
+  "exercise": "rejection",
+  "passed": true,
+  "run_id": "run_6368e96a20dd",
+  "gate_decision": "rejected",
+  "connector_invoked": false
+}

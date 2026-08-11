@@ -1,0 +1,16 @@
+{
+  "schema_version": "controlled-lark-pilot-0.1.0",
+  "scenario_id": "sales_renewal_risk_followup",
+  "workflow_id": "workflow_controlled_lark_pilot",
+  "workflow_version": "0.1.0",
+  "support_model": "assisted",
+  "timezone": "Asia/Shanghai",
+  "starts_on": "2026-08-03",
+  "expires_on": "2026-08-27",
+  "team_consent_confirmed": true,
+  "assignee_consent_confirmed": true,
+  "commercial_engagement_confirmed": true,
+  "required_approved_runs": 5,
+  "required_distinct_days": 5,
+  "required_distinct_cases": 2
+}
