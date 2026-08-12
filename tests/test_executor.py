@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import threading
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -148,7 +149,7 @@ class ExecutorTests(TestCase):
             summary = restarted.list_runs()[0]
 
             db_path = state_dir / "runs.sqlite3"
-            with sqlite3.connect(db_path) as connection:
+            with closing(sqlite3.connect(db_path)) as connection, connection:
                 event_rows = connection.execute(
                     "select event_type, node_id from run_events where run_id = ? order by sequence",
                     (waiting["run_id"],),
@@ -178,7 +179,7 @@ class ExecutorTests(TestCase):
             with TemporaryDirectory() as tmp:
                 state = LocalExecutor(Path(tmp), storage="sqlite").run(workflow)
 
-                with sqlite3.connect(Path(tmp) / "runs.sqlite3") as connection:
+                with closing(sqlite3.connect(Path(tmp) / "runs.sqlite3")) as connection, connection:
                     event_rows = connection.execute(
                         "select event_type, node_id from run_events where run_id = ? order by sequence",
                         (state["run_id"],),

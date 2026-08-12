@@ -25,10 +25,10 @@ class ProductionRoadmapTests(TestCase):
         self.assertEqual(positions, sorted(positions))
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
-        self.assertIn("- Current maturity: Controlled Live Pilot", roadmap)
-        self.assertIn("- Completed delivery loops: 1-40", roadmap)
-        self.assertIn("- Active loop: None; Loop 40 is complete with validated redacted evidence", roadmap)
-        self.assertIn("- Next maturity gate: Self-hosted Beta", roadmap)
+        self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
+        self.assertIn("- Completed delivery loops: 1-55", roadmap)
+        self.assertIn("- Active loop: None; Loop 55 is complete with authenticated live Operator snapshot evidence", roadmap)
+        self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
@@ -37,8 +37,12 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Target loops:** 40.", roadmap)
         self.assertIn("### Self-hosted Beta", roadmap)
         self.assertIn("**Target loops:** 41-43.", roadmap)
+        self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
-        self.assertIn("**Status:** Directional; no loop numbers assigned.", roadmap)
+        self.assertIn(
+            "**Status:** Directional; Loops 44-55 complete, further loop numbers unassigned.",
+            roadmap,
+        )
 
         self.assertIn(
             "| Loop 39: Scoped Live Lark Task Connector | Complete |",
@@ -49,15 +53,31 @@ class ProductionRoadmapTests(TestCase):
             roadmap,
         )
         self.assertIn(
-            "| Loop 41: Self-hosted Runtime Service Boundary | Candidate |",
+            "| Loop 41: Self-hosted Runtime Service Boundary | Complete |",
             roadmap,
         )
         self.assertIn(
-            "| Loop 42: Authenticated Ingress And Production Credentials | Candidate |",
+            "| Loop 42: Authenticated Ingress And Production Credentials | Complete |",
             roadmap,
         )
         self.assertIn(
-            "| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Candidate |",
+            "| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete |",
+            roadmap,
+        )
+        self.assertIn(
+            "| Loop 44: Verified Backup And Restore | Complete |",
+            roadmap,
+        )
+        self.assertIn(
+            "| Loop 45: State Upgrade And Migration | Complete |",
+            roadmap,
+        )
+        self.assertIn(
+            "| Loop 46: Runtime Observability Export | Complete |",
+            roadmap,
+        )
+        self.assertIn(
+            "| Loop 47: Data Retention And Disposal | Complete |",
             roadmap,
         )
 
@@ -122,6 +142,13 @@ class ProductionRoadmapTests(TestCase):
             "| Loop 38: Live Connector Readiness Review | Complete | Decision note approving only scoped live Lark/Feishu `create_task` follow-up, with credential, idempotency, failure, audit, test, and rollback boundaries |",
             "| Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |",
             "| Loop 40: Controlled Live Connector Pilot | Complete | Paid assisted five-day, five-run Pilot with two private cases, a human rejection, safety exercises, fixed verification, a `continue` decision, and finalized redacted evidence |",
+            "| Loop 41: Self-hosted Runtime Service Boundary | Complete | Versioned service configuration, loopback-only ingress, health/readiness probes, graceful signal shutdown, SQLite restart continuity, operator guide, and real-process smoke evidence |",
+            "| Loop 42: Authenticated Ingress And Production Credentials | Complete | File-backed bearer authentication, execution-time directory credentials, compact ingress audit, request-size guard, external TLS contract, and security smoke evidence |",
+            "| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete | Persistent interval schedules, explicit missed-run policy, claim-before-execute dispatch ledger, restart recovery, SQLite lease exclusion, standby takeover, and real-process evidence |",
+            "| Loop 44: Verified Backup And Restore | Complete | Offline three-database locking, referenced workflow artifacts, owner-only manifest, SHA-256 and integrity verification, atomic new-directory restore, credential exclusion, and real-process recovery drill |",
+            "| Loop 45: State Upgrade And Migration | Complete | Owner-only layout marker, read-only legacy/current/future preflight, mandatory pre-upgrade backup, source-preserving atomic copy upgrade, rollback boundary, and real-process cutover drill |",
+            "| Loop 46: Runtime Observability Export | Complete | Authenticated Prometheus aggregate metrics, fixed status/route labels, process-local HTTP counters, strict operational NDJSON, and real-process leakage evidence |",
+            "| Loop 47: Data Retention And Disposal | Complete | Versioned fixed retention policy, aggregate stopped-state plan, protected waiting/claimed state, secure-delete vacuumed copy, atomic publication, and real-process cutover evidence |",
         ]
 
         for row in history_rows:
@@ -147,14 +174,13 @@ class ProductionRoadmapTests(TestCase):
     def test_readme_summarizes_without_copying_the_rolling_queue(self):
         readme = _read("README.md")
 
-        self.assertIn("Current maturity: Controlled Live Pilot", readme)
-        self.assertIn("Delivery Loops 1-40 are complete", readme)
+        self.assertIn("Current maturity: Self-hosted Beta", readme)
+        self.assertIn("Delivery Loops 1-55 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)
         self.assertIn("Loop 40 completed a paid assisted Pilot", readme)
         candidate_loop_titles = [
-            "Loop 41: Self-hosted Runtime Service Boundary",
             "Loop 42: Authenticated Ingress And Production Credentials",
             "Loop 43: Durable Recurring Scheduling And Safe Dispatch",
         ]

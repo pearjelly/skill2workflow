@@ -2,7 +2,22 @@
 
 From Agent Skills to Controlled Enterprise Workflows.
 
-`skill2workflow` is an open-source Agent Workflow Runtime for enterprise AI adoption. It converts standard `SKILL.md` capability descriptions into controlled workflows that can be validated, visualized, executed, resumed, and audited.
+`skill2workflow` is an open-source, dependency-light Agent Workflow Runtime for
+enterprise AI adoption. It compiles standard `SKILL.md` capability descriptions
+into controlled workflows that can be validated, published, executed, paused,
+resumed, recovered, and audited.
+
+Current maturity is **Self-hosted Beta**. The supported production direction is
+a self-hosted, single-tenant runtime for one team, backed by SQLite and exposed
+through an authenticated service boundary. Workflow DSL remains the execution
+source of truth; LiteGraph is an editor and operational view. The runtime does
+not claim exactly-once execution, hosted multi-tenancy, built-in TLS
+termination, or automatic reconciliation of unknown external side effects.
+
+[Documentation](docs/) · [Changelog](CHANGELOG.md) ·
+[Security](SECURITY.md) · [Support](SUPPORT.md) ·
+[Governance](GOVERNANCE.md) · [Contributing](CONTRIBUTING.md) ·
+[Code of Conduct](CODE_OF_CONDUCT.md)
 
 The core idea is simple:
 
@@ -10,13 +25,32 @@ The core idea is simple:
 - Workflows answer: "Will it follow the required process every time?"
 - A durable executor answers: "Can the process recover, pause, resume, and leave an audit trail?"
 
-This repository is intentionally starting with a small executable harness instead of a large platform shell. The first closed loop is:
+The current controlled loop is:
 
 ```text
-SKILL.md -> Skill IR -> Workflow DSL -> Local Executor -> Run Log
+SKILL.md -> Skill IR -> Workflow DSL -> Immutable publication
+Authenticated service -> Durable run -> Human decision -> Audit / recovery
 ```
 
-LiteGraph visualization, enterprise control plane features, and connector expansion are part of the staged roadmap in the approved spec.
+## Fastest Controlled Journey
+
+From a source checkout, install the package and create a non-overwriting secure
+workspace containing a compiled, published workflow already paused at a human
+gate:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install .
+skill2workflow quickstart \
+  --root /tmp/skill2workflow-quickstart \
+  --port 8080
+```
+
+The command generates an owner-only ingress secret without printing it, uses
+SQLite state, and returns the waiting `run_id`. Follow the
+[installed quickstart guide](docs/quickstart.md) to inspect and approve that
+run, start the authenticated service, and submit a second trigger.
 
 ## Visual Overview
 
@@ -57,9 +91,11 @@ Enterprise workflows need more control:
 
 `skill2workflow` bridges that gap by compiling skills into an execution-controlled workflow runtime.
 
-## Current Harness
+## Current Product Boundary
 
-The current implementation is a dependency-light Python harness because the local bootstrap environment does not include Node.js or npm. It implements the first executable slice of the product:
+The current implementation is a Python standard-library runtime with an
+installed CLI, SQLite production persistence, static visual inspection, and
+explicit connector boundaries. It currently supports:
 
 - Parse standard `SKILL.md` into Skill IR
 - Preserve checklist source mapping with step title, detail, section, and line number
@@ -95,7 +131,19 @@ The current implementation is a dependency-light Python harness because the loca
 - Persist trigger input values in durable run context without logging full input values to audit by default
 - Map non-secret trigger input fields into HTTP connector request bodies through `connector.request.input_mapping`
 - Trigger published workflow versions from local HTTP webhook POST requests
+- Run a validated loopback-only long-running service with health/readiness probes, graceful signal shutdown, and SQLite restart continuity
+- Create a non-overwriting owner-only service workspace with a generated ingress secret and absolute configuration
+- Run an installed-wheel quickstart that compiles and publishes a bundled Skill, pauses at one human gate, and completes after explicit approval
+- Diagnose configuration, authentication, credential-directory, SQLite-state, and loopback-bind readiness without starting or modifying the service
+- Resolve connector credentials at execution time through private, bounded, descriptor-bound files while preserving atomic rotation
+- Require file-backed Bearer authentication for service business routes and resolve mounted connector credentials at execution time
+- Export authenticated low-cardinality Prometheus metrics and allowlisted operational NDJSON without workflow, run, request, or credential values
+- Request authenticated, durable, idempotent cooperative cancellation without claiming that in-flight external requests were aborted
+- Fence process-lost executions as `interrupted` after lease takeover without replaying an unknown external side effect
+- Plan and publish verified retained SQLite copies that remove expired terminal run payloads while preserving waiting work and the source
 - Trigger published workflow versions from deterministic one-shot local schedules
+- Dispatch durable recurring interval schedules with explicit missed-run and recovery semantics
+- Create, verify, and atomically restore owner-only offline SQLite state backups
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Validate and inspect the minimum connector manifest contract for future extensions
@@ -109,14 +157,33 @@ The current implementation is a dependency-light Python harness because the loca
 - Run a deterministic local pilot playbook with webhook trigger, credential handle, audit, snapshot, and node overlay artifacts
 - Run a deterministic local pilot scenario pack covering customer support, sales renewal, and risk exception flows with mapped connector input
 - Run a deterministic local scheduled-trigger smoke with schedule, run, audit, and snapshot artifacts
-- Verify editable install, package metadata, and the installed `skill2workflow` console script
+- Verify an isolated wheel, package metadata, and the installed `skill2workflow` console script
 - Check committed Workflow DSL and LiteGraph examples for obvious secret-like connector values
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
 ## Quickstart
 
-Run the shortest local demo from a fresh checkout:
+### Installed wheel quickstart
+
+After installing the wheel, create a secure service workspace containing a
+compiled, published example workflow that is already waiting at a human gate:
+
+```bash
+skill2workflow quickstart \
+  --root /tmp/skill2workflow-quickstart \
+  --port 8080
+```
+
+The command never overwrites an existing root or prints its generated ingress
+secret. Use the returned `run_id` with `control-run` and `resume-published` to
+inspect and approve the first controlled run. See [the installed quickstart
+guide](docs/quickstart.md) for the complete service and authenticated-trigger
+journey.
+
+### Source-checkout contributor demo
+
+Run the shortest contributor demo from a fresh source checkout:
 
 ```bash
 python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo
@@ -175,11 +242,75 @@ python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
 
 The schedule smoke publishes the approval example, writes a local one-shot schedule, runs due schedules with a fixed timestamp, resumes the manual gate, and writes inspection artifacts under `/tmp/skill2workflow-schedule-loop29/artifacts/`.
 
+Run the durable recurring scheduler smoke:
+
+```bash
+python3 scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-recurring-scheduler-loop43
+```
+
+This starts real active and standby service processes and verifies restart recovery, explicit missed-run handling, lease ownership, takeover, and stale-claim recovery.
+
+Run the verified backup/restore drill:
+
+```bash
+python3 scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-backup-restore-loop44
+```
+
+The drill rejects backup while a scheduler lease is active, restores an earlier point-in-time snapshot, starts a service on the restored state, performs an authenticated trigger, rejects tampering, and confirms credentials are excluded.
+
+Run the state upgrade/migration drill:
+
+```bash
+python3 scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-state-upgrade-loop45
+```
+
+The drill detects valid legacy-unversioned state, creates a verified pre-upgrade backup, preserves the source, atomically publishes a copy-on-write upgrade, starts the upgraded service, performs an authenticated trigger, and rejects a future layout.
+
+Run the runtime observability drill:
+
+```bash
+python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-loop46
+```
+
+The drill proves authenticated aggregate metrics, fixed low-cardinality labels, private-value exclusion, process-local request counters, and structured starting/ready/draining/stopped lifecycle logs across a real CLI service process.
+
+Run the data retention/disposal drill:
+
+```bash
+python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-retention-loop47
+```
+
+The drill proves stopped-service enforcement, aggregate planning, source preservation, removal of old terminal payloads from the published SQLite bytes, waiting/claimed protection, and a ready, triggerable retained-service cutover.
+
+Run the durable cooperative cancellation drill:
+
+```bash
+python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellation-loop48
+```
+
+The drill submits cancellation while a real service request is blocked in an external connector, records the completed attempt, suppresses retry/successor progress, cancels waiting work idempotently, restarts the service, and checks compact audit evidence.
+
+Run the interrupted-run recovery drill:
+
+```bash
+python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-interrupted-loop49
+```
+
+The drill commits one provider-side effect, kills the service before its response
+is persisted, waits for standby lease takeover, and proves a fenced
+`interrupted` run with one provider attempt, no successor, no automatic retry,
+preserved waiting work, compact audit, and aggregate metrics.
+
 Run the package install smoke:
 
 ```bash
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 ```
+
+This builds a wheel, installs it into a separate virtual environment, and runs
+the installed CLI outside the repository with source-import paths disabled.
+It is the release-artifact check; the editable install below remains a
+development convenience only.
 
 Run the committed-fixture secret hygiene check:
 
@@ -191,7 +322,7 @@ Or install the checkout in editable mode and use the console script directly:
 
 ```bash
 python3 -m venv /tmp/skill2workflow-venv
-/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68"
+/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=77.0.1"
 /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
 /tmp/skill2workflow-venv/bin/skill2workflow --help
 /tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json
@@ -355,7 +486,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/skill2workflow-sc
 PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due --state-dir /tmp/skill2workflow-control --now 2026-07-06T00:00:00Z
 ```
 
-Scheduled runs use the same trigger boundary as CLI and webhook triggers. The local schedule helper is not a hosted scheduler, cron manager, queue, auth layer, or production daemon.
+Scheduled runs use the same trigger boundary as CLI and webhook triggers. This `0.1.0` one-shot helper is for deterministic local evaluation. The self-hosted SQLite service supports the separate durable `0.2.0` interval contract documented in [`docs/recurring-scheduling.md`](docs/recurring-scheduling.md); neither format is a hosted cron manager or distributed queue.
 
 Start a local webhook adapter for pilot integration testing:
 
@@ -386,7 +517,38 @@ Use SQLite run storage for published runs:
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --storage sqlite
 ```
 
+Cancel a waiting or running published run at the next safe point:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli cancel-run <run_id> --state-dir /tmp/skill2workflow-control --storage sqlite
+```
+
+Cancellation is cooperative. Read [`docs/cancellation.md`](docs/cancellation.md) before using it with side-effecting connectors.
+
+After a crash, inspect `interrupted` runs with `control-runs`, `control-run`, and
+filtered `audit`; do not replay them until the provider outcome is reconciled.
+See [`docs/interrupted-recovery.md`](docs/interrupted-recovery.md).
+
 For SQLite-backed control-plane metadata, pass `--storage sqlite` to `workflows`, `workflow`, `deprecate`, and `audit` as well.
+
+After stopping the self-hosted service, create and verify an offline backup, then restore it into a new directory:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli backup --state-dir /var/lib/skill2workflow --output-dir /var/backups/skill2workflow/2026-08-11
+PYTHONPATH=src python3 -m skill2workflow.cli backup-verify --backup-dir /var/backups/skill2workflow/2026-08-11
+PYTHONPATH=src python3 -m skill2workflow.cli restore --backup-dir /var/backups/skill2workflow/2026-08-11 --state-dir /var/lib/skill2workflow-restored
+```
+
+See [`docs/backup-restore.md`](docs/backup-restore.md) before using this path; the backup contains sensitive business state even though service credentials are excluded.
+
+Before starting a newer binary against existing SQLite state, run the read-only upgrade plan and, when required, create a new upgraded directory:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli state-upgrade-plan --state-dir /var/lib/skill2workflow-old
+PYTHONPATH=src python3 -m skill2workflow.cli state-upgrade --state-dir /var/lib/skill2workflow-old --backup-dir /var/backups/skill2workflow/pre-upgrade --output-dir /var/lib/skill2workflow-new
+```
+
+The source directory is never edited. Follow [`docs/upgrade-migration.md`](docs/upgrade-migration.md) for the stop, cutover, validation, and rollback sequence.
 
 Filter audit events:
 
@@ -469,10 +631,20 @@ src/skill2workflow/
   secret_hygiene.py # Fixture secret hygiene scanner
   credentials.py  # Local credential provider boundary
   triggers.py     # Local trigger envelope helpers
-  schedules.py    # Deterministic local schedule helpers
+  schedules.py    # One-shot and durable recurring schedule boundaries
+  backup.py       # Verified offline SQLite backup and atomic restore
   webhooks.py     # Local webhook adapter for published triggers
+  service.py      # Long-running self-hosted runtime service boundary
+  service_doctor.py # Read-only startup readiness diagnostics
+  telemetry.py    # Aggregate Prometheus metrics and safe operational NDJSON
+  retention.py    # Copy-on-write sensitive runtime data retention
   pilot_scenarios.py # Local multi-scenario pilot pack helper
   schedule_smoke.py # Local scheduled-trigger smoke helper
+  recurring_scheduler_smoke.py # Restart, missed-run, and lease-takeover evidence
+  backup_restore_smoke.py # Point-in-time restore and restored-service drill
+  observability_smoke.py # Authenticated metrics and operational-log drill
+  retention_smoke.py # Stopped-state retention and cutover drill
+  cancellation_smoke.py # Concurrent request and cooperative stop drill
   release.py      # Read-only release preflight checks
   cli.py          # Command line interface
 scripts/          # Maintainer command helpers
@@ -480,7 +652,7 @@ examples/skills/  # Example SKILL.md inputs
 examples/connectors/ # Explicit local external connector fixtures
 examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
 examples/control-plane-snapshot.json # Example control-plane UI snapshot
-schemas/           # Versioned Workflow DSL JSON Schema
+schemas/           # Versioned Workflow DSL and service configuration JSON Schemas
 tests/            # Unit tests
 docs/             # Product spec and implementation plans
 docs/assets/      # README screenshots and system design diagrams
@@ -498,28 +670,75 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Controlled Live Pilot. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-40 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-55 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
+
+Loop 41 adds a validated, loopback-only long-running [runtime service](docs/service.md) with health/readiness probes, graceful signal shutdown, mandatory SQLite state, and restart-continuity evidence.
+
+Loop 42 secures that service with default-deny file-backed Bearer authentication, execution-time mounted credentials, compact secret-free audit events, request-size limits, rotation evidence, and an explicit [external TLS boundary](docs/security-boundary.md).
+
+Loop 43 completes the Self-hosted Beta gate with [durable recurring scheduling](docs/recurring-scheduling.md), explicit `latest` and `skip` missed-run policies, claim-before-execute dispatch records, restart recovery, and a shared SQLite lease for active/standby coordination. The boundary suppresses duplicate claims but does not claim exactly-once execution.
+
+Loop 44 starts Production Baseline hardening with [verified offline backup and restore](docs/backup-restore.md): three locked SQLite snapshots, referenced workflow artifacts, SHA-256 manifests, integrity checks, atomic restore into a new directory, credential exclusion, and a real restored-service drill. Current maturity remains Self-hosted Beta while the other Production Baseline evidence remains open.
+
+Loop 45 adds [state upgrade and migration](docs/upgrade-migration.md): explicit owner-only layout identity, legacy/current/future fail-closed preflight, a mandatory verified pre-upgrade backup, source-preserving copy-on-write migration, atomic new-directory publication, and an upgraded-service drill. Current maturity remains Self-hosted Beta while the remaining Production Baseline evidence stays open.
+
+Loop 46 adds [runtime observability](docs/observability.md): authenticated Prometheus text metrics, a fixed low-cardinality label vocabulary, aggregate SQLite gauges, process-local request counters, and allowlisted operational lifecycle/request NDJSON. It intentionally excludes identifiers, request values, credentials, tracing, and remote telemetry storage. Current maturity remains Self-hosted Beta while the remaining Production Baseline evidence stays open.
+
+Loop 47 adds [data retention and disposal](docs/data-retention.md): a fixed versioned policy, aggregate read-only planning, stopped-state copy-on-write application, protected waiting/claimed work, linked run/audit cleanup, SQLite secure deletion and vacuum, atomic publication, and a tested service cutover. The source and external backups remain operator-managed residual copies until securely destroyed. Current maturity remains Self-hosted Beta while the remaining Production Baseline evidence stays open.
+
+Loop 48 adds [durable cooperative run cancellation](docs/cancellation.md): an authenticated service route and CLI, an independent SQLite request ledger, immediate waiting-run cancellation, safe points before nodes and retries, concurrent in-flight request evidence, fixed metrics, backup validation, and retention integration. It explicitly does not claim forceful external-request abort or compensation.
+
+Loop 49 adds [interrupted-run recovery](docs/interrupted-recovery.md): service-owned execution tickets, scheduler-lease takeover, stale-writer fencing, preserved waiting and ownerless work, critical operator attention, backup validation, retention policy `0.3.0`, and a real `SIGKILL` drill proving no automatic replay after an unknown provider outcome. It does not claim exactly-once execution or automatic provider reconciliation. Current maturity remains Self-hosted Beta while the remaining Production Baseline evidence stays open.
+
+Loop 50 adds [release-artifact qualification](docs/release-artifact-qualification.md): a real wheel build, wheel-only installation into a separate environment, scrubbed source imports, installed production-module imports, a minimum production command contract, and release-preflight enforcement. It does not publish or sign an artifact, and the package version remains unchanged.
+
+Loop 51 adds [secure service bootstrap](docs/service-bootstrap.md): one non-overwriting command creates an owner-only ingress secret, connector directory, state directory, and absolute versioned configuration, then a real-process drill proves the generated service is ready and authenticated without manual edits.
+
+Loop 52 adds the [installed controlled quickstart](docs/quickstart.md): the installed wheel creates a secure workspace, compiles a bundled standard Skill, publishes it into SQLite, pauses at a real human gate, completes after one approval, and accepts a second authenticated service trigger without relying on source-checkout examples.
+
+Loop 53 adds the read-only [operational readiness Doctor](docs/service-doctor.md): one fixed, secret-free report checks configuration, ingress authentication, private credential and state directories, current SQLite integrity, and loopback address availability before service startup. The live `/readyz` probe remains authoritative after startup.
+
+Loop 54 hardens the [connector credential boundary](docs/credential-boundary.md): directory-backed values now require private directories and regular files, use bounded no-follow descriptor reads with identity rechecks, fail without value disclosure, and retain execution-time atomic rotation. The real security drill proves an overexposed file is blocked before outbound transport.
+
+Loop 55 adds an [authenticated live Operator snapshot](docs/live-control-snapshot.md): the running service exposes a zero-write, fixed-window control view; the CLI reads its Bearer token from a protected file, refuses insecure remote HTTP and redirects, enforces a 1 MiB response cap, and atomically writes owner-only evidence. Fixed metrics and NDJSON expose request outcomes without identifiers or payloads.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
 
-- `CONTRIBUTING.md`
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- [`SECURITY.md`](SECURITY.md)
+- [`SUPPORT.md`](SUPPORT.md)
+- [`GOVERNANCE.md`](GOVERNANCE.md)
+- [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 - `ROADMAP.md`
 - `docs/authoring.md`
+- `docs/backup-restore.md`
+- `docs/cancellation.md`
+- `docs/interrupted-recovery.md`
 - `docs/connectors.md`
 - `docs/controlled-pilot-deferral-review.md`
 - `docs/controlled-live-pilot.md`
 - `docs/credential-boundary.md`
+- `docs/data-retention.md`
 - `docs/examples.md`
+- `docs/observability.md`
 - `docs/pilot-playbook.md`
+- `docs/quickstart.md`
 - `docs/release-process.md`
+- `docs/release-artifact-qualification.md`
+- `docs/recurring-scheduling.md`
 - `docs/releases/v0.1.0.md`
 - `docs/runtime-policy.md`
+- `docs/security-boundary.md`
+- `docs/service.md`
+- `docs/service-doctor.md`
+- `docs/service-bootstrap.md`
 - `docs/stability.md`
 - `docs/triggers.md`
+- `docs/upgrade-migration.md`
 - `docs/workflow-dsl-contract.md`
 - `docs/workflow-dsl-compatibility.md`
 - `docs/superpowers/specs/2026-07-01-skill2workflow-design.md`

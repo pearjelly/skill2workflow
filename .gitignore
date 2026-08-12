@@ -12,3 +12,14 @@ venv/
 .skill2workflow/
 .superpowers/
 
+# Local authorization, credential, and runtime artifacts.
+/*-auth.png
+/*-authorization.png
+/credentials.json
+/*.sqlite
+/*.sqlite3
+/*.jsonl
+/*.pem
+/*.key
+/private/
+/secrets/

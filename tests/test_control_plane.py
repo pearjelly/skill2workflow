@@ -2,6 +2,7 @@ import json
 import importlib.util
 import sqlite3
 import threading
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -13,6 +14,29 @@ from skill2workflow.credentials import StaticCredentialProvider
 
 
 class ControlPlaneTests(TestCase):
+    def test_ingress_authentication_audit_is_strictly_allowlisted(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+
+            control.record_ingress_authentication(
+                False,
+                "POST secret-method",
+                "secret-route",
+                reason="secret-reason",
+            )
+            event = control.list_audit_events()[0]
+
+        self.assertEqual(
+            event,
+            {
+                "type": "ingress_authentication_denied",
+                "method": "OTHER",
+                "route": "unknown",
+                "reason": "unspecified",
+                "timestamp": event["timestamp"],
+            },
+        )
+
     def test_publish_workflow_persists_immutable_version_and_audit(self):
         workflow = _workflow(version="1.0.0")
 
@@ -34,6 +58,41 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(audit_events[0]["type"], "workflow_published")
         self.assertEqual(audit_events[0]["workflow_id"], "workflow_control")
         self.assertIn("checksum", record)
+
+    def test_publish_rejects_reserved_path_segments_in_workflow_identity(self):
+        for field in ("id", "version"):
+            with self.subTest(field=field), TemporaryDirectory() as tmp:
+                state_dir = Path(tmp)
+                workflow = _workflow(version="1.0.0")
+                workflow["workflow"][field] = ".."
+                control = LocalControlPlane(state_dir)
+
+                with self.assertRaisesRegex(ValueError, "safe path segment"):
+                    control.publish_workflow(workflow)
+
+                self.assertEqual(
+                    [path for path in state_dir.rglob("*.json") if path.is_file()],
+                    [],
+                )
+
+    def test_unsafe_workflow_identity_characters_use_collision_resistant_artifacts(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir)
+            first = _workflow(version="1.0.0")
+            first["workflow"]["id"] = "workflow/a"
+            second = _workflow(version="1.0.0")
+            second["workflow"]["id"] = "workflow?a"
+
+            first_record = control.publish_workflow(first)
+            second_record = control.publish_workflow(second)
+
+            first_stored = control.get_workflow("workflow/a", "1.0.0")
+            second_stored = control.get_workflow("workflow?a", "1.0.0")
+
+        self.assertNotEqual(first_record["artifact"], second_record["artifact"])
+        self.assertEqual(first_stored["workflow"]["id"], "workflow/a")
+        self.assertEqual(second_stored["workflow"]["id"], "workflow?a")
 
     def test_deprecate_updates_registry_without_mutating_published_artifact(self):
         with TemporaryDirectory() as tmp:
@@ -131,7 +190,7 @@ class ControlPlaneTests(TestCase):
             records = LocalControlPlane(state_dir, storage="sqlite").list_workflows()
             audit_types = [event["type"] for event in control.list_audit_events()]
 
-            with sqlite3.connect(state_dir / "control.sqlite3") as connection:
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection, connection:
                 workflow_rows = connection.execute("select workflow_id, version, status from workflow_versions").fetchall()
                 audit_rows = connection.execute("select event_type from audit_events order by sequence").fetchall()
 

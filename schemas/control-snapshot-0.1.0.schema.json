@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/control-snapshot-0.1.0.schema.json",
+  "title": "skill2workflow Control Snapshot 0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "summary",
+    "workflows",
+    "runs",
+    "audit_events",
+    "connectors",
+    "version_comparisons",
+    "operator_insights"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-control-snapshot-0.1.0"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "workflows": {
+      "$ref": "#/$defs/object_list"
+    },
+    "runs": {
+      "$ref": "#/$defs/object_list"
+    },
+    "audit_events": {
+      "$ref": "#/$defs/object_list"
+    },
+    "connectors": {
+      "$ref": "#/$defs/object_list"
+    },
+    "version_comparisons": {
+      "$ref": "#/$defs/object_list"
+    },
+    "operator_insights": {
+      "type": "object"
+    },
+    "window": {
+      "$ref": "#/$defs/window"
+    }
+  },
+  "$defs": {
+    "non_negative_integer": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "count_map": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/non_negative_integer"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workflow_count",
+        "run_count",
+        "audit_event_count",
+        "connector_count",
+        "status_counts",
+        "run_status_counts"
+      ],
+      "properties": {
+        "workflow_count": {
+          "$ref": "#/$defs/non_negative_integer"
+        },
+        "run_count": {
+          "$ref": "#/$defs/non_negative_integer"
+        },
+        "audit_event_count": {
+          "$ref": "#/$defs/non_negative_integer"
+        },
+        "connector_count": {
+          "$ref": "#/$defs/non_negative_integer"
+        },
+        "status_counts": {
+          "$ref": "#/$defs/count_map"
+        },
+        "run_status_counts": {
+          "$ref": "#/$defs/count_map"
+        }
+      }
+    },
+    "object_list": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "window_stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "returned",
+        "truncated"
+      ],
+      "properties": {
+        "total": {
+          "$ref": "#/$defs/non_negative_integer"
+        },
+        "returned": {
+          "$ref": "#/$defs/non_negative_integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_items",
+        "workflows",
+        "runs",
+        "audit_events",
+        "connectors",
+        "version_comparisons"
+      ],
+      "properties": {
+        "max_items": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workflows": {
+          "$ref": "#/$defs/window_stats"
+        },
+        "runs": {
+          "$ref": "#/$defs/window_stats"
+        },
+        "audit_events": {
+          "$ref": "#/$defs/window_stats"
+        },
+        "connectors": {
+          "$ref": "#/$defs/window_stats"
+        },
+        "version_comparisons": {
+          "$ref": "#/$defs/window_stats"
+        }
+      }
+    }
+  }
+}

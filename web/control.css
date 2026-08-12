@@ -42,8 +42,39 @@ input {
 
 .shell {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   min-height: 100vh;
+}
+
+.snapshot-scope {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.snapshot-scope strong {
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.snapshot-scope.is-bounded {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.snapshot-scope.is-truncated {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.snapshot-scope.is-truncated strong {
+  color: var(--amber);
 }
 
 .topbar {
@@ -334,7 +365,13 @@ tbody tr.is-selected {
   color: var(--amber);
 }
 
+.pill.cancelled {
+  background: #eef1f5;
+  color: #4f5b66;
+}
+
 .pill.failed,
+.pill.interrupted,
 .pill.false,
 .pill.critical,
 .pill.connector_failed {

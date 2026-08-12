@@ -1,0 +1,117 @@
+# Durable Recurring Scheduling
+
+Loop 43 adds persistent interval scheduling to the authenticated self-hosted service. The contract is `skill2workflow-schedule-0.2.0`, stored in SQLite and executed by the same published-workflow trigger boundary used by CLI and webhook runs. Workflow DSL remains the execution source of truth.
+
+This is the supported single-team, single-state-directory scheduler. It is not a distributed queue and it is not exactly-once delivery.
+
+## Schedule Contract
+
+Create a JSON document such as:
+
+```json
+{
+  "schema_version": "skill2workflow-schedule-0.2.0",
+  "schedule": {
+    "id": "schedule_hourly_report",
+    "workflow_id": "workflow_hourly_report",
+    "version": "0.1.0",
+    "starts_at": "2026-08-11T00:00:00Z",
+    "interval_seconds": 3600,
+    "missed_run_policy": "latest",
+    "enabled": true
+  },
+  "trigger": {
+    "idempotency_key_prefix": "schedule_hourly_report",
+    "input": {
+      "report": "hourly"
+    }
+  }
+}
+```
+
+`starts_at` must contain a timezone. `interval_seconds` accepts 1 through 31,536,000 seconds. `id` and `idempotency_key_prefix` use a constrained safe-character set. The published workflow version must already exist in the same SQLite state directory.
+
+The runtime derives the trigger source as `recurring-schedule:<schedule.id>` and derives one idempotency key per scheduled occurrence. Callers cannot override the source. Trigger input is persisted in run context, so it must not contain secrets.
+
+The public JSON Schema is [`schemas/recurring-schedule-0.2.0.schema.json`](../schemas/recurring-schedule-0.2.0.schema.json).
+
+## Missed-run Policy
+
+Every schedule declares `missed_run_policy`:
+
+- `latest` advances past all elapsed occurrences and claims only the latest due occurrence. The dispatch record reports how many older occurrences were coalesced.
+- `skip` records the whole missed range as `skipped` when more than one occurrence is due. A single exactly-due occurrence still runs normally.
+
+Disabling a schedule is durable. Re-enabling it preserves `next_run_at`, so the selected missed-run policy handles elapsed time explicitly rather than silently resetting the schedule.
+
+## Claim And Recovery Semantics
+
+Dispatch uses claim-before-execute inside a SQLite transaction. The scheduler first writes a unique `(schedule_id, scheduled_for)` dispatch record and advances `next_run_at`; only then does it invoke the workflow. Dispatch records are durable and inspectable with these terminal states:
+
+| Status | Meaning |
+| --- | --- |
+| `completed` | The trigger returned a durable run and trigger id. |
+| `failed` | Invocation raised an error; only the error type is retained. |
+| `skipped` | The declared `skip` policy omitted a missed range. |
+| `uncertain` | A previous owner lost its lease after claiming and before recording a terminal result. |
+
+On restart, an expired `claimed` record becomes `uncertain`. It is not retried automatically because the external effect might already have happened. An operator must inspect the workflow or connector result before deciding on a new manual action.
+
+This design suppresses duplicate claims in one SQLite state directory, but it is not exactly-once. A crash can leave execution outcome uncertain, and a downstream system can still accept a duplicate if an operator retries. Use provider-native idempotency for effectful connectors and treat `schedule-dispatches` as the recovery ledger.
+
+## SQLite Lease And Standby
+
+All SQLite scheduling paths share one global SQLite lease. The active service renews it while dispatching. A second process using the same state directory may run as a standby, but its `GET /readyz` returns HTTP 503 until it owns the lease. After a graceful active shutdown, the standby acquires the released lease and becomes ready. After a crash, takeover waits for lease expiry and marks stale claims `uncertain` before dispatching new work.
+
+Only the lease owner dispatches. The lease coordinates service processes that share one local SQLite filesystem; it is not a distributed lock for network filesystems or multiple independent databases. Do not run `schedule-run-due` concurrently with the service: the command respects the same lease and fails if another dispatcher owns it.
+
+## Operator Commands
+
+Add and inspect a recurring schedule using SQLite:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/hourly.json \
+  --state-dir /var/lib/skill2workflow --storage sqlite
+
+PYTHONPATH=src python3 -m skill2workflow.cli schedules \
+  --state-dir /var/lib/skill2workflow --storage sqlite
+
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches \
+  --state-dir /var/lib/skill2workflow --storage sqlite \
+  --schedule-id schedule_hourly_report
+```
+
+Pause and resume future dispatch:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-disable schedule_hourly_report \
+  --state-dir /var/lib/skill2workflow --storage sqlite
+
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-enable schedule_hourly_report \
+  --state-dir /var/lib/skill2workflow --storage sqlite
+```
+
+For deterministic operator testing without the long-running service:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due \
+  --state-dir /var/lib/skill2workflow --storage sqlite \
+  --now 2026-08-11T00:00:00Z
+```
+
+The legacy `skill2workflow-schedule-0.1.0` format remains a local one-shot JSON schedule for evaluation and compatibility. The long-running service dispatches only the durable `0.2.0` SQLite contract.
+
+## Repeatable Evidence
+
+Run the real-process evidence smoke:
+
+```bash
+python3 scripts/recurring_scheduler_smoke.py \
+  --work-dir /tmp/skill2workflow-recurring-scheduler-loop43
+```
+
+The smoke starts and stops real authenticated service processes and proves recurring dispatch, restart recovery, `latest` coalescing, single-owner readiness, standby takeover, stale-claim `uncertain` recovery, and graceful exit. Its output is compact and contains no credentials, workflow inputs, run ids, trigger ids, or lease-owner ids.
+
+## Deferred Boundaries
+
+Loop 43 does not add cron expressions, calendars, time-zone daylight-saving rules, distributed queues, network-filesystem locking, multi-tenant scheduler isolation, automatic retry of uncertain effects, dispatch retention, or exactly-once execution. Backup/restore, schema migration, bounded observability, and offline terminal-record retention are documented separately; automatic retention scheduling and broader fault-drill evidence remain Production Baseline work.

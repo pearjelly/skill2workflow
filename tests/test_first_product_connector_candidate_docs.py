@@ -49,8 +49,7 @@ class FirstProductConnectorCandidateDocsTests(TestCase):
         self.assertIn("| Loop 38: Live Connector Readiness Review | Complete |", roadmap)
         self.assertIn("| Loop 39: Scoped Live Lark Task Connector | Complete |", roadmap)
         self.assertIn("| Loop 40: Controlled Live Connector Pilot | Complete |", roadmap)
-        self.assertIn("Lark/Feishu task connector", roadmap)
-        self.assertIn("package-level and pilot-workflow dry-run evidence", roadmap)
+        self.assertIn("| Loop 41: Self-hosted Runtime Service Boundary | Complete |", roadmap)
 
 
 def _read(path: str) -> str:

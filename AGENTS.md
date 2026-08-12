@@ -15,8 +15,15 @@ This repository is the `skill2workflow` open-source harness.
 - Credential boundary guide: `docs/credential-boundary.md`.
 - Runtime policy guide: `docs/runtime-policy.md`.
 - Trigger API guide: `docs/triggers.md`.
+- Runtime observability guide: `docs/observability.md`.
+- Data retention guide: `docs/data-retention.md`.
+- Run cancellation guide: `docs/cancellation.md`.
 - Compatibility notes: `docs/workflow-dsl-contract.md`, `docs/workflow-dsl-compatibility.md`, and `docs/stability.md`.
 - Release process: `docs/release-process.md`.
+- Release artifact qualification: `docs/release-artifact-qualification.md`.
+- Secure service bootstrap: `docs/service-bootstrap.md`.
+- Installed controlled quickstart: `docs/quickstart.md`.
+- Operational readiness Doctor: `docs/service-doctor.md`.
 
 ## Local Commands
 
@@ -32,6 +39,9 @@ This repository is the `skill2workflow` open-source harness.
 - Example fixture sync: `PYTHONPATH=src python3 -m unittest tests.test_examples -v`
 - Web preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/`
 - Control UI preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/control.html`
+- Secure service bootstrap: `PYTHONPATH=src python3 -m skill2workflow.cli service-init --root /tmp/skill2workflow-service --port 8080`
+- Installed controlled quickstart: `PYTHONPATH=src python3 -m skill2workflow.cli quickstart --root /tmp/skill2workflow-quickstart --port 8080`
+- Service Doctor: `PYTHONPATH=src python3 -m skill2workflow.cli service-doctor --config /tmp/skill2workflow-runtime/config/service.json`
 - Run with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite`
 - Run with local credential file: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state --credential-file /tmp/skill2workflow-credentials.json`
 - Publish: `PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control`
@@ -44,6 +54,7 @@ This repository is the `skill2workflow` open-source harness.
 - Run due schedules: `PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due --state-dir /tmp/skill2workflow-control --now 2026-07-06T00:00:00Z`
 - Local webhook server: `PYTHONPATH=src python3 -m skill2workflow.cli webhook-server --state-dir /tmp/skill2workflow-control --host 127.0.0.1 --port 8080`
 - Resume published: `PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control`
+- Cancel published: `PYTHONPATH=src python3 -m skill2workflow.cli cancel-run <run_id> --state-dir /tmp/skill2workflow-control --storage sqlite`
 - Control runs: `PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill2workflow-control`
 - Control run detail: `PYTHONPATH=src python3 -m skill2workflow.cli control-run <run_id> --state-dir /tmp/skill2workflow-control`
 - Audit: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control`
@@ -57,8 +68,16 @@ This repository is the `skill2workflow` open-source harness.
 - Pilot smoke: `python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot`
 - Controlled Lark pilot: `python3 scripts/controlled_lark_pilot.py --help`
 - Controlled Lark preflight: `python3 scripts/controlled_lark_pilot.py preflight --input /tmp/skill2workflow-private-case.json`
+- State upgrade plan: `PYTHONPATH=src python3 -m skill2workflow.cli state-upgrade-plan --state-dir /tmp/skill2workflow-legacy-state`
+- State upgrade: `PYTHONPATH=src python3 -m skill2workflow.cli state-upgrade --state-dir /tmp/skill2workflow-legacy-state --backup-dir /tmp/skill2workflow-pre-upgrade-backup --output-dir /tmp/skill2workflow-upgraded-state`
+- State upgrade smoke: `python3 scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-state-upgrade-loop45`
+- Observability smoke: `python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-loop46`
+- Retention smoke: `python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-retention-loop47`
+- Cancellation smoke: `python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellation-loop48`
+- Interrupted recovery smoke: `python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-interrupted-loop49`
 - Schedule smoke: `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
 - Package smoke: `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
+- Service Doctor smoke: `python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-doctor`
 - Secret hygiene: `python3 scripts/secret_hygiene.py examples/workflows`
 - Editable install: `python3 -m venv /tmp/skill2workflow-venv && /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68" && /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .`
 - Installed CLI smoke: `/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json`

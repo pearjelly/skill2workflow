@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/service-config-0.2.0.schema.json",
+  "title": "skill2workflow self-hosted service configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "service",
+    "runtime",
+    "auth",
+    "credentials"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-service-0.2.0"
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "port"],
+      "properties": {
+        "host": {
+          "enum": ["127.0.0.1", "::1", "localhost"]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state_dir", "storage"],
+      "properties": {
+        "state_dir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "storage": {
+          "const": "sqlite"
+        }
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "token_file"],
+      "properties": {
+        "provider": {
+          "const": "bearer_token_file"
+        },
+        "token_file": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "directory"],
+      "properties": {
+        "provider": {
+          "const": "directory"
+        },
+        "directory": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

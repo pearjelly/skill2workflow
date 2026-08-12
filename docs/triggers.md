@@ -245,6 +245,12 @@ python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
 
 The smoke publishes the approval example, writes a local schedule, runs due schedules with a fixed timestamp, resumes the manual gate, and exports a control-plane snapshot under `/tmp/skill2workflow-schedule-loop29/artifacts/`.
 
+## Durable Recurring Scheduled Triggers
+
+The self-hosted SQLite service also supports persistent interval schedules using `schema_version: "skill2workflow-schedule-0.2.0"`. Unlike the legacy one-shot format above, recurring definitions survive service restarts, retain a durable dispatch ledger, require an explicit `latest` or `skip` missed-run policy, and share a global SQLite dispatcher lease.
+
+The service performs claim-before-execute and marks an expired in-flight claim `uncertain` instead of retrying an effect whose outcome is unknown. This is duplicate suppression, not exactly-once execution. Full contract, CLI examples, recovery guidance, and real-process evidence are in [`docs/recurring-scheduling.md`](recurring-scheduling.md).
+
 ## Run Context Semantics
 
 Triggered runs use the same published-run execution path as `run-published`, plus an initial run context.
@@ -283,15 +289,15 @@ Audit events intentionally do not include full `context.input` values by default
 
 ## Current Limits
 
-The local trigger API intentionally does not provide:
+The trigger API intentionally does not provide:
 
 - hosted webhooks or public ingress
-- a supervised production daemon
-- cron management, queues, or distributed scheduling
+- public hosted ingress or a managed service supervisor
+- cron/calendar expressions, queues, or distributed scheduling
 - authentication, RBAC, or IAM
 - secret injection
 - idempotency enforcement
-- recurring retry semantics across process restarts
+- automatic retry of uncertain recurring effects across process restarts
 - arbitrary input templating or connector request interpolation
 - header, URL, query string, credential, environment, or file mapping
 - schema-based input mapping beyond the explicit body-only contract

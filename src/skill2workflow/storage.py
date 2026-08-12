@@ -5,13 +5,20 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import closing, contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
+
+from .state_layout import ensure_current_state_layout
 
 
 RunState = Dict[str, object]
 WorkflowRecord = Dict[str, object]
 AuditEvent = Dict[str, object]
+
+
+class ExecutionFencedError(ValueError):
+    """Raised when an obsolete runtime owner attempts to mutate a recovered run."""
 
 
 class JsonRunStore:
@@ -34,78 +41,244 @@ class JsonRunStore:
     def list(self) -> List[RunState]:
         return [json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.runs_dir.glob("*.json"))]
 
+    def start_execution(self, state: RunState, owner_id: str, execution_id: str) -> None:
+        self.save(state)
+
+    def claim_execution(self, run_id: str, owner_id: str, execution_id: str) -> None:
+        return
+
+    def save_execution(
+        self, state: RunState, owner_id: str, execution_id: str
+    ) -> None:
+        self.save(state)
+
+    def ensure_execution_active(
+        self, run_id: str, owner_id: str, execution_id: str
+    ) -> None:
+        return
+
+    def recover_interrupted(self, current_owner: str) -> List[RunState]:
+        raise ValueError("interrupted run recovery requires sqlite storage")
+
+    def request_cancellation(self, run_id: str):
+        state = self.load(run_id)
+        status = str(state.get("status", ""))
+        if status == "cancelled":
+            return state, False
+        if status in {"completed", "failed", "interrupted"}:
+            raise ValueError(f"run {run_id} is already {status}")
+        marker = self.runs_dir / f"{run_id}.cancel"
+        newly_requested = False
+        try:
+            with marker.open("x", encoding="utf-8") as handle:
+                handle.write(_utc_now())
+            marker.chmod(0o600)
+            newly_requested = True
+        except FileExistsError:
+            pass
+        except OSError as error:
+            raise ValueError(f"run {run_id} cancellation could not be recorded") from error
+        if status == "waiting":
+            state = _cancel_state(state)
+            self.save(state)
+        else:
+            state = dict(state)
+            state["status"] = "cancel_requested"
+        return state, newly_requested
+
+    def cancellation_requested(self, run_id: str) -> bool:
+        return (self.runs_dir / f"{run_id}.cancel").is_file()
+
+    def mark_cancellation_applied(self, run_id: str) -> None:
+        return
+
 
 class SqliteRunStore:
     """Persist run state and queryable run events in SQLite."""
 
     def __init__(self, state_dir: Path):
         self.state_dir = Path(state_dir)
+        ensure_current_state_layout(self.state_dir)
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.state_dir / "runs.sqlite3"
         self._initialize()
 
     def save(self, state: RunState) -> None:
-        payload = json.dumps(state, ensure_ascii=False, sort_keys=True)
-        events = state.get("events", [])
-        if not isinstance(events, list):
-            events = []
-
         with self._connection() as connection:
+            connection.execute("begin immediate")
+            cancellation = connection.execute(
+                "select status from run_cancellations where run_id = ?",
+                (state["run_id"],),
+            ).fetchone()
+            if cancellation and str(state.get("status", "")) != "cancelled":
+                cancelled = _cancel_state(state)
+                state.clear()
+                state.update(cancelled)
+            _upsert_sqlite_state(connection, state)
+            if cancellation and str(cancellation[0]) == "requested":
+                connection.execute(
+                    "update run_cancellations set status = 'applied', applied_at = ? where run_id = ?",
+                    (_utc_now(), state["run_id"]),
+                )
+
+    def start_execution(
+        self, state: RunState, owner_id: str, execution_id: str
+    ) -> None:
+        owner = _required_execution_value(owner_id, "owner")
+        execution = _required_execution_value(execution_id, "id")
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            existing = connection.execute(
+                "select 1 from runs where run_id = ?", (state["run_id"],)
+            ).fetchone()
+            if existing:
+                raise ExecutionFencedError("execution ownership was fenced")
+            _upsert_sqlite_state(connection, state)
+            now = _utc_now()
             connection.execute(
                 """
-                insert into runs (
-                    run_id,
-                    workflow_id,
-                    workflow_version,
-                    status,
-                    current_node,
-                    state_json,
-                    updated_at
-                )
-                values (?, ?, ?, ?, ?, ?, datetime('now'))
+                insert into run_executions (
+                    run_id, owner_id, execution_id, status, claimed_at, updated_at
+                ) values (?, ?, ?, 'active', ?, ?)
+                """,
+                (state["run_id"], owner, execution, now, now),
+            )
+
+    def claim_execution(
+        self, run_id: str, owner_id: str, execution_id: str
+    ) -> None:
+        owner = _required_execution_value(owner_id, "owner")
+        execution = _required_execution_value(execution_id, "id")
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            run = connection.execute(
+                "select status from runs where run_id = ?", (run_id,)
+            ).fetchone()
+            if run is None:
+                raise FileNotFoundError(f"run not found: {run_id}")
+            if str(run[0]) != "waiting":
+                raise ExecutionFencedError("execution ownership was fenced")
+            ticket = connection.execute(
+                "select status from run_executions where run_id = ?", (run_id,)
+            ).fetchone()
+            if ticket and str(ticket[0]) != "released":
+                raise ExecutionFencedError("execution ownership was fenced")
+            now = _utc_now()
+            connection.execute(
+                """
+                insert into run_executions (
+                    run_id, owner_id, execution_id, status, claimed_at, updated_at
+                ) values (?, ?, ?, 'active', ?, ?)
                 on conflict(run_id) do update set
-                    workflow_id = excluded.workflow_id,
-                    workflow_version = excluded.workflow_version,
-                    status = excluded.status,
-                    current_node = excluded.current_node,
-                    state_json = excluded.state_json,
+                    owner_id = excluded.owner_id,
+                    execution_id = excluded.execution_id,
+                    status = 'active',
+                    claimed_at = excluded.claimed_at,
                     updated_at = excluded.updated_at
                 """,
-                (
-                    state["run_id"],
-                    state.get("workflow_id", "workflow"),
-                    state.get("workflow_version", "0.1.0"),
-                    state.get("status", "created"),
-                    state.get("current_node", ""),
-                    payload,
-                ),
+                (run_id, owner, execution, now, now),
             )
-            connection.execute("delete from run_events where run_id = ?", (state["run_id"],))
-            connection.executemany(
+
+    def save_execution(
+        self, state: RunState, owner_id: str, execution_id: str
+    ) -> None:
+        owner = _required_execution_value(owner_id, "owner")
+        execution = _required_execution_value(execution_id, "id")
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            ticket = connection.execute(
                 """
-                insert into run_events (
-                    run_id,
-                    sequence,
-                    event_type,
-                    node_id,
-                    timestamp,
-                    payload_json
-                )
-                values (?, ?, ?, ?, ?, ?)
+                select status from run_executions
+                where run_id = ? and owner_id = ? and execution_id = ?
                 """,
-                [
-                    (
-                        state["run_id"],
-                        index,
-                        _event_value(event, "type", "event"),
-                        _event_value(event, "node_id", ""),
-                        _event_value(event, "timestamp", ""),
-                        json.dumps(event, ensure_ascii=False, sort_keys=True),
-                    )
-                    for index, event in enumerate(events, start=1)
-                    if isinstance(event, dict)
-                ],
+                (state["run_id"], owner, execution),
+            ).fetchone()
+            if not ticket or str(ticket[0]) != "active":
+                raise ExecutionFencedError("execution ownership was fenced")
+            cancellation = connection.execute(
+                "select status from run_cancellations where run_id = ?",
+                (state["run_id"],),
+            ).fetchone()
+            if cancellation and str(state.get("status", "")) != "cancelled":
+                cancelled = _cancel_state(state)
+                state.clear()
+                state.update(cancelled)
+            _upsert_sqlite_state(connection, state)
+            status = str(state.get("status", ""))
+            ticket_status = "active" if status in {"created", "running"} else "released"
+            connection.execute(
+                """
+                update run_executions set status = ?, updated_at = ?
+                where run_id = ? and owner_id = ? and execution_id = ? and status = 'active'
+                """,
+                (ticket_status, _utc_now(), state["run_id"], owner, execution),
             )
+            if cancellation and str(cancellation[0]) == "requested":
+                connection.execute(
+                    """
+                    update run_cancellations set status = 'applied', applied_at = ?
+                    where run_id = ?
+                    """,
+                    (_utc_now(), state["run_id"]),
+                )
+
+    def ensure_execution_active(
+        self, run_id: str, owner_id: str, execution_id: str
+    ) -> None:
+        owner = _required_execution_value(owner_id, "owner")
+        execution = _required_execution_value(execution_id, "id")
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                select 1 from run_executions
+                where run_id = ? and owner_id = ? and execution_id = ?
+                  and status = 'active'
+                """,
+                (run_id, owner, execution),
+            ).fetchone()
+        if row is None:
+            raise ExecutionFencedError("execution ownership was fenced")
+
+    def recover_interrupted(self, current_owner: str) -> List[RunState]:
+        owner = _required_execution_value(current_owner, "owner")
+        recovered: List[RunState] = []
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            rows = connection.execute(
+                """
+                select e.run_id, r.state_json
+                from run_executions e join runs r on r.run_id = e.run_id
+                where e.status = 'active' and e.owner_id != ?
+                order by e.run_id
+                """,
+                (owner,),
+            ).fetchall()
+            for run_id, raw_state in rows:
+                state = json.loads(str(raw_state))
+                if str(state.get("status", "")) not in {"created", "running"}:
+                    connection.execute(
+                        "update run_executions set status = 'released', updated_at = ? where run_id = ?",
+                        (_utc_now(), str(run_id)),
+                    )
+                    continue
+                interrupted = _interrupt_state(state)
+                _upsert_sqlite_state(connection, interrupted)
+                connection.execute(
+                    """
+                    update run_executions set status = 'interrupted', updated_at = ?
+                    where run_id = ? and status = 'active'
+                    """,
+                    (_utc_now(), str(run_id)),
+                )
+                connection.execute(
+                    """
+                    update run_cancellations set status = 'applied', applied_at = ?
+                    where run_id = ? and status = 'requested'
+                    """,
+                    (_utc_now(), str(run_id)),
+                )
+                recovered.append(interrupted)
+        return recovered
 
     def load(self, run_id: str) -> RunState:
         with self._connection() as connection:
@@ -119,6 +292,91 @@ class SqliteRunStore:
             rows = connection.execute("select state_json from runs order by run_id").fetchall()
         return [json.loads(str(row[0])) for row in rows]
 
+    def snapshot_window(self, limit: int) -> Dict[str, object]:
+        """Read recent run state plus aggregate counts without loading all rows."""
+
+        with self._connection() as connection:
+            total = int(connection.execute("select count(*) from runs").fetchone()[0])
+            status_rows = connection.execute(
+                "select status, count(*) from runs group by status order by status"
+            ).fetchall()
+            rows = connection.execute(
+                """
+                select state_json from runs
+                order by updated_at desc, run_id desc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+        return {
+            "total": total,
+            "status_counts": {
+                str(status): int(count) for status, count in status_rows
+            },
+            "items": [json.loads(str(row[0])) for row in reversed(rows)],
+        }
+
+    def request_cancellation(self, run_id: str):
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            row = connection.execute(
+                "select state_json from runs where run_id = ?", (run_id,)
+            ).fetchone()
+            if row is None:
+                raise FileNotFoundError(f"run not found: {run_id}")
+            state = json.loads(str(row[0]))
+            status = str(state.get("status", ""))
+            existing = connection.execute(
+                "select status from run_cancellations where run_id = ?", (run_id,)
+            ).fetchone()
+            if status == "cancelled":
+                if existing and str(existing[0]) != "applied":
+                    connection.execute(
+                        "update run_cancellations set status = 'applied', applied_at = ? where run_id = ?",
+                        (_utc_now(), run_id),
+                    )
+                return state, False
+            if status in {"completed", "failed", "interrupted"}:
+                raise ValueError(f"run {run_id} is already {status}")
+            newly_requested = existing is None
+            if newly_requested:
+                connection.execute(
+                    """
+                    insert into run_cancellations (run_id, requested_at, status, applied_at)
+                    values (?, ?, 'requested', '')
+                    """,
+                    (run_id, _utc_now()),
+                )
+            if status == "waiting":
+                state = _cancel_state(state)
+                _save_sqlite_state(connection, state)
+                connection.execute(
+                    "update run_cancellations set status = 'applied', applied_at = ? where run_id = ?",
+                    (_utc_now(), run_id),
+                )
+            else:
+                state = dict(state)
+                state["status"] = "cancel_requested"
+            return state, newly_requested
+
+    def cancellation_requested(self, run_id: str) -> bool:
+        with self._connection() as connection:
+            row = connection.execute(
+                "select status from run_cancellations where run_id = ?", (run_id,)
+            ).fetchone()
+        return bool(row and str(row[0]) == "requested")
+
+    def mark_cancellation_applied(self, run_id: str) -> None:
+        with self._connection() as connection:
+            connection.execute(
+                """
+                update run_cancellations
+                set status = 'applied', applied_at = ?
+                where run_id = ? and status = 'requested'
+                """,
+                (_utc_now(), run_id),
+            )
+
     def _initialize(self) -> None:
         with self._connection() as connection:
             connection.execute(
@@ -131,6 +389,30 @@ class SqliteRunStore:
                     current_node text not null,
                     state_json text not null,
                     updated_at text not null
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table if not exists run_cancellations (
+                    run_id text primary key,
+                    requested_at text not null,
+                    status text not null check(status in ('requested', 'applied')),
+                    applied_at text not null,
+                    foreign key (run_id) references runs(run_id) on delete cascade
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table if not exists run_executions (
+                    run_id text primary key,
+                    owner_id text not null,
+                    execution_id text not null,
+                    status text not null check(status in ('active', 'released', 'interrupted')),
+                    claimed_at text not null,
+                    updated_at text not null,
+                    foreign key (run_id) references runs(run_id) on delete cascade
                 )
                 """
             )
@@ -203,6 +485,7 @@ class SqliteControlStore:
 
     def __init__(self, state_dir: Path):
         self.state_dir = Path(state_dir)
+        ensure_current_state_layout(self.state_dir)
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self.workflows_dir = self.state_dir / "workflows"
         self.workflows_dir.mkdir(parents=True, exist_ok=True)
@@ -284,6 +567,52 @@ class SqliteControlStore:
             rows = connection.execute("select payload_json from audit_events order by sequence").fetchall()
         return [json.loads(str(row[0])) for row in rows]
 
+    def snapshot_window(self, limit: int) -> Dict[str, object]:
+        """Read recent registry and audit rows plus totals in one SQLite view."""
+
+        with self._connection() as connection:
+            workflow_total = int(
+                connection.execute("select count(*) from workflow_versions").fetchone()[0]
+            )
+            workflow_status_rows = connection.execute(
+                """
+                select status, count(*) from workflow_versions
+                group by status order by status
+                """
+            ).fetchall()
+            workflow_rows = connection.execute(
+                """
+                select record_json from workflow_versions
+                order by published_at desc, record_key desc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+            audit_total = int(
+                connection.execute("select count(*) from audit_events").fetchone()[0]
+            )
+            audit_rows = connection.execute(
+                """
+                select payload_json from audit_events
+                order by sequence desc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+        return {
+            "workflow_total": workflow_total,
+            "workflow_status_counts": {
+                str(status): int(count) for status, count in workflow_status_rows
+            },
+            "workflows": [
+                json.loads(str(row[0])) for row in reversed(workflow_rows)
+            ],
+            "audit_total": audit_total,
+            "audit_events": [
+                json.loads(str(row[0])) for row in reversed(audit_rows)
+            ],
+        }
+
     def _initialize(self) -> None:
         with self._connection() as connection:
             connection.execute(
@@ -351,3 +680,118 @@ def _sqlite_connection(db_path: Path):
 def _event_value(event: Dict[str, object], key: str, default: str) -> str:
     value = event.get(key, default)
     return str(value) if value is not None else default
+
+
+def _cancel_state(state: RunState) -> RunState:
+    updated = dict(state)
+    events = list(updated.get("events", []))
+    node_id = str(updated.get("current_node", ""))
+    if not any(
+        isinstance(event, dict) and event.get("type") == "run_cancel_requested"
+        for event in events
+    ):
+        events.append(
+            {
+                "type": "run_cancel_requested",
+                "node_id": node_id,
+                "timestamp": _utc_now(),
+            }
+        )
+    if not any(
+        isinstance(event, dict) and event.get("type") == "run_cancelled"
+        for event in events
+    ):
+        events.append(
+            {
+                "type": "run_cancelled",
+                "node_id": node_id,
+                "timestamp": _utc_now(),
+            }
+        )
+    updated["events"] = events
+    updated["status"] = "cancelled"
+    return updated
+
+
+def _interrupt_state(state: RunState) -> RunState:
+    updated = dict(state)
+    events = list(updated.get("events", []))
+    if not any(
+        isinstance(event, dict) and event.get("type") == "run_interrupted"
+        for event in events
+    ):
+        events.append(
+            {
+                "type": "run_interrupted",
+                "node_id": str(updated.get("current_node", "")),
+                "timestamp": _utc_now(),
+            }
+        )
+    updated["events"] = events
+    updated["status"] = "interrupted"
+    return updated
+
+
+def _required_execution_value(value: str, field: str) -> str:
+    normalized = str(value or "")
+    if not normalized or len(normalized) > 128:
+        raise ValueError(f"execution {field} must be a non-empty string of at most 128 characters")
+    return normalized
+
+
+def _upsert_sqlite_state(connection, state: RunState) -> None:
+    payload = json.dumps(state, ensure_ascii=False, sort_keys=True)
+    events = state.get("events", [])
+    if not isinstance(events, list):
+        events = []
+    connection.execute(
+        """
+        insert into runs (
+            run_id, workflow_id, workflow_version, status, current_node,
+            state_json, updated_at
+        ) values (?, ?, ?, ?, ?, ?, datetime('now'))
+        on conflict(run_id) do update set
+            workflow_id = excluded.workflow_id,
+            workflow_version = excluded.workflow_version,
+            status = excluded.status,
+            current_node = excluded.current_node,
+            state_json = excluded.state_json,
+            updated_at = excluded.updated_at
+        """,
+        (
+            state["run_id"],
+            state.get("workflow_id", "workflow"),
+            state.get("workflow_version", "0.1.0"),
+            state.get("status", "created"),
+            state.get("current_node", ""),
+            payload,
+        ),
+    )
+    connection.execute("delete from run_events where run_id = ?", (state["run_id"],))
+    connection.executemany(
+        """
+        insert into run_events (
+            run_id, sequence, event_type, node_id, timestamp, payload_json
+        ) values (?, ?, ?, ?, ?, ?)
+        """,
+        [
+            (
+                state["run_id"],
+                index,
+                _event_value(event, "type", "event"),
+                _event_value(event, "node_id", ""),
+                _event_value(event, "timestamp", ""),
+                json.dumps(event, ensure_ascii=False, sort_keys=True),
+            )
+            for index, event in enumerate(events, start=1)
+            if isinstance(event, dict)
+        ],
+    )
+
+
+def _save_sqlite_state(connection, state: RunState) -> None:
+    _upsert_sqlite_state(connection, state)
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()

@@ -1,0 +1,15 @@
+name: Private moderation contact request
+description: Ask a maintainer to establish private contact without publishing sensitive details.
+title: "moderation: private contact requested"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form only to request private maintainer contact about a Code of Conduct concern. Do not include names, allegations, screenshots, or incident details in this public issue.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy acknowledgement
+      options:
+        - label: I have not included sensitive details and am requesting a private response channel.
+          required: true

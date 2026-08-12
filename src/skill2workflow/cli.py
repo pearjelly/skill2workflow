@@ -4,16 +4,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import sqlite3
 import sys
 from pathlib import Path
 
+from .backup import create_state_backup, restore_state_backup, verify_state_backup
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
 from .dashboard import build_control_snapshot
 from .executor import LocalExecutor
+from .live_snapshot import fetch_live_control_snapshot, write_private_snapshot
+from .migration import inspect_state_upgrade, upgrade_state
 from .parser import parse_skill_file
+from .quickstart import initialize_quickstart_workspace
+from .retention import apply_state_retention, inspect_state_retention
 from .schedules import LocalScheduleRunner
+from .service import load_service_config, serve_runtime_service
+from .service_bootstrap import initialize_service_workspace
+from .service_doctor import diagnose_service
+from .telemetry import OperationalEventLogger
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 from .webhooks import serve_webhook_requests
 
@@ -112,6 +122,23 @@ def main(argv=None) -> int:
     schedules_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     schedules_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
+    schedule_dispatches_cmd = subparsers.add_parser(
+        "schedule-dispatches",
+        help="List durable recurring-schedule dispatch records",
+    )
+    schedule_dispatches_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedule_dispatches_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
+    schedule_dispatches_cmd.add_argument("--schedule-id", default="")
+
+    for command, help_text in (
+        ("schedule-enable", "Enable a durable recurring schedule"),
+        ("schedule-disable", "Disable a durable recurring schedule"),
+    ):
+        schedule_state_cmd = subparsers.add_parser(command, help=help_text)
+        schedule_state_cmd.add_argument("schedule_id")
+        schedule_state_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+        schedule_state_cmd.add_argument("--storage", choices=["sqlite"], default="sqlite")
+
     schedule_run_due_cmd = subparsers.add_parser(
         "schedule-run-due",
         help="Run due local schedules through the trigger boundary",
@@ -132,12 +159,97 @@ def main(argv=None) -> int:
     webhook_server_cmd.add_argument("--credential-file", type=Path)
     webhook_server_cmd.add_argument("--once", action="store_true", help="Handle one request and then exit")
 
+    service_cmd = subparsers.add_parser(
+        "service",
+        help="Run the validated self-hosted single-tenant service boundary",
+    )
+    service_cmd.add_argument("--config", type=Path, required=True)
+
+    service_doctor_cmd = subparsers.add_parser(
+        "service-doctor",
+        help="Check self-hosted service readiness without starting it",
+    )
+    service_doctor_cmd.add_argument("--config", type=Path, required=True)
+
+    service_init_cmd = subparsers.add_parser(
+        "service-init",
+        help="Create a secure non-overwriting self-hosted service workspace",
+    )
+    service_init_cmd.add_argument("--root", type=Path, required=True)
+    service_init_cmd.add_argument("--host", default="127.0.0.1")
+    service_init_cmd.add_argument("--port", type=int, default=8080)
+
+    quickstart_cmd = subparsers.add_parser(
+        "quickstart",
+        help="Create a secure service workspace with one waiting example workflow",
+    )
+    quickstart_cmd.add_argument("--root", type=Path, required=True)
+    quickstart_cmd.add_argument("--host", default="127.0.0.1")
+    quickstart_cmd.add_argument("--port", type=int, default=8080)
+
+    backup_cmd = subparsers.add_parser(
+        "backup",
+        help="Create a verified offline backup of self-hosted SQLite state",
+    )
+    backup_cmd.add_argument("--state-dir", type=Path, required=True)
+    backup_cmd.add_argument("--output-dir", type=Path, required=True)
+
+    backup_verify_cmd = subparsers.add_parser(
+        "backup-verify",
+        help="Verify a self-hosted SQLite state backup",
+    )
+    backup_verify_cmd.add_argument("--backup-dir", type=Path, required=True)
+
+    restore_cmd = subparsers.add_parser(
+        "restore",
+        help="Restore a verified backup into a new state directory",
+    )
+    restore_cmd.add_argument("--backup-dir", type=Path, required=True)
+    restore_cmd.add_argument("--state-dir", type=Path, required=True)
+
+    state_upgrade_plan_cmd = subparsers.add_parser(
+        "state-upgrade-plan",
+        help="Inspect whether self-hosted SQLite state requires an upgrade",
+    )
+    state_upgrade_plan_cmd.add_argument("--state-dir", type=Path, required=True)
+
+    state_upgrade_cmd = subparsers.add_parser(
+        "state-upgrade",
+        help="Back up and copy legacy SQLite state into the current layout",
+    )
+    state_upgrade_cmd.add_argument("--state-dir", type=Path, required=True)
+    state_upgrade_cmd.add_argument("--output-dir", type=Path, required=True)
+    state_upgrade_cmd.add_argument("--backup-dir", type=Path, required=True)
+
+    retention_plan_cmd = subparsers.add_parser(
+        "state-retention-plan",
+        help="Inspect aggregate data eligible for copy-on-write retention",
+    )
+    retention_plan_cmd.add_argument("policy", type=Path)
+    retention_plan_cmd.add_argument("--state-dir", type=Path, required=True)
+
+    retention_apply_cmd = subparsers.add_parser(
+        "state-retention-apply",
+        help="Publish a verified retained copy of stopped SQLite state",
+    )
+    retention_apply_cmd.add_argument("policy", type=Path)
+    retention_apply_cmd.add_argument("--state-dir", type=Path, required=True)
+    retention_apply_cmd.add_argument("--output-dir", type=Path, required=True)
+
     resume_published_cmd = subparsers.add_parser("resume-published", help="Resume a waiting published run")
     resume_published_cmd.add_argument("run_id")
     resume_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     resume_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
     resume_published_cmd.add_argument("--credential-file", type=Path)
     resume_published_cmd.add_argument("--reject", action="store_true")
+
+    cancel_run_cmd = subparsers.add_parser(
+        "cancel-run",
+        help="Request idempotent cancellation of a published run",
+    )
+    cancel_run_cmd.add_argument("run_id")
+    cancel_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    cancel_run_cmd.add_argument("--storage", choices=["sqlite"], default="sqlite")
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -163,8 +275,10 @@ def main(argv=None) -> int:
         "control-snapshot",
         help="Export a read-only control-plane snapshot for the local UI",
     )
-    control_snapshot_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    control_snapshot_cmd.add_argument("--state-dir", type=Path)
     control_snapshot_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_snapshot_cmd.add_argument("--service-url")
+    control_snapshot_cmd.add_argument("--auth-token-file", type=Path)
     control_snapshot_cmd.add_argument("-o", "--output", type=Path)
 
     args = parser.parse_args(argv)
@@ -311,6 +425,25 @@ def main(argv=None) -> int:
         _print_json(LocalScheduleRunner(args.state_dir, storage=args.storage).list_schedules())
         return 0
 
+    if args.command == "schedule-dispatches":
+        return _control_action(
+            lambda: LocalScheduleRunner(
+                args.state_dir,
+                storage=args.storage,
+            ).list_dispatches(schedule_id=args.schedule_id)
+        )
+
+    if args.command in {"schedule-enable", "schedule-disable"}:
+        return _control_action(
+            lambda: LocalScheduleRunner(
+                args.state_dir,
+                storage=args.storage,
+            ).set_recurring_enabled(
+                args.schedule_id,
+                enabled=args.command == "schedule-enable",
+            )
+        )
+
     if args.command == "schedule-run-due":
         return _control_action(
             lambda: LocalScheduleRunner(
@@ -323,6 +456,74 @@ def main(argv=None) -> int:
     if args.command == "webhook-server":
         return _serve_webhook_server(args)
 
+    if args.command == "service":
+        return _serve_runtime_service(args)
+
+    if args.command == "service-doctor":
+        result = diagnose_service(args.config)
+        _print_json(result)
+        return 0 if result["status"] == "ready" else 1
+
+    if args.command == "service-init":
+        return _service_bootstrap_action(
+            lambda: initialize_service_workspace(
+                args.root,
+                host=args.host,
+                port=args.port,
+            )
+        )
+
+    if args.command == "quickstart":
+        return _quickstart_action(
+            lambda: initialize_quickstart_workspace(
+                args.root,
+                host=args.host,
+                port=args.port,
+            )
+        )
+
+    if args.command == "backup":
+        return _backup_action(
+            lambda: create_state_backup(args.state_dir, args.output_dir)
+        )
+
+    if args.command == "backup-verify":
+        return _backup_action(lambda: verify_state_backup(args.backup_dir))
+
+    if args.command == "restore":
+        return _backup_action(
+            lambda: restore_state_backup(args.backup_dir, args.state_dir)
+        )
+
+    if args.command == "state-upgrade-plan":
+        return _migration_action(lambda: inspect_state_upgrade(args.state_dir))
+
+    if args.command == "state-upgrade":
+        return _migration_action(
+            lambda: upgrade_state(
+                args.state_dir,
+                args.output_dir,
+                args.backup_dir,
+            )
+        )
+
+    if args.command == "state-retention-plan":
+        return _retention_action(
+            lambda: inspect_state_retention(
+                args.state_dir,
+                _load_json(args.policy),
+            )
+        )
+
+    if args.command == "state-retention-apply":
+        return _retention_action(
+            lambda: apply_state_retention(
+                args.state_dir,
+                args.output_dir,
+                _load_json(args.policy),
+            )
+        )
+
     if args.command == "resume-published":
         return _control_action(
             lambda: LocalControlPlane(
@@ -333,6 +534,9 @@ def main(argv=None) -> int:
                 args.run_id, approved=not args.reject
             )
         )
+
+    if args.command == "cancel-run":
+        return _control_action(lambda: _cancel_run(args))
 
     if args.command == "control-runs":
         _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_runs())
@@ -359,12 +563,34 @@ def main(argv=None) -> int:
         return 0
 
     if args.command == "control-snapshot":
-        snapshot = build_control_snapshot(args.state_dir, storage=args.storage)
-        if args.output:
-            args.output.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2), encoding="utf-8")
-        else:
-            _print_json(snapshot)
-        return 0
+        try:
+            if args.service_url:
+                if args.auth_token_file is None or args.state_dir is not None:
+                    raise ValueError(
+                        "live control snapshot requires --auth-token-file and excludes --state-dir"
+                    )
+                snapshot = fetch_live_control_snapshot(
+                    args.service_url,
+                    args.auth_token_file,
+                )
+            else:
+                if args.auth_token_file is not None:
+                    raise ValueError("--auth-token-file requires --service-url")
+                snapshot = build_control_snapshot(
+                    args.state_dir or Path(".skill2workflow"),
+                    storage=args.storage,
+                )
+            if args.output:
+                write_private_snapshot(args.output, snapshot)
+            else:
+                _print_json(snapshot)
+            return 0
+        except ValueError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        except OSError:
+            print("control snapshot operation failed", file=sys.stderr)
+            return 1
 
     return 1
 
@@ -383,6 +609,69 @@ def _control_action(callback) -> int:
         return 0
     except ValueError as error:
         print(str(error), file=sys.stderr)
+        return 1
+    except FileNotFoundError:
+        print("run not found", file=sys.stderr)
+        return 1
+
+
+def _backup_action(callback) -> int:
+    try:
+        _print_json(callback())
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except (OSError, sqlite3.Error):
+        print("state backup operation failed", file=sys.stderr)
+        return 1
+
+
+def _migration_action(callback) -> int:
+    try:
+        _print_json(callback())
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except (OSError, sqlite3.Error):
+        print("state upgrade operation failed", file=sys.stderr)
+        return 1
+
+
+def _retention_action(callback) -> int:
+    try:
+        _print_json(callback())
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except (OSError, sqlite3.Error):
+        print("state retention operation failed", file=sys.stderr)
+        return 1
+
+
+def _service_bootstrap_action(callback) -> int:
+    try:
+        _print_json(callback())
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except OSError:
+        print("service bootstrap operation failed", file=sys.stderr)
+        return 1
+
+
+def _quickstart_action(callback) -> int:
+    try:
+        _print_json(callback())
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except OSError:
+        print("quickstart operation failed", file=sys.stderr)
         return 1
 
 
@@ -403,6 +692,17 @@ def _trigger_workflow(args):
     )
 
 
+def _cancel_run(args):
+    state = LocalControlPlane(
+        args.state_dir,
+        storage=args.storage,
+    ).cancel_published_run(args.run_id)
+    return {
+        "run_id": str(state["run_id"]),
+        "status": str(state["status"]),
+    }
+
+
 def _serve_webhook_server(args) -> int:
     try:
         serve_webhook_requests(
@@ -414,6 +714,20 @@ def _serve_webhook_server(args) -> int:
                 credential_provider=_credential_provider(args),
             ),
             once=args.once,
+        )
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
+
+
+def _serve_runtime_service(args) -> int:
+    try:
+        serve_runtime_service(
+            load_service_config(args.config),
+            event_logger=OperationalEventLogger(),
         )
         return 0
     except ValueError as error:

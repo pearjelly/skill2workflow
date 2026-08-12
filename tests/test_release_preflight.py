@@ -2,7 +2,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.release import CommandResult, CommandSpec, run_release_preflight
+from skill2workflow.release import (
+    CommandResult,
+    CommandSpec,
+    default_verification_commands,
+    run_release_preflight,
+)
 
 
 class ReleasePreflightTests(TestCase):
@@ -81,6 +86,64 @@ class ReleasePreflightTests(TestCase):
         self.assertFalse(result.ok)
         self.assertIn("release_notes", _failed_check_names(result))
 
+    def test_preflight_rejects_missing_changelog(self):
+        with TemporaryDirectory() as tmp:
+            repo_root = _write_release_repo(Path(tmp), version="0.1.1")
+            (repo_root / "CHANGELOG.md").unlink()
+
+            result = run_release_preflight(
+                repo_root,
+                version="0.1.1",
+                notes=Path("docs/releases/v0.1.1.md"),
+                skip_git=True,
+                skip_commands=True,
+            )
+
+        self.assertFalse(result.ok)
+        self.assertIn("changelog", _failed_check_names(result))
+
+    def test_preflight_rejects_changelog_without_target_release(self):
+        with TemporaryDirectory() as tmp:
+            repo_root = _write_release_repo(Path(tmp), version="0.1.1")
+            (repo_root / "CHANGELOG.md").write_text(
+                "# Changelog\n\n## [Unreleased]\n\n- Pending work.\n\n"
+                "## [0.1.0] - 2026-07-03\n\n- Initial release.\n",
+                encoding="utf-8",
+            )
+
+            result = run_release_preflight(
+                repo_root,
+                version="0.1.1",
+                notes=Path("docs/releases/v0.1.1.md"),
+                skip_git=True,
+                skip_commands=True,
+            )
+
+        self.assertFalse(result.ok)
+        self.assertIn("changelog", _failed_check_names(result))
+
+    def test_preflight_rejects_invalid_changelog_release_date(self):
+        with TemporaryDirectory() as tmp:
+            repo_root = _write_release_repo(Path(tmp), version="0.1.1")
+            changelog = repo_root / "CHANGELOG.md"
+            changelog.write_text(
+                changelog.read_text(encoding="utf-8").replace(
+                    "2026-07-03", "2026-02-30"
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_release_preflight(
+                repo_root,
+                version="0.1.1",
+                notes=Path("docs/releases/v0.1.1.md"),
+                skip_git=True,
+                skip_commands=True,
+            )
+
+        self.assertFalse(result.ok)
+        self.assertIn("changelog", _failed_check_names(result))
+
     def test_preflight_rejects_dirty_working_tree(self):
         with TemporaryDirectory() as tmp:
             repo_root = _write_release_repo(Path(tmp), version="0.1.1")
@@ -139,6 +202,16 @@ class ReleasePreflightTests(TestCase):
         self.assertFalse(result.ok)
         self.assertIn("command:unit_tests", _failed_check_names(result))
 
+    def test_default_preflight_qualifies_the_built_wheel(self):
+        repo_root = Path("/tmp/release-source")
+
+        commands = {spec.name: list(spec.command) for spec in default_verification_commands(repo_root)}
+
+        self.assertIn("package_wheel", commands)
+        self.assertEqual(commands["package_wheel"][0], commands["unit_tests"][0])
+        self.assertEqual(commands["package_wheel"][1:3], ["scripts/package_smoke.py", "--work-dir"])
+        self.assertTrue(commands["package_wheel"][3].endswith("skill2workflow-release-package-smoke"))
+
 
 class FakeRunner:
     def __init__(self, responses):
@@ -166,6 +239,11 @@ def _write_release_repo(root: Path, version: str, init_version: str = "") -> Pat
     )
     (release_dir / f"v{version}.md").write_text(
         f"# skill2workflow v{version} Release Notes\n\n- Package version: `{version}`\n",
+        encoding="utf-8",
+    )
+    (root / "CHANGELOG.md").write_text(
+        "# Changelog\n\n## [Unreleased]\n\n- Pending work.\n\n"
+        f"## [{version}] - 2026-07-03\n\n- Release {version}.\n",
         encoding="utf-8",
     )
     return root

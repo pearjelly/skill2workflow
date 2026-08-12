@@ -24,7 +24,14 @@ AuditEvent = Dict[str, object]
 class LocalControlPlane:
     """Manage local workflow versions, published runs, and audit events."""
 
-    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None, connector_runtime=None):
+    def __init__(
+        self,
+        state_dir: Path,
+        storage: str = "json",
+        credential_provider=None,
+        connector_runtime=None,
+        execution_owner: str = "",
+    ):
         self.state_dir = Path(state_dir)
         self.workflows_dir = self.state_dir / "workflows"
         self.connectors_path = self.state_dir / "connectors.json"
@@ -34,6 +41,7 @@ class LocalControlPlane:
             storage=storage,
             credential_provider=credential_provider,
             connector_runtime=connector_runtime,
+            execution_owner=execution_owner,
         )
         self.store = create_control_store(self.state_dir, storage=storage)
         self.workflows_dir.mkdir(parents=True, exist_ok=True)
@@ -190,11 +198,81 @@ class LocalControlPlane:
         )
         return state
 
+    def cancel_published_run(self, run_id: str) -> RunState:
+        """Request an idempotent cancellation without accepting arbitrary reason text."""
+
+        current = self.executor.get_run(run_id)
+        workflow_id = str(current.get("workflow_id", "workflow"))
+        workflow_version = str(current.get("workflow_version", "0.1.0"))
+        self._workflow_record(workflow_id, workflow_version)
+        state, newly_requested = self.executor.request_cancel(run_id)
+        if newly_requested:
+            self._append_audit(
+                {
+                    "type": "run_cancel_requested",
+                    "run_id": run_id,
+                    "workflow_id": workflow_id,
+                    "workflow_version": workflow_version,
+                    "timestamp": _now(),
+                }
+            )
+            if state["status"] == "cancelled":
+                self._append_audit(
+                    {
+                        "type": "run_cancelled",
+                        "run_id": run_id,
+                        "workflow_id": workflow_id,
+                        "workflow_version": workflow_version,
+                        "timestamp": _now(),
+                    }
+                )
+        return state
+
     def list_runs(self) -> List[RunState]:
         return self.executor.list_runs()
 
     def get_run(self, run_id: str) -> RunState:
         return self.executor.get_run(run_id)
+
+    def recover_interrupted_runs(self) -> int:
+        """Fence abandoned service executions and expose their unknown outcome."""
+
+        recovered = self.executor.recover_interrupted_runs()
+        existing = {
+            str(event.get("run_id", ""))
+            for event in self.list_audit_events(event_type="run_interrupted")
+        }
+        candidates = {str(state.get("run_id", "")): state for state in recovered}
+        for summary in self.executor.list_runs():
+            if str(summary.get("status", "")) != "interrupted":
+                continue
+            run_id = str(summary.get("run_id", ""))
+            if run_id and run_id not in candidates:
+                candidates[run_id] = self.executor.get_run(run_id)
+        for run_id, state in candidates.items():
+            interruption = next(
+                (
+                    event
+                    for event in state.get("events", [])
+                    if isinstance(event, dict)
+                    and event.get("type") == "run_interrupted"
+                ),
+                None,
+            )
+            if not interruption or run_id in existing:
+                continue
+            self._append_audit(
+                {
+                    "type": "run_interrupted",
+                    "run_id": run_id,
+                    "workflow_id": str(state.get("workflow_id", "workflow")),
+                    "workflow_version": str(
+                        state.get("workflow_version", "0.1.0")
+                    ),
+                    "timestamp": str(interruption.get("timestamp", "")) or _now(),
+                }
+            )
+        return len(recovered)
 
     def list_audit_events(
         self,
@@ -213,6 +291,34 @@ class LocalControlPlane:
         if event_type:
             events = [event for event in events if str(event.get("type", "")) == event_type]
         return events
+
+    def record_ingress_authentication(
+        self,
+        authenticated: bool,
+        method: str,
+        route: str,
+        reason: str = "",
+    ) -> None:
+        """Persist allowlisted authentication evidence without request credentials."""
+
+        normalized_method = str(method).upper()
+        if normalized_method not in {"GET", "POST", "PUT", "DELETE"}:
+            normalized_method = "OTHER"
+        normalized_route = str(route)
+        if normalized_route not in {"workflow_trigger", "run_cancel", "unknown"}:
+            normalized_route = "unknown"
+        normalized_reason = str(reason)
+        if normalized_reason not in {"missing_or_malformed", "invalid", "provider_unavailable"}:
+            normalized_reason = "unspecified"
+        event = {
+            "type": "ingress_authenticated" if authenticated else "ingress_authentication_denied",
+            "method": normalized_method,
+            "route": normalized_route,
+            "timestamp": _now(),
+        }
+        if not authenticated:
+            event["reason"] = normalized_reason
+        self._append_audit(event)
 
     def list_connectors(self) -> List[Dict[str, object]]:
         if self.connectors_path.exists():
@@ -314,7 +420,16 @@ def _load_json(path: Path):
 
 
 def _safe_name(value: str) -> str:
-    return "".join(char if char.isalnum() or char in {"-", "_", "."} else "_" for char in value)
+    text = str(value)
+    if text in {"", ".", ".."}:
+        raise ValueError("workflow id and version must map to a safe path segment")
+    if (
+        len(text.encode("utf-8")) <= 120
+        and all(char.isalnum() or char in {"-", "_", "."} for char in text)
+    ):
+        return text
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+    return f"identity_{digest}"
 
 
 def _now() -> str:

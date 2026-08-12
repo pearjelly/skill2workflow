@@ -123,6 +123,34 @@ class VisualizerTests(TestCase):
         self.assertEqual(overlay["review"]["latest_event_type"], "human_gate_waiting")
         self.assertEqual(overlay["end"]["status"], "not_started")
 
+    def test_run_overlay_for_nodes_marks_only_current_node_interrupted(self):
+        run_state = {
+            "run_id": "run_interrupted",
+            "status": "interrupted",
+            "current_node": "call_api",
+            "node_results": {"start": {"status": "completed"}},
+            "events": [
+                {"type": "node_completed", "node_id": "start"},
+                {
+                    "type": "connector_started",
+                    "node_id": "call_api",
+                    "connector_id": "http",
+                    "connector_status": "running",
+                },
+                {"type": "run_interrupted", "node_id": "call_api"},
+            ],
+        }
+
+        overlay = run_overlay_for_nodes(["start", "call_api", "end"], run_state)
+
+        self.assertEqual(overlay["start"]["status"], "completed")
+        self.assertEqual(overlay["call_api"]["status"], "interrupted")
+        self.assertTrue(overlay["call_api"]["current"])
+        self.assertEqual(
+            overlay["call_api"]["latest_event_type"], "run_interrupted"
+        )
+        self.assertEqual(overlay["end"]["status"], "not_started")
+
     def test_workflow_to_litegraph_derives_transition_edges_when_edges_are_absent(self):
         workflow = _approval_workflow()
         workflow["edges"] = []

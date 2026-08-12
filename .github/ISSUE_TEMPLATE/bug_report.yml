@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem in the harness, CLI, DSL, runtime, editor, or docs.
+description: Report a reproducible problem in the CLI, DSL, runtime, service, editor, packaging, or docs.
 title: "bug: "
 labels:
   - bug
@@ -7,7 +7,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reporting a bug. Please include enough detail for a contributor to reproduce it from a fresh checkout.
+        Thanks for reporting a bug. Please include enough detail for a contributor to reproduce it from a fresh checkout. Do not report security vulnerabilities here; use the private reporting link in SECURITY.md.
   - type: dropdown
     id: area
     attributes:
@@ -18,6 +18,10 @@ body:
         - Workflow DSL
         - Executor
         - Control Plane
+        - Runtime Service / Ingress
+        - Scheduling
+        - Backup / Migration / Retention
+        - Observability
         - Connector Runtime
         - LiteGraph Editor
         - Documentation
@@ -53,13 +57,13 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Include OS, Python version, and whether JSON or SQLite storage was used.
-      placeholder: "macOS 15, Python 3.9, JSON storage"
+      description: Include OS, Python version, storage mode, and whether the installed CLI or source checkout was used.
+      placeholder: "Ubuntu 24.04, Python 3.14, SQLite service, installed wheel"
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
       label: Logs or workflow snippets
-      description: Paste minimal logs, validation output, or Workflow DSL snippets. Remove secrets.
+      description: Paste minimal logs, validation output, or Workflow DSL snippets. Remove secrets, credentials, customer data, and private paths.
       render: text

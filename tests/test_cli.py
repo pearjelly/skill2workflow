@@ -9,9 +9,372 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from skill2workflow.cli import main
+from skill2workflow.schedules import RecurringScheduleStore
+from skill2workflow.state_layout import STATE_LAYOUT_MARKER
 
 
 class CliTests(TestCase):
+    def test_cancel_run_command_cancels_waiting_published_run(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            workflow_path = root / "workflow.json"
+            workflow_path.write_text(json.dumps(_approval_workflow()), encoding="utf-8")
+            run_stdout = StringIO()
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(workflow_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+            with redirect_stdout(run_stdout):
+                self.assertEqual(
+                    main(
+                        [
+                            "run-published",
+                            "workflow_demo",
+                            "--version",
+                            "0.1.0",
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+            run_id = json.loads(run_stdout.getvalue())["run_id"]
+            cancel_stdout = StringIO()
+
+            with redirect_stdout(cancel_stdout):
+                exit_code = main(
+                    [
+                        "cancel-run",
+                        run_id,
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        cancellation = json.loads(cancel_stdout.getvalue())
+        self.assertEqual(cancellation["status"], "cancelled")
+        self.assertEqual(set(cancellation), {"run_id", "status"})
+
+    def test_cancel_run_missing_id_uses_fixed_error_without_traceback(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            from skill2workflow.control_plane import LocalControlPlane
+
+            LocalControlPlane(state_dir, storage="sqlite")
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "cancel-run",
+                        "run_missing123",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "run not found\n")
+
+    def test_state_retention_plan_and_apply_commands_publish_new_copy(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            output_dir = root / "retained"
+            workflow_path = root / "workflow.json"
+            policy_path = root / "retention.json"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            policy_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "skill2workflow-retention-policy-0.1.0",
+                        "retention": {
+                            "delete_before": "2026-01-01T00:00:00Z",
+                            "terminal_run_statuses": ["completed", "failed"],
+                            "terminal_dispatch_statuses": [
+                                "completed",
+                                "failed",
+                                "skipped",
+                                "uncertain",
+                            ],
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(workflow_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+            RecurringScheduleStore(state_dir)
+            plan_stdout = StringIO()
+            with redirect_stdout(plan_stdout):
+                plan_exit = main(
+                    [
+                        "state-retention-plan",
+                        str(policy_path),
+                        "--state-dir",
+                        str(state_dir),
+                    ]
+                )
+            apply_stdout = StringIO()
+            with redirect_stdout(apply_stdout):
+                apply_exit = main(
+                    [
+                        "state-retention-apply",
+                        str(policy_path),
+                        "--state-dir",
+                        str(state_dir),
+                        "--output-dir",
+                        str(output_dir),
+                    ]
+                )
+
+        self.assertEqual(plan_exit, 0)
+        self.assertEqual(apply_exit, 0)
+        self.assertEqual(json.loads(plan_stdout.getvalue())["status"], "ready")
+        self.assertEqual(
+            json.loads(apply_stdout.getvalue())["status"],
+            "retained_copy_created",
+        )
+
+    def test_state_retention_command_normalizes_unexpected_storage_failure(self):
+        stderr = StringIO()
+        with patch(
+            "skill2workflow.cli.apply_state_retention",
+            side_effect=OSError("private retention filesystem detail"),
+        ):
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "state-retention-apply",
+                        "/private/policy.json",
+                        "--state-dir",
+                        "/private/state",
+                        "--output-dir",
+                        "/private/output",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "state retention operation failed\n")
+        self.assertNotIn("private retention filesystem detail", stderr.getvalue())
+
+    def test_state_upgrade_plan_and_upgrade_commands_migrate_legacy_copy(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            source = root / "legacy"
+            output = root / "upgraded"
+            backup = root / "pre-upgrade-backup"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(workflow_path),
+                            "--state-dir",
+                            str(source),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+            RecurringScheduleStore(source)
+            (source / STATE_LAYOUT_MARKER).unlink()
+
+            plan_stdout = StringIO()
+            with redirect_stdout(plan_stdout):
+                self.assertEqual(
+                    main(["state-upgrade-plan", "--state-dir", str(source)]), 0
+                )
+            upgrade_stdout = StringIO()
+            with redirect_stdout(upgrade_stdout):
+                self.assertEqual(
+                    main(
+                        [
+                            "state-upgrade",
+                            "--state-dir",
+                            str(source),
+                            "--output-dir",
+                            str(output),
+                            "--backup-dir",
+                            str(backup),
+                        ]
+                    ),
+                    0,
+                )
+            plan = json.loads(plan_stdout.getvalue())
+            upgraded = json.loads(upgrade_stdout.getvalue())
+
+        self.assertEqual(plan["status"], "upgrade_required")
+        self.assertEqual(upgraded["status"], "upgraded")
+
+    def test_backup_verify_and_restore_commands_round_trip_sqlite_state(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            schedule_path = root / "schedule.json"
+            state_dir = root / "state"
+            backup_dir = root / "backup"
+            restored_dir = root / "restored"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            schedule_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "skill2workflow-schedule-0.2.0",
+                        "schedule": {
+                            "id": "schedule_backup_cli",
+                            "workflow_id": "workflow_demo",
+                            "version": "0.1.0",
+                            "starts_at": "2026-08-11T00:00:00Z",
+                            "interval_seconds": 3600,
+                            "missed_run_policy": "latest",
+                        },
+                        "trigger": {"input": {}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            outputs = []
+            for arguments in (
+                ["publish", str(workflow_path), "--state-dir", str(state_dir), "--storage", "sqlite"],
+                ["schedule-add", str(schedule_path), "--state-dir", str(state_dir), "--storage", "sqlite"],
+                ["backup", "--state-dir", str(state_dir), "--output-dir", str(backup_dir)],
+                ["backup-verify", "--backup-dir", str(backup_dir)],
+                ["restore", "--backup-dir", str(backup_dir), "--state-dir", str(restored_dir)],
+            ):
+                stdout = StringIO()
+                with redirect_stdout(stdout):
+                    self.assertEqual(main(arguments), 0)
+                outputs.append(json.loads(stdout.getvalue()))
+            restored_stdout = StringIO()
+            with redirect_stdout(restored_stdout):
+                self.assertEqual(
+                    main(["workflows", "--state-dir", str(restored_dir), "--storage", "sqlite"]),
+                    0,
+                )
+            restored_workflows = json.loads(restored_stdout.getvalue())
+
+        self.assertEqual(outputs[2]["status"], "created")
+        self.assertEqual(outputs[3]["status"], "valid")
+        self.assertEqual(outputs[4]["status"], "restored")
+        self.assertEqual(restored_workflows[0]["workflow_id"], "workflow_demo")
+
+    def test_backup_command_normalizes_unexpected_storage_failure(self):
+        stderr = StringIO()
+        with patch(
+            "skill2workflow.cli.create_state_backup",
+            side_effect=OSError("private filesystem detail"),
+        ):
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "backup",
+                        "--state-dir",
+                        "/private/state",
+                        "--output-dir",
+                        "/private/backup",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "state backup operation failed\n")
+        self.assertNotIn("private filesystem detail", stderr.getvalue())
+
+    def test_state_upgrade_command_normalizes_unexpected_storage_failure(self):
+        stderr = StringIO()
+        with patch(
+            "skill2workflow.cli.upgrade_state",
+            side_effect=OSError("private migration filesystem detail"),
+        ):
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "state-upgrade",
+                        "--state-dir",
+                        "/private/state",
+                        "--backup-dir",
+                        "/private/backup",
+                        "--output-dir",
+                        "/private/output",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "state upgrade operation failed\n")
+        self.assertNotIn("private migration filesystem detail", stderr.getvalue())
+
+    def test_service_command_loads_validated_configuration(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = root / "service.json"
+            state_dir = root / "state"
+            token_file = root / "ingress.token"
+            credential_dir = root / "credentials"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "skill2workflow-service-0.2.0",
+                        "service": {"host": "127.0.0.1", "port": 8080},
+                        "runtime": {"state_dir": str(state_dir), "storage": "sqlite"},
+                        "auth": {
+                            "provider": "bearer_token_file",
+                            "token_file": str(token_file),
+                        },
+                        "credentials": {
+                            "provider": "directory",
+                            "directory": str(credential_dir),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            captured = {}
+
+            def fake_service(config, event_logger=None):
+                captured["config"] = config
+                captured["event_logger"] = event_logger
+
+            with patch("skill2workflow.cli.serve_runtime_service", side_effect=fake_service):
+                exit_code = main(["service", "--config", str(config_path)])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(captured["config"].state_dir, state_dir)
+        self.assertEqual(captured["config"].storage, "sqlite")
+        self.assertEqual(captured["config"].auth_token_file, token_file)
+        self.assertEqual(captured["config"].credential_dir, credential_dir)
+        self.assertIsNotNone(captured["event_logger"])
+
     def test_visualize_command_writes_litegraph_json(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -267,6 +630,99 @@ class CliTests(TestCase):
         self.assertEqual(audit_events[0]["trigger_source"], "local-schedule:schedule_daily_report")
         self.assertNotIn("input", audit_events[0])
 
+    def test_schedule_commands_support_sqlite_recurring_definitions_and_dispatch_records(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            schedule_path = root / "recurring.json"
+            state_dir = root / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            schedule_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "skill2workflow-schedule-0.2.0",
+                        "schedule": {
+                            "id": "schedule_recurring_cli",
+                            "workflow_id": "workflow_demo",
+                            "version": "0.1.0",
+                            "starts_at": "2026-08-11T00:00:00Z",
+                            "interval_seconds": 60,
+                            "missed_run_policy": "latest",
+                        },
+                        "trigger": {"input": {}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            dispatch_stdout = StringIO()
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["publish", str(workflow_path), "--state-dir", str(state_dir), "--storage", "sqlite"]),
+                    0,
+                )
+                self.assertEqual(
+                    main(["schedule-add", str(schedule_path), "--state-dir", str(state_dir), "--storage", "sqlite"]),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "schedule-disable",
+                            "schedule_recurring_cli",
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "schedule-enable",
+                            "schedule_recurring_cli",
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "schedule-run-due",
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                            "--now",
+                            "2026-08-11T00:00:00Z",
+                        ]
+                    ),
+                    0,
+                )
+            with redirect_stdout(dispatch_stdout):
+                exit_code = main(
+                    [
+                        "schedule-dispatches",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                        "--schedule-id",
+                        "schedule_recurring_cli",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        dispatches = json.loads(dispatch_stdout.getvalue())
+        self.assertEqual(len(dispatches), 1)
+        self.assertEqual(dispatches[0]["status"], "completed")
+        self.assertNotIn("input", dispatches[0])
+
     def test_webhook_server_command_wires_local_control_plane(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"
@@ -506,6 +962,7 @@ class CliTests(TestCase):
                 )
 
             snapshot = json.loads(output_path.read_text(encoding="utf-8"))
+            output_mode = output_path.stat().st_mode & 0o777
 
         self.assertEqual(publish_exit, 0)
         self.assertEqual(run_exit, 0)
@@ -516,6 +973,46 @@ class CliTests(TestCase):
         self.assertEqual(snapshot["workflows"][0]["workflow_id"], "workflow_demo")
         self.assertEqual(snapshot["runs"][0]["workflow_id"], "workflow_demo")
         self.assertIn("run_completed", {event["type"] for event in snapshot["audit_events"]})
+        self.assertEqual(output_mode, 0o600)
+
+    def test_control_snapshot_command_fetches_live_service_without_printing_token(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            token_file = root / "ingress.token"
+            output_path = root / "live-snapshot.json"
+            token_file.write_text("t" * 48, encoding="utf-8")
+            token_file.chmod(0o600)
+            snapshot = {
+                "schema_version": "skill2workflow-control-snapshot-0.1.0",
+                "window": {"max_items": 100},
+            }
+
+            with patch(
+                "skill2workflow.cli.fetch_live_control_snapshot",
+                return_value=snapshot,
+            ) as fetch:
+                exit_code = main(
+                    [
+                        "control-snapshot",
+                        "--service-url",
+                        "https://workflow.example.test",
+                        "--auth-token-file",
+                        str(token_file),
+                        "-o",
+                        str(output_path),
+                    ]
+                )
+                fetched_call = fetch.call_args
+            written_snapshot = json.loads(output_path.read_text(encoding="utf-8"))
+            written_mode = output_path.stat().st_mode & 0o777
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            fetched_call.args,
+            ("https://workflow.example.test", token_file),
+        )
+        self.assertEqual(written_snapshot, snapshot)
+        self.assertEqual(written_mode, 0o600)
 
     def test_run_and_list_runs_can_use_sqlite_storage(self):
         with TemporaryDirectory() as tmp:

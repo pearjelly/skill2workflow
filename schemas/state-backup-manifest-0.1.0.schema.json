@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/state-backup-manifest-0.1.0.schema.json",
+  "title": "skill2workflow self-hosted state backup manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "state_layout_version",
+    "created_at",
+    "storage",
+    "database_count",
+    "workflow_artifact_count",
+    "scheduler_leases_cleared",
+    "scheduler_database_synthesized",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-state-backup-0.1.0"
+    },
+    "state_layout_version": {
+      "enum": [
+        "skill2workflow-sqlite-layout-legacy-unversioned",
+        "skill2workflow-sqlite-layout-0.1.0"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "storage": {
+      "const": "sqlite"
+    },
+    "database_count": {
+      "const": 3
+    },
+    "workflow_artifact_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scheduler_leases_cleared": {
+      "const": true
+    },
+    "scheduler_database_synthesized": {
+      "type": "boolean"
+    },
+    "files": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "kind", "size_bytes", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(control\\.sqlite3|runs\\.sqlite3|scheduler\\.sqlite3|state-layout\\.json|workflows/[^/]+/[^/]+\\.json)$"
+          },
+          "kind": {
+            "enum": ["sqlite", "workflow_artifact", "state_layout"]
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77.0.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,7 +8,8 @@ version = "0.1.0"
 description = "Compile Agent Skills into controlled enterprise workflows."
 readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
   { name = "skill2workflow contributors" }
 ]
@@ -21,17 +22,28 @@ keywords = [
   "litegraph"
 ]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 4 - Beta",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Topic :: Software Development :: Libraries :: Application Frameworks"
 ]
+
+[project.urls]
+Homepage = "https://github.com/pearjelly/skill2workflow"
+Documentation = "https://github.com/pearjelly/skill2workflow/tree/main/docs"
+Repository = "https://github.com/pearjelly/skill2workflow"
+Issues = "https://github.com/pearjelly/skill2workflow/issues"
+Changelog = "https://github.com/pearjelly/skill2workflow/blob/main/CHANGELOG.md"
+Security = "https://github.com/pearjelly/skill2workflow/blob/main/SECURITY.md"
 
 [project.scripts]
 skill2workflow = "skill2workflow.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-

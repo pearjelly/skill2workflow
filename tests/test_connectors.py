@@ -2,9 +2,12 @@ import json
 import importlib.util
 import threading
 import time
+import urllib.error
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from io import BytesIO
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.connectors import (
     CONNECTOR_MANIFEST_VERSION,
@@ -217,6 +220,27 @@ class ConnectorTests(TestCase):
         self.assertEqual(json.loads(result["output"]["body"]), {"error": "unavailable"})
         self.assertEqual(result["error"], "HTTP 503")
 
+    def test_http_connector_closes_http_error_response(self):
+        response_body = BytesIO(b'{"error":"unavailable"}')
+        error = urllib.error.HTTPError(
+            "https://example.test/fail",
+            503,
+            "Service Unavailable",
+            {"Content-Type": "application/json"},
+            response_body,
+        )
+
+        with patch(
+            "skill2workflow.connectors.urllib.request.urlopen",
+            side_effect=error,
+        ):
+            result = execute_connector(
+                _http_node("https://example.test/fail", method="POST")
+            )
+
+        self.assertEqual(result["status"], "failed")
+        self.assertTrue(response_body.closed)
+
     def test_http_connector_rejects_missing_request_and_invalid_url_before_network_call(self):
         cases = [
             ({"id": "http", "kind": "http"}, "requires connector.request"),
@@ -387,7 +411,7 @@ class _ConnectorRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         try:
             self.wfile.write(raw)
-        except BrokenPipeError:
+        except (BrokenPipeError, ConnectionResetError):
             return
 
     def log_message(self, format, *args):

@@ -18,11 +18,20 @@ RunState = Dict[str, object]
 class LocalExecutor:
     """Execute Workflow DSL with pluggable local run-state storage."""
 
-    def __init__(self, state_dir: Path, storage: str = "json", credential_provider=None, connector_runtime=None):
+    def __init__(
+        self,
+        state_dir: Path,
+        storage: str = "json",
+        credential_provider=None,
+        connector_runtime=None,
+        execution_owner: str = "",
+    ):
         self.state_dir = Path(state_dir)
         self.store = create_run_store(self.state_dir, storage)
         self.credential_provider = credential_provider
         self.connector_runtime = connector_runtime or ConnectorRuntime()
+        self.execution_owner = str(execution_owner or "")
+        self._execution_ids: Dict[str, str] = {}
 
     def run(self, workflow: Dict[str, object], context: Dict[str, object] = None) -> RunState:
         workflow_meta = workflow.get("workflow", {})
@@ -46,8 +55,18 @@ class LocalExecutor:
             "events": [],
             "workflow": workflow,
         }
-        self._save(state)
-        return self._drive(state)
+        if self.execution_owner:
+            execution_id = f"execution_{uuid.uuid4().hex}"
+            self.store.start_execution(
+                state, self.execution_owner, execution_id
+            )
+            self._execution_ids[str(state["run_id"])] = execution_id
+        else:
+            self._save(state)
+        try:
+            return self._drive(state)
+        finally:
+            self._execution_ids.pop(str(state["run_id"]), None)
 
     def resume(self, run_id: str, approved: bool = True) -> RunState:
         state = self._load(run_id)
@@ -59,6 +78,13 @@ class LocalExecutor:
         next_node = node.get("on_success") if approved else node.get("on_failure")
         if not isinstance(next_node, str):
             raise ValueError(f"run {run_id} cannot resume from {node['id']}")
+
+        if self.execution_owner:
+            execution_id = f"execution_{uuid.uuid4().hex}"
+            self.store.claim_execution(
+                run_id, self.execution_owner, execution_id
+            )
+            self._execution_ids[run_id] = execution_id
 
         result = {
             "status": "approved" if approved else "rejected",
@@ -81,21 +107,65 @@ class LocalExecutor:
         )
         state["status"] = "running"
         state["current_node"] = next_node
-        self._save(state)
-        return self._drive(state)
+        try:
+            self._save(state)
+            if state["status"] == "cancelled":
+                return state
+            return self._drive(state)
+        finally:
+            self._execution_ids.pop(run_id, None)
+
+    def cancel(self, run_id: str) -> RunState:
+        """Request durable cancellation and apply it immediately when safely waiting."""
+
+        state, _ = self.request_cancel(run_id)
+        return state
+
+    def request_cancel(self, run_id: str):
+        """Return cancellation state plus whether this call created the request."""
+
+        return self.store.request_cancellation(run_id)
 
     def list_runs(self) -> List[RunState]:
         return [_summarize_run(state) for state in self.store.list()]
 
+    def snapshot_window(self, limit: int) -> Dict[str, object]:
+        """Return a bounded SQLite run window and aggregate status counts."""
+
+        window = self.store.snapshot_window(limit)
+        return {
+            "total": window["total"],
+            "status_counts": window["status_counts"],
+            "items": [_summarize_run(state) for state in window["items"]],
+        }
+
     def get_run(self, run_id: str) -> RunState:
         return self._load(run_id)
 
+    def recover_interrupted_runs(self) -> List[RunState]:
+        if not self.execution_owner:
+            raise ValueError("interrupted run recovery requires an execution owner")
+        return self.store.recover_interrupted(self.execution_owner)
+
     def _drive(self, state: RunState) -> RunState:
+        if state.get("status") == "cancelled":
+            return state
         workflow = state["workflow"]
         node_map = self._node_map(workflow)
         state["status"] = "running"
+        self._save(state)
+        if state["status"] == "cancelled":
+            return state
+
+        cancelled = self._cancel_if_requested(state)
+        if cancelled is not None:
+            return cancelled
 
         for _ in range(len(node_map) + 1):
+            cancelled = self._cancel_if_requested(state)
+            if cancelled is not None:
+                return cancelled
+            self._ensure_execution_active(state)
             current_id = state["current_node"]
             node = node_map[current_id]
             node_type = node.get("type")
@@ -192,6 +262,10 @@ class LocalExecutor:
         recovered = False
 
         for attempt in range(1, max_attempts + 2):
+            cancelled = self._cancel_if_requested(state)
+            if cancelled is not None:
+                return cancelled
+            self._ensure_execution_active(state)
             attempts = attempt
             self._event(
                 state,
@@ -205,6 +279,10 @@ class LocalExecutor:
                     "max_attempts": max_attempts,
                 },
             )
+            self._save(state)
+            if state.get("status") == "cancelled":
+                return state
+            self._ensure_execution_active(state)
             try:
                 connector_result = self.connector_runtime.execute_connector(
                     node,
@@ -238,6 +316,9 @@ class LocalExecutor:
                     "error": last_error,
                 },
             )
+            cancelled = self._cancel_if_requested(state)
+            if cancelled is not None:
+                return cancelled
             if attempt <= max_attempts:
                 self._event(
                     state,
@@ -250,6 +331,9 @@ class LocalExecutor:
                         "error": last_error,
                     },
                 )
+            self._save(state)
+            if state.get("status") == "cancelled":
+                return state
 
         result_status = str(connector_result.get("status", "failed"))
         node_result = {
@@ -321,6 +405,10 @@ class LocalExecutor:
             )
             next_node = node.get("on_failure")
 
+        cancelled = self._cancel_if_requested(state)
+        if cancelled is not None:
+            return cancelled
+
         if not isinstance(next_node, str) or next_node not in node_map:
             state["status"] = "failed"
             state["error"] = f"{current_id} has no valid connector transition target"
@@ -331,6 +419,24 @@ class LocalExecutor:
         state["current_node"] = next_node
         self._save(state)
         return None
+
+    def _cancel_if_requested(self, state: RunState):
+        run_id = str(state.get("run_id", ""))
+        if not run_id or not self.store.cancellation_requested(run_id):
+            return None
+        if str(state.get("status", "")) in {
+            "completed",
+            "failed",
+            "cancelled",
+            "interrupted",
+        }:
+            return None
+        self._event(state, "run_cancel_requested", str(state.get("current_node", "")))
+        state["status"] = "cancelled"
+        self._event(state, "run_cancelled", str(state.get("current_node", "")))
+        self._save(state)
+        self.store.mark_cancellation_applied(run_id)
+        return state
 
     def _event(self, state: RunState, event_type: str, node_id: str, extra: Dict[str, object] = None) -> None:
         event = {
@@ -343,7 +449,22 @@ class LocalExecutor:
         state["events"].append(event)
 
     def _save(self, state: RunState) -> None:
+        run_id = str(state.get("run_id", ""))
+        execution_id = self._execution_ids.get(run_id, "")
+        if self.execution_owner and execution_id:
+            self.store.save_execution(
+                state, self.execution_owner, execution_id
+            )
+            return
         self.store.save(state)
+
+    def _ensure_execution_active(self, state: RunState) -> None:
+        run_id = str(state.get("run_id", ""))
+        execution_id = self._execution_ids.get(run_id, "")
+        if self.execution_owner and execution_id:
+            self.store.ensure_execution_active(
+                run_id, self.execution_owner, execution_id
+            )
 
     def _load(self, run_id: str) -> RunState:
         return self.store.load(run_id)

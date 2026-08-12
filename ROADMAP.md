@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-40
-- Current maturity: Controlled Live Pilot
-- Active loop: None; Loop 40 is complete with validated redacted evidence
-- Next maturity gate: Self-hosted Beta
-- Next decision: select or defer Loop 41 after the controlled-Pilot review
+- Completed delivery loops: 1-55
+- Current maturity: Self-hosted Beta
+- Active loop: None; Loop 55 is complete with authenticated live Operator snapshot evidence
+- Next maturity gate: Production Baseline
+- Next decision: select the next Production Baseline loop after reviewing the live Operator snapshot drill
 
 ## Production Readiness Path
 
@@ -44,59 +44,99 @@ This gate requires the completed scoped live connector action plus controlled pi
 
 **Target loops:** 41-43.
 
+**Status:** Achieved.
+
 This gate requires a long-running service boundary, authenticated ingress, a production credential boundary, durable recurring scheduling, restart recovery, and concurrency-safe dispatch for one self-hosted instance.
 
 SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON and JSONL remain supported for examples, local development, and evaluation.
 
 ### Production Baseline
 
-**Status:** Directional; no loop numbers assigned.
+**Status:** Directional; Loops 44-55 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. These capabilities become numbered loops only after Self-hosted Beta evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, and the authenticated live Operator snapshot became Loop 55 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, and a bounded live Operator read surface are achieved by Loops 44-55. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
-### Loop 40: Controlled Live Connector Pilot
+### Loop 55: Authenticated Live Operator Snapshot
 
-**Status:** Complete with the recorded `continue` decision.
+**Status:** Complete.
 
-**Prior basis:** The Lark/Feishu task connector has package-level and pilot-workflow dry-run evidence, including the sales renewal risk workflow after a manual control gate. Loop 39 also produced the redacted connector-validation note at `docs/lark-live-connector-validation.md`. Live behavior remains limited to the fixed `create_task` action. The one scoped live connector validation is not the controlled real-team business-workflow pilot required for Loop 40.
+**Prior basis:** The Operator inspector consumed only manually exported files. A running service exposed aggregate metrics but no authenticated control snapshot, so operators could not inspect bounded workflow, run, audit, connector, and attention state through the supported service boundary.
 
-**Outcome:** A separately authorized paid assisted Pilot completed five approved real task creations across five distinct `Asia/Shanghai` calendar days, using two opaque private case identifiers. It also recorded one independent human rejection with no connector invocation, completed the disabled-live and rollback exercises, and passed all seven fixed verification commands. Partner and operator both acknowledged the final `continue` decision.
+**Outcome:** The service exposes one authenticated, zero-write `GET /api/v1/control-snapshot` route with a fixed 100-item window and 1 MiB response cap. The CLI fetches it without putting the Bearer token in argv, accepts only HTTPS or loopback HTTP, rejects redirects and ambiguous responses, and atomically publishes `0600` output.
 
-**Evidence:** [`docs/pilot-evidence/loop-40/`](docs/pilot-evidence/loop-40/) contains the finalized allowlisted charter, run summaries, safety exercises, verification result, decision, and evidence index. It intentionally excludes business values, task identifiers, provider response bodies, and credentials.
+**Evidence:** [`docs/live-control-snapshot.md`](docs/live-control-snapshot.md) defines the server, client, window, caching, and output contracts. Unit tests cover authentication, pre-readiness access, zero persisted writes, output size, URL restrictions, redirects, schema validation, and private atomic output. `scripts/live_control_snapshot_smoke.py` proves the complete CLI-to-service path and fixed observability in real processes.
 
-**Safety outcome:** The earlier failed workspace remains closed and retained as a historical incident record; it was never retried. The completed Pilot used a fresh authorization boundary. Each approved run remained human-gated, used only a short-lived token in memory, and the finalized evidence contains no raw provider or credential material. The connector continues to provide a no-Vault, no-network `preflight` before a future human-gated run.
+**Safety boundary:** This is a single-team read surface, not a browser session, UI polling channel, pagination API, RBAC layer, hosted control plane, or remote audit store. Snapshots contain authorized workflow and run metadata; operators must protect output and terminate external TLS before loopback forwarding.
 
-**Historical deferral:** [`docs/controlled-pilot-deferral-review.md`](docs/controlled-pilot-deferral-review.md) records the prior normalized failure and its stop rule. It is not completion evidence and did not contribute to this completed Pilot.
-
-The dry-run behavioral baseline remains available through:
+The repeatable evidence command is:
 
 ```bash
-python3 scripts/lark_task_pilot_smoke.py --work-dir /tmp/skill2workflow-lark-task-pilot
+python3 scripts/live_control_snapshot_smoke.py --work-dir /tmp/skill2workflow-live-snapshot-loop55
 ```
 
-Loop 40 advances maturity only to Controlled Live Pilot. It does not authorize additional Lark/Feishu API behavior, hosted multi-tenancy, or Self-hosted Beta claims.
+Loop 55 closes the live Operator read gap without adding remote mutations or poll-driven audit growth. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 40 is complete and there is no active delivery loop; select the next loop after reviewing the completed controlled-Pilot evidence.
+This rolling queue is ordered. Loop 55 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the live snapshot drill.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
 | Loop 40: Controlled Live Connector Pilot | Complete | Paid assisted Pilot completed under the fixed live `create_task` boundary with five approved real tasks, five days, two cases, a rejection, safety exercises, and verification | Finalized redacted evidence at `docs/pilot-evidence/loop-40/`; maturity advances to Controlled Live Pilot |
-| Loop 41: Self-hosted Runtime Service Boundary | Candidate | Add one long-running service entry point with validated configuration | Health/readiness checks, graceful shutdown, and restart continuity evidence |
-| Loop 42: Authenticated Ingress And Production Credentials | Candidate | Require authentication by default for the production service path and resolve credential handles at execution time | Compact security audit evidence and a documented external TLS termination boundary |
-| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Candidate | Persist recurring schedules with restart recovery and a defined missed-run policy | Durable dispatch records and lease or locking semantics for one SQLite-backed service instance |
+| Loop 41: Self-hosted Runtime Service Boundary | Complete | Added one loopback-only long-running service entry point with versioned validated configuration and SQLite state | Health/readiness checks, graceful SIGTERM smoke, and two-process restart continuity evidence |
+| Loop 42: Authenticated Ingress And Production Credentials | Complete | Require authentication by default for business routes and resolve mounted credential handles at execution time | Compact secret-free security audit evidence, rotation smoke, and a documented external TLS termination boundary |
+| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete | Persist recurring schedules with restart recovery and a defined missed-run policy | Durable dispatch records, explicit uncertain recovery, and one SQLite lease with standby takeover evidence |
+| Loop 44: Verified Backup And Restore | Complete | Protect and recover the complete self-hosted SQLite state boundary without credentials | Owner-only SHA-256 manifest, integrity-checked atomic restore, and restored-service drill evidence |
+| Loop 45: State Upgrade And Migration | Complete | Make state compatibility explicit and move legacy SQLite state without mutating the source | Read-only preflight, mandatory verified backup, atomic copy-on-write upgrade, rollback contract, and upgraded-service drill evidence |
+| Loop 46: Runtime Observability Export | Complete | Expose bounded service telemetry without leaking business or credential values | Authenticated aggregate Prometheus text, fixed label vocabulary, safe NDJSON, and real-process drill evidence |
+| Loop 47: Data Retention And Disposal | Complete | Remove expired sensitive runtime state without risking protected work or mutating the source | Fixed policy schema, aggregate plan, verified retained copy, byte-level disposal, and cutover drill evidence |
+| Loop 48: Durable Cooperative Run Cancellation | Complete | Persist an operator stop decision independently from stale run snapshots and suppress future workflow progress | Authenticated route and CLI, safe-point/retry semantics, compact audit, backup/retention integration, and concurrent real-process evidence |
+| Loop 49: Interrupted Run Recovery | Complete | Detect process-lost service executions without replaying an unknown external side effect | Execution tickets, lease-bound takeover, stale-writer fencing, graceful-drain exclusion, compact attention, and real `SIGKILL` evidence |
+| Loop 50: Release Artifact Qualification | Complete | Prove the distributed wheel carries the production CLI and modules without source-checkout assistance | Wheel-only isolated install, scrubbed import environment, minimum command contract, Beta metadata, and release-preflight evidence |
+| Loop 51: Secure Service Bootstrap | Complete | Turn an installed wheel into one ready secure service workspace without manual configuration assembly | Non-overwriting owner-only layout, generated ingress secret, compact output, installed CLI contract, and authenticated real-process drill |
+| Loop 52: Installed Controlled Quickstart | Complete | Let an installed-wheel user reach a durable human-gated workflow without source examples or manual DSL assembly | Bundled Skill compilation, immutable SQLite publication, waiting/resume path, unchanged service startup, and authenticated installed-wheel journey |
+| Loop 53: Operational Readiness Doctor | Complete | Diagnose whether one self-hosted service configuration can safely start without mutating its workspace | Fixed secret-free checks, shared startup guards, stable exit codes, permission and bind failure evidence, and a real CLI drill |
+| Loop 54: Descriptor-bound Connector Credentials | Complete | Bind every execution-time connector credential read to one private regular file without losing atomic rotation | `0700`/`0600` enforcement, no-follow identity checks, 64 KiB bound, generic failures, and outbound suppression evidence |
+| Loop 55: Authenticated Live Operator Snapshot | Complete | Expose the existing Operator artifact through a bounded authenticated service read without poll-driven state mutation | Fixed-window and byte bounds, safe token-file CLI, owner-only output, fixed telemetry, and real-process evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
+
+The Loop 39 validation remains recorded at `docs/lark-live-connector-validation.md`. Live behavior remains limited to the fixed `create_task` action. The one scoped live connector validation is not the controlled real-team business-workflow pilot required for Loop 40. The earlier stopped Pilot is retained separately at `docs/controlled-pilot-deferral-review.md` and did not contribute to the completed evidence.
 
 Loop 41 keeps the runtime scope single-instance and single-tenant. It does not introduce worker coordination or a multi-tenant service boundary.
 
 Loop 42 requires authentication by default on the production service path, credential-handle resolution, compact security audit evidence, and external TLS termination. It does not introduce multi-tenant RBAC, an OAuth platform, or a hosted secret manager.
 
 Loop 43 covers persistent recurring schedules, restart recovery, missed-run policy, durable dispatch records, and lease or locking semantics for one SQLite-backed service instance. Duplicate suppression relies on persisted dispatch state and workflow or connector idempotency; the roadmap must not claim exactly-once execution.
+
+Loop 44 covers only verified offline backup and atomic new-directory restore for the current SQLite layout. It excludes credentials, hot backup, cross-version migration, retention automation, remote replication, and a complete disaster-recovery claim.
+
+Loop 45 covers explicit layout identity and the one supported legacy-unversioned-to-current copy-on-write migration. It excludes online or in-place migration, automatic deployment orchestration, downgrade conversion, post-cutover write reconciliation, and arbitrary future schemas.
+
+Loop 46 covers only the fixed authenticated aggregate metric and operational-event contracts. It excludes identifiers and request values, tracing, histograms, alerts, dashboards, remote telemetry storage, log rotation, and distributed aggregation.
+
+Loop 47 covers only offline copy-on-write disposal of old terminal runs, their linked evidence, and terminal dispatches. It excludes automatic legal policy, secure destruction of source media or backups, workflow/schedule-definition pruning, active-run cancellation, online retention, and post-cutover reconciliation.
+
+Loop 48 covers only durable cooperative cancellation for one run. It excludes forceful thread or provider abort, side-effect rollback, compensation, bulk cancellation, deadlines, arbitrary reason text, and exactly-once execution. Fail-closed interrupted-run detection is delivered separately by Loop 49.
+
+Loop 49 covers service-process ownership loss and fencing for the single-tenant SQLite runtime. It excludes automatic replay, provider reconciliation adapters, compensation, distributed workers, machine-level fencing, and exactly-once execution.
+
+Loop 50 covers isolated wheel qualification and public metadata alignment. It excludes package-registry upload, tags, GitHub Releases, artifact signing, SBOM generation, reproducible-build claims, and a new package version.
+
+Loop 51 covers first-run creation of one local service workspace. It excludes external TLS automation, process supervision, system accounts, containers, firewall policy, hosted secret management, connector credential generation, and workflow publication.
+
+Loop 52 covers a local installed-wheel demonstration workflow. It excludes external connectors, real business side effects, production workflow design, automatic approval, destructive reset, and hosted onboarding.
+
+Loop 53 covers read-only pre-start diagnostics. It excludes repair, permission changes, migration, scheduler-lease acquisition, live dependency checks, external connector calls, supervisor integration, and replacement of the live readiness endpoint.
+
+Loop 54 covers only directory-backed connector credential reads. It excludes encryption at rest, secret distribution, IAM, OAuth, hosted vaults, automatic rotation, certificate/key parsing, and changes to the local-evaluation JSON credential file.
+
+Loop 55 covers only authenticated bounded reads of the current control snapshot. It excludes browser credential storage, CORS, live UI polling, remote mutations, pagination cursors, RBAC, hosted TLS, multi-tenant filtering, and remote audit storage.
 
 Selection rules:
 
@@ -172,6 +212,21 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 38: Live Connector Readiness Review | Complete | Decision note approving only scoped live Lark/Feishu `create_task` follow-up, with credential, idempotency, failure, audit, test, and rollback boundaries |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
 | Loop 40: Controlled Live Connector Pilot | Complete | Paid assisted five-day, five-run Pilot with two private cases, a human rejection, safety exercises, fixed verification, a `continue` decision, and finalized redacted evidence |
+| Loop 41: Self-hosted Runtime Service Boundary | Complete | Versioned service configuration, loopback-only ingress, health/readiness probes, graceful signal shutdown, SQLite restart continuity, operator guide, and real-process smoke evidence |
+| Loop 42: Authenticated Ingress And Production Credentials | Complete | File-backed bearer authentication, execution-time directory credentials, compact ingress audit, request-size guard, external TLS contract, and security smoke evidence |
+| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete | Persistent interval schedules, explicit missed-run policy, claim-before-execute dispatch ledger, restart recovery, SQLite lease exclusion, standby takeover, and real-process evidence |
+| Loop 44: Verified Backup And Restore | Complete | Offline three-database locking, referenced workflow artifacts, owner-only manifest, SHA-256 and integrity verification, atomic new-directory restore, credential exclusion, and real-process recovery drill |
+| Loop 45: State Upgrade And Migration | Complete | Owner-only layout marker, read-only legacy/current/future preflight, mandatory pre-upgrade backup, source-preserving atomic copy upgrade, rollback boundary, and real-process cutover drill |
+| Loop 46: Runtime Observability Export | Complete | Authenticated Prometheus aggregate metrics, fixed status/route labels, process-local HTTP counters, strict operational NDJSON, and real-process leakage evidence |
+| Loop 47: Data Retention And Disposal | Complete | Versioned fixed retention policy, aggregate stopped-state plan, protected waiting/claimed state, secure-delete vacuumed copy, atomic publication, and real-process cutover evidence |
+| Loop 48: Durable Cooperative Run Cancellation | Complete | Independent SQLite cancellation ledger, authenticated route and CLI, immediate waiting stop, running/retry safe points, stale-save protection, backup/retention integration, and real-process concurrency evidence |
+| Loop 49: Interrupted Run Recovery | Complete | Lease-owned execution tickets, transactional interruption, stale-writer fencing, graceful-drain protection, backup/retention/metrics integration, and real-process crash evidence |
+| Loop 50: Release Artifact Qualification | Complete | Wheel-only isolated install, scrubbed import environment, installed production-module and command contract checks, Beta metadata, and release-preflight enforcement |
+| Loop 51: Secure Service Bootstrap | Complete | Non-overwriting owner-only workspace, generated ingress secret, absolute versioned configuration, installed CLI contract, and authenticated real-process first-run evidence |
+| Loop 52: Installed Controlled Quickstart | Complete | Bundled standard Skill, validated DSL, immutable SQLite publication, one human gate, one-step resume, and installed-wheel authenticated trigger evidence |
+| Loop 53: Operational Readiness Doctor | Complete | Fixed secret-free startup checks, descriptor-bound token validation, private runtime directories, stable exits, and real CLI failure evidence |
+| Loop 54: Descriptor-bound Connector Credentials | Complete | Private descriptor-bound value reads, bounded UTF-8 input, atomic rotation, fixed errors, and real transport-suppression evidence |
+| Loop 55: Authenticated Live Operator Snapshot | Complete | Zero-write authenticated service snapshot, fixed collection and byte bounds, safe CLI retrieval, private atomic output, and real-process observability evidence |
 
 ## Release Direction
 
@@ -191,6 +246,7 @@ These areas require their own approved loops:
 - Full RBAC or IAM
 - Complete BPMN compatibility
 - Distributed scheduling or worker coordination
+- Online or incremental backup, cross-version state migration, and remote replication
 - Hosted ingress, callback verification, and queues
 - OAuth, token refresh, and hosted credential management
 - Automatic connector discovery, installation, or marketplace indexing

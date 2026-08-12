@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/state-layout-marker-0.1.0.schema.json",
+  "title": "skill2workflow SQLite state layout marker",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "state_layout_version", "service_initialized"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-state-layout-marker-0.1.0"
+    },
+    "state_layout_version": {
+      "const": "skill2workflow-sqlite-layout-0.1.0"
+    },
+    "service_initialized": {
+      "type": "boolean"
+    }
+  }
+}

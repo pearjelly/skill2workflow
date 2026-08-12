@@ -19,6 +19,8 @@
     approved: "#087443",
     rejected: "#b42318",
     failed: "#b42318",
+    cancelled: "#5d6673",
+    interrupted: "#b42318",
   };
   const TERMINAL_TYPES = new Set(["end", "failure"]);
   const EXAMPLES = {

@@ -1,0 +1,243 @@
+import json
+import os
+import zipfile
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest import TestCase
+from unittest.mock import patch
+
+from scripts.package_smoke import (
+    REQUIRED_CONSOLE_COMMANDS,
+    _inspect_wheel,
+    _run,
+    run_package_smoke,
+)
+
+
+class PackageSmokeTests(TestCase):
+    def test_smoke_builds_and_installs_a_wheel_without_editable_source(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            repo = root / "repo"
+            work = root / "work"
+            fixture = repo / "examples" / "workflows" / "approval-flow.workflow.json"
+            fixture.parent.mkdir(parents=True)
+            fixture.write_text("{}", encoding="utf-8")
+            commands = []
+
+            class FakeEnvBuilder:
+                def __init__(self, **_kwargs):
+                    pass
+
+                def create(self, target):
+                    binary_dir = Path(target) / ("Scripts" if os.name == "nt" else "bin")
+                    binary_dir.mkdir(parents=True)
+                    (binary_dir / ("python.exe" if os.name == "nt" else "python")).touch()
+                    (binary_dir / ("skill2workflow.exe" if os.name == "nt" else "skill2workflow")).touch()
+
+            def fake_run(command, cwd):
+                command = [str(value) for value in command]
+                commands.append((command, Path(cwd)))
+                if "wheel" in command:
+                    wheel_dir = Path(command[command.index("--wheel-dir") + 1])
+                    wheel_dir.mkdir(parents=True, exist_ok=True)
+                    wheel = wheel_dir / "skill2workflow-0.1.0-py3-none-any.whl"
+                    with zipfile.ZipFile(wheel, "w") as archive:
+                        archive.writestr("skill2workflow/__init__.py", "")
+                        archive.writestr(
+                            "skill2workflow-0.1.0.dist-info/licenses/LICENSE",
+                            (
+                                Path(__file__).resolve().parents[1] / "LICENSE"
+                            ).read_text(encoding="utf-8"),
+                        )
+                        archive.writestr(
+                            "skill2workflow-0.1.0.dist-info/METADATA",
+                            _valid_metadata(),
+                        )
+                if "importlib.metadata" in " ".join(command):
+                    return (
+                        '{"version": "0.1.0", "classifiers": '
+                        '["Development Status :: 4 - Beta"]}\n'
+                    )
+                if command[-1:] == ["--help"]:
+                    return "usage: skill2workflow\n" + "\n".join(
+                        REQUIRED_CONSOLE_COMMANDS
+                    )
+                if "service-init" in command:
+                    bootstrap_root = Path(command[command.index("--root") + 1])
+                    secret_path = bootstrap_root / "secrets" / "ingress-token"
+                    config_path = bootstrap_root / "config" / "service.json"
+                    secret_path.parent.mkdir(parents=True)
+                    config_path.parent.mkdir(parents=True)
+                    secret_path.write_text("s" * 48 + "\n", encoding="utf-8")
+                    config_path.write_text("{}", encoding="utf-8")
+                    return json.dumps(
+                        {
+                            "status": "initialized",
+                            "config_file": str(config_path),
+                            "token_file": str(secret_path),
+                        }
+                    )
+                if "service-doctor" in command:
+                    return json.dumps(
+                        {
+                            "schema_version": "skill2workflow-service-doctor-result-0.1.0",
+                            "status": "ready",
+                            "checks": [
+                                {"id": check_id, "status": "passed", "code": "ready"}
+                                for check_id in (
+                                    "config",
+                                    "auth",
+                                    "credentials",
+                                    "state",
+                                    "bind",
+                                )
+                            ],
+                        }
+                    )
+                if "validate" in command:
+                    return '{"valid": true}\n'
+                return "ok\n"
+
+            with patch("scripts.package_smoke.venv.EnvBuilder", FakeEnvBuilder), patch(
+                "scripts.package_smoke._run", side_effect=fake_run
+            ), patch(
+                "scripts.package_smoke._qualify_live_snapshot",
+                return_value=True,
+            ) as qualify_live_snapshot:
+                result = run_package_smoke(repo, work)
+
+        flattened = [part for command, _cwd in commands for part in command]
+        self.assertNotIn("-e", flattened)
+        self.assertIn("wheel", flattened)
+        self.assertEqual(result["install_mode"], "wheel")
+        self.assertTrue(result["isolated_from_source"])
+        self.assertTrue(result["service_bootstrap_status"])
+        self.assertTrue(result["service_doctor_status"])
+        self.assertTrue(result["live_snapshot_status"])
+        qualify_live_snapshot.assert_called_once()
+        self.assertTrue(result["license_included"])
+        self.assertTrue(result["private_artifacts_excluded"])
+        self.assertTrue(result["wheel_metadata_valid"])
+        self.assertTrue(result["project_urls_valid"])
+        self.assertTrue(result["python_classifiers_valid"])
+        self.assertEqual(
+            result["maturity_classifier"], "Development Status :: 4 - Beta"
+        )
+        self.assertEqual(
+            result["required_console_commands"], list(REQUIRED_CONSOLE_COMMANDS)
+        )
+        runtime_cwds = [cwd for command, cwd in commands if "skill2workflow" in Path(command[0]).name]
+        self.assertTrue(runtime_cwds)
+        self.assertTrue(
+            all(cwd == (work / "isolated").resolve() for cwd in runtime_cwds)
+        )
+
+    def test_run_removes_pythonpath_and_disables_user_site_packages(self):
+        with patch.dict(os.environ, {"PYTHONPATH": "/source/leak"}, clear=False), patch(
+            "scripts.package_smoke.subprocess.run"
+        ) as run:
+            run.return_value.returncode = 0
+            run.return_value.stdout = "ok"
+            run.return_value.stderr = ""
+
+            _run(["python", "-V"], Path("/tmp"))
+
+        environment = run.call_args.kwargs["env"]
+        self.assertNotIn("PYTHONPATH", environment)
+        self.assertEqual(environment["PYTHONNOUSERSITE"], "1")
+
+    def test_wheel_inspection_rejects_private_or_state_artifacts(self):
+        with TemporaryDirectory() as temporary:
+            wheel = Path(temporary) / "skill2workflow-0.1.0-py3-none-any.whl"
+            _write_test_wheel(
+                wheel,
+                extra={"docs/pilot-evidence/loop-40/run.json": "{}"},
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "unexpected top-level"):
+                _inspect_wheel(wheel)
+
+    def test_wheel_inspection_requires_license_and_matching_metadata(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            missing_license = root / "missing-license.whl"
+            _write_test_wheel(missing_license, include_license=False)
+            bad_metadata = root / "bad-metadata.whl"
+            _write_test_wheel(
+                bad_metadata,
+                metadata=(
+                    "Metadata-Version: 2.4\n"
+                    "Name: skill2workflow\n"
+                    "Version: 0.1.0\n"
+                    "License-Expression: Proprietary\n"
+                    "Requires-Python: >=3.10\n"
+                ),
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "license"):
+                _inspect_wheel(missing_license)
+            with self.assertRaisesRegex(RuntimeError, "metadata"):
+                _inspect_wheel(bad_metadata)
+
+    def test_wheel_inspection_rejects_modified_license_text(self):
+        with TemporaryDirectory() as temporary:
+            wheel = Path(temporary) / "modified-license.whl"
+            official = (
+                Path(__file__).resolve().parents[1] / "LICENSE"
+            ).read_text(encoding="utf-8")
+            _write_test_wheel(
+                wheel,
+                license_text=official + "\nmodified\n",
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "license"):
+                _inspect_wheel(wheel)
+
+
+def _write_test_wheel(
+    path: Path,
+    *,
+    include_license: bool = True,
+    license_text: str = "",
+    metadata: str = "",
+    extra=None,
+) -> None:
+    metadata = metadata or _valid_metadata()
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("skill2workflow/__init__.py", "")
+        archive.writestr(
+            "skill2workflow-0.1.0.dist-info/METADATA", metadata
+        )
+        if include_license:
+            archive.writestr(
+                "skill2workflow-0.1.0.dist-info/licenses/LICENSE",
+                license_text
+                or (Path(__file__).resolve().parents[1] / "LICENSE").read_text(
+                    encoding="utf-8"
+                ),
+            )
+        for name, value in (extra or {}).items():
+            archive.writestr(name, value)
+
+
+def _valid_metadata() -> str:
+    classifiers = "".join(
+        f"Classifier: Programming Language :: Python :: {version}\n"
+        for version in ("3.9", "3.10", "3.11", "3.12", "3.13", "3.14")
+    )
+    return (
+        "Metadata-Version: 2.4\n"
+        "Name: skill2workflow\n"
+        "Version: 0.1.0\n"
+        "License-Expression: Apache-2.0\n"
+        "License-File: LICENSE\n"
+        "Requires-Python: >=3.9\n"
+        "Project-URL: Homepage, https://github.com/pearjelly/skill2workflow\n"
+        "Project-URL: Repository, https://github.com/pearjelly/skill2workflow\n"
+        "Project-URL: Issues, https://github.com/pearjelly/skill2workflow/issues\n"
+        "Project-URL: Documentation, https://github.com/pearjelly/skill2workflow/tree/main/docs\n"
+        "Project-URL: Changelog, https://github.com/pearjelly/skill2workflow/blob/main/CHANGELOG.md\n"
+        "Project-URL: Security, https://github.com/pearjelly/skill2workflow/blob/main/SECURITY.md\n"
+        + classifiers
+    )

@@ -9,6 +9,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 from typing import Callable, Iterable, List, Optional, Sequence
 
@@ -82,6 +83,7 @@ def run_release_preflight(
     checks.append(_check_version_format(version))
     checks.append(_check_project_version(repo_root / "pyproject.toml", version))
     checks.append(_check_module_version(repo_root / "src" / "skill2workflow" / "__init__.py", version))
+    checks.append(_check_changelog(repo_root / "CHANGELOG.md", version))
     checks.append(_check_release_notes(repo_root, notes, version, tag))
 
     if skip_git:
@@ -106,6 +108,15 @@ def default_verification_commands(repo_root: Path) -> Sequence[CommandSpec]:
     return [
         CommandSpec("unit_tests", [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"]),
         CommandSpec("py_compile", [sys.executable, "-m", "py_compile", *py_files]),
+        CommandSpec(
+            "package_wheel",
+            [
+                sys.executable,
+                "scripts/package_smoke.py",
+                "--work-dir",
+                "/tmp/skill2workflow-release-package-smoke",
+            ],
+        ),
     ]
 
 
@@ -166,6 +177,50 @@ def _check_version_file(name: str, path: Path, pattern: str, expected: str) -> P
     if actual != expected:
         return _failed(name, f"{path} has {actual}, expected {expected}")
     return _passed(name, f"{path.name} declares {expected}")
+
+
+def _check_changelog(path: Path, version: str) -> PreflightCheck:
+    if not path.exists():
+        return _failed("changelog", f"{path} is missing")
+
+    text = path.read_text(encoding="utf-8")
+    unreleased = re.search(r"(?m)^## \[Unreleased\]\s*$", text)
+    releases = list(
+        re.finditer(
+            rf"(?m)^## \[{re.escape(version)}\] - (\d{{4}}-\d{{2}}-\d{{2}})\s*$",
+            text,
+        )
+    )
+    problems = []
+    if unreleased is None:
+        problems.append("must contain an Unreleased heading")
+    if len(releases) != 1:
+        problems.append(f"must contain exactly one target version heading for {version}")
+    elif _invalid_iso_date(releases[0].group(1)):
+        problems.append("target version heading must contain a valid ISO date")
+    if unreleased is not None and releases and unreleased.start() > releases[0].start():
+        problems.append("Unreleased must appear before released versions")
+    if len(releases) == 1:
+        following = re.search(r"(?m)^## \[", text[releases[0].end() :])
+        entry_end = (
+            releases[0].end() + following.start()
+            if following is not None
+            else len(text)
+        )
+        entry = text[releases[0].end() : entry_end]
+        if re.search(r"(?m)^- \S", entry) is None:
+            problems.append("target version entry must contain at least one change")
+    if problems:
+        return _failed("changelog", "; ".join(problems))
+    return _passed("changelog", f"{path.name} records {version}")
+
+
+def _invalid_iso_date(value: str) -> bool:
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return True
+    return False
 
 
 def _check_release_notes(repo_root: Path, notes: Path, version: str, tag: str) -> PreflightCheck:

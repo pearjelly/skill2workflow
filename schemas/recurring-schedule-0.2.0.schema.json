@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/recurring-schedule-0.2.0.schema.json",
+  "title": "skill2workflow durable recurring schedule",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schedule", "trigger"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-schedule-0.2.0"
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "workflow_id",
+        "version",
+        "starts_at",
+        "interval_seconds",
+        "missed_run_policy"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$"
+        },
+        "workflow_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "starts_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        },
+        "missed_run_policy": {
+          "enum": ["latest", "skip"]
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "idempotency_key_prefix": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_.:-]+$"
+        },
+        "input": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

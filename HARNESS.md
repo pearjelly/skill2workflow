@@ -42,7 +42,78 @@ python3 -m json.tool /tmp/skill2workflow-schedule-loop29/artifacts/control-plane
 
 The schedule smoke exercises a deterministic one-shot schedule, due-run selection with an explicit timestamp, the published trigger boundary, durable input context, audit export, and control-plane snapshot generation without cron, sleeping, background threads, or external services.
 
-Run the editable install and console-script smoke:
+Run the durable recurring scheduler evidence:
+
+```bash
+python3 scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-recurring-scheduler-loop43
+python3 -m json.tool /tmp/skill2workflow-recurring-scheduler-loop43/recurring-scheduler-smoke.json >/tmp/skill2workflow-recurring-scheduler-check.json
+```
+
+This real-process smoke covers recurring dispatch, restart recovery, `latest` missed-run coalescing, single-owner readiness, active/standby lease takeover, stale-claim `uncertain` recovery, and graceful exit. It uses only local SQLite and loopback listeners.
+
+Run the verified backup/restore drill:
+
+```bash
+python3 scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-backup-restore-loop44
+python3 -m json.tool /tmp/skill2workflow-backup-restore-loop44/backup-restore-smoke.json >/tmp/skill2workflow-backup-restore-check.json
+```
+
+The drill proves offline lease exclusion, a verified point-in-time snapshot, atomic restore, restored-service readiness and trigger execution, tamper rejection, credential exclusion, and graceful shutdown.
+
+Run the state upgrade/migration evidence:
+
+```bash
+python3 scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-state-upgrade-loop45
+python3 -m json.tool /tmp/skill2workflow-state-upgrade-loop45/state-upgrade-smoke.json >/tmp/skill2workflow-state-upgrade-check.json
+```
+
+The drill proves read-only legacy preflight, a verified pre-upgrade backup, source immutability, atomic copy-on-write publication, upgraded-service readiness and trigger execution, future-layout rejection, and graceful shutdown.
+
+Run the authenticated observability evidence:
+
+```bash
+python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-loop46
+python3 -m json.tool /tmp/skill2workflow-observability-loop46/observability-smoke.json >/tmp/skill2workflow-observability-check.json
+```
+
+This real-process smoke proves default-deny metrics, authenticated Prometheus text export, aggregate workflow/run state, fixed low-cardinality labels, private-value exclusion, and structured lifecycle/request NDJSON.
+
+Run the data retention/disposal evidence:
+
+```bash
+python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-retention-loop47
+python3 -m json.tool /tmp/skill2workflow-retention-loop47/retention-smoke.json >/tmp/skill2workflow-retention-check.json
+```
+
+Run the durable cooperative cancellation evidence:
+
+```bash
+python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellation-loop48
+python3 -m json.tool /tmp/skill2workflow-cancellation-loop48/cancellation-smoke.json >/tmp/skill2workflow-cancellation-check.json
+```
+
+Run the interrupted-run crash recovery evidence:
+
+```bash
+python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-interrupted-loop49
+python3 -m json.tool /tmp/skill2workflow-interrupted-loop49/interrupted-recovery-smoke.json >/tmp/skill2workflow-interrupted-check.json
+```
+
+Run the secure first-service bootstrap evidence:
+
+```bash
+python3 scripts/service_bootstrap_smoke.py --work-dir /tmp/skill2workflow-service-bootstrap-loop51
+```
+
+Run the installed controlled quickstart evidence:
+
+```bash
+python3 scripts/quickstart_smoke.py --work-dir /tmp/skill2workflow-quickstart-loop52
+```
+
+This real-process smoke proves active-service refusal, source preservation, fixed old-terminal deletion, waiting/claimed protection, byte-level private-payload removal from the retained databases, and retained-service cutover.
+
+Run the isolated wheel and console-script smoke:
 
 ```bash
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
@@ -58,7 +129,7 @@ Manual editable install path:
 
 ```bash
 python3 -m venv /tmp/skill2workflow-venv
-/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68"
+/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=77.0.1"
 /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
 /tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json
 ```
@@ -135,6 +206,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workfl
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
+PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --service-url http://127.0.0.1:8080 --auth-token-file /tmp/skill2workflow-ingress.token -o /tmp/skill2workflow-live-snapshot.json
 ```
 
 Open the local control-plane inspector at `http://localhost:4173/web/control.html` after starting `python3 -m http.server 4173`.
@@ -240,8 +312,16 @@ Implemented:
   - documents the schedule contract and non-goals in `docs/triggers.md`
 - Packaging and installability
   - verifies package metadata and empty runtime dependency policy through `tests/test_packaging.py`
-  - verifies editable install and the installed `skill2workflow` console script through `scripts/package_smoke.py`
+  - builds a wheel, installs it into a separate virtual environment, clears source-import paths, and verifies the installed `skill2workflow` console script, service help, production-module imports, and workflow validation through `scripts/package_smoke.py`
   - keeps source-checkout `PYTHONPATH=src` commands and editable-install commands documented side by side
+- Secure service bootstrap
+  - creates a complete non-overwriting owner-only service workspace through `skill2workflow service-init`
+  - generates the ingress secret without printing it and wires absolute config, state, and connector paths
+  - proves unchanged startup, readiness, authentication, no-overwrite behavior, graceful exit, and durable state through `scripts/service_bootstrap_smoke.py`
+- Installed controlled quickstart
+  - compiles a bundled standard Skill and publishes it immutably through the installed `quickstart` command
+  - creates a durable waiting run that completes after one explicit approval
+  - proves the wheel-only journey, generated service startup, and authenticated second trigger through `scripts/quickstart_smoke.py`
 - Connector runtime
   - provides active `manual` and `http` connector manifests
   - gives compiled `human_gate` nodes a default manual connector binding

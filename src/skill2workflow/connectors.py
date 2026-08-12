@@ -7,6 +7,7 @@ import json
 import socket
 import urllib.error
 import urllib.request
+from contextlib import closing
 from dataclasses import dataclass
 from typing import Callable, Dict, List
 
@@ -375,18 +376,19 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
                 "input_mapping": mapping_summary,
             }
     except urllib.error.HTTPError as error:
-        payload = error.read().decode("utf-8")
-        return {
-            "status": "failed",
-            "connector": {"id": "http", "kind": "http"},
-            "output": {
-                "status_code": int(error.code),
-                "headers": dict(error.headers.items()),
-                "body": payload,
-            },
-            "error": f"HTTP {error.code}",
-            "input_mapping": mapping_summary,
-        }
+        with closing(error):
+            payload = error.read().decode("utf-8")
+            return {
+                "status": "failed",
+                "connector": {"id": "http", "kind": "http"},
+                "output": {
+                    "status_code": int(error.code),
+                    "headers": dict(error.headers.items()),
+                    "body": payload,
+                },
+                "error": f"HTTP {error.code}",
+                "input_mapping": mapping_summary,
+            }
     except (TimeoutError, socket.timeout) as error:
         raise ConnectorExecutionError(f"http connector timed out: {error}")
     except urllib.error.URLError as error:

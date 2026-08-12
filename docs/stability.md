@@ -1,6 +1,9 @@
 # Stability Boundaries
 
-`skill2workflow` is pre-alpha, but some surfaces are already stable enough for contributors and early adopters to build against. This document separates stable contracts from experimental internals.
+`skill2workflow` is at Self-hosted Beta maturity. Some surfaces are stable for
+the `0.1.x` compatibility line, while Production Baseline work and the internals
+listed below remain experimental. This document separates those contracts from
+implementation details that may still change.
 
 ## Stable For 0.1.x
 
@@ -20,6 +23,18 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Local trigger command and envelope documented in `docs/triggers.md`
 - Local trigger run-context shape documented in `docs/triggers.md`
 - Local webhook route and response shape documented in `docs/triggers.md`
+- Self-hosted service configuration `skill2workflow-service-0.2.0` and its published JSON Schema
+- Loopback service health/readiness paths and authenticated workflow-trigger boundary documented in `docs/service.md`
+- Authenticated `POST /runs/{run_id}/cancel`, CLI `cancel-run`, terminal `cancelled`, and cooperative safe-point semantics documented in `docs/cancellation.md`
+- Authenticated Prometheus text metric names, fixed label vocabularies, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`
+- Control snapshot `skill2workflow-control-snapshot-0.1.0`, `schemas/control-snapshot-0.1.0.schema.json`, authenticated `GET /api/v1/control-snapshot`, and live `window` semantics documented in `docs/live-control-snapshot.md`
+- Retention policies `skill2workflow-retention-policy-0.1.0`, `skill2workflow-retention-policy-0.2.0`, and `skill2workflow-retention-policy-0.3.0`, aggregate plan/apply summaries, and protected state semantics documented in `docs/data-retention.md`
+- Additive SQLite `run_executions` ownership tickets, terminal `interrupted` run state, and no-replay recovery semantics documented in `docs/interrupted-recovery.md`
+- File-backed single-team Bearer and execution-time directory credential contracts documented in `docs/security-boundary.md`
+- Durable recurring schedule input contract `skill2workflow-schedule-0.2.0` and its published JSON Schema
+- Recurring dispatch states, missed-run policies, and single-SQLite lease semantics documented in `docs/recurring-scheduling.md`
+- State backup manifest `skill2workflow-state-backup-0.1.0`, current `skill2workflow-sqlite-layout-0.1.0`, and verified offline restore contract documented in `docs/backup-restore.md`
+- State layout marker `skill2workflow-state-layout-marker-0.1.0`, fail-closed compatibility preflight, and legacy-to-current copy-on-write migration documented in `docs/upgrade-migration.md`
 - Body-only HTTP connector input mapping documented in `docs/connectors.md`
 - Minimum connector manifest contract documented in `docs/connectors.md`
 - explicit local connector fixture loading for examples, using `load_external_connector(path)` plus `ConnectorRuntime([external_connector])`
@@ -36,17 +51,20 @@ These surfaces may change while the project learns from real workflows:
 - Visual write-back allowlist beyond the documented fields
 - Connector manifest fields beyond the documented minimum contract
 - Dynamic connector loading, automatic connector discovery and product-specific connector packages
-- Connector package installation, marketplace indexing, OAuth, hosted callbacks, queues, and production schedulers
+- Connector package installation, marketplace indexing, OAuth, hosted callbacks, and distributed queues
 - HTTP connector request metadata beyond documented method, URL, headers, body, timeout, credential handles, and body-only input mapping
-- Advanced credential provider configuration beyond local static files
+- Credential providers beyond the documented local static file and mounted directory boundaries
 - Advanced retry behavior beyond documented connector-node retry execution
-- Enterprise credential storage, secret redaction, and IAM
+- Hosted secret storage, OAuth, multi-tenant RBAC, and IAM
 - Advanced input mapping beyond the body-only contract, templating, and connector request interpolation
-- Hosted webhook ingress, callback verification, queues, and schedulers
+- Hosted webhook ingress, callback verification, distributed queues, cron/calendar scheduling, and multi-database schedulers
 - Product-specific connector packages and connector marketplaces
-- Local control-plane storage file layout
+- SQLite table internals beyond the published state-layout identity and supported migration path
 - Executor event taxonomy beyond documented audit examples
-- Future UI/API boundaries
+- Future remote mutation APIs, browser credential sessions, and live UI polling beyond the fixed read-only snapshot boundary
+- Observability backends, alert rules, dashboards, tracing, histograms, and per-node telemetry beyond the fixed Loop 46 export contract
+- Forceful connector abort, provider compensation, bulk cancellation, cancellation deadlines, automatic replay/reconciliation, distributed ownership, and exactly-once execution beyond the fixed Loop 48 cancellation and Loop 49 interruption contracts
+- Legal-policy automation, backup expiration, media erasure, and online retention beyond the fixed copy-on-write contract
 
 ## Extension Rules
 

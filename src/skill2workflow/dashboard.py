@@ -11,26 +11,74 @@ from .visualizer import run_overlay_for_nodes
 
 SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
 MAX_RECENT_EVENTS = 5
+MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 
 
-def build_control_snapshot(state_dir: Path, storage: str = "json", connector_runtime=None) -> Dict[str, object]:
+def build_control_snapshot(
+    state_dir: Path,
+    storage: str = "json",
+    connector_runtime=None,
+    max_items: Optional[int] = None,
+) -> Dict[str, object]:
     """Build a read-only control-plane snapshot from existing local state."""
     control = LocalControlPlane(Path(state_dir), storage=storage, connector_runtime=connector_runtime)
-    workflows = control.list_workflows()
-    audit_events = control.list_audit_events()
-    runs = [_run_summary(control, run, audit_events) for run in control.list_runs()]
-    connectors = control.list_connectors()
-    version_comparisons = _version_comparisons(control, workflows)
+    return build_control_snapshot_from_control(control, max_items=max_items)
 
-    return {
+
+def build_control_snapshot_from_control(
+    control: LocalControlPlane,
+    max_items: Optional[int] = None,
+) -> Dict[str, object]:
+    """Build a snapshot from an existing control plane with an optional tail window."""
+
+    if max_items is not None and (
+        isinstance(max_items, bool) or not isinstance(max_items, int) or max_items <= 0
+    ):
+        raise ValueError("max_items must be a positive integer")
+
+    bounded_sqlite = bool(
+        max_items is not None
+        and hasattr(control.store, "snapshot_window")
+        and hasattr(control.executor.store, "snapshot_window")
+    )
+    if bounded_sqlite:
+        control_window = control.store.snapshot_window(max_items)
+        run_window = control.executor.snapshot_window(max_items)
+        workflows = control_window["workflows"]
+        audit_events = control_window["audit_events"]
+        selected_runs = run_window["items"]
+        workflow_total = int(control_window["workflow_total"])
+        run_total = int(run_window["total"])
+        audit_total = int(control_window["audit_total"])
+        workflow_status_counts = control_window["workflow_status_counts"]
+        run_status_counts = run_window["status_counts"]
+    else:
+        all_workflows = control.list_workflows()
+        all_audit_events = control.list_audit_events()
+        all_runs = control.list_runs()
+        workflows = _tail(all_workflows, max_items)
+        audit_events = _tail(all_audit_events, max_items)
+        selected_runs = _tail(all_runs, max_items)
+        workflow_total = len(all_workflows)
+        run_total = len(all_runs)
+        audit_total = len(all_audit_events)
+        workflow_status_counts = _status_counts(all_workflows)
+        run_status_counts = _run_status_counts(all_runs)
+    all_connectors = control.list_connectors()
+    connectors = _tail(all_connectors, max_items)
+    runs = [_run_summary(control, run, audit_events) for run in selected_runs]
+    all_version_comparisons = _version_comparisons(control, workflows)
+    version_comparisons = _tail(all_version_comparisons, max_items)
+
+    snapshot = {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,
         "summary": {
-            "workflow_count": len(workflows),
-            "run_count": len(runs),
-            "audit_event_count": len(audit_events),
-            "connector_count": len(connectors),
-            "status_counts": _status_counts(workflows),
-            "run_status_counts": _run_status_counts(runs),
+            "workflow_count": workflow_total,
+            "run_count": run_total,
+            "audit_event_count": audit_total,
+            "connector_count": len(all_connectors),
+            "status_counts": workflow_status_counts,
+            "run_status_counts": run_status_counts,
         },
         "workflows": workflows,
         "runs": runs,
@@ -38,6 +86,32 @@ def build_control_snapshot(state_dir: Path, storage: str = "json", connector_run
         "connectors": connectors,
         "version_comparisons": version_comparisons,
         "operator_insights": _operator_insights(runs, audit_events, version_comparisons),
+    }
+    if max_items is not None:
+        snapshot["window"] = {
+            "max_items": max_items,
+            "workflows": _window(workflow_total, len(workflows)),
+            "runs": _window(run_total, len(runs)),
+            "audit_events": _window(audit_total, len(audit_events)),
+            "connectors": _window(len(all_connectors), len(connectors)),
+            "version_comparisons": _window(
+                len(all_version_comparisons), len(version_comparisons)
+            ),
+        }
+    return snapshot
+
+
+def _tail(items: List[object], max_items: Optional[int]) -> List[object]:
+    if max_items is None or len(items) <= max_items:
+        return list(items)
+    return list(items[-max_items:])
+
+
+def _window(total: int, returned: int) -> Dict[str, object]:
+    return {
+        "total": total,
+        "returned": returned,
+        "truncated": returned < total,
     }
 
 
@@ -138,6 +212,9 @@ def _operator_insights(
 ) -> Dict[str, object]:
     waiting_runs = [run for run in runs if str(run.get("status", "")) == "waiting"]
     failed_runs = [run for run in runs if str(run.get("status", "")) == "failed"]
+    interrupted_runs = [
+        run for run in runs if str(run.get("status", "")) == "interrupted"
+    ]
     connector_failures = [
         event for event in audit_events if str(event.get("type", "")) == "connector_failed"
     ]
@@ -152,6 +229,10 @@ def _operator_insights(
         attention_items.append(_run_attention_item(run, "waiting_run", "warning"))
     for run in failed_runs:
         attention_items.append(_run_attention_item(run, "failed_run", "critical"))
+    for run in interrupted_runs:
+        attention_items.append(
+            _run_attention_item(run, "interrupted_run", "critical")
+        )
     for event in connector_failures:
         attention_items.append(_connector_failure_attention_item(event))
 
@@ -159,6 +240,7 @@ def _operator_insights(
         "attention_counts": {
             "waiting_runs": len(waiting_runs),
             "failed_runs": len(failed_runs),
+            "interrupted_runs": len(interrupted_runs),
             "connector_failures": len(connector_failures),
             "version_changes": len(version_changes),
         },

@@ -51,6 +51,7 @@ The executor records policy and recovery visibility in run state:
 | `node_retrying` | A failed connector node will be retried. Includes `attempt`, `next_attempt`, `max_attempts`, and `error`. |
 | `node_recovered` | A connector node succeeded after at least one failed attempt. Includes final `attempt`, `max_attempts`, and last error. |
 | `node_failed` | A node reached terminal failure after exhausting available retry attempts. |
+| `run_interrupted` | A replacement service fenced an active execution owned by a lost process. The external outcome is unknown and no automatic retry occurs. |
 
 Node results for connector nodes include:
 

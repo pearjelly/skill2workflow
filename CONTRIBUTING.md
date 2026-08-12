@@ -1,6 +1,8 @@
 # Contributing to skill2workflow
 
-Thank you for helping improve `skill2workflow`. The project is still pre-alpha, so the most valuable contributions are small, runnable, and easy to verify.
+Thank you for helping improve `skill2workflow`. The project is currently at
+Self-hosted Beta maturity, so the most valuable contributions are scoped,
+runnable, and easy to verify without overstating the production boundary.
 
 ## Project Direction
 
@@ -24,16 +26,23 @@ Run the full test suite:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
+CI repeats the full release-relevant checks on Python 3.9 and 3.14, covering
+the supported floor and the current stable interpreter. Contributors may use
+any supported Python locally; compatibility-sensitive changes should be
+reviewed against both matrix endpoints.
+
 Optionally install the checkout in editable mode to use the `skill2workflow` console script:
 
 ```bash
 python3 -m venv /tmp/skill2workflow-venv
-/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68"
+/tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=77.0.1"
 /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
 /tmp/skill2workflow-venv/bin/skill2workflow --help
 ```
 
-You can also run the package smoke helper, which creates its own temporary virtual environment and validates the installed console script:
+You can also run the package smoke helper, which builds a wheel, installs it
+into a separate temporary virtual environment, and validates the installed
+console script outside the checkout with source-import paths disabled:
 
 ```bash
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
@@ -64,6 +73,50 @@ Run the deterministic local scheduled-trigger smoke:
 
 ```bash
 python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
+```
+
+For durable recurring schedule, runtime service, or scheduler lease changes, run:
+
+```bash
+python3 scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-recurring-scheduler-loop43
+```
+
+For backup, restore, SQLite state layout, or recovery changes, run:
+
+```bash
+python3 scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-backup-restore-loop44
+```
+
+For state layout identity, upgrade, migration, cutover, or rollback changes, also run:
+
+```bash
+python3 scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-state-upgrade-loop45
+```
+
+For service metrics, route classification, or operational logging changes, also run:
+
+```bash
+python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-loop46
+```
+
+For retention policy, state disposal, or retained-copy cutover changes, also run:
+
+```bash
+python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-retention-loop47
+```
+
+For run lifecycle, cancellation, retry safe-point, or concurrent service changes, also run:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_cancellation tests.test_cancellation_docs -v
+python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellation-loop48
+```
+
+For service ownership, lease takeover, crash recovery, or stale-writer fencing changes, also run:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_interrupted_recovery tests.test_interrupted_recovery_docs -v
+python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-interrupted-loop49
 ```
 
 Open the web editor:
@@ -107,6 +160,10 @@ Before changing behavior, read:
 
 - `ROADMAP.md`
 - `HARNESS.md`
+- `SECURITY.md`
+- `SUPPORT.md`
+- `GOVERNANCE.md`
+- `CODE_OF_CONDUCT.md`
 - `docs/credential-boundary.md`
 - `docs/workflow-dsl-contract.md`
 - `docs/workflow-dsl-compatibility.md`
@@ -124,6 +181,7 @@ Before changing behavior, read:
 - Do not commit secrets, credentials, private keys, cookies, production authorization headers, or customer data in Workflow DSL or LiteGraph fixtures.
 - Avoid runtime dependencies unless they directly support a spec-backed capability.
 - Update docs and examples when user-facing behavior changes.
+- Add user-visible changes to the `Unreleased` section of `CHANGELOG.md` without choosing a release version in an ordinary feature PR.
 
 ## Connector Example Safety
 
@@ -135,9 +193,14 @@ Run the committed-fixture secret hygiene check before opening connector or examp
 
 ```bash
 python3 scripts/secret_hygiene.py examples/workflows
+python3 scripts/secret_hygiene.py --repository-root .
 ```
 
-This check catches obvious secret-like keys and values in committed JSON fixtures. It is a guardrail, not a replacement for review.
+The focused command catches obvious secret-like keys and values in committed
+JSON fixtures. Repository mode enumerates tracked files plus unignored local
+candidates, rejects private state, credential files, key material, and media
+outside `docs/assets`, then scans allowed JSON. Findings never echo suspected
+secret values. These checks are guardrails, not replacements for review.
 
 ## Pull Request Checklist
 
@@ -148,6 +211,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 python3 scripts/secret_hygiene.py examples/workflows
+python3 scripts/secret_hygiene.py --repository-root .
 git diff --check
 ```
 
@@ -165,11 +229,57 @@ For trigger, schedule, connector, or control-plane changes, also run:
 python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29
 ```
 
+For recurring schedule or service coordination changes, also run:
+
+```bash
+python3 scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-recurring-scheduler-loop43
+```
+
+For backup, restore, SQLite state layout, or disaster-recovery changes, also run:
+
+```bash
+python3 scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-backup-restore-loop44
+```
+
+For state upgrade or migration changes, also run:
+
+```bash
+python3 scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-state-upgrade-loop45
+```
+
+For metrics or operational log changes, also run:
+
+```bash
+python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-loop46
+```
+
+For retention or disposal changes, also run:
+
+```bash
+python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-retention-loop47
+```
+
+For cancellation behavior or service concurrency changes, also run:
+
+```bash
+python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellation-loop48
+```
+
+For interrupted-run recovery or execution fencing changes, also run:
+
+```bash
+python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-interrupted-loop49
+```
+
 For release PRs, run the release preflight with the target version and notes:
 
 ```bash
 PYTHONPATH=src python3 scripts/release_preflight.py --version <version> --notes docs/releases/v<version>.md --dry-run
 ```
+
+Before that command, move the finalized entries from `Unreleased` into the
+matching dated version heading in `CHANGELOG.md`. A version bump remains a
+separate maintainer decision.
 
 For docs-only changes, the full test suite should still pass unless the PR description explains why local verification was not possible.
 

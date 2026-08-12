@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/retention-policy-0.3.0.schema.json",
+  "title": "skill2workflow retention policy 0.3.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "retention"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-retention-policy-0.3.0"
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delete_before",
+        "terminal_run_statuses",
+        "terminal_dispatch_statuses"
+      ],
+      "properties": {
+        "delete_before": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "terminal_run_statuses": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {"const": "completed"},
+            {"const": "failed"},
+            {"const": "cancelled"},
+            {"const": "interrupted"}
+          ],
+          "items": false
+        },
+        "terminal_dispatch_statuses": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {"const": "completed"},
+            {"const": "failed"},
+            {"const": "skipped"},
+            {"const": "uncertain"}
+          ],
+          "items": false
+        }
+      }
+    }
+  }
+}

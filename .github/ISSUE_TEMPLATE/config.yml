@@ -1,5 +1,11 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
+  - name: Security vulnerability reporting instructions
+    url: https://github.com/pearjelly/skill2workflow/blob/main/SECURITY.md
+    about: Follow the private-reporting or detail-free fallback process; never disclose sensitive details publicly.
+  - name: Support boundary
+    url: https://github.com/pearjelly/skill2workflow/blob/main/SUPPORT.md
+    about: Choose the correct support channel and sanitize all reproduction evidence.
   - name: Roadmap
     url: https://github.com/pearjelly/skill2workflow/blob/main/ROADMAP.md
     about: Check the staged delivery plan before opening broad feature requests.

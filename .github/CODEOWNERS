@@ -1,0 +1,12 @@
+# Default review routing for the current maintainer-led project.
+* @pearjelly
+
+# Critical repository, legal, security, release, schema, and runtime boundaries.
+/.github/ @pearjelly
+/LICENSE @pearjelly
+/SECURITY.md @pearjelly
+/GOVERNANCE.md @pearjelly
+/pyproject.toml @pearjelly
+/schemas/ @pearjelly
+/scripts/ @pearjelly
+/src/skill2workflow/ @pearjelly

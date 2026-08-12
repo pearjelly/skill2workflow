@@ -681,8 +681,8 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         self.assertIn("docs/pilot-evidence/loop-40/", readme)
         self.assertIn("docs/controlled-live-pilot.md", readme)
         self.assertIn("Loop 40", readme)
-        self.assertIn("Current maturity: Controlled Live Pilot", readme)
-        self.assertIn("Delivery Loops 1-40 are complete", readme)
+        self.assertIn("Current maturity: Self-hosted Beta", readme)
+        self.assertIn("Delivery Loops 1-55 are complete", readme)
 
     def test_deferral_review_records_only_supported_findings_and_reentry_gate(self):
         review = (ROOT / "docs" / "controlled-pilot-deferral-review.md").read_text(

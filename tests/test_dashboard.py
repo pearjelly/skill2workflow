@@ -3,10 +3,91 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from skill2workflow.control_plane import LocalControlPlane
-from skill2workflow.dashboard import build_control_snapshot
+from unittest.mock import patch
+
+from skill2workflow.dashboard import (
+    build_control_snapshot,
+    build_control_snapshot_from_control,
+)
 
 
 class DashboardTests(TestCase):
+    def test_sqlite_bounded_snapshot_does_not_call_unbounded_list_paths(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start v1"))
+            control.publish_workflow(_workflow(version="1.1.0", node_title="Start v2"))
+            control.run_published_workflow("workflow_dashboard", "1.0.0")
+            control.run_published_workflow("workflow_dashboard", "1.1.0")
+
+            with patch.object(
+                control.store,
+                "load_index",
+                side_effect=AssertionError("unbounded workflow read"),
+            ), patch.object(
+                control.store,
+                "list_audit_events",
+                side_effect=AssertionError("unbounded audit read"),
+            ), patch.object(
+                control.executor.store,
+                "list",
+                side_effect=AssertionError("unbounded run read"),
+            ):
+                snapshot = build_control_snapshot_from_control(control, max_items=1)
+
+        self.assertEqual(snapshot["summary"]["workflow_count"], 2)
+        self.assertEqual(snapshot["summary"]["run_count"], 2)
+        self.assertEqual(len(snapshot["workflows"]), 1)
+        self.assertEqual(len(snapshot["runs"]), 1)
+        self.assertEqual(len(snapshot["audit_events"]), 1)
+        self.assertTrue(snapshot["window"]["workflows"]["truncated"])
+        self.assertTrue(snapshot["window"]["runs"]["truncated"])
+
+    def test_bounded_snapshot_reports_total_and_returned_windows(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir)
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start v1"))
+            control.publish_workflow(_workflow(version="1.1.0", node_title="Start v2"))
+            control.run_published_workflow("workflow_dashboard", "1.0.0")
+            control.run_published_workflow("workflow_dashboard", "1.1.0")
+
+            snapshot = build_control_snapshot(state_dir, max_items=1)
+
+        self.assertEqual(snapshot["summary"]["workflow_count"], 2)
+        self.assertEqual(snapshot["summary"]["run_count"], 2)
+        self.assertGreater(snapshot["summary"]["audit_event_count"], 1)
+        self.assertEqual(len(snapshot["workflows"]), 1)
+        self.assertEqual(len(snapshot["runs"]), 1)
+        self.assertEqual(len(snapshot["audit_events"]), 1)
+        self.assertEqual(snapshot["audit_events"][0]["type"], "run_completed")
+        self.assertEqual(snapshot["window"]["max_items"], 1)
+        self.assertEqual(
+            snapshot["window"]["workflows"],
+            {"total": 2, "returned": 1, "truncated": True},
+        )
+        self.assertEqual(
+            snapshot["window"]["runs"],
+            {"total": 2, "returned": 1, "truncated": True},
+        )
+        self.assertEqual(
+            snapshot["window"]["audit_events"],
+            {
+                "total": snapshot["summary"]["audit_event_count"],
+                "returned": 1,
+                "truncated": True,
+            },
+        )
+
+    def test_bounded_snapshot_rejects_non_positive_or_boolean_limit(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            for value in (0, -1, True):
+                with self.subTest(value=value):
+                    with self.assertRaisesRegex(ValueError, "max_items"):
+                        build_control_snapshot(state_dir, max_items=value)
+
     def test_build_control_snapshot_summarizes_registry_runs_audit_and_versions(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)
@@ -87,6 +168,34 @@ class DashboardTests(TestCase):
         self.assertEqual(connector_overlay["attempts"], 1)
         self.assertEqual(connector_overlay["audit_event_count"], 3)
         self.assertNotIn("output", connector_overlay)
+
+    def test_interrupted_run_is_a_distinct_critical_attention_item(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir)
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            run = control.run_published_workflow("workflow_dashboard", "1.0.0")
+            detail = control.get_run(run["run_id"])
+            detail["status"] = "interrupted"
+            detail["events"].append(
+                {
+                    "type": "run_interrupted",
+                    "node_id": detail["current_node"],
+                    "timestamp": "2026-08-11T00:00:00+00:00",
+                }
+            )
+            control.executor.store.save(detail)
+
+            insights = build_control_snapshot(state_dir)["operator_insights"]
+
+        self.assertEqual(insights["attention_counts"]["interrupted_runs"], 1)
+        self.assertIn(
+            ("interrupted_run", run["run_id"]),
+            {
+                (item["kind"], item.get("run_id"))
+                for item in insights["attention_items"]
+            },
+        )
 
 
 def _workflow(version: str, node_title: str):

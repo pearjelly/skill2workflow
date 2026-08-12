@@ -18,6 +18,10 @@ body:
         - Workflow DSL
         - Executor
         - Control Plane
+        - Runtime Service / Ingress
+        - Scheduling
+        - Backup / Migration / Retention
+        - Observability
         - Connector Runtime
         - LiteGraph Editor
         - Documentation

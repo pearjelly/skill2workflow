@@ -5,6 +5,7 @@
     view: "operator",
     selected: null,
     filter: "",
+    sourceLabel: "",
   };
 
   const els = {};
@@ -22,6 +23,9 @@
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
+    els.snapshotScope = document.getElementById("snapshot-scope");
+    els.snapshotScopeTitle = document.getElementById("snapshot-scope-title");
+    els.snapshotScopeDetail = document.getElementById("snapshot-scope-detail");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -67,8 +71,7 @@
       }
       loadSnapshot(await response.json(), "Example Snapshot");
     } catch (error) {
-      setStatus("Invalid", "is-invalid");
-      showDetail("Error", { error: error.message });
+      rejectSnapshot("Example Snapshot", { error: error.message });
     }
   }
 
@@ -80,40 +83,163 @@
     try {
       loadSnapshot(JSON.parse(await file.text()), file.name);
     } catch (error) {
-      setStatus("Invalid", "is-invalid");
-      showDetail("Error", { error: error.message });
+      rejectSnapshot(file.name, { error: error.message });
     }
   }
 
   function loadSnapshot(snapshot, label) {
     const errors = validateSnapshot(snapshot);
     if (errors.length) {
-      setStatus("Invalid", "is-invalid");
-      showDetail("Invalid Snapshot", { label: label, errors: errors });
+      rejectSnapshot(label, { errors: errors });
       return;
     }
     state.snapshot = snapshot;
-    state.selected = { kind: "snapshot", value: snapshot.summary || {} };
+    state.sourceLabel = label;
+    state.selected = {
+      kind: "snapshot",
+      value: Object.assign(
+        {},
+        snapshot.summary || {},
+        { window: snapshot.window || null },
+      ),
+    };
     setStatus("Loaded", "is-valid");
+    render();
+  }
+
+  function rejectSnapshot(label, details) {
+    state.snapshot = null;
+    state.sourceLabel = label;
+    state.selected = {
+      kind: "error",
+      value: Object.assign({ label: label }, details || {}),
+    };
+    setStatus("Invalid", "is-invalid");
     render();
   }
 
   function validateSnapshot(snapshot) {
     const errors = [];
-    if (!snapshot || typeof snapshot !== "object") errors.push("snapshot must be an object");
-    if (!Array.isArray(snapshot.workflows)) errors.push("workflows must be an array");
-    if (!Array.isArray(snapshot.runs)) errors.push("runs must be an array");
-    if (!Array.isArray(snapshot.audit_events)) errors.push("audit_events must be an array");
-    if (!Array.isArray(snapshot.connectors)) errors.push("connectors must be an array");
-    if (!Array.isArray(snapshot.version_comparisons)) errors.push("version_comparisons must be an array");
+    if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+      errors.push("snapshot must be an object");
+      return errors;
+    }
+    if (snapshot.schema_version !== "skill2workflow-control-snapshot-0.1.0") {
+      errors.push("schema_version is unsupported");
+    }
+    if (!snapshot.summary || typeof snapshot.summary !== "object" || Array.isArray(snapshot.summary)) {
+      errors.push("summary must be an object");
+    }
+    const collectionFields = [
+      "workflows",
+      "runs",
+      "audit_events",
+      "connectors",
+      "version_comparisons",
+    ];
+    collectionFields.forEach(function (field) {
+      if (!Array.isArray(snapshot[field])) {
+        errors.push(field + " must be an array");
+      } else if (snapshot[field].some(function (item) {
+        return !item || typeof item !== "object" || Array.isArray(item);
+      })) {
+        errors.push(field + " items must be objects");
+      }
+    });
+    if (snapshot.window !== undefined) {
+      validateSnapshotWindow(snapshot, collectionFields, errors);
+    }
     return errors;
   }
 
+  function validateSnapshotWindow(snapshot, collectionFields, errors) {
+    const windowState = snapshot.window;
+    if (!windowState || typeof windowState !== "object" || Array.isArray(windowState)) {
+      errors.push("window must be an object");
+      return;
+    }
+    const maxItems = windowState.max_items;
+    if (!Number.isInteger(maxItems) || maxItems < 1) {
+      errors.push("window.max_items must be a positive integer");
+      return;
+    }
+    const summaryKeys = {
+      workflows: "workflow_count",
+      runs: "run_count",
+      audit_events: "audit_event_count",
+      connectors: "connector_count",
+    };
+    collectionFields.forEach(function (field) {
+      const stats = windowState[field];
+      if (!stats || typeof stats !== "object" || Array.isArray(stats)) {
+        errors.push("window." + field + " must be an object");
+        return;
+      }
+      const total = stats.total;
+      const returned = stats.returned;
+      const truncated = stats.truncated;
+      const actualLength = Array.isArray(snapshot[field]) ? snapshot[field].length : -1;
+      if (
+        !isNonNegativeInteger(total) ||
+        !isNonNegativeInteger(returned) ||
+        typeof truncated !== "boolean" ||
+        returned !== actualLength ||
+        returned > total ||
+        returned > maxItems ||
+        truncated !== (returned < total)
+      ) {
+        errors.push("window." + field + " is inconsistent");
+        return;
+      }
+      const summaryKey = summaryKeys[field];
+      if (summaryKey && snapshot.summary && snapshot.summary[summaryKey] !== total) {
+        errors.push("summary." + summaryKey + " does not match window." + field);
+      }
+    });
+  }
+
+  function isNonNegativeInteger(value) {
+    return Number.isInteger(value) && value >= 0;
+  }
+
   function render() {
+    renderSnapshotScope();
     renderSummary();
     renderTabs();
     renderTables();
     renderDetail();
+  }
+
+  function renderSnapshotScope() {
+    els.snapshotScope.className = "snapshot-scope";
+    if (!state.snapshot) {
+      els.snapshotScopeTitle.textContent = "No valid snapshot";
+      els.snapshotScopeDetail.textContent = state.sourceLabel
+        ? state.sourceLabel + " was rejected; previous data was cleared."
+        : "Load an example or snapshot file to inspect its scope.";
+      return;
+    }
+    const windowState = state.snapshot.window;
+    if (!windowState) {
+      els.snapshotScopeTitle.textContent = "Complete offline snapshot";
+      els.snapshotScopeDetail.textContent = state.sourceLabel + " contains the full exported collections.";
+      return;
+    }
+    els.snapshotScope.classList.add("is-bounded");
+    const fields = ["workflows", "runs", "audit_events", "connectors", "version_comparisons"];
+    const truncated = fields.filter(function (field) {
+      return windowState[field] && windowState[field].truncated;
+    });
+    if (truncated.length) {
+      els.snapshotScope.classList.add("is-truncated");
+    }
+    const truncationLabel = truncated.length === 1
+      ? "1 collection is truncated"
+      : truncated.length + " collections are truncated";
+    els.snapshotScopeTitle.textContent = "Bounded snapshot";
+    els.snapshotScopeDetail.textContent = truncated.length
+      ? truncationLabel + ": " + truncated.join(", ") + ". Totals remain visible in Summary."
+      : "All collections fit within the " + windowState.max_items + " item live window.";
   }
 
   function renderSummary() {
