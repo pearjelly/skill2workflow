@@ -1494,6 +1494,97 @@ class CliTests(TestCase):
         self.assertEqual(workflow_records[0]["status"], "published")
         self.assertEqual(run_summary["workflow_version"], "0.1.0")
 
+    def test_workflows_command_supports_bounded_redacted_inventory_window(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            first_path = root / "workflow-v1.json"
+            second = _workflow()
+            second["workflow"]["version"] = "0.2.0"
+            second["nodes"][0]["title"] = "private workflow title"
+            second_path = root / "workflow-v2.json"
+            first_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            second_path.write_text(json.dumps(second), encoding="utf-8")
+
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(first_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(second_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "workflows",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                        "--limit",
+                        "1",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        inventory = json.loads(output.getvalue())
+        self.assertEqual(
+            inventory["schema_version"],
+            "skill2workflow-workflow-inventory-0.1.0",
+        )
+        self.assertEqual(inventory["summary"]["total"], 2)
+        self.assertEqual(inventory["window"], {
+            "max_items": 1,
+            "total": 2,
+            "returned": 1,
+            "truncated": True,
+        })
+        self.assertEqual(inventory["versions"][0]["version"], "0.2.0")
+        self.assertEqual(
+            set(inventory["versions"][0]),
+            {"workflow_id", "version", "status", "aliases", "checksum"},
+        )
+        self.assertNotIn("private workflow title", output.getvalue())
+
+    def test_workflows_command_rejects_invalid_bounded_inventory_limit(self):
+        with TemporaryDirectory() as tmp:
+            error = StringIO()
+            with redirect_stderr(error):
+                exit_code = main(
+                    [
+                        "workflows",
+                        "--state-dir",
+                        str(Path(tmp) / "state"),
+                        "--limit",
+                        "101",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(error.getvalue().strip(), "max_items must be a positive bounded integer")
+
     def test_trigger_command_starts_published_workflow_with_input_metadata(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

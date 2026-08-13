@@ -7,6 +7,25 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowReleaseDocumentationTests(TestCase):
+    def test_local_workflow_inventory_guide_records_bounded_redacted_contract(self):
+        guide = (ROOT / "docs" / "local-workflow-inventory.md").read_text(
+            encoding="utf-8"
+        )
+        stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        cli = (ROOT / "src" / "skill2workflow" / "cli.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("skill2workflow workflows", guide)
+        self.assertIn("--limit 100", guide)
+        self.assertIn("skill2workflow-workflow-inventory-0.1.0", guide)
+        self.assertIn("trigger inputs", guide)
+        self.assertIn("complete-list", guide)
+        self.assertIn("workflow-content redaction", stability)
+        self.assertIn("bounded local published-workflow inventory", changelog)
+        self.assertIn('"--limit"', cli)
+
     def test_review_contract_and_cas_boundary_are_published(self):
         guide = (ROOT / "docs" / "workflow-releases.md").read_text(encoding="utf-8")
         plan = (

@@ -49,6 +49,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "backup-verify",
     "backup-list",
     "backup-retention-plan",
+    "workflows",
     "schedules",
     "schedule-dispatches",
     "restore",

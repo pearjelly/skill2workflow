@@ -25,6 +25,6 @@ class RemoteTriggerDocumentationTests(TestCase):
         self.assertIn("remote-trigger.md", service_guide)
         self.assertIn("service-trigger", stability)
         self.assertIn("Loop 85: Protected Remote Workflow Triggering", roadmap)
-        self.assertIn("Delivery Loops 1-126 are complete", readme)
+        self.assertIn("Delivery Loops 1-127 are complete", readme)
         self.assertIn("service-trigger", changelog.lower())
         self.assertIn('"service-trigger"', package_smoke)

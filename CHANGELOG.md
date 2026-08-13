@@ -12,6 +12,9 @@ release; Roadmap loop completion alone does not publish a new version.
   and `schedule-dispatches --limit`. The 1-1000 windows omit trigger inputs,
   lease owners, and claim-expiry details while preserving complete-list
   compatibility when the flags are omitted.
+- Added bounded local published-workflow inventory through `workflows --limit`.
+  The 1-100 redacted window reuses the workflow-inventory contract and omits
+  workflow content while preserving complete-list compatibility.
 - Added bounded read-only backup expiration planning through
   `backup-retention-plan`. An explicit cutoff and minimum-valid-backup floor
   produce candidates only from a complete inventory; truncation, invalid sets,

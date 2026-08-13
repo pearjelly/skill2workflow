@@ -396,6 +396,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workfl
 PYTHONPATH=src python3 -m skill2workflow.cli audit-verify --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli backup-list --parent-dir /var/backups/skill2workflow --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli backup-retention-plan /etc/skill2workflow/backup-retention.json --parent-dir /var/backups/skill2workflow
+PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control --storage sqlite --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli schedules --state-dir /tmp/skill2workflow-control --storage sqlite --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches --state-dir /tmp/skill2workflow-control --storage sqlite --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control

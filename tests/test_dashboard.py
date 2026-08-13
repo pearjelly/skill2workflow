@@ -13,6 +13,7 @@ from skill2workflow.dashboard import (
     build_recurring_schedule_list_from_store,
     build_recurring_schedule_dispatch_list_from_store,
     build_workflow_artifact_report_from_control,
+    build_workflow_inventory_from_control,
     build_run_detail,
     build_run_list,
     build_run_page_from_control,
@@ -23,6 +24,26 @@ from skill2workflow.telemetry import RuntimeTelemetry
 
 
 class DashboardTests(TestCase):
+    def test_workflow_inventory_is_bounded_redacted_and_storage_compatible(self):
+        for storage in ("json", "sqlite"):
+            with self.subTest(storage=storage), TemporaryDirectory() as tmp:
+                control = LocalControlPlane(Path(tmp), storage=storage)
+                control.publish_workflow(_workflow(version="1.0.0", node_title="v1"))
+                control.publish_workflow(
+                    _workflow(version="2.0.0", node_title="private title")
+                )
+                inventory = build_workflow_inventory_from_control(control, max_items=1)
+
+            self.assertEqual(
+                inventory["schema_version"],
+                "skill2workflow-workflow-inventory-0.1.0",
+            )
+            self.assertEqual(inventory["summary"]["total"], 2)
+            self.assertEqual(inventory["window"]["returned"], 1)
+            self.assertTrue(inventory["window"]["truncated"])
+            self.assertEqual(inventory["versions"][0]["version"], "2.0.0")
+            self.assertNotIn("private title", json.dumps(inventory))
+
     def test_run_page_is_filtered_redacted_and_cursor_paged(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

@@ -18,7 +18,7 @@ from .backup import (
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
-from .dashboard import build_control_snapshot
+from .dashboard import build_control_snapshot, build_workflow_inventory_from_control
 from .executor import LocalExecutor
 from .live_snapshot import fetch_live_control_snapshot, write_private_snapshot
 from .migration import inspect_state_upgrade, upgrade_state
@@ -137,6 +137,11 @@ def main(argv=None) -> int:
     workflows_cmd = subparsers.add_parser("workflows", help="List published workflow versions")
     workflows_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     workflows_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    workflows_cmd.add_argument(
+        "--limit",
+        type=int,
+        help="Return a compact redacted inventory window (1-100)",
+    )
 
     workflow_artifacts_cmd = subparsers.add_parser(
         "workflow-artifacts",
@@ -765,8 +770,15 @@ def main(argv=None) -> int:
         )
 
     if args.command == "workflows":
-        _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_workflows())
-        return 0
+        control = LocalControlPlane(args.state_dir, storage=args.storage)
+        if args.limit is None:
+            _print_json(control.list_workflows())
+            return 0
+        return _control_action(
+            lambda: build_workflow_inventory_from_control(
+                control, max_items=args.limit
+            )
+        )
 
     if args.command == "workflow-artifacts":
         return _control_action(
