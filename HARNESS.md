@@ -160,6 +160,12 @@ skill2workflow service-runs \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-run-page \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token \
+  --status failed \
+  --max-items 25
+
 skill2workflow service-recurring-schedules \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token

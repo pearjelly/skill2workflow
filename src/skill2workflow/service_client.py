@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Dict, Optional
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 
 from .backup import BACKUP_READINESS_SCHEMA_VERSION
 from .retention import RETENTION_READINESS_SCHEMA_VERSION
@@ -24,6 +24,8 @@ from .dashboard import (
     RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION,
     RUN_DETAIL_SCHEMA_VERSION,
     RUN_LIST_SCHEMA_VERSION,
+    RUN_PAGE_SCHEMA_VERSION,
+    MAX_RUN_PAGE_ITEMS,
     RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION,
     RECURRING_SCHEDULE_LIST_SCHEMA_VERSION,
     SUPPORT_BUNDLE_SCHEMA_VERSION,
@@ -50,6 +52,7 @@ from .webhooks import MAX_REQUEST_BODY_BYTES
 
 
 MAX_SERVICE_ACTION_RESPONSE_BYTES = 64 * 1024
+MAX_RUN_PAGE_RESPONSE_BYTES = 64 * 1024
 MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
@@ -332,6 +335,37 @@ def fetch_run_list(
         conflict_message="run list unavailable",
     )
     _validate_run_list(payload)
+    return payload
+
+
+def fetch_run_page(
+    service_url: str,
+    token_file: Path,
+    *,
+    max_items: int = MAX_RUN_PAGE_ITEMS,
+    cursor: str = "",
+    status: str = "",
+    workflow_id: str = "",
+) -> Dict[str, object]:
+    """Fetch one filtered, cursor-paged authenticated run projection."""
+
+    if isinstance(max_items, bool) or not isinstance(max_items, int) or not 1 <= max_items <= MAX_RUN_PAGE_ITEMS:
+        raise ValueError("max_items must be an integer from 1 through 100")
+    params = {"max_items": str(max_items)}
+    if cursor:
+        params["cursor"] = str(cursor)
+    if status:
+        params["status"] = str(status)
+    if workflow_id:
+        params["workflow_id"] = str(workflow_id)
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/runs?" + urlencode(params),
+        conflict_message="run page unavailable",
+        max_response_bytes=MAX_RUN_PAGE_RESPONSE_BYTES,
+    )
+    _validate_run_page(payload)
     return payload
 
 
@@ -752,7 +786,10 @@ def fetch_audit_consistency(
 def service_endpoint(service_url: str, path: str) -> str:
     """Build one path under an unambiguous service origin."""
 
-    if not isinstance(path, str) or not path.startswith("/") or "?" in path or "#" in path:
+    if not isinstance(path, str) or not path.startswith("/") or "#" in path:
+        raise ValueError("service URL must be an unambiguous HTTPS or loopback HTTP origin")
+    path_parts = urlsplit(path)
+    if path_parts.scheme or path_parts.netloc or not path_parts.path.startswith("/"):
         raise ValueError("service URL must be an unambiguous HTTPS or loopback HTTP origin")
     try:
         parsed = urlsplit(str(service_url))
@@ -775,7 +812,7 @@ def service_endpoint(service_url: str, path: str) -> str:
         netloc = f"[{netloc}]"
     if port is not None:
         netloc = f"{netloc}:{port}"
-    return urlunsplit((parsed.scheme, netloc, path, "", ""))
+    return urlunsplit((parsed.scheme, netloc, path_parts.path, path_parts.query, ""))
 
 
 def _post_json(
@@ -958,7 +995,6 @@ def _validate_run_list(payload: Dict[str, object]) -> None:
 
     if set(payload) != {"schema_version", "summary", "runs", "window"}:
         raise ServiceActionError()
-
     if payload.get("schema_version") != RUN_LIST_SCHEMA_VERSION:
         raise ServiceActionError()
     summary = payload.get("summary")
@@ -1002,6 +1038,72 @@ def _validate_run_list(payload: Dict[str, object]) -> None:
     ):
         raise ServiceActionError()
 
+
+def _validate_run_page(payload: Dict[str, object]) -> None:
+    """Reject responses outside the filtered paged run-list contract."""
+
+    if set(payload) != {"schema_version", "summary", "filters", "runs", "window"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RUN_PAGE_SCHEMA_VERSION:
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    statuses = {
+        "created", "running", "waiting", "completed", "failed",
+        "cancelled", "interrupted", "other",
+    }
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != {"total", "status_counts"}
+        or not _is_non_negative_integer(summary.get("total"))
+        or not isinstance(summary.get("status_counts"), dict)
+        or set(summary["status_counts"]) != statuses
+        or any(not _is_non_negative_integer(value) for value in summary["status_counts"].values())
+        or sum(summary["status_counts"].values()) != summary["total"]
+    ):
+        raise ServiceActionError()
+    filters = payload.get("filters")
+    if (
+        not isinstance(filters, dict)
+        or set(filters) != {"status", "workflow_id"}
+        or not isinstance(filters["status"], str)
+        or not isinstance(filters["workflow_id"], str)
+    ):
+        raise ServiceActionError()
+    runs = payload.get("runs")
+    run_fields = {
+        "run_id", "workflow_id", "workflow_version", "status", "current_node",
+        "event_count", "node_result_count",
+    }
+    if not isinstance(runs, list) or len(runs) > MAX_RUN_PAGE_ITEMS or any(
+        not isinstance(run, dict)
+        or set(run) != run_fields
+        or not _is_safe_run_identifier(run.get("run_id"))
+        or any(not isinstance(run.get(field), str) for field in ("run_id", "workflow_id", "workflow_version", "status", "current_node"))
+        or run.get("status") not in statuses
+        or any(not _is_non_negative_integer(run.get(field)) for field in ("event_count", "node_result_count"))
+        for run in runs
+    ):
+        raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_items", "total", "returned", "has_more", "next_cursor"}
+        or not _is_non_negative_integer(window.get("max_items"))
+        or window.get("max_items") < 1
+        or window.get("max_items") > MAX_RUN_PAGE_ITEMS
+        or not _is_non_negative_integer(window.get("total"))
+        or not _is_non_negative_integer(window.get("returned"))
+        or window.get("returned") != len(runs)
+        or window.get("returned") > window.get("max_items")
+        or window.get("returned") > window.get("total")
+        or not isinstance(window.get("has_more"), bool)
+        or window.get("has_more") != (window.get("returned") < window.get("total"))
+        or (window.get("has_more") and not isinstance(window.get("next_cursor"), str))
+        or (not window.get("has_more") and window.get("next_cursor") is not None)
+        or (isinstance(window.get("next_cursor"), str) and len(window.get("next_cursor")) > 512)
+        or window.get("total") != summary.get("total")
+    ):
+        raise ServiceActionError()
 
 def _validate_recurring_schedule_list(payload: Dict[str, object]) -> None:
     """Reject responses outside the fixed redacted recurring-schedule contract."""

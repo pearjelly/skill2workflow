@@ -165,6 +165,27 @@ class LocalExecutor:
             "items": [_summarize_run(state) for state in window["items"]],
         }
 
+    def run_page(
+        self,
+        limit: int,
+        *,
+        before_updated_at: str = "",
+        before_run_id: str = "",
+        status: str = "",
+        workflow_id: str = "",
+    ) -> Dict[str, object]:
+        """Return one bounded filtered run page from the durable store."""
+
+        page = self.store.run_page(
+            limit,
+            before_updated_at=before_updated_at,
+            before_run_id=before_run_id,
+            status=status,
+            workflow_id=workflow_id,
+        )
+        page["items"] = [_summarize_run(state) for state in page["items"]]
+        return page
+
     def get_run(self, run_id: str) -> RunState:
         return self._load(run_id)
 

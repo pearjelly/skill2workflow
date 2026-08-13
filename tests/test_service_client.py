@@ -29,6 +29,7 @@ from skill2workflow.service_client import (
     post_run_resume,
     fetch_run_detail,
     fetch_run_list,
+    fetch_run_page,
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
     fetch_workflow_artifact_report,
@@ -55,6 +56,62 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_run_page_uses_authenticated_get_with_filters_and_cursor(self):
+        observed = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append({"path": self.path, "authorization": self.headers.get("Authorization")})
+                _send_json(
+                    self,
+                    200,
+                    {
+                        "schema_version": "skill2workflow-run-list-0.2.0",
+                        "summary": {
+                            "total": 1,
+                            "status_counts": {
+                                "created": 0, "running": 0, "waiting": 0,
+                                "completed": 0, "failed": 1, "cancelled": 0,
+                                "interrupted": 0, "other": 0,
+                            },
+                        },
+                        "filters": {"status": "failed", "workflow_id": "workflow"},
+                        "runs": [],
+                        "window": {
+                            "max_items": 10, "total": 1, "returned": 0,
+                            "has_more": True, "next_cursor": "cursor-token",
+                        },
+                    },
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            page = fetch_run_page(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                status="failed",
+                workflow_id="workflow",
+                cursor="cursor-token",
+                max_items=10,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(page["schema_version"], "skill2workflow-run-list-0.2.0")
+        self.assertEqual(observed[0]["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertIn("status=failed", observed[0]["path"])
+        self.assertIn("workflow_id=workflow", observed[0]["path"])
+        self.assertIn("cursor=cursor-token", observed[0]["path"])
+        self.assertFalse(thread.is_alive())
+
     def test_service_probe_returns_fixed_ready_contract_without_credentials(self):
         observed = []
         responses = {

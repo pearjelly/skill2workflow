@@ -39,6 +39,7 @@ from .service_client import (
     fetch_workflow_diff,
     fetch_run_detail,
     fetch_run_list,
+    fetch_run_page,
     fetch_support_bundle,
     post_recurring_schedule_state,
     post_run_cancel,
@@ -358,6 +359,17 @@ def main(argv=None) -> int:
     )
     service_runs_cmd.add_argument("--service-url", required=True)
     service_runs_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_run_page_cmd = subparsers.add_parser(
+        "service-run-page",
+        help="List filtered cursor-paged redacted runs through the authenticated service",
+    )
+    service_run_page_cmd.add_argument("--service-url", required=True)
+    service_run_page_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_run_page_cmd.add_argument("--status", default="")
+    service_run_page_cmd.add_argument("--workflow-id", default="")
+    service_run_page_cmd.add_argument("--cursor", default="")
+    service_run_page_cmd.add_argument("--max-items", type=int, default=100)
 
     service_schedules_cmd = subparsers.add_parser(
         "service-recurring-schedules",
@@ -914,6 +926,18 @@ def main(argv=None) -> int:
             lambda: fetch_run_list(
                 args.service_url,
                 args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-run-page":
+        return _service_action(
+            lambda: fetch_run_page(
+                args.service_url,
+                args.auth_token_file,
+                max_items=args.max_items,
+                cursor=args.cursor,
+                status=args.status,
+                workflow_id=args.workflow_id,
             )
         )
 

@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added protected cursor-paged run discovery at `GET /api/v1/runs` and the
+  `service-run-page` CLI. Operators can filter by status/workflow and continue
+  through history without loading unbounded run state; the existing `/runs`
+  0.1.0 contract remains unchanged.
 - Added a bounded global workflow deadline: `policies.workflow_timeout_ms`
   starts at run creation, continues while human gates wait, and records fixed
   `workflow_timeout` failure evidence at executor safe points. The deadline is

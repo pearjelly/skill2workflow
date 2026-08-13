@@ -43,6 +43,7 @@ class RunDetailDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
+        harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(encoding="utf-8")
 
         self.assertIn("docs/run-detail.md", readme)
@@ -51,8 +52,12 @@ class RunDetailDocumentationTests(TestCase):
         self.assertIn("GET /runs", service)
         self.assertIn("service-show", stability)
         self.assertIn("service-runs", stability)
+        self.assertIn("service-run-page", harness)
         self.assertIn('"service-show"', package_smoke)
         self.assertIn('"service-runs"', package_smoke)
+        self.assertIn("service-run-page", service)
+        self.assertIn("service-run-page", stability)
+        self.assertIn('"service-run-page"', package_smoke)
         self.assertIn("docs/support-bundle.md", readme)
         self.assertIn("service-support-bundle", stability)
         self.assertIn('"service-support-bundle"', package_smoke)
@@ -83,6 +88,21 @@ class RunDetailDocumentationTests(TestCase):
             "service-show",
         ):
             self.assertIn(phrase, guide)
+
+    def test_filtered_paged_run_list_contract_is_published(self):
+        schema = json.loads(
+            (ROOT / "schemas" / "run-list-0.2.0.schema.json").read_text(encoding="utf-8")
+        )
+        guide = (ROOT / "docs" / "run-list.md").read_text(encoding="utf-8")
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-run-list-0.2.0",
+        )
+        self.assertEqual(schema["properties"]["runs"]["maxItems"], 100)
+        self.assertIn("GET /api/v1/runs", guide)
+        self.assertIn("status=failed", guide)
+        self.assertIn("next_cursor", guide)
+        self.assertIn("service-run-page", guide)
 
     def test_support_bundle_schema_and_guide_publish_safe_incident_contract(self):
         schema = json.loads(

@@ -15,6 +15,7 @@ from skill2workflow.dashboard import (
     build_workflow_artifact_report_from_control,
     build_run_detail,
     build_run_list,
+    build_run_page_from_control,
     build_support_bundle_from_control,
 )
 from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringScheduleStore
@@ -22,6 +23,28 @@ from skill2workflow.telemetry import RuntimeTelemetry
 
 
 class DashboardTests(TestCase):
+    def test_run_page_is_filtered_redacted_and_cursor_paged(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            control.run_published_workflow("workflow_dashboard", "1.0.0")
+            control.run_published_workflow("workflow_dashboard", "1.0.0")
+            page = build_run_page_from_control(
+                control,
+                max_items=1,
+                status="completed",
+                workflow_id="workflow_dashboard",
+            )
+
+        self.assertEqual(page["schema_version"], "skill2workflow-run-list-0.2.0")
+        self.assertEqual(page["filters"], {"status": "completed", "workflow_id": "workflow_dashboard"})
+        self.assertEqual(page["summary"]["total"], 2)
+        self.assertEqual(page["window"]["returned"], 1)
+        self.assertTrue(page["window"]["has_more"])
+        self.assertTrue(page["window"]["next_cursor"])
+        self.assertNotIn("context", json.dumps(page, ensure_ascii=False))
+
     def test_sqlite_bounded_snapshot_does_not_call_unbounded_list_paths(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

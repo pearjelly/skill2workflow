@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -15,6 +19,7 @@ from .visualizer import run_overlay_for_nodes
 SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
 RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
 RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
+RUN_PAGE_SCHEMA_VERSION = "skill2workflow-run-list-0.2.0"
 SUPPORT_BUNDLE_SCHEMA_VERSION = "skill2workflow-support-bundle-0.1.0"
 WORKFLOW_INVENTORY_SCHEMA_VERSION = "skill2workflow-workflow-inventory-0.1.0"
 RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list-0.1.0"
@@ -24,6 +29,7 @@ MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 MAX_RUN_DETAIL_EVENTS = 50
 MAX_RUN_LIST_ITEMS = 100
+MAX_RUN_PAGE_ITEMS = 100
 MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
@@ -178,6 +184,69 @@ def build_run_list_from_control(
             "total": total,
             "returned": len(runs),
             "truncated": len(runs) < total,
+        },
+    }
+
+
+def build_run_page_from_control(
+    control: LocalControlPlane,
+    *,
+    max_items: int = MAX_RUN_PAGE_ITEMS,
+    cursor: str = "",
+    status: str = "",
+    workflow_id: str = "",
+) -> Dict[str, object]:
+    """Build a filtered, cursor-paged redacted run projection for SQLite service use."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or max_items <= 0
+        or max_items > MAX_RUN_PAGE_ITEMS
+    ):
+        raise ValueError("max_items must be a positive bounded integer")
+    normalized_status = str(status or "")
+    if normalized_status and normalized_status not in _RUN_STATUS_VALUES[:-1]:
+        raise ValueError("run page status is invalid")
+    normalized_workflow_id = str(workflow_id or "")
+    if len(normalized_workflow_id) > 128:
+        raise ValueError("run page workflow_id is too long")
+    before_updated_at, before_run_id = _decode_run_page_cursor(cursor)
+    if not hasattr(control.executor, "run_page"):
+        raise ValueError("run pages require sqlite storage")
+    page = control.executor.run_page(
+        max_items,
+        before_updated_at=before_updated_at,
+        before_run_id=before_run_id,
+        status=normalized_status,
+        workflow_id=normalized_workflow_id,
+    )
+    runs = [
+        _safe_run_summary(run)
+        for run in page.get("items", [])
+        if isinstance(run, dict)
+    ]
+    next_cursor = None
+    if page.get("has_more") and isinstance(page.get("next_cursor"), dict):
+        next_cursor = _encode_run_page_cursor(page["next_cursor"])
+    total = int(page.get("total", 0))
+    return {
+        "schema_version": RUN_PAGE_SCHEMA_VERSION,
+        "summary": {
+            "total": total,
+            "status_counts": _fixed_run_status_counts(page.get("status_counts", {})),
+        },
+        "filters": {
+            "status": normalized_status,
+            "workflow_id": normalized_workflow_id,
+        },
+        "runs": runs,
+        "window": {
+            "max_items": max_items,
+            "total": total,
+            "returned": len(runs),
+            "has_more": bool(page.get("has_more")),
+            "next_cursor": next_cursor,
         },
     }
 
@@ -504,6 +573,7 @@ def build_support_bundle_from_control(
     http_requests.pop("workflow_deprecation", None)
     http_requests.pop("workflow_inventory", None)
     http_requests.pop("workflow_diff", None)
+    http_requests.pop("run_page", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests
     return {
@@ -560,6 +630,56 @@ def _fixed_run_status_counts(value: object) -> Dict[str, int]:
             normalized = status if status in _RUN_STATUS_VALUES[:-1] else "other"
             counts[normalized] += _safe_non_negative_int(count)
     return counts
+
+
+def _encode_run_page_cursor(value: object) -> str:
+    if not isinstance(value, dict) or set(value) != {"updated_at", "run_id"}:
+        raise ValueError("run page cursor is invalid")
+    updated_at = str(value.get("updated_at", ""))
+    run_id = str(value.get("run_id", ""))
+    _validate_run_page_cursor_parts(updated_at, run_id)
+    raw = json.dumps(
+        {"updated_at": updated_at, "run_id": run_id},
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_run_page_cursor(cursor: str):
+    normalized = str(cursor or "")
+    if not normalized:
+        return "", ""
+    if len(normalized) > 512 or any(
+        character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for character in normalized
+    ):
+        raise ValueError("run page cursor is invalid")
+    try:
+        raw = base64.urlsafe_b64decode(normalized + "=" * (-len(normalized) % 4))
+        value = json.loads(raw.decode("utf-8"))
+    except (binascii.Error, UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError("run page cursor is invalid") from error
+    if not isinstance(value, dict) or set(value) != {"updated_at", "run_id"}:
+        raise ValueError("run page cursor is invalid")
+    updated_at = str(value.get("updated_at", ""))
+    run_id = str(value.get("run_id", ""))
+    _validate_run_page_cursor_parts(updated_at, run_id)
+    return updated_at, run_id
+
+
+def _validate_run_page_cursor_parts(updated_at: str, run_id: str) -> None:
+    try:
+        parsed = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError("run page cursor is invalid") from error
+    if parsed.tzinfo is None and len(updated_at) != 19:
+        raise ValueError("run page cursor is invalid")
+    if not run_id.startswith("run_") or len(run_id) > 128:
+        raise ValueError("run page cursor is invalid")
+    if any(character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-" for character in run_id):
+        raise ValueError("run page cursor is invalid")
 
 
 def build_run_detail_from_control(

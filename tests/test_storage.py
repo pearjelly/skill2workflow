@@ -8,6 +8,61 @@ from skill2workflow.storage import SqliteControlStore, SqliteRunStore
 
 
 class StorageTests(TestCase):
+    def test_sqlite_run_page_filters_and_returns_stable_cursor_window(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteRunStore(Path(tmp))
+            for index, status in enumerate(("completed", "failed", "failed")):
+                store.save(
+                    {
+                        "run_id": f"run_page_{index}",
+                        "workflow_id": "workflow_page" if index < 2 else "workflow_other",
+                        "workflow_version": "0.1.0",
+                        "status": status,
+                        "current_node": "end",
+                        "events": [],
+                    }
+                )
+            page = store.run_page(
+                1,
+                status="failed",
+                workflow_id="workflow_page",
+            )
+
+        self.assertEqual(page["total"], 1)
+        self.assertEqual(page["status_counts"], {"failed": 1})
+        self.assertFalse(page["has_more"])
+        self.assertEqual([item["run_id"] for item in page["items"]], ["run_page_1"])
+        self.assertEqual(page["next_cursor"], None)
+
+    def test_sqlite_run_page_cursor_continues_without_loading_all_runs(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteRunStore(Path(tmp))
+            for index in range(3):
+                store.save(
+                    {
+                        "run_id": f"run_cursor_{index}",
+                        "workflow_id": "workflow_cursor",
+                        "workflow_version": "0.1.0",
+                        "status": "failed",
+                        "current_node": "end",
+                        "events": [],
+                    }
+                )
+            first = store.run_page(2, workflow_id="workflow_cursor")
+            cursor = first["next_cursor"]
+            second = store.run_page(
+                2,
+                workflow_id="workflow_cursor",
+                before_updated_at=cursor["updated_at"],
+                before_run_id=cursor["run_id"],
+            )
+
+        self.assertEqual(first["total"], 3)
+        self.assertTrue(first["has_more"])
+        self.assertEqual([item["run_id"] for item in first["items"]], ["run_cursor_1", "run_cursor_2"])
+        self.assertEqual([item["run_id"] for item in second["items"]], ["run_cursor_0"])
+        self.assertFalse(second["has_more"])
+
     def test_sqlite_idempotent_audit_repair_is_atomic_across_concurrent_retries(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

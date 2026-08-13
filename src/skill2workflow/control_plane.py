@@ -878,6 +878,7 @@ class LocalControlPlane:
             "run_cancel",
             "run_resume",
             "run_list",
+            "run_page",
             "run_detail",
             "recurring_schedule_action",
             "workflow_release",

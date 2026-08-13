@@ -106,6 +106,19 @@ class JsonRunStore:
             and str(state.get("error_code", "")) == "workflow_timeout"
         ][:limit]
 
+    def run_page(
+        self,
+        limit: int,
+        *,
+        before_updated_at: str = "",
+        before_run_id: str = "",
+        status: str = "",
+        workflow_id: str = "",
+    ) -> Dict[str, object]:
+        """Return one bounded filtered page from the SQLite run index."""
+
+        raise ValueError("run pages require sqlite storage")
+
     def request_cancellation(self, run_id: str):
         state = self.load(run_id)
         status = str(state.get("status", ""))
@@ -360,6 +373,74 @@ class SqliteRunStore:
                 str(status): int(count) for status, count in status_rows
             },
             "items": [json.loads(str(row[0])) for row in reversed(rows)],
+        }
+
+    def run_page(
+        self,
+        limit: int,
+        *,
+        before_updated_at: str = "",
+        before_run_id: str = "",
+        status: str = "",
+        workflow_id: str = "",
+    ) -> Dict[str, object]:
+        """Return a bounded, filtered cursor page without loading all runs."""
+
+        _validate_page_limit(limit)
+        before_updated_at = str(before_updated_at or "")
+        before_run_id = str(before_run_id or "")
+        if bool(before_updated_at) != bool(before_run_id):
+            raise ValueError("run page cursor must contain updated_at and run_id")
+        filter_clauses = []
+        filter_values = []
+        if status:
+            filter_clauses.append("status = ?")
+            filter_values.append(str(status))
+        if workflow_id:
+            filter_clauses.append("workflow_id = ?")
+            filter_values.append(str(workflow_id))
+        clauses = list(filter_clauses)
+        values = list(filter_values)
+        if before_updated_at:
+            clauses.append("(updated_at < ? or (updated_at = ? and run_id < ?))")
+            values.extend([before_updated_at, before_updated_at, before_run_id])
+        filter_where = (
+            " where " + " and ".join(filter_clauses) if filter_clauses else ""
+        )
+        where = " where " + " and ".join(clauses) if clauses else ""
+        with self._connection() as connection:
+            total = int(
+                connection.execute(
+                    f"select count(*) from runs{filter_where}", filter_values
+                ).fetchone()[0]
+            )
+            status_rows = connection.execute(
+                f"select status, count(*) from runs{filter_where} group by status order by status",
+                filter_values,
+            ).fetchall()
+            rows = connection.execute(
+                f"""
+                select run_id, updated_at, state_json
+                from runs{where}
+                order by updated_at desc, run_id desc
+                limit ?
+                """,
+                values + [limit + 1],
+            ).fetchall()
+        has_more = len(rows) > limit
+        page_rows = rows[:limit]
+        next_cursor = None
+        if has_more and page_rows:
+            next_cursor = {
+                "updated_at": str(page_rows[-1][1]),
+                "run_id": str(page_rows[-1][0]),
+            }
+        return {
+            "total": total,
+            "status_counts": {str(status): int(count) for status, count in status_rows},
+            "items": [json.loads(str(row[2])) for row in reversed(page_rows)],
+            "has_more": has_more,
+            "next_cursor": next_cursor,
         }
 
     def expire_waiting_workflow_deadlines(
@@ -1618,6 +1699,11 @@ def _required_execution_value(value: str, field: str) -> str:
 def _validate_sweep_limit(limit: int) -> None:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 256:
         raise ValueError("workflow deadline sweep limit must be an integer from 1 through 256")
+
+
+def _validate_page_limit(limit: int) -> None:
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+        raise ValueError("run page limit must be an integer from 1 through 100")
 
 
 def _expire_waiting_workflow_state(state: RunState, now: str):

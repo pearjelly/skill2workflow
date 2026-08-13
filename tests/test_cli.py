@@ -211,6 +211,53 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_run_page_command_prints_filtered_cursor_page(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-run-list-0.2.0",
+            "summary": {"total": 0, "status_counts": {
+                "created": 0, "running": 0, "waiting": 0, "completed": 0,
+                "failed": 0, "cancelled": 0, "interrupted": 0, "other": 0,
+            }},
+            "filters": {"status": "failed", "workflow_id": "workflow"},
+            "runs": [],
+            "window": {"max_items": 25, "total": 0, "returned": 0, "has_more": False, "next_cursor": None},
+        }
+        with patch(
+            "skill2workflow.cli.fetch_run_page",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-run-page",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                        "--status",
+                        "failed",
+                        "--workflow-id",
+                        "workflow",
+                        "--cursor",
+                        "cursor-token",
+                        "--max-items",
+                        "25",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            max_items=25,
+            cursor="cursor-token",
+            status="failed",
+            workflow_id="workflow",
+        )
+
     def test_service_recurring_schedules_command_prints_redacted_inventory(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

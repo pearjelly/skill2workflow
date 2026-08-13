@@ -721,7 +721,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-116 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-117 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1035,6 +1035,12 @@ The self-hosted SQLite service expires waiting runs about once per second while
 holding the scheduler lease, with bounded atomic expiry, cancellation
 precedence, and retry-safe terminal audit reconciliation. It never resumes a
 workflow or executes a successor, and remains capped at 256 candidates per pass.
+
+Loop 117 adds [filtered cursor-paged run discovery](docs/run-list.md). The
+additive authenticated `GET /api/v1/runs` route and `service-run-page` CLI let
+operators find historical failed or waiting runs without reading SQLite
+directly. Pages remain redacted and bounded to 100 items/64 KiB, while the
+existing `/runs` 0.1.0 tail contract stays unchanged.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

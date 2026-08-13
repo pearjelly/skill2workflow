@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable, Dict, Optional
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from . import __version__
 from .backup import (
@@ -41,6 +41,7 @@ from .dashboard import (
     build_workflow_inventory_from_control,
     build_run_detail_from_control,
     build_run_list_from_control,
+    build_run_page_from_control,
     build_support_bundle_from_control,
 )
 from .schedules import RecurringScheduleDispatcher, SchedulerLeaseError
@@ -82,6 +83,7 @@ LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
 MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_RUN_PAGE_RESPONSE_BYTES = 64 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
@@ -747,6 +749,8 @@ def _handler_for(service: RuntimeService):
                         self._handle_support_bundle()
                     elif self.command == "GET" and path == "/runs":
                         self._handle_run_list()
+                    elif self.command == "GET" and path == "/api/v1/runs":
+                        self._handle_run_page()
                     elif self.command == "GET" and _run_detail_id(path):
                         self._handle_run_detail(_run_detail_id(path))
                     elif self.command == "POST" and _resume_run_id(path):
@@ -965,6 +969,54 @@ def _handler_for(service: RuntimeService):
                     raise ValueError("run list exceeds response limit")
             except (ValueError, OSError, sqlite3.Error):
                 self._send_json(503, {"error": "run list unavailable"})
+                return
+            self._send_json(200, payload)
+
+        def _handle_run_page(self):
+            """Serve a filtered, cursor-paged redacted run projection."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(400, {"error": "run page request must not include a body"})
+                return
+            try:
+                query = _run_page_query(self.path)
+                payload = build_run_page_from_control(
+                    service.control_plane,
+                    max_items=query["max_items"],
+                    cursor=query["cursor"],
+                    status=query["status"],
+                    workflow_id=query["workflow_id"],
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_RUN_PAGE_RESPONSE_BYTES:
+                    raise ValueError("run page exceeds response limit")
+            except ValueError as error:
+                self._send_json(400, {"error": str(error)})
+                return
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "run page unavailable"})
                 return
             self._send_json(200, payload)
 
@@ -2111,6 +2163,8 @@ def _request_route(method: str, path: str) -> str:
         return "support_bundle"
     if method == "GET" and path == "/runs":
         return "run_list"
+    if method == "GET" and path == "/api/v1/runs":
+        return "run_page"
     if method == "GET" and _run_detail_id(path):
         return "run_detail"
     if path.startswith("/webhooks/"):
@@ -2193,6 +2247,40 @@ def _run_detail_id(path: str) -> str:
     ):
         return ""
     return run_id
+
+
+def _run_page_query(request_path: str) -> Dict[str, object]:
+    """Parse the bounded query contract for filtered run discovery."""
+
+    try:
+        query = parse_qs(
+            urlsplit(str(request_path)).query,
+            keep_blank_values=True,
+            max_num_fields=8,
+        )
+    except ValueError as error:
+        raise ValueError("run page query is invalid") from error
+    allowed = {"cursor", "max_items", "status", "workflow_id"}
+    if any(key not in allowed for key in query):
+        raise ValueError("run page query contains an unsupported field")
+
+    def one(key: str) -> str:
+        values = query.get(key, [""])
+        if len(values) != 1:
+            raise ValueError(f"run page query field {key} must appear once")
+        return str(values[0])
+
+    raw_limit = one("max_items") or "100"
+    try:
+        max_items = int(raw_limit)
+    except (TypeError, ValueError) as error:
+        raise ValueError("run page max_items must be an integer") from error
+    return {
+        "cursor": one("cursor"),
+        "max_items": max_items,
+        "status": one("status"),
+        "workflow_id": one("workflow_id"),
+    }
 
 
 def _audit_consistency_run_id(path: str) -> str:

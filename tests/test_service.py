@@ -1555,6 +1555,40 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(audit_count_after, audit_count_before)
         self.assertFalse(thread.is_alive())
 
+    def test_run_page_is_authenticated_filtered_and_cursor_paged(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            control.run_published_workflow("workflow_service", "0.1.0")
+            control.run_published_workflow("workflow_service", "0.1.0")
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={"config": config, "ready_callback": lambda service: (holder.update({"service": service}), ready.set())},
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            status, page = _get_json(
+                f"http://{host}:{port}/api/v1/runs?status=completed&workflow_id=workflow_service&max_items=1",
+                token=AUTH_TOKEN,
+            )
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(page["schema_version"], "skill2workflow-run-list-0.2.0")
+        self.assertEqual(page["filters"], {"status": "completed", "workflow_id": "workflow_service"})
+        self.assertEqual(page["summary"]["total"], 2)
+        self.assertEqual(page["window"]["returned"], 1)
+        self.assertTrue(page["window"]["has_more"])
+        self.assertFalse(thread.is_alive())
+
     def test_support_bundle_is_authenticated_redacted_bounded_and_read_only(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

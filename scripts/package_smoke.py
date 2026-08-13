@@ -56,6 +56,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-cancel",
     "service-show",
     "service-runs",
+    "service-run-page",
     "service-recurring-schedules",
     "service-recurring-dispatches",
     "service-workflow-artifacts",
