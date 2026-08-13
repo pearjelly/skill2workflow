@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-66
+- Completed delivery loops: 1-67
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 66 is complete with bounded trigger inputs
+- Active loop: None; Loop 67 is complete with declarative trigger input contracts
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the bounded-input drill
+- Next decision: select the next Production Baseline loop after reviewing the input-contract drill
 
 ## Production Readiness Path
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-66 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-67 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, and bounded trigger inputs became Loop 66 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, and declarative trigger input contracts became Loop 67 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, and bounded trigger input validation are achieved by Loops 44-66. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, and declarative trigger input contracts are achieved by Loops 44-67. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -370,9 +370,49 @@ version `0.1.0` or the single-tenant service boundary. Current maturity remains
 Self-hosted Beta until the remaining Production Baseline evidence is explicitly
 completed and reviewed.
 
+### Loop 67: Declarative Trigger Input Contracts
+
+**Status:** Complete.
+
+**Prior basis:** Loop 66 bounded the size of trigger objects, but every
+published workflow still accepted any JSON object. Operators could not declare
+which business fields were required, which types were safe, or whether unknown
+fields should be rejected before a run was claimed.
+
+**Outcome:** Workflow DSL `0.1.0` now supports an optional, bounded
+JSON-Schema-like `input_schema`. The root is an object; nested objects, arrays,
+strings, numbers, booleans, nulls, ranges, enums, required properties, and
+additional-property policy are validated by a dependency-free contract module.
+Malformed contracts fail publication. Invalid trigger values fail before
+SQLite idempotency claims, run-state creation, audit emission, or connector
+execution, with fixed errors that expose only a JSON path and reason.
+
+**Evidence:** [`docs/workflow-dsl-contract.md`](docs/workflow-dsl-contract.md),
+[`docs/workflow-dsl-compatibility.md`](docs/workflow-dsl-compatibility.md), and
+[`docs/triggers.md`](docs/triggers.md) define the supported subset, bounds,
+compatibility behavior, and pre-execution boundary. Contract, runtime,
+publication, SQLite idempotency, documentation, and full-suite tests cover
+valid, malformed, missing, mistyped, unknown, and legacy inputs.
+
+**Safety boundary:** This is a bounded local contract, not full JSON Schema,
+field-level secrecy, coercion, redaction, encryption, rate limiting, hosted
+validation, or exactly-once provider execution. Workflows without
+`input_schema` retain the historical open-object behavior.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_input_schema tests.test_webhooks -v
+```
+
+Loop 67 makes business-input intent executable without changing the Workflow
+DSL version or the single-tenant service boundary. Current maturity remains
+Self-hosted Beta until the remaining Production Baseline evidence is explicitly
+completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 66 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the bounded-input drill.
+This rolling queue is ordered. Loop 67 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the input-contract drill.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -404,6 +444,7 @@ This rolling queue is ordered. Loop 66 is complete and there is no active delive
 | Loop 64: Declarative Fallback Transitions | Complete | Preserve exhausted connector failures while routing to an explicit alternate workflow path | `on_fallback` target/edge validation, durable `node_fallback` evidence, control-plane promotion, and LiteGraph fallback slot |
 | Loop 65: SQLite Audit Integrity | Complete | Make durable SQLite audit evidence independently verifiable across operation, backup/restore, and retention | `sha256-chain-v1` links, payload-free `audit-verify`, legacy-column upgrade, invalid-backup rejection, and retained-copy rechain |
 | Loop 66: Bounded Trigger Inputs | Complete | Bound durable trigger context and idempotency fingerprint work consistently across all trigger entry paths | Shared 1 MiB canonical input limit, fixed oversize errors, and CLI/schedule/recurring/webhook contract tests |
+| Loop 67: Declarative Trigger Input Contracts | Complete | Make published workflow business inputs explicit without breaking open-object legacy workflows | Bounded `input_schema`, publication/runtime validation, pre-idempotency rejection, fixed errors, and contract/SQLite compatibility tests |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -460,6 +501,11 @@ Loop 64 covers only an explicit `tool_call.on_fallback` transition after connect
 Loop 65 covers only a local SQLite SHA-256 audit chain and fixed verification result. It excludes digital signatures, external keys, immutable storage, remote streaming, JSON/JSONL chain guarantees, and hosted compliance retention policy.
 
 Loop 66 covers only a 1 MiB canonical UTF-8 JSON-object limit on trigger inputs. It excludes encryption, redaction, field-level schemas, rate limiting, streaming uploads, historical-state rewriting, and exactly-once execution.
+
+Loop 67 covers only the documented bounded `input_schema` subset and its
+pre-idempotency runtime validation. It excludes full JSON Schema, coercion,
+secret classification, encryption, redaction, hosted validation, rate
+limiting, historical-state rewriting, and exactly-once execution.
 
 Selection rules:
 
@@ -561,6 +607,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 64: Declarative Fallback Transitions | Complete | Explicit connector fallback transition, failed-attempt preservation, fixed audit evidence, compiler validation, and LiteGraph projection |
 | Loop 65: SQLite Audit Integrity | Complete | SHA-256 audit links, compact verification result, legacy-column upgrade, backup rejection, and retained-copy rechain |
 | Loop 66: Bounded Trigger Inputs | Complete | Shared canonical input limit and fixed oversize failure contract across CLI, schedules, recurring schedules, and webhooks |
+| Loop 67: Declarative Trigger Input Contracts | Complete | Optional bounded `input_schema`, publication/runtime validation, fixed path-only errors, and legacy open-object compatibility |
 
 ## Release Direction
 

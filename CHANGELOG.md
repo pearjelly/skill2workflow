@@ -29,6 +29,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added explicit `tool_call.on_fallback` transitions after exhausted connector retries, preserving failed-attempt evidence and promoting fixed fallback audit events.
 - Added SQLite `sha256-chain-v1` audit integrity links, compact `audit-verify` verification, legacy-column upgrade, backup rejection for invalid current chains, and retained-copy re-chaining.
 - Added a shared 1 MiB canonical UTF-8 trigger-input limit across CLI, webhook, one-shot schedule, and recurring schedule entry paths, with fixed oversize errors and no Workflow DSL compatibility change.
+- Added optional bounded declarative `input_schema` contracts for published workflows, with publication validation and pre-idempotency trigger rejection for missing, mistyped, out-of-range, and undeclared input values.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

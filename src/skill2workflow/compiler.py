@@ -6,6 +6,7 @@ import re
 from typing import Dict, List, Set
 
 from .connectors import default_connector_binding
+from .input_schema import validate_input_schema_contract
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -160,6 +161,9 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
                 ["schema_version"],
             )
         )
+
+    if "input_schema" in workflow:
+        errors.extend(validate_input_schema_contract(workflow.get("input_schema"), ["input_schema"]))
 
     workflow_meta = workflow.get("workflow")
     if not isinstance(workflow_meta, dict):

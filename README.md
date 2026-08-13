@@ -678,7 +678,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-66 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-67 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -733,6 +733,12 @@ Loop 64 adds [declarative fallback transitions](docs/workflow-dsl-contract.md): 
 Loop 65 adds [SQLite audit integrity](docs/audit-integrity.md): each current audit row participates in a `sha256-chain-v1`, `audit-verify` returns a fixed payload-free result, legacy audit tables are upgraded on open, invalid chains block backup verification, and retained copies are re-chained after intentional deletion. It is an integrity signal, not a signature or authenticity claim.
 
 Loop 66 adds [bounded trigger inputs](docs/triggers.md): CLI, webhook, one-shot schedule, and recurring schedule paths enforce one shared 1 MiB canonical UTF-8 JSON-object limit before durable context or SQLite idempotency fingerprinting. Oversized values fail closed with fixed errors; the limit does not redact or encrypt business data.
+
+Loop 67 adds [declarative trigger input contracts](docs/workflow-dsl-contract.md):
+published workflows may declare a bounded JSON-Schema-like `input_schema`.
+The control plane validates required fields, types, ranges, enums, nested
+objects, and arrays before idempotency claims, run creation, audit emission,
+or connector execution, while workflows without the field remain compatible.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

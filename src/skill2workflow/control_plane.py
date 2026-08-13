@@ -12,6 +12,7 @@ from typing import Dict, List
 from .connectors import default_connectors
 from .compiler import validate_workflow
 from .executor import LocalExecutor, RunState
+from .input_schema import InputSchemaValidationError, validate_trigger_input
 from .storage import create_control_store
 from .triggers import (
     TriggerIdempotencyError,
@@ -141,9 +142,16 @@ class LocalControlPlane:
         if record.get("status") != "published":
             raise ValueError(f"workflow version is not published: {workflow_id}@{version}")
 
+        workflow = self.get_workflow(workflow_id, version)
+        if trigger:
+            try:
+                validate_trigger_input(workflow.get("input_schema"), trigger.get("input", {}))
+            except InputSchemaValidationError as error:
+                raise ValueError(str(error)) from error
+
         started_at = _now()
         context = trigger_run_context(trigger) if trigger else None
-        state = self.executor.run(self.get_workflow(workflow_id, version), context=context)
+        state = self.executor.run(workflow, context=context)
         started_event = {
             "type": "run_started",
             "run_id": state["run_id"],
@@ -174,6 +182,7 @@ class LocalControlPlane:
         workflow_id = str(trigger["workflow_id"])
         workflow_version = str(trigger["version"])
         idempotency_key = str(trigger.get("idempotency_key", ""))
+        self._validate_trigger_input(workflow_id, workflow_version, trigger.get("input", {}))
         if self.storage != "sqlite" or not idempotency_key:
             return self._execute_trigger(trigger)
 
@@ -229,6 +238,16 @@ class LocalControlPlane:
             trigger=trigger,
         )
         return trigger_response(trigger, state)
+
+    def _validate_trigger_input(self, workflow_id: str, version: str, value: object) -> None:
+        record = self._workflow_record(workflow_id, version)
+        if record.get("status") != "published":
+            raise ValueError(f"workflow version is not published: {workflow_id}@{version}")
+        workflow = self.get_workflow(workflow_id, version)
+        try:
+            validate_trigger_input(workflow.get("input_schema"), value)
+        except InputSchemaValidationError as error:
+            raise ValueError(str(error)) from error
 
     def resume_published_run(self, run_id: str, approved: bool = True) -> RunState:
         current = self.executor.get_run(run_id)

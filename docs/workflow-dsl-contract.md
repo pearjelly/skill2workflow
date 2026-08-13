@@ -27,12 +27,47 @@ The schema documents the stable top-level shape:
 - `entry`
 - `nodes`
 - `edges`
+- `input_schema` (optional)
 - `state_schema`
 - `guards`
 - `checkpoints`
 - `policies`
 
 It also documents the initial node and edge shapes. The current schema intentionally allows additional properties so the compiler, executor, visual editor, and connector runtime can add metadata without breaking old readers.
+
+## Declarative Trigger Input Contracts
+
+Published workflows may declare an optional `input_schema` to make their
+business-facing trigger payload explicit:
+
+```json
+{
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "customer_id": {"type": "string", "minLength": 1},
+      "priority": {"type": "string", "enum": ["high", "normal"]}
+    },
+    "required": ["customer_id"],
+    "additionalProperties": false
+  }
+}
+```
+
+This is a deliberately narrow JSON-Schema-like subset, not a claim of full
+JSON Schema support. The root must be an object. Nested schemas support
+`object`, `array`, `string`, `integer`, `number`, `boolean`, and `null`, with
+`properties`, `required`, `additionalProperties`, `items`, `minLength`,
+`maxLength`, `minimum`, `maximum`, and `enum` where applicable. Unsupported
+keywords are rejected at workflow validation/publication time. The schema is
+bounded to 64 KiB, eight nesting levels, 128 object properties, and 128 enum
+items.
+
+Trigger input is checked after the shared canonical 1 MiB envelope limit but
+before a SQLite idempotency claim, run-state creation, audit emission, or any
+external connector call. A rejected request returns a fixed validation error
+with a JSON path and never echoes the rejected value. Workflows without
+`input_schema` retain the historical open-object input behavior.
 
 ## Connector Binding
 

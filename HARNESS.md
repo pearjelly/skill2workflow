@@ -33,6 +33,11 @@ python3 -m json.tool /tmp/skill2workflow-pilot/artifacts/workflow.overlay.litegr
 
 The pilot smoke exercises webhook trigger, durable input context, manual gate resume, local HTTP connector execution, credential-handle resolution, audit export, snapshot node overlays, and LiteGraph run overlays without using external services.
 
+Published workflows may also declare a bounded `input_schema` contract. The
+control plane validates it before idempotency claims and execution; see
+[`docs/workflow-dsl-contract.md`](docs/workflow-dsl-contract.md) and
+[`docs/triggers.md`](docs/triggers.md).
+
 Run the local scheduled-trigger smoke:
 
 ```bash

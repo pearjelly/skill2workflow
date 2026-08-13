@@ -30,6 +30,15 @@ class DslContractTests(TestCase):
         self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["to"]["pattern"], "^/body/.+")
         self.assertIn("on_fallback", schema["$defs"]["node"]["properties"])
 
+    def test_input_schema_contract_is_additive_and_bounded_in_schema(self):
+        schema = json.loads((ROOT / "schemas" / "workflow.schema.json").read_text(encoding="utf-8"))
+
+        self.assertIn("input_schema", schema["properties"])
+        self.assertEqual(schema["properties"]["input_schema"]["$ref"], "#/$defs/input_schema")
+        self.assertEqual(schema["$defs"]["input_schema"]["properties"]["type"]["const"], "object")
+        self.assertFalse(schema["$defs"]["input_schema"]["additionalProperties"])
+        self.assertIn("input_schema_node", schema["$defs"])
+
     def test_approval_flow_example_is_a_golden_valid_workflow_fixture(self):
         workflow = json.loads(
             (ROOT / "examples" / "workflows" / "approval-flow.workflow.json").read_text(encoding="utf-8")

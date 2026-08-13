@@ -37,6 +37,15 @@ Supported fields:
 
 `input` must be a JSON object when supplied. Trigger input keys are normalized as strings. The canonical UTF-8 JSON representation of the object is capped at **1 MiB (1,048,576 bytes)** before it is copied into durable run state or used to compute a SQLite idempotency fingerprint. CLI, one-shot schedule, and recurring schedule paths share this limit and reject oversized input with a fixed `ValueError`. The webhook parser maps that validation failure to HTTP 400; its earlier transport body bound may reject the larger wire request with HTTP 413. The limit bounds durable context and fingerprint work; it is not a confidentiality or redaction feature.
 
+If the published workflow declares `input_schema`, the same trigger boundary
+also validates the normalized object against that optional, bounded contract.
+The root is an object and the supported subset is documented in
+[`docs/workflow-dsl-contract.md`](workflow-dsl-contract.md). Validation runs
+before SQLite idempotency claims, run-state creation, audit emission, and
+connector execution. Invalid values receive a fixed error with a JSON path;
+the rejected value is not included in the error. Workflows without
+`input_schema` keep the historical open-object behavior.
+
 Do not put secrets, credentials, access tokens, private keys, or long confidential documents in trigger input. Connector credentials should use the separate local credential-provider boundary documented in `docs/credential-boundary.md`. The current runtime does not provide secret redaction, encryption, or IAM.
 
 ## CLI Usage

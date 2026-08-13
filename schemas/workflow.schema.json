@@ -32,6 +32,10 @@
         "$ref": "#/$defs/edge"
       }
     },
+    "input_schema": {
+      "$ref": "#/$defs/input_schema",
+      "description": "Optional bounded JSON-Schema-like contract for trigger input. The runtime supports only the documented subset in docs/workflow-dsl-contract.md."
+    },
     "state_schema": {
       "type": "object",
       "description": "Optional workflow state schema for future typed execution state."
@@ -226,6 +230,91 @@
         },
         "condition": {
           "type": ["object", "string", "null"]
+        }
+      }
+    },
+    "input_schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "description": "Bounded trigger-input contract. Root type must be object; supported types are object, array, string, integer, number, boolean, and null.",
+      "properties": {
+        "type": {
+          "const": "object"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/input_schema_node"
+          }
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "additionalProperties": {
+          "type": "boolean",
+          "default": true
+        },
+        "enum": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128
+        }
+      }
+    },
+    "input_schema_node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["object", "array", "string", "integer", "number", "boolean", "null"]
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/input_schema_node"
+          }
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "additionalProperties": {
+          "type": "boolean",
+          "default": true
+        },
+        "items": {
+          "$ref": "#/$defs/input_schema_node"
+        },
+        "minLength": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "enum": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128
         }
       }
     },

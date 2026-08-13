@@ -36,6 +36,9 @@ Within the `0.1.x` release line:
 - New metadata may be added through additional properties.
 - New node types may be added when schema and validator tests document their contract.
 - Readers should ignore unknown additional properties unless they explicitly validate that field.
+- Optional `input_schema` contracts are additive. Readers that do not enforce
+  them may retain the historical open-object behavior, while current
+  publishers and trigger boundaries validate the documented bounded subset.
 
 ## Breaking Changes
 
@@ -85,6 +88,14 @@ Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on `tool
 Workflow DSL examples and fixtures must not store secrets. They may reference credential handles under connector metadata, but resolved credential values must stay in a local provider boundary outside Workflow DSL, LiteGraph fixtures, trigger input, run state, and audit events. Hosted credential storage, secret redaction, IAM, connector marketplaces, and product-specific SaaS connectors are outside the `0.1.x` built-in connector boundary.
 
 HTTP `connector.request.input_mapping` is a constrained runtime-copy mapping contract. It reads only `/input/...` paths from durable run context and writes only `/body/...` paths into the outbound HTTP request body copy. Header mapping, URL interpolation, expression syntax, credential mapping, and product-specific connector packages are outside the current compatibility boundary.
+
+`input_schema` is a constrained trigger-input contract, not full JSON Schema.
+Its root is an object; supported nested types and keywords are documented in
+`docs/workflow-dsl-contract.md`. The contract is bounded and rejected at
+publication when malformed. Invalid trigger values are rejected before
+idempotency claims or execution. Removing or changing an existing contract in
+a new immutable workflow version is permitted; changing the meaning of an
+already-published version is not.
 
 Connector manifests use the minimum contract documented in `docs/connectors.md`. Workflow DSL `connector.id` and `connector.kind` identify the connector a runtime should use, but Workflow DSL remains authoritative over node identity, transitions, guards, policies, and request metadata. The current local runtime exposes built-in manifests and does not dynamically load external connector packages.
 
