@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-75
+- Completed delivery loops: 1-76
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 75 is complete with atomic run-audit emission and consistency diagnostics
+- Active loop: None; Loop 76 is complete with authenticated remote run-audit consistency diagnostics
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the artifact consistency drill
+- Next decision: select the next Production Baseline loop after reviewing the remote run-audit consistency drill
 
 ## Production Readiness Path
 
@@ -742,9 +742,46 @@ cross-database recovery boundary explicit. Current maturity remains
 Self-hosted Beta until the remaining Production Baseline evidence is selected
 and reviewed.
 
+### Loop 76: Remote Run Audit Consistency
+
+**Status:** Complete.
+
+**Prior basis:** Loop 75 made the diagnostic available locally, but remote
+self-hosted operators still had to obtain shell access to the service state
+directory or assemble evidence through several separate endpoints.
+
+**Outcome:** The authenticated service now exposes
+`GET /api/v1/audit-consistency` and the installed
+`service-audit-consistency` client. Both reuse the exact bounded
+`skill2workflow-run-audit-report-0.1.0` contract. The route is read-only,
+available before readiness when auth and SQLite state are readable, and does
+not append audit state, acquire the scheduler lease, or call connectors.
+
+**Evidence:** [`docs/remote-audit-consistency.md`](docs/remote-audit-consistency.md)
+defines the request, fixed error, authentication, 64 KiB bound, and client
+origin/redirect/schema checks. Service, client, CLI, telemetry, package, docs,
+and full-suite tests prove authenticated access, zero-write behavior, redaction,
+oversize rejection, and exact response validation.
+
+**Safety boundary:** This is a remote read path only. It does not repair audit
+history, make the two SQLite databases atomic, provide remote replication, or
+claim exactly-once provider effects.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_service.RuntimeServiceTests.test_audit_consistency_is_authenticated_bounded_and_read_only \
+  tests.test_service.RuntimeServiceTests.test_audit_consistency_is_available_before_readiness \
+  tests.test_service.RuntimeServiceTests.test_audit_consistency_rejects_oversized_projection_without_disclosure \
+  tests.test_service_client.ServiceClientTests.test_audit_consistency_uses_authenticated_get_and_validates_contract \
+  tests.test_cli.CliTests.test_service_audit_consistency_command_prints_report \
+  -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 75 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the run-audit consistency evidence.
+This rolling queue is ordered. Loop 76 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the remote run-audit consistency evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -892,6 +929,11 @@ counts. It excludes cross-database atomicity, automatic repair, audit rewriting,
 connector replay, digital signatures, remote replication, and exactly-once
 provider effects.
 
+Loop 76 covers only an authenticated remote read of the Loop 75 report and its
+protected CLI client. It excludes remote writes, automatic repair, audit
+rewriting, remote replication, RBAC, hosted support, and exactly-once provider
+effects.
+
 Selection rules:
 
 - Merge or explicitly defer the current loop before starting the next one.
@@ -1001,6 +1043,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 73: Atomic Workflow Registry Mutations | Complete | SQLite transactionally couples immutable publication/deprecation registry changes with audit evidence and preserves concurrent versions |
 | Loop 74: Workflow Artifact Consistency | Complete | Bounded registry/file consistency report, guarded known-failure cleanup, and installed CLI/schema contract |
 | Loop 75: Run Audit Consistency | Complete | Atomic run-audit batches, bounded cross-database consistency report, and installed CLI/schema contract |
+| Loop 76: Remote Run Audit Consistency | Complete | Authenticated zero-write endpoint, exact bounded remote client, readiness-independent diagnostics, telemetry/docs/package evidence |
 
 ## Release Direction
 

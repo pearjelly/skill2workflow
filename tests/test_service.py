@@ -23,6 +23,7 @@ from skill2workflow.service import (
     MAX_AUTH_TOKEN_BYTES,
     MAX_CONCURRENT_BUSINESS_REQUESTS,
     MAX_LIVE_CONTROL_SNAPSHOT_BYTES,
+    MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
     RuntimeService,
     ServiceScheduleLoop,
     ServiceConfig,
@@ -110,6 +111,112 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_audit_consistency_is_authenticated_bounded_and_read_only(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            run = control.run_published_workflow("workflow_service", "0.1.0")
+            audit_count_before = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/api/v1/audit-consistency"
+
+            denied_status, denied = _get_json(url)
+            accepted_status, report = _get_json(url, token=AUTH_TOKEN)
+            body_connection = http.client.HTTPConnection(host, port, timeout=2)
+            body_connection.request(
+                "GET",
+                "/api/v1/audit-consistency",
+                body=b"{}",
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            )
+            body_response = body_connection.getresponse()
+            body_payload = json.loads(body_response.read().decode("utf-8"))
+            body_status = body_response.status
+            body_connection.close()
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+            audit_count_after = len(
+                LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+            )
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(report["schema_version"], "skill2workflow-run-audit-report-0.1.0")
+        self.assertEqual(report["summary"]["run_count"], 1)
+        self.assertEqual(report["summary"]["attention_runs"], 0)
+        self.assertEqual(report["runs"][0]["run_id"], run["run_id"])
+        self.assertEqual(body_status, 400)
+        self.assertEqual(
+            body_payload,
+            {"error": "audit consistency request must not include a body"},
+        )
+        self.assertEqual(audit_count_after, audit_count_before)
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_consistency_rejects_oversized_projection_without_disclosure(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            host, port = service.server_address
+            thread = threading.Thread(target=service._server.handle_request, daemon=True)
+            private_value = "private-audit-report-value-" + (
+                "x" * MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES
+            )
+            with patch.object(
+                service.control_plane,
+                "inspect_run_audit",
+                return_value={"private": private_value},
+            ):
+                thread.start()
+                status, payload = _get_json(
+                    f"http://{host}:{port}/api/v1/audit-consistency",
+                    token=AUTH_TOKEN,
+                )
+                thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 503)
+        self.assertEqual(payload, {"error": "audit consistency unavailable"})
+        self.assertNotIn("private-audit-report-value", json.dumps(payload))
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_consistency_is_available_before_readiness(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            host, port = service.server_address
+            thread = threading.Thread(target=service._server.handle_request, daemon=True)
+            thread.start()
+            status, report = _get_json(
+                f"http://{host}:{port}/api/v1/audit-consistency",
+                token=AUTH_TOKEN,
+            )
+            thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(report["summary"]["run_count"], 0)
+        self.assertEqual(service.status, "starting")
+        self.assertFalse(thread.is_alive())
     def test_business_routes_fail_fast_when_admission_budget_is_exhausted_but_probes_remain_available(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

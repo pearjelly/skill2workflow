@@ -187,6 +187,17 @@ def build_support_bundle_from_control(
     if service_status not in {"starting", "ready", "draining", "stopped", "unknown"}:
         raise ValueError("support bundle service status is invalid")
     run_list = build_run_list_from_control(control)
+    observability = telemetry.aggregate(
+        service_status=service_status,
+        ready=ready,
+        scheduler_lease_owned=scheduler_lease_owned,
+    )
+    # Keep the 0.1.0 support-bundle contract stable when new telemetry routes
+    # are added; the live metrics endpoint remains the complete route matrix.
+    http_requests = dict(observability.get("http_requests", {}))
+    http_requests.pop("audit_consistency", None)
+    observability = dict(observability)
+    observability["http_requests"] = http_requests
     return {
         "schema_version": SUPPORT_BUNDLE_SCHEMA_VERSION,
         "service": {
@@ -196,11 +207,7 @@ def build_support_bundle_from_control(
             "scheduler_lease_owned": bool(scheduler_lease_owned),
         },
         "run_list": run_list,
-        "observability": telemetry.aggregate(
-            service_status=service_status,
-            ready=ready,
-            scheduler_lease_owned=scheduler_lease_owned,
-        ),
+        "observability": observability,
     }
 
 

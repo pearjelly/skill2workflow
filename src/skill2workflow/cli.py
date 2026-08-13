@@ -24,6 +24,7 @@ from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace
 from .service_doctor import diagnose_service
 from .service_client import (
+    fetch_audit_consistency,
     fetch_run_detail,
     fetch_run_list,
     fetch_support_bundle,
@@ -342,6 +343,13 @@ def main(argv=None) -> int:
     service_support_cmd.add_argument("--service-url", required=True)
     service_support_cmd.add_argument("--auth-token-file", type=Path, required=True)
     service_support_cmd.add_argument("--output", type=Path, required=True)
+
+    service_audit_cmd = subparsers.add_parser(
+        "service-audit-consistency",
+        help="Inspect run/audit consistency through the authenticated service",
+    )
+    service_audit_cmd.add_argument("--service-url", required=True)
+    service_audit_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -733,6 +741,14 @@ def main(argv=None) -> int:
         except OSError:
             print("support bundle operation failed", file=sys.stderr)
             return 1
+
+    if args.command == "service-audit-consistency":
+        return _service_action(
+            lambda: fetch_audit_consistency(
+                args.service_url,
+                args.auth_token_file,
+            )
+        )
 
     if args.command == "control-runs":
         _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_runs())

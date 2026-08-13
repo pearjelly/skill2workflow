@@ -8,12 +8,14 @@ from unittest import TestCase
 from skill2workflow.service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
+    MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
     ServiceActionError,
     post_run_cancel,
     post_run_resume,
     fetch_run_detail,
     fetch_run_list,
     fetch_support_bundle,
+    fetch_audit_consistency,
 )
 
 
@@ -22,6 +24,74 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_audit_consistency_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+        payload = _audit_consistency_payload()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_audit_consistency(
+                f"http://127.0.0.1:{server.server_port}", token_file
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(
+            observed,
+            [{"path": "/api/v1/audit-consistency", "authorization": f"Bearer {AUTH_TOKEN}"}],
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_consistency_rejects_oversized_response(self):
+        body = b"x" * (MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_audit_consistency(f"http://127.0.0.1:{server.server_port}", token_file)
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
     def test_support_bundle_uses_authenticated_get_and_validates_contract(self):
         observed = []
         payload = _support_bundle_payload()
@@ -509,6 +579,36 @@ def _support_bundle_payload():
             "recurring_schedule_count": 0,
             "http_requests": {route: dict(zero_http) for route in routes},
         },
+    }
+
+
+def _audit_consistency_payload():
+    return {
+        "schema_version": "skill2workflow-run-audit-report-0.1.0",
+        "status": "clean",
+        "summary": {
+            "run_count": 1,
+            "checked_runs": 1,
+            "attention_runs": 0,
+            "missing_events": 0,
+            "duplicate_events": 0,
+            "unexpected_events": 0,
+            "truncated": False,
+        },
+        "runs": [
+            {
+                "run_id": RUN_ID,
+                "workflow_id": "workflow_service",
+                "workflow_version": "0.1.0",
+                "run_status": "completed",
+                "status": "clean",
+                "expected_event_count": 2,
+                "observed_event_count": 2,
+                "missing": [],
+                "duplicate": [],
+                "unexpected": [],
+            }
+        ],
     }
 
 

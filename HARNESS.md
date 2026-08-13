@@ -158,6 +158,10 @@ skill2workflow service-runs \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-audit-consistency \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
 skill2workflow service-support-bundle \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token \
@@ -367,6 +371,7 @@ Implemented:
   - compares exact published versions through the bounded `workflow-diff` review contract
   - reports registry/file consistency through bounded `workflow-artifacts` diagnostics
   - reports run-state/control-audit divergence through bounded `audit-consistency` diagnostics
+  - exposes the same diagnostic through authenticated `service-audit-consistency` for remote operators
   - supports an optional expected-current-version compare-and-swap promotion guard
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions

@@ -15,11 +15,17 @@ from .dashboard import (
     RUN_LIST_SCHEMA_VERSION,
     SUPPORT_BUNDLE_SCHEMA_VERSION,
 )
+from .control_plane import (
+    MAX_RUN_AUDIT_REPORT_RUNS,
+    MAX_RUN_AUDIT_REPORT_TYPES,
+    RUN_AUDIT_REPORT_SCHEMA_VERSION,
+)
 from .service import read_service_bearer_token
 
 
 MAX_SERVICE_ACTION_RESPONSE_BYTES = 64 * 1024
 MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
+MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -139,6 +145,23 @@ def fetch_support_bundle(
         max_response_bytes=MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     )
     _validate_support_bundle(payload)
+    return payload
+
+
+def fetch_audit_consistency(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch the bounded, authenticated run/audit consistency projection."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/audit-consistency",
+        conflict_message="audit consistency unavailable",
+        max_response_bytes=MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
+    )
+    _validate_audit_consistency(payload)
     return payload
 
 
@@ -403,6 +426,7 @@ def _validate_support_bundle(payload: Dict[str, object]) -> None:
         or not isinstance(service.get("scheduler_lease_owned"), bool)
     ):
         raise ServiceActionError()
+
     run_list = payload.get("run_list")
     if not isinstance(run_list, dict):
         raise ServiceActionError()
@@ -459,6 +483,71 @@ def _validate_support_bundle(payload: Dict[str, object]) -> None:
             for counts in http_requests.values()
         )
     ):
+        raise ServiceActionError()
+
+
+def _validate_audit_consistency(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed run-audit report contract."""
+
+    if set(payload) != {"schema_version", "status", "summary", "runs"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RUN_AUDIT_REPORT_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if payload.get("status") not in {"clean", "attention"}:
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    summary_fields = {
+        "run_count", "checked_runs", "attention_runs", "missing_events",
+        "duplicate_events", "unexpected_events", "truncated",
+    }
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != summary_fields
+        or any(not _is_non_negative_integer(summary.get(field)) for field in summary_fields - {"truncated"})
+        or not isinstance(summary.get("truncated"), bool)
+        or summary.get("checked_runs") > MAX_RUN_AUDIT_REPORT_RUNS
+        or summary.get("run_count") < summary.get("checked_runs")
+    ):
+        raise ServiceActionError()
+    runs = payload.get("runs")
+    if not isinstance(runs, list) or len(runs) > MAX_RUN_AUDIT_REPORT_RUNS:
+        raise ServiceActionError()
+    run_fields = {
+        "run_id", "workflow_id", "workflow_version", "run_status", "status",
+        "expected_event_count", "observed_event_count", "missing", "duplicate", "unexpected",
+    }
+
+    def valid_differences(value):
+        return isinstance(value, list) and len(value) <= MAX_RUN_AUDIT_REPORT_TYPES and all(
+            isinstance(item, dict)
+            and set(item) == {"type", "count"}
+            and isinstance(item.get("type"), str)
+            and item.get("type")
+            and _is_non_negative_integer(item.get("count"))
+            and item.get("count") > 0
+            for item in value
+        )
+
+    for run in runs:
+        if (
+            not isinstance(run, dict)
+            or set(run) != run_fields
+            or not _is_safe_run_identifier(run.get("run_id"))
+            or any(
+                not isinstance(run.get(field), str) or not run.get(field)
+                for field in ("run_id", "workflow_id", "workflow_version", "run_status")
+            )
+            or run.get("status") not in {"clean", "attention"}
+            or any(
+                not _is_non_negative_integer(run.get(field))
+                for field in ("expected_event_count", "observed_event_count")
+            )
+            or not valid_differences(run.get("missing"))
+            or not valid_differences(run.get("duplicate"))
+            or not valid_differences(run.get("unexpected"))
+        ):
+            raise ServiceActionError()
+    if summary.get("checked_runs") != len(runs):
         raise ServiceActionError()
 
 

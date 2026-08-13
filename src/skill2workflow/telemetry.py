@@ -22,6 +22,7 @@ _ROUTES = (
     "readiness",
     "metrics",
     "control_snapshot",
+    "audit_consistency",
     "support_bundle",
     "run_list",
     "run_detail",

@@ -51,6 +51,7 @@ LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
 MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
 
@@ -519,6 +520,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_metrics()
                 elif self.command == "GET" and path == "/api/v1/control-snapshot":
                     self._handle_control_snapshot()
+                elif self.command == "GET" and path == "/api/v1/audit-consistency":
+                    self._handle_audit_consistency()
                 elif self.command == "GET" and path == "/api/v1/support-bundle":
                     self._handle_support_bundle()
                 elif self.command == "GET" and path == "/runs":
@@ -708,6 +711,47 @@ def _handler_for(service: RuntimeService):
                     raise ValueError("run list exceeds response limit")
             except (ValueError, OSError, sqlite3.Error):
                 self._send_json(503, {"error": "run list unavailable"})
+                return
+            self._send_json(200, payload)
+
+        def _handle_audit_consistency(self):
+            """Serve the bounded, value-free run/audit consistency projection."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "audit consistency request must not include a body"},
+                )
+                return
+            try:
+                payload = service.control_plane.inspect_run_audit()
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES:
+                    raise ValueError("audit consistency exceeds response limit")
+            except (ValueError, OSError, sqlite3.Error):
+                self._send_json(503, {"error": "audit consistency unavailable"})
                 return
             self._send_json(200, payload)
 
@@ -984,6 +1028,8 @@ def _request_route(method: str, path: str) -> str:
         return "metrics"
     if method == "GET" and path == "/api/v1/control-snapshot":
         return "control_snapshot"
+    if method == "GET" and path == "/api/v1/audit-consistency":
+        return "audit_consistency"
     if method == "GET" and path == "/api/v1/support-bundle":
         return "support_bundle"
     if method == "GET" and path == "/runs":

@@ -55,6 +55,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry = RuntimeTelemetry(state_dir, monotonic=lambda: 15.25)
             telemetry.observe_http("workflow_trigger", 200)
             telemetry.observe_http("control_snapshot", 200)
+            telemetry.observe_http("audit_consistency", 200)
             telemetry.observe_http("support_bundle", 200)
             telemetry.observe_http("run_list", 200)
             telemetry.observe_http("run_detail", 200)
@@ -123,10 +124,14 @@ class RuntimeTelemetryTests(TestCase):
                 "audit_event_count", "recurring_schedule_count", "http_requests",
             },
         )
-        self.assertEqual(set(aggregate["http_requests"]), {
-            "health", "readiness", "metrics", "control_snapshot", "support_bundle",
-            "run_list", "run_detail", "workflow_trigger", "run_cancel", "run_resume", "unknown",
-        })
+        self.assertEqual(
+            set(aggregate["http_requests"]),
+            {
+                "health", "readiness", "metrics", "control_snapshot", "audit_consistency",
+                "support_bundle", "run_list", "run_detail", "workflow_trigger", "run_cancel",
+                "run_resume", "unknown",
+            },
+        )
         serialized = json.dumps(aggregate, ensure_ascii=False)
         for forbidden in (
             "workflow_private_customer_48392",

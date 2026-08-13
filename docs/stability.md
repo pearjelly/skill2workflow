@@ -22,6 +22,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - SQLite publication and deprecation transactionally couple single-record registry changes with their audit rows, preserving immutable-version and retry semantics
 - `workflow-artifacts` report contract `skill2workflow-workflow-artifact-report-0.1.0`, including bounded registry/file consistency issues and known-failure SQLite publication cleanup
 - `audit-consistency` report contract `skill2workflow-run-audit-report-0.1.0`, including bounded missing/duplicate/unexpected run-audit projections; one control-plane lifecycle/runtime emission is transactional in SQLite, while the two-database boundary remains diagnostic-only
+- Authenticated `GET /api/v1/audit-consistency` and `service-audit-consistency` reuse the exact run-audit report contract with a 64 KiB response bound, zero-write semantics, and readiness-independent availability when auth and SQLite state are readable
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`

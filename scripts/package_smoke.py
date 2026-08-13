@@ -51,6 +51,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-show",
     "service-runs",
     "service-support-bundle",
+    "service-audit-consistency",
     "control-snapshot",
 )
 
