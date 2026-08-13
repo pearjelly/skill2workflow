@@ -3,17 +3,23 @@
 from __future__ import annotations
 
 import json
+import math
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Dict, Optional
 from urllib.parse import urlsplit, urlunsplit
 
-from .dashboard import RUN_DETAIL_SCHEMA_VERSION, RUN_LIST_SCHEMA_VERSION
+from .dashboard import (
+    RUN_DETAIL_SCHEMA_VERSION,
+    RUN_LIST_SCHEMA_VERSION,
+    SUPPORT_BUNDLE_SCHEMA_VERSION,
+)
 from .service import read_service_bearer_token
 
 
 MAX_SERVICE_ACTION_RESPONSE_BYTES = 64 * 1024
+MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -119,6 +125,23 @@ def fetch_run_list(
     return payload
 
 
+def fetch_support_bundle(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch one authenticated, redacted diagnostic package."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/support-bundle",
+        conflict_message="support bundle unavailable",
+        max_response_bytes=MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
+    )
+    _validate_support_bundle(payload)
+    return payload
+
+
 def service_endpoint(service_url: str, path: str) -> str:
     """Build one path under an unambiguous service origin."""
 
@@ -171,6 +194,7 @@ def _get_json(
     token_file: Path,
     path: str,
     conflict_message: str,
+    max_response_bytes: int = MAX_SERVICE_ACTION_RESPONSE_BYTES,
 ) -> Dict[str, object]:
     return _request_json(
         service_url,
@@ -179,6 +203,7 @@ def _get_json(
         method="GET",
         body=None,
         conflict_message=conflict_message,
+        max_response_bytes=max_response_bytes,
     )
 
 
@@ -190,6 +215,7 @@ def _request_json(
     method: str,
     body: Optional[bytes],
     conflict_message: str,
+    max_response_bytes: int = MAX_SERVICE_ACTION_RESPONSE_BYTES,
 ) -> Dict[str, object]:
     endpoint = service_endpoint(service_url, path)
     token = read_service_bearer_token(token_file)
@@ -216,9 +242,11 @@ def _request_json(
     )
     try:
         with opener.open(request, timeout=5) as response:
-            if response.status != 200 or not _safe_json_response_headers(response):
+            if response.status != 200 or not _safe_json_response_headers(
+                response, max_response_bytes=max_response_bytes
+            ):
                 raise ServiceActionError(status_code=int(response.status))
-            return _decode_response(response)
+            return _decode_response(response, max_response_bytes=max_response_bytes)
     except urllib.error.HTTPError as error:
         try:
             status_code = int(error.code)
@@ -357,6 +385,83 @@ def _validate_run_list(payload: Dict[str, object]) -> None:
         raise ServiceActionError()
 
 
+def _validate_support_bundle(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed redacted support-bundle contract."""
+
+    if set(payload) != {"schema_version", "service", "run_list", "observability"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != SUPPORT_BUNDLE_SCHEMA_VERSION:
+        raise ServiceActionError()
+    service = payload.get("service")
+    statuses = {"starting", "ready", "draining", "stopped", "unknown"}
+    if (
+        not isinstance(service, dict)
+        or set(service) != {"status", "ready", "storage", "scheduler_lease_owned"}
+        or service.get("status") not in statuses
+        or not isinstance(service.get("ready"), bool)
+        or service.get("storage") != "sqlite"
+        or not isinstance(service.get("scheduler_lease_owned"), bool)
+    ):
+        raise ServiceActionError()
+    run_list = payload.get("run_list")
+    if not isinstance(run_list, dict):
+        raise ServiceActionError()
+    _validate_run_list(run_list)
+
+    observability = payload.get("observability")
+    workflow_statuses = {"published", "deprecated", "other"}
+    run_statuses = {
+        "created", "running", "waiting", "completed", "failed", "cancelled", "interrupted", "other"
+    }
+    dispatch_statuses = {"claimed", "completed", "failed", "skipped", "uncertain", "other"}
+    routes = {
+        "health", "readiness", "metrics", "control_snapshot", "support_bundle", "run_list",
+        "run_detail", "workflow_trigger", "run_cancel", "run_resume", "unknown",
+    }
+    status_classes = {"2xx", "4xx", "5xx"}
+
+    def valid_counts(value, keys):
+        return (
+            isinstance(value, dict)
+            and set(value) == keys
+            and all(_is_non_negative_integer(item) for item in value.values())
+        )
+
+    http_requests = observability.get("http_requests") if isinstance(observability, dict) else None
+    if (
+        not isinstance(observability, dict)
+        or set(observability) != {
+            "service_status", "ready", "scheduler_lease_owned", "uptime_seconds",
+            "workflow_status_counts", "run_status_counts", "dispatch_status_counts",
+            "audit_event_count", "recurring_schedule_count", "http_requests",
+        }
+        or observability.get("service_status") not in statuses
+        or observability.get("service_status") != service.get("status")
+        or not isinstance(observability.get("ready"), bool)
+        or observability.get("ready") != service.get("ready")
+        or not isinstance(observability.get("scheduler_lease_owned"), bool)
+        or observability.get("scheduler_lease_owned") != service.get("scheduler_lease_owned")
+        or not isinstance(observability.get("uptime_seconds"), (int, float))
+        or isinstance(observability.get("uptime_seconds"), bool)
+        or not math.isfinite(float(observability.get("uptime_seconds")))
+        or observability.get("uptime_seconds") < 0
+        or not valid_counts(observability.get("workflow_status_counts"), workflow_statuses)
+        or not valid_counts(observability.get("run_status_counts"), run_statuses)
+        or not valid_counts(observability.get("dispatch_status_counts"), dispatch_statuses)
+        or not _is_non_negative_integer(observability.get("audit_event_count"))
+        or not _is_non_negative_integer(observability.get("recurring_schedule_count"))
+        or not isinstance(http_requests, dict)
+        or set(http_requests) != routes
+        or any(
+            not isinstance(counts, dict)
+            or set(counts) != status_classes
+            or any(not _is_non_negative_integer(item) for item in counts.values())
+            for counts in http_requests.values()
+        )
+    ):
+        raise ServiceActionError()
+
+
 def _is_non_negative_integer(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
 
@@ -370,7 +475,11 @@ def _is_safe_run_identifier(value: object) -> bool:
     )
 
 
-def _safe_json_response_headers(response) -> bool:
+def _safe_json_response_headers(
+    response,
+    *,
+    max_response_bytes: int = MAX_SERVICE_ACTION_RESPONSE_BYTES,
+) -> bool:
     declared_lengths = response.headers.get_all("Content-Length", [])
     if len(declared_lengths) > 1:
         return False
@@ -379,7 +488,7 @@ def _safe_json_response_headers(response) -> bool:
             declared_length = int(declared_lengths[0])
         except (TypeError, ValueError):
             return False
-        if declared_length < 0 or declared_length > MAX_SERVICE_ACTION_RESPONSE_BYTES:
+        if declared_length < 0 or declared_length > max_response_bytes:
             return False
     return (
         response.headers.get_content_type() == "application/json"
@@ -388,9 +497,13 @@ def _safe_json_response_headers(response) -> bool:
     )
 
 
-def _decode_response(response) -> Dict[str, object]:
-    body = response.read(MAX_SERVICE_ACTION_RESPONSE_BYTES + 1)
-    if len(body) > MAX_SERVICE_ACTION_RESPONSE_BYTES:
+def _decode_response(
+    response,
+    *,
+    max_response_bytes: int = MAX_SERVICE_ACTION_RESPONSE_BYTES,
+) -> Dict[str, object]:
+    body = response.read(max_response_bytes + 1)
+    if len(body) > max_response_bytes:
         raise ServiceActionError()
     try:
         payload = json.loads(body.decode("utf-8"))

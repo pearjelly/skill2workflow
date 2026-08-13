@@ -120,6 +120,11 @@ skill2workflow service-show <run_id> \
 skill2workflow service-runs \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
+
+skill2workflow service-support-bundle \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token \
+  --output /var/lib/skill2workflow/support-bundle.json
 ```
 
 Run the interrupted-run crash recovery evidence:

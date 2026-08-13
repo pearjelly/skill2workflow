@@ -12,10 +12,12 @@ from .visualizer import run_overlay_for_nodes
 SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
 RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
 RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
+SUPPORT_BUNDLE_SCHEMA_VERSION = "skill2workflow-support-bundle-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 MAX_RUN_DETAIL_EVENTS = 50
 MAX_RUN_LIST_ITEMS = 100
+MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
 
 
 def build_control_snapshot(
@@ -166,6 +168,39 @@ def build_run_list_from_control(
             "returned": len(runs),
             "truncated": len(runs) < total,
         },
+    }
+
+
+def build_support_bundle_from_control(
+    control: LocalControlPlane,
+    telemetry,
+    *,
+    service_status: str,
+    ready: bool,
+    scheduler_lease_owned: bool,
+    storage: str = "sqlite",
+) -> Dict[str, object]:
+    """Build one fixed, redacted diagnostic package from live service state."""
+
+    if storage != "sqlite":
+        raise ValueError("support bundle requires sqlite storage")
+    if service_status not in {"starting", "ready", "draining", "stopped", "unknown"}:
+        raise ValueError("support bundle service status is invalid")
+    run_list = build_run_list_from_control(control)
+    return {
+        "schema_version": SUPPORT_BUNDLE_SCHEMA_VERSION,
+        "service": {
+            "status": service_status,
+            "ready": bool(ready),
+            "storage": storage,
+            "scheduler_lease_owned": bool(scheduler_lease_owned),
+        },
+        "run_list": run_list,
+        "observability": telemetry.aggregate(
+            service_status=service_status,
+            ready=ready,
+            scheduler_lease_owned=scheduler_lease_owned,
+        ),
     }
 
 

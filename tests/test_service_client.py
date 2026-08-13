@@ -7,11 +7,13 @@ from unittest import TestCase
 
 from skill2workflow.service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
+    MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     ServiceActionError,
     post_run_cancel,
     post_run_resume,
     fetch_run_detail,
     fetch_run_list,
+    fetch_support_bundle,
 )
 
 
@@ -20,6 +22,81 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_support_bundle_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+        payload = _support_bundle_payload()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            bundle = fetch_support_bundle(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(bundle, payload)
+        self.assertEqual(
+            observed,
+            [
+                {
+                    "path": "/api/v1/support-bundle",
+                    "authorization": f"Bearer {AUTH_TOKEN}",
+                }
+            ],
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_support_bundle_rejects_oversized_response(self):
+        body = b"x" * (MAX_SUPPORT_BUNDLE_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_support_bundle(f"http://127.0.0.1:{server.server_port}", token_file)
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
     def test_run_list_uses_authenticated_get_and_validates_contract(self):
         observed = []
 
@@ -385,6 +462,54 @@ class ServiceClientTests(TestCase):
             thread.join(timeout=2)
             server.server_close()
         self.assertFalse(thread.is_alive())
+
+
+def _support_bundle_payload():
+    status_counts = {
+        "created": 0,
+        "running": 0,
+        "waiting": 0,
+        "completed": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "interrupted": 0,
+        "other": 0,
+    }
+    routes = (
+        "health", "readiness", "metrics", "control_snapshot", "support_bundle",
+        "run_list", "run_detail", "workflow_trigger", "run_cancel", "run_resume", "unknown",
+    )
+    zero_http = {"2xx": 0, "4xx": 0, "5xx": 0}
+    return {
+        "schema_version": "skill2workflow-support-bundle-0.1.0",
+        "service": {
+            "status": "ready",
+            "ready": True,
+            "storage": "sqlite",
+            "scheduler_lease_owned": True,
+        },
+        "run_list": {
+            "schema_version": "skill2workflow-run-list-0.1.0",
+            "summary": {"total": 0, "status_counts": dict(status_counts)},
+            "runs": [],
+            "window": {"max_items": 100, "total": 0, "returned": 0, "truncated": False},
+        },
+        "observability": {
+            "service_status": "ready",
+            "ready": True,
+            "scheduler_lease_owned": True,
+            "uptime_seconds": 1.25,
+            "workflow_status_counts": {"published": 0, "deprecated": 0, "other": 0},
+            "run_status_counts": dict(status_counts),
+            "dispatch_status_counts": {
+                "claimed": 0, "completed": 0, "failed": 0, "skipped": 0,
+                "uncertain": 0, "other": 0,
+            },
+            "audit_event_count": 0,
+            "recurring_schedule_count": 0,
+            "http_requests": {route: dict(zero_http) for route in routes},
+        },
+    }
 
 
 def _send_json(handler, status_code, payload):

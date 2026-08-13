@@ -25,9 +25,11 @@ from .dashboard import (
     MAX_LIVE_SNAPSHOT_BYTES,
     MAX_RUN_DETAIL_EVENTS,
     MAX_RUN_LIST_ITEMS,
+    MAX_SUPPORT_BUNDLE_BYTES,
     build_control_snapshot_from_control,
     build_run_detail_from_control,
     build_run_list_from_control,
+    build_support_bundle_from_control,
 )
 from .schedules import RecurringScheduleDispatcher, SchedulerLeaseError
 from .state_layout import ensure_service_state_layout, mark_service_state_initialized
@@ -505,6 +507,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_metrics()
                 elif self.command == "GET" and path == "/api/v1/control-snapshot":
                     self._handle_control_snapshot()
+                elif self.command == "GET" and path == "/api/v1/support-bundle":
+                    self._handle_support_bundle()
                 elif self.command == "GET" and path == "/runs":
                     self._handle_run_list()
                 elif self.command == "GET" and _run_detail_id(path):
@@ -687,6 +691,56 @@ def _handler_for(service: RuntimeService):
                     raise ValueError("run list exceeds response limit")
             except (ValueError, OSError, sqlite3.Error):
                 self._send_json(503, {"error": "run list unavailable"})
+                return
+            self._send_json(200, payload)
+
+        def _handle_support_bundle(self):
+            """Serve one bounded, redacted diagnostic package."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "support bundle request must not include a body"},
+                )
+                return
+            try:
+                readiness_status, _ = service.readiness()
+                lease_owned = service.scheduler.dispatcher.has_lease(now_epoch=time.time())
+                payload = build_support_bundle_from_control(
+                    service.control_plane,
+                    service.telemetry,
+                    service_status=service.status,
+                    ready=readiness_status == 200,
+                    scheduler_lease_owned=lease_owned,
+                    storage=service.config.storage,
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_SUPPORT_BUNDLE_BYTES:
+                    raise ValueError("support bundle exceeds response limit")
+            except (ValueError, OSError, sqlite3.Error):
+                self._send_json(503, {"error": "support bundle unavailable"})
                 return
             self._send_json(200, payload)
 
@@ -911,6 +965,8 @@ def _request_route(method: str, path: str) -> str:
         return "metrics"
     if method == "GET" and path == "/api/v1/control-snapshot":
         return "control_snapshot"
+    if method == "GET" and path == "/api/v1/support-bundle":
+        return "support_bundle"
     if method == "GET" and path == "/runs":
         return "run_list"
     if method == "GET" and _run_detail_id(path):

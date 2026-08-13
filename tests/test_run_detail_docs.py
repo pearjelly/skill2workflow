@@ -53,6 +53,9 @@ class RunDetailDocumentationTests(TestCase):
         self.assertIn("service-runs", stability)
         self.assertIn('"service-show"', package_smoke)
         self.assertIn('"service-runs"', package_smoke)
+        self.assertIn("docs/support-bundle.md", readme)
+        self.assertIn("service-support-bundle", stability)
+        self.assertIn('"service-support-bundle"', package_smoke)
 
     def test_run_list_schema_and_guide_publish_discovery_contract(self):
         schema = json.loads(
@@ -78,5 +81,34 @@ class RunDetailDocumentationTests(TestCase):
             "does not append audit events",
             "service-runs",
             "service-show",
+        ):
+            self.assertIn(phrase, guide)
+
+    def test_support_bundle_schema_and_guide_publish_safe_incident_contract(self):
+        schema = json.loads(
+            (ROOT / "schemas" / "support-bundle-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        guide = (ROOT / "docs" / "support-bundle.md").read_text(encoding="utf-8")
+        self.assertEqual(
+            schema["$id"],
+            "https://skill2workflow.dev/schemas/support-bundle-0.1.0.schema.json",
+        )
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-support-bundle-0.1.0",
+        )
+        self.assertEqual(schema["$defs"]["runList"]["properties"]["runs"]["maxItems"], 100)
+        for phrase in (
+            "GET /api/v1/support-bundle",
+            "128 KiB",
+            "does not append audit events",
+            "does not acquire the scheduler lease",
+            "service-support-bundle",
+            "0600",
+            "workflow DSL",
+            "credential values",
+            "does not include",
         ):
             self.assertIn(phrase, guide)

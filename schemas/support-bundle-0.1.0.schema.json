@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/support-bundle-0.1.0.schema.json",
+  "title": "skill2workflow authenticated redacted support bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "service", "run_list", "observability"],
+  "properties": {
+    "schema_version": {"const": "skill2workflow-support-bundle-0.1.0"},
+    "service": {"$ref": "#/$defs/service"},
+    "run_list": {"$ref": "#/$defs/runList"},
+    "observability": {"$ref": "#/$defs/observability"}
+  },
+  "$defs": {
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "statusCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["created", "running", "waiting", "completed", "failed", "cancelled", "interrupted", "other"],
+      "properties": {
+        "created": {"$ref": "#/$defs/nonNegativeInteger"},
+        "running": {"$ref": "#/$defs/nonNegativeInteger"},
+        "waiting": {"$ref": "#/$defs/nonNegativeInteger"},
+        "completed": {"$ref": "#/$defs/nonNegativeInteger"},
+        "failed": {"$ref": "#/$defs/nonNegativeInteger"},
+        "cancelled": {"$ref": "#/$defs/nonNegativeInteger"},
+        "interrupted": {"$ref": "#/$defs/nonNegativeInteger"},
+        "other": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "ready", "storage", "scheduler_lease_owned"],
+      "properties": {
+        "status": {"enum": ["starting", "ready", "draining", "stopped", "unknown"]},
+        "ready": {"type": "boolean"},
+        "storage": {"const": "sqlite"},
+        "scheduler_lease_owned": {"type": "boolean"}
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "workflow_id", "workflow_version", "status", "current_node", "event_count", "node_result_count"],
+      "properties": {
+        "run_id": {"type": "string", "pattern": "^run_[A-Za-z0-9_-]{1,123}$"},
+        "workflow_id": {"type": "string"},
+        "workflow_version": {"type": "string"},
+        "status": {"enum": ["created", "running", "waiting", "completed", "failed", "cancelled", "interrupted", "other"]},
+        "current_node": {"type": "string"},
+        "event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "node_result_count": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "runList": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "summary", "runs", "window"],
+      "properties": {
+        "schema_version": {"const": "skill2workflow-run-list-0.1.0"},
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["total", "status_counts"],
+          "properties": {
+            "total": {"$ref": "#/$defs/nonNegativeInteger"},
+            "status_counts": {"$ref": "#/$defs/statusCounts"}
+          }
+        },
+        "runs": {"type": "array", "items": {"$ref": "#/$defs/run"}, "maxItems": 100},
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["max_items", "total", "returned", "truncated"],
+          "properties": {
+            "max_items": {"type": "integer", "minimum": 1, "maximum": 100},
+            "total": {"$ref": "#/$defs/nonNegativeInteger"},
+            "returned": {"$ref": "#/$defs/nonNegativeInteger"},
+            "truncated": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "workflowStatusCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["published", "deprecated", "other"],
+      "properties": {
+        "published": {"$ref": "#/$defs/nonNegativeInteger"},
+        "deprecated": {"$ref": "#/$defs/nonNegativeInteger"},
+        "other": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "dispatchStatusCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claimed", "completed", "failed", "skipped", "uncertain", "other"],
+      "properties": {
+        "claimed": {"$ref": "#/$defs/nonNegativeInteger"},
+        "completed": {"$ref": "#/$defs/nonNegativeInteger"},
+        "failed": {"$ref": "#/$defs/nonNegativeInteger"},
+        "skipped": {"$ref": "#/$defs/nonNegativeInteger"},
+        "uncertain": {"$ref": "#/$defs/nonNegativeInteger"},
+        "other": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "httpCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["2xx", "4xx", "5xx"],
+      "properties": {
+        "2xx": {"$ref": "#/$defs/nonNegativeInteger"},
+        "4xx": {"$ref": "#/$defs/nonNegativeInteger"},
+        "5xx": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service_status", "ready", "scheduler_lease_owned", "uptime_seconds", "workflow_status_counts", "run_status_counts", "dispatch_status_counts", "audit_event_count", "recurring_schedule_count", "http_requests"],
+      "properties": {
+        "service_status": {"enum": ["starting", "ready", "draining", "stopped", "unknown"]},
+        "ready": {"type": "boolean"},
+        "scheduler_lease_owned": {"type": "boolean"},
+        "uptime_seconds": {"type": "number", "minimum": 0},
+        "workflow_status_counts": {"$ref": "#/$defs/workflowStatusCounts"},
+        "run_status_counts": {"$ref": "#/$defs/statusCounts"},
+        "dispatch_status_counts": {"$ref": "#/$defs/dispatchStatusCounts"},
+        "audit_event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "recurring_schedule_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "http_requests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["health", "readiness", "metrics", "control_snapshot", "support_bundle", "run_list", "run_detail", "workflow_trigger", "run_cancel", "run_resume", "unknown"],
+          "properties": {
+            "health": {"$ref": "#/$defs/httpCounts"},
+            "readiness": {"$ref": "#/$defs/httpCounts"},
+            "metrics": {"$ref": "#/$defs/httpCounts"},
+            "control_snapshot": {"$ref": "#/$defs/httpCounts"},
+            "support_bundle": {"$ref": "#/$defs/httpCounts"},
+            "run_list": {"$ref": "#/$defs/httpCounts"},
+            "run_detail": {"$ref": "#/$defs/httpCounts"},
+            "workflow_trigger": {"$ref": "#/$defs/httpCounts"},
+            "run_cancel": {"$ref": "#/$defs/httpCounts"},
+            "run_resume": {"$ref": "#/$defs/httpCounts"},
+            "unknown": {"$ref": "#/$defs/httpCounts"}
+          }
+        }
+      }
+    }
+  }
+}

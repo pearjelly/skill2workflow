@@ -107,6 +107,10 @@ skill2workflow service-show run_example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 ```
 
+For incident handoff, `service-support-bundle` writes one bounded, redacted
+diagnostic artifact without exporting the full control snapshot; see
+[`support-bundle.md`](support-bundle.md).
+
 ## Verification
 
 The real threaded-service regression covers the full route, exact body

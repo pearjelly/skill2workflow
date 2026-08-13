@@ -12,7 +12,10 @@ from skill2workflow.dashboard import (
     build_control_snapshot_from_control,
     build_run_detail,
     build_run_list,
+    build_support_bundle_from_control,
 )
+from skill2workflow.schedules import RecurringScheduleStore
+from skill2workflow.telemetry import RuntimeTelemetry
 
 
 class DashboardTests(TestCase):
@@ -306,6 +309,38 @@ class DashboardTests(TestCase):
         self.assertNotIn("context", serialized)
         self.assertNotEqual(projected["runs"][0]["run_id"], "")
         self.assertIn(projected["runs"][0]["run_id"], {first["run_id"], second["run_id"]})
+
+    def test_support_bundle_is_fixed_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            run = control.run_published_workflow("workflow_dashboard", "1.0.0")
+            state = control.get_run(run["run_id"])
+            state["context"] = {"private_input": "private-bundle-input"}
+            state["node_results"]["start"]["output"] = "private-bundle-output"
+            control.executor.store.save(state)
+            RecurringScheduleStore(state_dir)
+            bundle = build_support_bundle_from_control(
+                control,
+                RuntimeTelemetry(state_dir, monotonic=lambda: 2.0),
+                service_status="ready",
+                ready=True,
+                scheduler_lease_owned=False,
+            )
+
+        self.assertEqual(bundle["schema_version"], "skill2workflow-support-bundle-0.1.0")
+        self.assertEqual(
+            set(bundle), {"schema_version", "service", "run_list", "observability"}
+        )
+        self.assertEqual(bundle["service"]["storage"], "sqlite")
+        self.assertEqual(bundle["run_list"]["summary"]["total"], 1)
+        self.assertEqual(bundle["observability"]["service_status"], "ready")
+        self.assertIn("support_bundle", bundle["observability"]["http_requests"])
+        serialized = json.dumps(bundle, ensure_ascii=False)
+        self.assertNotIn("private-bundle-input", serialized)
+        self.assertNotIn("private-bundle-output", serialized)
+        self.assertNotIn("context", serialized)
 
 
 def _workflow(version: str, node_title: str):

@@ -210,6 +210,49 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_support_bundle_writes_private_output(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        with TemporaryDirectory() as tmp:
+            output = Path(tmp) / "support-bundle.json"
+            expected = {
+                "schema_version": "skill2workflow-support-bundle-0.1.0",
+                "service": {"status": "ready"},
+                "run_list": {"runs": []},
+                "observability": {"audit_event_count": 0},
+            }
+            with patch(
+                "skill2workflow.cli.fetch_support_bundle",
+                return_value=expected,
+            ) as fetch:
+                with redirect_stdout(stdout):
+                    exit_code = main(
+                        [
+                            "service-support-bundle",
+                            "--service-url",
+                            "https://service.example",
+                            "--auth-token-file",
+                            str(token_file),
+                            "--output",
+                            str(output),
+                        ]
+                    )
+
+            written = json.loads(output.read_text(encoding="utf-8"))
+            output_mode = output.stat().st_mode & 0o777
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(written, expected)
+        self.assertEqual(output_mode, 0o600)
+        self.assertEqual(
+            json.loads(stdout.getvalue()),
+            {
+                "schema_version": "skill2workflow-support-bundle-0.1.0",
+                "output": str(output),
+            },
+        )
+        fetch.assert_called_once_with("https://service.example", token_file)
+
     def test_state_retention_plan_and_apply_commands_publish_new_copy(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

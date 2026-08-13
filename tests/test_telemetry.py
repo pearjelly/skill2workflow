@@ -55,6 +55,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry = RuntimeTelemetry(state_dir, monotonic=lambda: 15.25)
             telemetry.observe_http("workflow_trigger", 200)
             telemetry.observe_http("control_snapshot", 200)
+            telemetry.observe_http("support_bundle", 200)
             telemetry.observe_http("run_list", 200)
             telemetry.observe_http("run_detail", 200)
             telemetry.observe_http("run_resume", 409)
@@ -75,6 +76,7 @@ class RuntimeTelemetryTests(TestCase):
             "skill2workflow_recurring_schedules 1",
             'skill2workflow_http_requests_total{route="workflow_trigger",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="control_snapshot",status_class="2xx"} 1',
+            'skill2workflow_http_requests_total{route="support_bundle",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="run_list",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="run_detail",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="run_resume",status_class="4xx"} 1',
@@ -90,6 +92,49 @@ class RuntimeTelemetryTests(TestCase):
             str(state_dir),
         ):
             self.assertNotIn(forbidden, rendered)
+
+    def test_aggregate_support_bundle_contract_is_fixed_and_value_free(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            control.trigger_workflow(
+                {
+                    "workflow_id": "workflow_private_customer_48392",
+                    "version": "0.1.0",
+                    "source": "support-bundle-test",
+                    "idempotency_key": "private-idempotency-value",
+                    "input": {"customer": "private-customer-value"},
+                }
+            )
+            RecurringScheduleStore(state_dir)
+            telemetry = RuntimeTelemetry(state_dir, monotonic=lambda: 4.0)
+            aggregate = telemetry.aggregate(
+                service_status="ready",
+                ready=True,
+                scheduler_lease_owned=False,
+            )
+
+        self.assertEqual(
+            set(aggregate),
+            {
+                "service_status", "ready", "scheduler_lease_owned", "uptime_seconds",
+                "workflow_status_counts", "run_status_counts", "dispatch_status_counts",
+                "audit_event_count", "recurring_schedule_count", "http_requests",
+            },
+        )
+        self.assertEqual(set(aggregate["http_requests"]), {
+            "health", "readiness", "metrics", "control_snapshot", "support_bundle",
+            "run_list", "run_detail", "workflow_trigger", "run_cancel", "run_resume", "unknown",
+        })
+        serialized = json.dumps(aggregate, ensure_ascii=False)
+        for forbidden in (
+            "workflow_private_customer_48392",
+            "private-idempotency-value",
+            "private-customer-value",
+            str(state_dir),
+        ):
+            self.assertNotIn(forbidden, serialized)
 
     def test_operational_events_have_strict_allowlisted_ndjson_shapes(self):
         stream = io.StringIO()

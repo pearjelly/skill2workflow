@@ -12,7 +12,7 @@ from collections import Counter
 from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Optional, TextIO
+from typing import Callable, Dict, Optional, TextIO
 
 
 TELEMETRY_EVENT_SCHEMA_VERSION = "skill2workflow-operational-event-0.1.0"
@@ -22,6 +22,7 @@ _ROUTES = (
     "readiness",
     "metrics",
     "control_snapshot",
+    "support_bundle",
     "run_list",
     "run_detail",
     "workflow_trigger",
@@ -62,7 +63,9 @@ class RuntimeTelemetry:
         with self._lock:
             self._http_counts[(normalized_route, status_class)] += 1
 
-    def render(self, *, service_status: str, ready: bool, scheduler_lease_owned: bool) -> str:
+    def aggregate(self, *, service_status: str, ready: bool, scheduler_lease_owned: bool) -> Dict[str, object]:
+        """Return the same fixed, value-free aggregates used by metrics export."""
+
         workflow_counts = self._grouped_counts(
             "control.sqlite3", "workflow_versions", "status", _WORKFLOW_STATUSES
         )
@@ -75,8 +78,43 @@ class RuntimeTelemetry:
         with self._lock:
             http_counts = dict(self._http_counts)
 
-        uptime = max(0.0, float(self._monotonic()) - float(self._started_at))
         lifecycle = service_status if service_status in _LIFECYCLE_STATUSES else "unknown"
+        http_requests = {
+            route: {
+                status_class: int(http_counts.get((route, status_class), 0))
+                for status_class in _STATUS_CLASSES
+            }
+            for route in _ROUTES
+        }
+        return {
+            "service_status": lifecycle,
+            "ready": bool(ready),
+            "scheduler_lease_owned": bool(scheduler_lease_owned),
+            "uptime_seconds": round(
+                max(0.0, float(self._monotonic()) - float(self._started_at)), 3
+            ),
+            "workflow_status_counts": workflow_counts,
+            "run_status_counts": run_counts,
+            "dispatch_status_counts": dispatch_counts,
+            "audit_event_count": audit_count,
+            "recurring_schedule_count": schedule_count,
+            "http_requests": http_requests,
+        }
+
+    def render(self, *, service_status: str, ready: bool, scheduler_lease_owned: bool) -> str:
+        aggregate = self.aggregate(
+            service_status=service_status,
+            ready=ready,
+            scheduler_lease_owned=scheduler_lease_owned,
+        )
+        workflow_counts = aggregate["workflow_status_counts"]
+        run_counts = aggregate["run_status_counts"]
+        dispatch_counts = aggregate["dispatch_status_counts"]
+        audit_count = aggregate["audit_event_count"]
+        schedule_count = aggregate["recurring_schedule_count"]
+        uptime = aggregate["uptime_seconds"]
+        lifecycle = aggregate["service_status"]
+        http_requests = aggregate["http_requests"]
         lines = [
             "# HELP skill2workflow_service_ready Whether the service is ready to accept workflow traffic.",
             "# TYPE skill2workflow_service_ready gauge",
@@ -116,7 +154,7 @@ class RuntimeTelemetry:
                 lines.append(
                     "skill2workflow_http_requests_total"
                     f'{{route="{route}",status_class="{status_class}"}} '
-                    f"{http_counts.get((route, status_class), 0)}"
+                    f"{http_requests[route][status_class]}"
                 )
         return "\n".join(lines) + "\n"
 

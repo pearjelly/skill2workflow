@@ -671,7 +671,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-60 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-61 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -715,6 +715,8 @@ Loop 59 adds authenticated [redacted run detail](docs/run-detail.md): `GET /runs
 
 Loop 60 adds authenticated [redacted run discovery](docs/run-list.md): `GET /runs` and the installed `service-runs` command expose at most 100 fixed summaries and status counts, completing the list → inspect → decide operator handoff without exporting payloads or credentials.
 
+Loop 61 adds an authenticated [redacted support bundle](docs/support-bundle.md): `GET /api/v1/support-bundle` and the installed `service-support-bundle` command produce one bounded `0600` diagnostic artifact from fixed lifecycle, aggregate observability, and run-list data without exporting payloads or credentials.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -731,6 +733,7 @@ See:
 - `docs/human-approval.md`
 - `docs/run-detail.md`
 - `docs/run-list.md`
+- `docs/support-bundle.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`
 - `docs/controlled-pilot-deferral-review.md`

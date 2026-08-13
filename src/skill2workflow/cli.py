@@ -26,6 +26,7 @@ from .service_doctor import diagnose_service
 from .service_client import (
     fetch_run_detail,
     fetch_run_list,
+    fetch_support_bundle,
     post_run_cancel,
     post_run_resume,
 )
@@ -299,6 +300,14 @@ def main(argv=None) -> int:
     )
     service_runs_cmd.add_argument("--service-url", required=True)
     service_runs_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_support_cmd = subparsers.add_parser(
+        "service-support-bundle",
+        help="Write a bounded redacted support bundle through the authenticated service",
+    )
+    service_support_cmd.add_argument("--service-url", required=True)
+    service_support_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_support_cmd.add_argument("--output", type=Path, required=True)
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -633,6 +642,24 @@ def main(argv=None) -> int:
                 args.auth_token_file,
             )
         )
+
+    if args.command == "service-support-bundle":
+        try:
+            bundle = fetch_support_bundle(args.service_url, args.auth_token_file)
+            write_private_snapshot(args.output, bundle)
+            _print_json(
+                {
+                    "schema_version": bundle["schema_version"],
+                    "output": str(args.output),
+                }
+            )
+            return 0
+        except ValueError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        except OSError:
+            print("support bundle operation failed", file=sys.stderr)
+            return 1
 
     if args.command == "control-runs":
         _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_runs())

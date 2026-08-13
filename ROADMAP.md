@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-60
+- Completed delivery loops: 1-61
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 60 is complete with authenticated redacted run discovery
+- Active loop: None; Loop 61 is complete with authenticated redacted support bundle
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the redacted run-discovery drill
+- Next decision: select the next Production Baseline loop after reviewing the redacted support-bundle drill
 
 ## Production Readiness Path
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-60 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-61 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, and authenticated redacted run discovery became Loop 60 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, and authenticated redacted support bundle became Loop 61 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, and bounded redacted run discovery are achieved by Loops 44-60. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, and a bounded redacted support bundle are achieved by Loops 44-61. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -170,9 +170,33 @@ PYTHONPATH=src python3 -m unittest \
 
 Loop 60 completes the remote operator discovery handoff without changing workflow execution authority or the single-tenant network boundary. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
 
+### Loop 61: Authenticated Redacted Support Bundle
+
+**Status:** Complete.
+
+**Prior basis:** Loop 60 completed run discovery, but incident triage still required an operator to manually combine readiness, metrics, run-list, and service details. That increased support friction and encouraged sharing broader snapshots or raw state directories.
+
+**Outcome:** `GET /api/v1/support-bundle` serves one authenticated, read-only `skill2workflow-support-bundle-0.1.0` projection. It combines fixed lifecycle state, structured aggregate observability, and the nested redacted run-list contract under a 128 KiB response bound. The installed `service-support-bundle` client validates the origin, protected token file, headers, byte bound, and schema before atomically writing a 0600 file.
+
+**Evidence:** [`docs/support-bundle.md`](docs/support-bundle.md) defines the incident handoff, exclusions, and operator command. Dashboard, telemetry, service, client, CLI, schema, documentation, wheel, and full-suite tests prove that the bundle excludes paths, workflow DSL, trigger input, node-result payloads, connector responses, credentials, raw errors, audit payloads, and request headers, while not appending audit state or acquiring the scheduler lease.
+
+**Safety boundary:** This is a single-tenant diagnostic artifact. It excludes remote upload, tracing, raw logs, full state export, browser sessions, RBAC, hosted support, and automatic disclosure or retention decisions.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_service.RuntimeServiceTests.test_support_bundle_is_authenticated_redacted_bounded_and_read_only \
+  tests.test_service_client.ServiceClientTests.test_support_bundle_uses_authenticated_get_and_validates_contract \
+  tests.test_cli.CliTests.test_service_support_bundle_writes_private_output \
+  -v
+```
+
+Loop 61 closes the incident-handoff gap without changing workflow execution authority or the single-tenant network boundary. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 60 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the redacted run-discovery drill.
+This rolling queue is ordered. Loop 61 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the redacted support-bundle drill.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -198,6 +222,7 @@ This rolling queue is ordered. Loop 60 is complete and there is no active delive
 | Loop 58: Protected Remote Operator Action Clients | Complete | Make the existing service actions safe and ergonomic from an installed CLI | Token-file auth, origin/redirect/proxy/response bounds, exact request contracts, compact errors, and wheel help evidence |
 | Loop 59: Authenticated Redacted Run Detail | Complete | Let an operator inspect one run safely before remote action | Fixed redacted schema, 50-event window, 64 KiB response bound, authenticated `service-show`, and leakage/read-only evidence |
 | Loop 60: Authenticated Redacted Run Discovery | Complete | Let an operator discover candidate runs safely before inspection or remote action | Fixed redacted schema, 100-run window, 64 KiB response bound, authenticated `service-runs`, and leakage/read-only evidence |
+| Loop 61: Authenticated Redacted Support Bundle | Complete | Give an operator one safe incident-handoff artifact without exporting raw state | Fixed support-bundle schema, structured aggregate observability, nested 100-run window, 128 KiB response bound, authenticated `service-support-bundle`, and 0600 output evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -243,6 +268,8 @@ Loop 59 covers only one authenticated `GET /runs/{run_id}` projection and its pr
 
 Loop 60 covers only one authenticated `GET /runs` projection and its protected CLI client. It excludes arbitrary filters, pagination cursors, full state export, mutation, browser sessions, RBAC, remote audit storage, and provider-side execution guarantees.
 
+Loop 61 covers only one authenticated `GET /api/v1/support-bundle` projection and its protected CLI client. It excludes remote upload, tracing, raw logs, full state export, browser sessions, RBAC, hosted support, and automatic disclosure or retention decisions.
+
 Selection rules:
 
 - Merge or explicitly defer the current loop before starting the next one.
@@ -260,7 +287,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, human gates, retry/recovery policy, run context, and connector events |
-| Control plane | Publish immutable workflow versions, trigger runs from CLI/webhook/schedules, query audit evidence, export read-only operator snapshots, and inspect one redacted run detail |
+| Control plane | Publish immutable workflow versions, trigger runs from CLI/webhook/schedules, query audit evidence, export read-only operator snapshots, inspect redacted runs, and write a redacted support bundle |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:
@@ -337,6 +364,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 58: Protected Remote Operator Action Clients | Complete | Token-file authenticated resume/cancel CLI, fixed origin and response safety, compact errors, and installed-wheel command evidence |
 | Loop 59: Authenticated Redacted Run Detail | Complete | Fixed redacted run-detail schema, authenticated service route, protected `service-show` client, and bounded leakage/read-only evidence |
 | Loop 60: Authenticated Redacted Run Discovery | Complete | Fixed redacted run-list schema, authenticated service route, protected `service-runs` client, and bounded leakage/read-only evidence |
+| Loop 61: Authenticated Redacted Support Bundle | Complete | Fixed redacted support-bundle schema, structured aggregate observability, protected `service-support-bundle` client, 0600 atomic output, and bounded leakage/read-only evidence |
 
 ## Release Direction
 

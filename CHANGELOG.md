@@ -23,6 +23,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added protected `service-resume` and `service-cancel` CLI clients that read Bearer tokens from owner-only files and reject unsafe origins, redirects, and unbounded responses.
 - Added authenticated redacted run detail at `GET /runs/{run_id}` and the protected `service-show` CLI with a fixed 50-event window and no raw workflow, input, connector, credential, or error payloads.
 - Added authenticated redacted run discovery at `GET /runs` and the protected `service-runs` CLI with fixed status counts, a 100-item window, and no payload or credential export.
+- Added an authenticated redacted support bundle at `GET /api/v1/support-bundle` and the protected `service-support-bundle` CLI with fixed aggregate observability, a nested run list, and owner-only atomic output.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed
