@@ -1,21 +1,59 @@
 import json
 import threading
+import urllib.error
 import urllib.request
+from email.message import Message
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest import TestCase
 
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.webhooks import (
+    MAX_REQUEST_BODY_BYTES,
     WebhookError,
     handle_webhook_request,
     parse_webhook_request,
     serve_webhook_requests,
+    _content_length,
 )
 
 
 class WebhookTests(TestCase):
+    def test_serve_webhook_requests_rejects_non_loopback_binding(self):
+        with TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "loopback host"):
+                serve_webhook_requests(
+                    host="0.0.0.0",
+                    port=0,
+                    control_plane=LocalControlPlane(Path(tmp)),
+                    once=True,
+                )
+
+    def test_content_length_rejects_ambiguous_invalid_and_oversized_metadata(self):
+        cases = [
+            ({"Content-Length": "not-a-number"}, "non-negative integer", 400),
+            ({"Content-Length": "-1"}, "non-negative integer", 400),
+            ({"Transfer-Encoding": "chunked"}, "transfer encoding", 400),
+            ({"Content-Length": str(MAX_REQUEST_BODY_BYTES + 1)}, "exceeds", 413),
+        ]
+        for values, message, status_code in cases:
+            with self.subTest(values=values):
+                headers = Message()
+                for name, value in values.items():
+                    headers[name] = value
+                with self.assertRaises(WebhookError) as raised:
+                    _content_length(SimpleNamespace(headers=headers))
+                self.assertIn(message, str(raised.exception))
+                self.assertEqual(raised.exception.status_code, status_code)
+
+        headers = Message()
+        headers["Content-Length"] = "1"
+        headers["Content-Length"] = "2"
+        with self.assertRaisesRegex(WebhookError, "multiple content lengths"):
+            _content_length(SimpleNamespace(headers=headers))
+
     def test_parse_webhook_request_maps_post_body_to_trigger_request(self):
         request = parse_webhook_request(
             "POST",
@@ -199,6 +237,56 @@ class WebhookTests(TestCase):
         self.assertEqual(body["workflow_version"], "3.0.0")
         self.assertEqual(body["run_status"], "completed")
         self.assertEqual(body["input_keys"], ["ticket_id"])
+        self.assertFalse(thread.is_alive())
+
+    def test_serve_webhook_requests_rejects_oversized_body_without_triggering(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp))
+            control.publish_workflow(_workflow("3.1.0"))
+            ready = threading.Event()
+            address = {}
+
+            thread = threading.Thread(
+                target=serve_webhook_requests,
+                kwargs={
+                    "host": "127.0.0.1",
+                    "port": 0,
+                    "control_plane": control,
+                    "once": True,
+                    "ready_callback": lambda server: (
+                        address.update({"server": server.server_address}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = address["server"]
+            request = urllib.request.Request(
+                f"http://{host}:{port}/webhooks/workflow_webhook/3.1.0",
+                headers={
+                    "Content-Type": "application/json",
+                    "Content-Length": str(MAX_REQUEST_BODY_BYTES + 1),
+                },
+                method="POST",
+            )
+
+            with self.assertRaises(urllib.error.HTTPError) as raised:
+                urllib.request.urlopen(request, timeout=2)
+            response = raised.exception
+            status = response.status
+            body = json.loads(response.read().decode("utf-8"))
+            response.close()
+            thread.join(timeout=2)
+            runs = control.list_runs()
+
+        self.assertEqual(status, 413)
+        self.assertEqual(
+            body,
+            {"error": f"request body exceeds {MAX_REQUEST_BODY_BYTES} bytes"},
+        )
+        self.assertEqual(runs, [])
         self.assertFalse(thread.is_alive())
 
 

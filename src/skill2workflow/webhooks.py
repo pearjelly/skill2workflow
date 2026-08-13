@@ -8,6 +8,10 @@ from typing import Callable, Dict
 from urllib.parse import unquote, urlsplit
 
 
+MAX_REQUEST_BODY_BYTES = 1024 * 1024
+_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+
+
 class WebhookError(Exception):
     """Raised when a local webhook request cannot be accepted."""
 
@@ -54,6 +58,8 @@ def serve_webhook_requests(
 ) -> None:
     """Serve local webhook requests with the Python standard library."""
 
+    if str(host).lower() not in _LOOPBACK_HOSTS:
+        raise ValueError("local webhook server must bind to a loopback host")
     handler = _handler_for(control_plane)
     server = HTTPServer((host, int(port)), handler)
     try:
@@ -82,8 +88,8 @@ def _handler_for(control_plane):
             self._handle_webhook()
 
         def _handle_webhook(self):
-            body = self.rfile.read(_content_length(self))
             try:
+                body = self.rfile.read(_content_length(self))
                 payload = handle_webhook_request(control_plane, self.command, self.path, body)
                 self._send_json(200, payload)
             except WebhookError as error:
@@ -133,7 +139,27 @@ def _optional_text(payload: Dict[str, object], key: str) -> str:
 
 
 def _content_length(handler: BaseHTTPRequestHandler) -> int:
+    if handler.headers.get("Transfer-Encoding"):
+        raise WebhookError("transfer encoding is not supported", status_code=400)
+    content_lengths = handler.headers.get_all("Content-Length", [])
+    if len(content_lengths) > 1:
+        raise WebhookError("multiple content lengths are not supported", status_code=400)
+    raw_value = content_lengths[0] if content_lengths else "0"
     try:
-        return int(handler.headers.get("Content-Length", "0") or "0")
+        value = int(raw_value)
     except ValueError:
-        return 0
+        raise WebhookError(
+            "content length must be a non-negative integer",
+            status_code=400,
+        )
+    if value < 0:
+        raise WebhookError(
+            "content length must be a non-negative integer",
+            status_code=400,
+        )
+    if value > MAX_REQUEST_BODY_BYTES:
+        raise WebhookError(
+            f"request body exceeds {MAX_REQUEST_BODY_BYTES} bytes",
+            status_code=413,
+        )
+    return value

@@ -103,6 +103,8 @@ Triggered run details include:
 ## Local Webhook Adapter
 
 The local webhook adapter exposes the same trigger boundary over a dependency-free local HTTP server. It is intended for local pilot integration testing, not hosted ingress.
+It accepts only loopback bind hosts (`127.0.0.1`, `::1`, or `localhost`) and
+rejects public-interface bindings.
 
 Start the local server:
 
@@ -156,6 +158,11 @@ Supported fields:
 | `source` | No | Local webhook source label. Defaults to `local-webhook`. |
 | `idempotency_key` | No | Recorded as trigger metadata only. It is not enforced. |
 | `input` | No | JSON object copied into durable run context. Responses and audit events expose only keys. |
+
+The local adapter accepts at most 1 MiB of request body. It rejects transfer
+encoding, duplicate/invalid/negative `Content-Length` values, and oversized
+bodies before reading or triggering a workflow. An oversized request receives
+HTTP `413`; malformed length metadata receives HTTP `400`.
 
 The response shape matches the CLI trigger response:
 

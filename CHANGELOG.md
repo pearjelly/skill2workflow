@@ -34,6 +34,8 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added repository security, support, moderation, pull-request, and CI supply-chain policies; GitHub Actions now use fixed reviewed commits, read-only permissions, bounded jobs, and non-persistent checkout credentials.
 - Added repository-wide pre-commit hygiene scanning that rejects private paths, runtime state, key material, misplaced binary media, and symbolic links without reading rejected artifacts or echoing suspected secret values.
 - Hardened explicit JSON hygiene scans to reject symbolic links, non-regular or unavailable files, invalid UTF-8, invalid JSON, and inputs above 2 MiB with fixed redacted findings instead of tracebacks.
+- Hardened the local webhook adapter with the same bounded request-body and strict `Content-Length` contract as the authenticated service boundary.
+- Restricted the unauthenticated local webhook adapter to loopback hosts so a local test command cannot be accidentally exposed on a public interface.
 - Bound state-layout marker validation to one owner-only regular-file descriptor, rejected path-replacement races, and capped marker input at 16 KiB before decoding.
 - Generated systemd units carry no secret values or `Environment=` entries and require a private regular service configuration plus a non-symlink executable.
 - Bound ingress-token reads to one owner-only no-follow regular-file descriptor, capped token input at 16 KiB, and made service startup reject unsafe state or credential directory permissions.

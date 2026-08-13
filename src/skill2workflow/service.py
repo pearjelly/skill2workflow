@@ -31,12 +31,11 @@ from .state_layout import (
     validate_current_state_marker,
 )
 from .telemetry import RuntimeTelemetry
-from .webhooks import WebhookError, handle_webhook_request
+from .webhooks import MAX_REQUEST_BODY_BYTES, WebhookError, handle_webhook_request
 
 
 SERVICE_SCHEMA_VERSION = "skill2workflow-service-0.2.0"
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
-MAX_REQUEST_BODY_BYTES = 1024 * 1024
 MAX_AUTH_TOKEN_BYTES = 16 * 1024
 LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
 MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
