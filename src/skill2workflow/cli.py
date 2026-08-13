@@ -600,6 +600,12 @@ def main(argv=None) -> int:
     control_snapshot_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
     control_snapshot_cmd.add_argument("--service-url")
     control_snapshot_cmd.add_argument("--auth-token-file", type=Path)
+    control_snapshot_cmd.add_argument(
+        "--max-items",
+        type=int,
+        default=None,
+        help="Bound an offline snapshot to the newest items (1-1000)",
+    )
     control_snapshot_cmd.add_argument("-o", "--output", type=Path)
 
     args = parser.parse_args(argv)
@@ -1175,6 +1181,8 @@ def main(argv=None) -> int:
                     raise ValueError(
                         "live control snapshot requires --auth-token-file and excludes --state-dir"
                     )
+                if args.max_items is not None:
+                    raise ValueError("--max-items is only valid for offline snapshots")
                 snapshot = fetch_live_control_snapshot(
                     args.service_url,
                     args.auth_token_file,
@@ -1185,6 +1193,7 @@ def main(argv=None) -> int:
                 snapshot = build_control_snapshot(
                     args.state_dir or Path(".skill2workflow"),
                     storage=args.storage,
+                    max_items=args.max_items,
                 )
             if args.output:
                 write_private_snapshot(args.output, snapshot)

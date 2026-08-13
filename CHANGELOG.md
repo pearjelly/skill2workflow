@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `control-snapshot --max-items` for bounded offline operator exports.
+  JSON and SQLite snapshots retain newest collection windows up to 1,000 while
+  preserving aggregate totals; live snapshots keep their fixed 100-item bound.
 - Added bounded local audit inspection through `audit --limit`. Filters are
   applied in JSON/SQLite storage before retaining the newest matching events,
   with a fixed 1-1000 range and chronological output.

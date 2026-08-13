@@ -94,6 +94,24 @@ class JsonRunStore:
     def list(self) -> List[RunState]:
         return [json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.runs_dir.glob("*.json"))]
 
+    def snapshot_window(self, limit: int) -> Dict[str, object]:
+        """Read a bounded run tail while retaining aggregate status counts."""
+
+        _validate_snapshot_limit(limit)
+        selected = deque(maxlen=limit)
+        status_counts = Counter()
+        total = 0
+        for path in sorted(self.runs_dir.glob("*.json")):
+            state = json.loads(path.read_text(encoding="utf-8"))
+            total += 1
+            status_counts[str(state.get("status", "other"))] += 1
+            selected.append(state)
+        return {
+            "total": total,
+            "status_counts": dict(status_counts),
+            "items": list(selected),
+        }
+
     def start_execution(self, state: RunState, owner_id: str, execution_id: str) -> None:
         self.save(state)
 
@@ -685,6 +703,29 @@ class JsonControlStore:
 
     def save_index(self, index: Dict[str, WorkflowRecord]) -> None:
         self.index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def snapshot_window(self, limit: int) -> Dict[str, object]:
+        """Read a bounded JSON control window with aggregate totals."""
+
+        _validate_snapshot_limit(limit)
+        index = self.load_index()
+        records = sorted(
+            index.values(),
+            key=lambda record: (str(record.get("workflow_id", "")), str(record.get("version", ""))),
+        )
+        status_counts = Counter(str(record.get("status", "other")) for record in records)
+        audit_events = self.list_audit_events(limit=limit)
+        audit_total = 0
+        if self.audit_path.exists():
+            with self.audit_path.open("r", encoding="utf-8") as handle:
+                audit_total = sum(1 for line in handle if line.strip())
+        return {
+            "workflow_total": len(records),
+            "workflow_status_counts": dict(status_counts),
+            "workflows": records[-limit:],
+            "audit_total": audit_total,
+            "audit_events": audit_events,
+        }
 
     def append_audit(self, event: AuditEvent) -> None:
         self.append_audit_batch([event])
@@ -1792,6 +1833,11 @@ def _validate_sweep_limit(limit: int) -> None:
 def _validate_page_limit(limit: int) -> None:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
         raise ValueError("run page limit must be an integer from 1 through 100")
+
+
+def _validate_snapshot_limit(limit: int) -> None:
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+        raise ValueError("control snapshot limit must be an integer from 1 through 1000")
 
 
 def _expire_waiting_workflow_state(state: RunState, now: str):

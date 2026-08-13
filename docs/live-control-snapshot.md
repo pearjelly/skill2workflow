@@ -83,6 +83,23 @@ skill2workflow control-snapshot \
 Use the offline form for a complete stopped-state export. Use the live form for
 a bounded operational view.
 
+For routine inspection of a long-running local state directory, request a
+bounded offline window:
+
+```bash
+skill2workflow control-snapshot \
+  --state-dir /var/lib/skill2workflow \
+  --storage sqlite \
+  --max-items 100 \
+  --output /var/lib/skill2workflow/operator-snapshot.json
+```
+
+`--max-items` accepts `1` through `1000` and adds the same `window` accounting
+used by the live snapshot. JSON and SQLite storage retain only the newest
+window for runs, audit events, and workflow records while computing aggregate
+totals. The flag is rejected for `--service-url`, whose live bound is fixed at
+100 items. Omitting it keeps the complete offline export compatibility path.
+
 The existing Operator UI can load either artifact. It labels complete offline
 exports separately from bounded snapshots and highlights truncated collections,
 while Summary continues to show the total counts. A malformed or internally

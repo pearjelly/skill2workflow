@@ -27,6 +27,7 @@ RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION = "skill2workflow-recurring-schedule-ac
 RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
+MAX_OFFLINE_SNAPSHOT_ITEMS = 1000
 MAX_RUN_DETAIL_EVENTS = 50
 MAX_RUN_LIST_ITEMS = 100
 MAX_RUN_PAGE_ITEMS = 100
@@ -55,16 +56,19 @@ def build_control_snapshot_from_control(
     """Build a snapshot from an existing control plane with an optional tail window."""
 
     if max_items is not None and (
-        isinstance(max_items, bool) or not isinstance(max_items, int) or max_items <= 0
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or max_items <= 0
+        or max_items > MAX_OFFLINE_SNAPSHOT_ITEMS
     ):
-        raise ValueError("max_items must be a positive integer")
+        raise ValueError("max_items must be an integer from 1 through 1000")
 
-    bounded_sqlite = bool(
+    bounded_storage = bool(
         max_items is not None
         and hasattr(control.store, "snapshot_window")
         and hasattr(control.executor.store, "snapshot_window")
     )
-    if bounded_sqlite:
+    if bounded_storage:
         control_window = control.store.snapshot_window(max_items)
         run_window = control.executor.snapshot_window(max_items)
         workflows = control_window["workflows"]

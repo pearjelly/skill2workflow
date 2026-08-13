@@ -2273,6 +2273,55 @@ class CliTests(TestCase):
         self.assertIn("run_completed", {event["type"] for event in snapshot["audit_events"]})
         self.assertEqual(output_mode, 0o600)
 
+    def test_control_snapshot_command_accepts_bounded_offline_window(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            first = root / "first.json"
+            second = root / "second.json"
+            first.write_text(json.dumps(_workflow()), encoding="utf-8")
+            second_workflow = _workflow()
+            second_workflow["workflow"]["version"] = "0.2.0"
+            second.write_text(json.dumps(second_workflow), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(main(["publish", str(first), "--state-dir", str(state_dir)]), 0)
+                self.assertEqual(main(["publish", str(second), "--state-dir", str(state_dir)]), 0)
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "control-snapshot",
+                        "--state-dir",
+                        str(state_dir),
+                        "--max-items",
+                        "1",
+                    ]
+                )
+
+        snapshot = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(snapshot["window"]["max_items"], 1)
+        self.assertEqual(len(snapshot["workflows"]), 1)
+        self.assertEqual(snapshot["window"]["workflows"]["truncated"], True)
+
+    def test_control_snapshot_command_rejects_max_items_for_live_service(self):
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            exit_code = main(
+                [
+                    "control-snapshot",
+                    "--service-url",
+                    "https://workflow.example.test",
+                    "--auth-token-file",
+                    "/private/ingress.token",
+                    "--max-items",
+                    "1",
+                ]
+            )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "--max-items is only valid for offline snapshots\n")
+
     def test_control_snapshot_command_fetches_live_service_without_printing_token(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

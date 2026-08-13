@@ -44,6 +44,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
             "HTTPS or loopback HTTP",
             "redirects",
             "0600",
+            "--max-items 100",
+            "1` through `1000",
+            "rejected for `--service-url`",
             "live_control_snapshot_smoke.py",
         ):
             self.assertIn(phrase, guide)
@@ -61,9 +64,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         )
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-121 are complete", readme)
+        self.assertIn("Delivery Loops 1-122 are complete", readme)
         self.assertIn("docs/live-control-snapshot.md", readme)
-        self.assertIn("- Completed delivery loops: 1-121", roadmap)
+        self.assertIn("- Completed delivery loops: 1-122", roadmap)
         self.assertIn(
             "| Loop 55: Authenticated Live Operator Snapshot | Complete |",
             roadmap,

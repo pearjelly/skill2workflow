@@ -54,14 +54,17 @@ class DashboardTests(TestCase):
             control.run_published_workflow("workflow_dashboard", "1.0.0")
             control.run_published_workflow("workflow_dashboard", "1.1.0")
 
+            original_audit_list = control.store.list_audit_events
+
+            def bounded_audit_list(*args, **kwargs):
+                if kwargs.get("limit") is None:
+                    raise AssertionError("unbounded audit read")
+                return original_audit_list(*args, **kwargs)
+
             with patch.object(
                 control.store,
-                "load_index",
-                side_effect=AssertionError("unbounded workflow read"),
-            ), patch.object(
-                control.store,
                 "list_audit_events",
-                side_effect=AssertionError("unbounded audit read"),
+                side_effect=bounded_audit_list,
             ), patch.object(
                 control.executor.store,
                 "list",
@@ -76,6 +79,39 @@ class DashboardTests(TestCase):
         self.assertEqual(len(snapshot["audit_events"]), 1)
         self.assertTrue(snapshot["window"]["workflows"]["truncated"])
         self.assertTrue(snapshot["window"]["runs"]["truncated"])
+
+    def test_json_bounded_snapshot_does_not_call_unbounded_list_paths(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir)
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start v1"))
+            control.publish_workflow(_workflow(version="1.1.0", node_title="Start v2"))
+            control.run_published_workflow("workflow_dashboard", "1.0.0")
+            control.run_published_workflow("workflow_dashboard", "1.1.0")
+
+            original_audit_list = control.store.list_audit_events
+
+            def bounded_audit_list(*args, **kwargs):
+                if kwargs.get("limit") is None:
+                    raise AssertionError("unbounded audit read")
+                return original_audit_list(*args, **kwargs)
+
+            with patch.object(
+                control.store,
+                "list_audit_events",
+                side_effect=bounded_audit_list,
+            ), patch.object(
+                control.executor.store,
+                "list",
+                side_effect=AssertionError("unbounded run read"),
+            ):
+                snapshot = build_control_snapshot_from_control(control, max_items=1)
+
+        self.assertEqual(snapshot["summary"]["workflow_count"], 2)
+        self.assertEqual(snapshot["summary"]["run_count"], 2)
+        self.assertEqual(len(snapshot["workflows"]), 1)
+        self.assertEqual(len(snapshot["runs"]), 1)
+        self.assertEqual(len(snapshot["audit_events"]), 1)
 
     def test_bounded_snapshot_reports_total_and_returned_windows(self):
         with TemporaryDirectory() as tmp:

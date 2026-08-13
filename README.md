@@ -164,6 +164,7 @@ explicit connector boundaries. It currently supports:
 - Audit connector execution events through the control plane
 - Audit runtime policy events such as `node_retrying`, `node_recovered`, and `node_failed` through the control plane
 - Export a read-only control-plane snapshot with derived operator insights
+- Export a bounded offline control-plane snapshot with `control-snapshot --max-items`
 - Inspect operator attention items, recent events, connector events, per-node run overlays, workflows, runs, audit events, and version deltas in a static local control-plane UI
 - Inspect enterprise example workflows for sales, customer service, risk review, and operations analysis
 - Generate a deterministic first-run demo workspace for contributor onboarding
@@ -724,7 +725,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-121 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-122 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1066,6 +1067,11 @@ Loop 121 adds [bounded local audit inspection](docs/audit-integrity.md).
 `audit --limit` applies workflow/version/run/event-type filters in the storage
 backend, retains only the newest matching events up to 1,000, and prints them
 in chronological order. Omitting the flag preserves the complete-list path.
+
+Loop 122 adds [bounded offline control snapshots](docs/live-control-snapshot.md).
+`control-snapshot --max-items` exposes the existing window contract for local
+JSON and SQLite state, retaining only the newest selected collections while
+preserving aggregate totals. Live snapshots keep their fixed 100-item bound.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
