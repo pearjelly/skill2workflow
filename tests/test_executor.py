@@ -67,6 +67,25 @@ class ExecutorTests(TestCase):
         self.assertEqual(failed["error_code"], "workflow_timeout")
         self.assertEqual(failed["node_results"]["review"]["approved"], False)
 
+    def test_workflow_deadline_sweeper_expires_waiting_run_without_successor(self):
+        clock = _TestClock()
+        workflow = _approval_workflow()
+        workflow["policies"] = {"workflow_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp), storage="sqlite", clock=clock)
+            waiting = executor.run(workflow)
+            clock.advance(5)
+            expired = executor.expire_workflow_deadlines()
+            failed = executor.get_run(waiting["run_id"])
+            repeated = executor.expire_workflow_deadlines()
+
+        self.assertEqual(len(expired), 1)
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(failed["error_code"], "workflow_timeout")
+        self.assertEqual(failed["events"][-1]["source"], "deadline_sweeper")
+        self.assertEqual(repeated, [])
+
     def test_default_timeout_fails_closed_at_a_safe_point_and_persists_fixed_error(self):
         clock = _TestClock()
         runtime = _AdvancingConnectorRuntime(clock, milliseconds=10)

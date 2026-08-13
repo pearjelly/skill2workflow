@@ -76,6 +76,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - SQLite trigger idempotency for keyed service/control-plane requests, including durable replay, fixed `409` conflicts, and unresolved-outcome fail-closed behavior documented in `docs/triggers.md`
 - Bounded active execution timeout semantics for `policies.default_timeout_ms`, including fixed `execution_timeout` evidence and human-gate pause behavior documented in `docs/runtime-policy.md`
 - Bounded global workflow deadline semantics for `policies.workflow_timeout_ms`, including fixed `workflow_timeout` evidence and human-gate wall-clock coverage documented in `docs/runtime-policy.md`
+- Lease-owned SQLite deadline sweep semantics for waiting runs, including bounded atomic expiry, cancellation precedence, audit reconciliation, and no-successor execution documented in `docs/recurring-scheduling.md`
 - Connector retry policy semantics for `max_attempts` and bounded fixed `backoff_ms`, including control-plane audit and local visual evidence documented in `docs/runtime-policy.md` and `docs/connectors.md`
 - Optional `tool_call.on_fallback` transition semantics, edge validation, LiteGraph slot projection, and fixed `node_fallback` evidence documented in `docs/workflow-dsl-contract.md`
 - SQLite audit integrity result contract `skill2workflow-audit-integrity-0.1.0` and the payload-free `audit-verify` CLI; this does not claim signatures or JSON/JSONL chain guarantees

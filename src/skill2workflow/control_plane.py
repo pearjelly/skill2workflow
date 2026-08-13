@@ -17,7 +17,11 @@ from typing import Dict, List
 
 from .connectors import default_connectors
 from .compiler import validate_workflow
-from .executor import LocalExecutor, RunState
+from .executor import (
+    MAX_WORKFLOW_DEADLINE_SWEEP_RUNS,
+    LocalExecutor,
+    RunState,
+)
 from .input_schema import InputSchemaValidationError, validate_trigger_input
 from .storage import create_control_store
 from .triggers import (
@@ -801,6 +805,38 @@ class LocalControlPlane:
             self._append_audit_batch(reconciliation_events)
         return len(recovered)
 
+    def expire_workflow_deadlines(
+        self, now: str = None, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS
+    ) -> Dict[str, int]:
+        """Expire waiting deadlines and reconcile their terminal audit evidence."""
+
+        expired = self.executor.expire_workflow_deadlines(now=now, limit=limit)
+        candidates = {
+            str(state.get("run_id", "")): state
+            for state in expired
+            if str(state.get("run_id", ""))
+        }
+        remaining = max(0, int(limit) - len(candidates))
+        if remaining:
+            for state in self.executor.list_workflow_timeout_runs(limit=remaining):
+                run_id = str(state.get("run_id", ""))
+                if run_id:
+                    candidates.setdefault(run_id, state)
+        audit_events = []
+        for state in candidates.values():
+            audit_events.append(
+                _workflow_timeout_audit_event(
+                    state,
+                    str(state.get("workflow_id", "workflow")),
+                    str(state.get("workflow_version", "0.1.0")),
+                )
+            )
+        self._append_missing_audit_events(audit_events)
+        return {
+            "expired_count": len(expired),
+            "audit_candidate_count": len(audit_events),
+        }
+
     def list_audit_events(
         self,
         workflow_id: str = "",
@@ -1444,6 +1480,20 @@ def _last_run_event_timestamp(state: RunState, event_type: str) -> str:
         if timestamp:
             return str(timestamp)
     return ""
+
+
+def _workflow_timeout_audit_event(
+    state: RunState, workflow_id: str, workflow_version: str
+) -> AuditEvent:
+    event = {
+        "type": "run_failed",
+        "run_id": str(state.get("run_id", "")),
+        "workflow_id": str(workflow_id),
+        "workflow_version": str(workflow_version),
+        "timestamp": _last_run_event_timestamp(state, "run_failed") or _now(),
+        "error_code": "workflow_timeout",
+    }
+    return event
 
 
 def _last_run_event(state: RunState, event_type: str):

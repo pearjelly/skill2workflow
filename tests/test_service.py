@@ -302,6 +302,48 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(telemetry.inflight_scheduler_dispatches(), 0)
         self.assertFalse(thread.is_alive())
 
+    def test_scheduler_lease_recovery_runs_workflow_deadline_sweep(self):
+        with TemporaryDirectory() as tmp:
+            scheduler = ServiceScheduleLoop(Path(tmp))
+            with patch.object(scheduler.dispatcher, "recover_stale_claims") as recover, patch.object(
+                scheduler.dispatcher.control_plane, "recover_interrupted_runs"
+            ) as interrupted, patch.object(
+                scheduler.dispatcher.control_plane, "expire_workflow_deadlines"
+            ) as expire:
+                scheduler._recover_after_acquire(123.0)
+
+        recover.assert_called_once_with(now_epoch=123.0)
+        interrupted.assert_called_once_with()
+        expire.assert_called_once()
+
+    def test_running_scheduler_expires_waiting_workflow_deadline(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+            workflow = _approval_workflow()
+            workflow["policies"] = {"workflow_timeout_ms": 50}
+            service.control_plane.publish_workflow(workflow)
+            waiting = service.control_plane.run_published_workflow(
+                "workflow_service_approval", "0.1.0"
+            )
+            service.scheduler.start()
+            deadline = time.monotonic() + 2
+            failed = None
+            while time.monotonic() < deadline:
+                current = service.control_plane.get_run(waiting["run_id"])
+                if current.get("status") == "failed":
+                    failed = current
+                    break
+                time.sleep(0.02)
+            service.scheduler.stop()
+            service._server.server_close()
+            audit_tail = service.control_plane.list_audit_events(
+                run_id=waiting["run_id"]
+            )[-1]
+
+        self.assertIsNotNone(failed)
+        self.assertEqual(failed["error_code"], "workflow_timeout")
+        self.assertEqual(audit_tail["type"], "run_failed")
+
     def test_lifecycle_logger_failure_cannot_break_startup_or_shutdown(self):
         class FailingLifecycleLogger:
             def __init__(self):

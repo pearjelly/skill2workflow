@@ -52,6 +52,28 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(events[-1]["type"], "run_failed")
         self.assertEqual(events[-1]["error_code"], "workflow_timeout")
 
+    def test_workflow_deadline_sweeper_reconciles_terminal_audit_and_is_idempotent(self):
+        clock = _TestClock()
+        workflow = _approval_workflow("8.0.0")
+        workflow["policies"] = {"workflow_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(workflow)
+            control.executor._clock = clock
+            waiting = control.run_published_workflow("workflow_control", "8.0.0")
+            clock.advance(5)
+            first = control.expire_workflow_deadlines(clock())
+            second = control.expire_workflow_deadlines(clock())
+            events = control.list_audit_events(run_id=waiting["run_id"])
+            report = control.inspect_run_audit(waiting["run_id"])
+
+        self.assertEqual(first["expired_count"], 1)
+        self.assertEqual(second["expired_count"], 0)
+        self.assertEqual([event["type"] for event in events].count("run_failed"), 1)
+        self.assertEqual(events[-1]["error_code"], "workflow_timeout")
+        self.assertEqual(report["status"], "clean")
+
     def test_ingress_authentication_audit_is_strictly_allowlisted(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp), storage="sqlite")

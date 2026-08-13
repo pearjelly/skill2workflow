@@ -78,6 +78,34 @@ class JsonRunStore:
     def recover_interrupted(self, current_owner: str) -> List[RunState]:
         raise ValueError("interrupted run recovery requires sqlite storage")
 
+    def expire_waiting_workflow_deadlines(
+        self, now: str, limit: int = 256
+    ) -> List[RunState]:
+        """Expire bounded waiting runs whose durable workflow deadline elapsed."""
+
+        _validate_sweep_limit(limit)
+        expired = []
+        for state in self.list():
+            if len(expired) >= limit:
+                break
+            updated = _expire_waiting_workflow_state(state, now)
+            if updated is None:
+                continue
+            self.save(updated)
+            expired.append(updated)
+        return expired
+
+    def list_workflow_timeout_runs(self, limit: int = 256) -> List[RunState]:
+        """Return a bounded set of terminal workflow-timeout states."""
+
+        _validate_sweep_limit(limit)
+        return [
+            state
+            for state in self.list()
+            if str(state.get("status", "")) == "failed"
+            and str(state.get("error_code", "")) == "workflow_timeout"
+        ][:limit]
+
     def request_cancellation(self, run_id: str):
         state = self.load(run_id)
         status = str(state.get("status", ""))
@@ -333,6 +361,65 @@ class SqliteRunStore:
             },
             "items": [json.loads(str(row[0])) for row in reversed(rows)],
         }
+
+    def expire_waiting_workflow_deadlines(
+        self, now: str, limit: int = 256
+    ) -> List[RunState]:
+        """Atomically expire a bounded set of waiting workflow deadlines."""
+
+        _validate_sweep_limit(limit)
+        expired = []
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            rows = connection.execute(
+                """
+                select run_id, state_json
+                from runs
+                where status = 'waiting'
+                  and state_json like '%"workflow_deadline_at": "%'
+                  and state_json not like '%"workflow_deadline_at": ""%'
+                order by updated_at, run_id
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+            for run_id, raw_state in rows:
+                cancellation = connection.execute(
+                    "select status from run_cancellations where run_id = ?",
+                    (str(run_id),),
+                ).fetchone()
+                if cancellation and str(cancellation[0]) == "requested":
+                    continue
+                state = json.loads(str(raw_state))
+                updated = _expire_waiting_workflow_state(state, now)
+                if updated is None:
+                    continue
+                _save_sqlite_state(connection, updated)
+                expired.append(updated)
+        return expired
+
+    def list_workflow_timeout_runs(self, limit: int = 256) -> List[RunState]:
+        """Return a bounded set of terminal workflow-timeout states."""
+
+        _validate_sweep_limit(limit)
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                select state_json
+                from runs
+                where status = 'failed'
+                  and state_json like '%"error_code": "workflow_timeout"%'
+                order by updated_at, run_id
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [
+            state
+            for (raw_state,) in rows
+            if (state := json.loads(str(raw_state))).get("error_code")
+            == "workflow_timeout"
+        ]
 
     def request_cancellation(self, run_id: str):
         with self._connection() as connection:
@@ -1526,6 +1613,65 @@ def _required_execution_value(value: str, field: str) -> str:
     if not normalized or len(normalized) > 128:
         raise ValueError(f"execution {field} must be a non-empty string of at most 128 characters")
     return normalized
+
+
+def _validate_sweep_limit(limit: int) -> None:
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 256:
+        raise ValueError("workflow deadline sweep limit must be an integer from 1 through 256")
+
+
+def _expire_waiting_workflow_state(state: RunState, now: str):
+    if str(state.get("status", "")) != "waiting":
+        return None
+    execution = state.get("execution")
+    if not isinstance(execution, dict):
+        return None
+    deadline_at = str(execution.get("workflow_deadline_at", ""))
+    if not deadline_at:
+        return None
+    try:
+        current_at = _parse_storage_timestamp(now)
+        deadline = _parse_storage_timestamp(deadline_at)
+        expired = current_at >= deadline
+    except (TypeError, ValueError, OverflowError):
+        expired = True
+    if not expired:
+        return None
+    events = state.get("events", [])
+    if not isinstance(events, list):
+        events = []
+    events.append(
+        {
+            "type": "run_failed",
+            "node_id": str(state.get("current_node", "")),
+            "timestamp": str(now),
+            "error_code": "workflow_timeout",
+            "timeout_ms": _positive_int(execution.get("workflow_timeout_ms")),
+            "source": "deadline_sweeper",
+        }
+    )
+    state["events"] = events
+    state["status"] = "failed"
+    state["error_code"] = "workflow_timeout"
+    state["error"] = "workflow wall-clock deadline exceeded"
+    execution["started_at"] = ""
+    execution["deadline_at"] = ""
+    execution["workflow_started_at"] = ""
+    execution["workflow_deadline_at"] = ""
+    return state
+
+
+def _positive_int(value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return 0
+    return value
+
+
+def _parse_storage_timestamp(value: object) -> datetime:
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must include a timezone")
+    return parsed.astimezone(timezone.utc)
 
 
 def _upsert_sqlite_state(connection, state: RunState) -> None:

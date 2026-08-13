@@ -136,6 +136,11 @@ documented in `docs/runtime-policy.md`.
 
 Workflow DSL examples and fixtures must not store secrets. They may reference credential handles under connector metadata, but resolved credential values must stay in a local provider boundary outside Workflow DSL, LiteGraph fixtures, trigger input, run state, and audit events. Hosted credential storage, secret redaction, IAM, connector marketplaces, and product-specific SaaS connectors are outside the `0.1.x` built-in connector boundary.
 
+The self-hosted SQLite service additionally sweeps elapsed waiting global
+deadlines from the active scheduler lease; standalone executors remain
+safe-point only. See `docs/recurring-scheduling.md` for the bounded expiry and
+audit-reconciliation boundary.
+
 HTTP `connector.request.input_mapping` is a constrained runtime-copy mapping contract. It reads only `/input/...` paths from durable run context and writes only `/body/...` paths into the outbound HTTP request body copy. Header mapping, URL interpolation, expression syntax, credential mapping, and product-specific connector packages are outside the current compatibility boundary.
 
 `input_schema` is a constrained trigger-input contract, not full JSON Schema.

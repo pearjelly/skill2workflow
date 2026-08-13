@@ -12,6 +12,9 @@ release; Roadmap loop completion alone does not publish a new version.
   starts at run creation, continues while human gates wait, and records fixed
   `workflow_timeout` failure evidence at executor safe points. The deadline is
   capped at 30 days and does not forcefully abort an in-flight provider call.
+- Added a lease-owned SQLite deadline sweeper that atomically expires waiting
+  runs after their global deadline, preserves cancellation precedence, never
+  runs a successor, and retries missing terminal audit evidence.
 - Added bounded connector retry backoff: `retry.backoff_ms` and
   `policies.default_retry.backoff_ms` now provide a fixed, capped delay before
   connector retries, with timeout/cancellation safe points and run-state,

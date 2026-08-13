@@ -62,11 +62,16 @@ deadline. The executor checks it before each node, after connector returns, and
 after retry backoff. It is persisted in the run's internal execution state and
 cleared only at terminal completion, cancellation, or failure. It cannot
 forcefully interrupt a provider call already in flight, and it does not provide
-background expiry or scheduled recovery for a run that is never resumed.
+background expiry when used as a standalone local executor. The self-hosted
+SQLite service adds a bounded deadline sweep on the active scheduler lease:
+roughly once per second it atomically expires waiting runs whose deadline has
+passed, records the same fixed failure evidence, and reconciles the terminal
+audit event. A pending cancellation wins over expiry. The sweep is capped at
+256 candidates per pass and never resumes the workflow or executes a successor.
 
 The local executor does not yet implement node-level wall-clock deadlines or
-scheduled recovery. A configured retry backoff is part of the active execution
-segment and is checked against `default_timeout_ms` after the delay.
+general scheduled recovery. A configured retry backoff is part of the active
+execution segment and is checked against `default_timeout_ms` after the delay.
 
 ## Fallback Transitions
 

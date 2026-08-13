@@ -99,6 +99,7 @@ MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 REQUEST_SOCKET_TIMEOUT_SECONDS = 5.0
+WORKFLOW_DEADLINE_SWEEP_INTERVAL_SECONDS = 1.0
 _MUTATING_REQUEST_ROUTES = frozenset(
     {
         "workflow_trigger",
@@ -488,6 +489,7 @@ class ServiceScheduleLoop:
         self._last_error = ""
         self._dispatch_gate_lock = threading.RLock()
         self._dispatch_enabled = True
+        self._next_workflow_deadline_sweep = 0.0
 
     def start(self) -> None:
         now = time.time()
@@ -559,6 +561,7 @@ class ServiceScheduleLoop:
             try:
                 now_epoch = time.time()
                 if self.dispatcher.has_lease(now_epoch=now_epoch):
+                    self._sweep_workflow_deadlines(now_epoch)
                     tracked_dispatch = False
                     if self.telemetry is not None:
                         try:
@@ -597,9 +600,20 @@ class ServiceScheduleLoop:
         except (OSError, sqlite3.Error, ValueError):
             pass
 
+    def _sweep_workflow_deadlines(self, now_epoch: float, force: bool = False) -> None:
+        if not force and float(now_epoch) < self._next_workflow_deadline_sweep:
+            return
+        self.dispatcher.control_plane.expire_workflow_deadlines(
+            now=datetime.now(timezone.utc).isoformat()
+        )
+        self._next_workflow_deadline_sweep = (
+            float(now_epoch) + WORKFLOW_DEADLINE_SWEEP_INTERVAL_SECONDS
+        )
+
     def _recover_after_acquire(self, now_epoch: float) -> None:
         self.dispatcher.recover_stale_claims(now_epoch=now_epoch)
         self.dispatcher.control_plane.recover_interrupted_runs()
+        self._sweep_workflow_deadlines(now_epoch, force=True)
 
 
 def serve_runtime_service(

@@ -70,6 +70,22 @@ the process releases the lease. A dispatch that already passed that gate may
 finish and record `completed`, `failed`, or `uncertain` evidence; no new
 scheduled trigger begins after `draining` is published.
 
+## Workflow Deadline Sweep
+
+The active service scheduler also owns a bounded workflow-deadline sweep. About
+once per second, it selects waiting runs with a durable
+`policies.workflow_timeout_ms` deadline that has elapsed and updates them in the
+same SQLite state boundary under `BEGIN IMMEDIATE`. The transition records a
+fixed `run_failed` event with `error_code: "workflow_timeout"`, clears the
+deadline window, and never resumes the human gate or invokes a successor. A
+pending cooperative cancellation wins the race. Audit emission is reconciled
+with the same retry-safe missing-event path used by operator actions.
+
+Only the current scheduler lease owner performs the sweep; a standby takes it
+over after lease acquisition. Each pass is capped at 256 candidates. The
+standalone JSON/SQLite executor still checks deadlines at its own safe points,
+but does not run a background sweeper.
+
 ## Operator Commands
 
 Add and inspect a recurring schedule using SQLite:

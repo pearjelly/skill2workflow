@@ -721,7 +721,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-115 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-116 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1027,7 +1027,14 @@ Loop 115 adds a bounded global Workflow deadline to the [runtime policy](docs/ru
 Workflows can declare `policies.workflow_timeout_ms` up to 30 days; it starts at
 run creation, continues through human-gate waiting, and fails closed with fixed
 `workflow_timeout` evidence at resume and other executor safe points. It does
-not forcefully abort in-flight provider calls or add background expiry.
+not forcefully abort in-flight provider calls, and standalone local executors
+remain safe-point only.
+
+Loop 116 adds the lease-owned [workflow deadline sweep](docs/recurring-scheduling.md).
+The self-hosted SQLite service expires waiting runs about once per second while
+holding the scheduler lease, with bounded atomic expiry, cancellation
+precedence, and retry-safe terminal audit reconciliation. It never resumes a
+workflow or executes a successor, and remains capped at 256 candidates per pass.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

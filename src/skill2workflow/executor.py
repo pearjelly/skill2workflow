@@ -17,6 +17,7 @@ RunState = Dict[str, object]
 MAX_ACTIVE_TIMEOUT_MS = 86_400_000
 MAX_WORKFLOW_TIMEOUT_MS = 2_592_000_000
 MAX_RETRY_BACKOFF_MS = 60_000
+MAX_WORKFLOW_DEADLINE_SWEEP_RUNS = 256
 
 
 class LocalExecutor:
@@ -171,6 +172,21 @@ class LocalExecutor:
         if not self.execution_owner:
             raise ValueError("interrupted run recovery requires an execution owner")
         return self.store.recover_interrupted(self.execution_owner)
+
+    def expire_workflow_deadlines(
+        self, now: str = None, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS
+    ) -> List[RunState]:
+        """Expire bounded waiting runs without resuming workflow execution."""
+
+        timestamp = self._now() if now is None else str(now)
+        return self.store.expire_waiting_workflow_deadlines(timestamp, limit=limit)
+
+    def list_workflow_timeout_runs(
+        self, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS
+    ) -> List[RunState]:
+        """Return bounded terminal timeout states for audit reconciliation."""
+
+        return self.store.list_workflow_timeout_runs(limit=limit)
 
     def _drive(self, state: RunState) -> RunState:
         if state.get("status") == "cancelled":
