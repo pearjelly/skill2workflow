@@ -24,6 +24,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Local trigger run-context shape documented in `docs/triggers.md`
 - Shared 1 MiB canonical UTF-8 JSON-object trigger-input limit and fixed oversize failure boundary documented in `docs/triggers.md`
 - Optional bounded declarative `input_schema` trigger contracts, publication validation, and pre-idempotency runtime rejection documented in `docs/workflow-dsl-contract.md` and `docs/triggers.md`
+- Fixed process-local business-request admission of 16 active handlers, `429`/`Retry-After` rejection, and probe availability documented in `docs/service.md`
 - Local webhook route and response shape documented in `docs/triggers.md`
 - Self-hosted service configuration `skill2workflow-service-0.2.0` and its published JSON Schema
 - Loopback service health/readiness paths and authenticated workflow-trigger boundary documented in `docs/service.md`

@@ -38,6 +38,11 @@ control plane validates it before idempotency claims and execution; see
 [`docs/workflow-dsl-contract.md`](docs/workflow-dsl-contract.md) and
 [`docs/triggers.md`](docs/triggers.md).
 
+The self-hosted service also applies a fixed 16-handler process-local
+admission budget to non-probe routes. Exhaustion returns a fixed `429` with
+`Retry-After: 1`; `/healthz` and `/readyz` remain available for traffic
+management. See [`docs/service.md`](docs/service.md).
+
 Run the local scheduled-trigger smoke:
 
 ```bash

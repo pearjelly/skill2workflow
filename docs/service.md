@@ -1,6 +1,6 @@
 # Self-hosted Runtime Service
 
-The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md).
+The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work.
 
 The HTTP control plane and recurring dispatcher share the scheduler lease owner.
 Graceful drain waits for in-flight HTTP handlers before releasing that lease. After
@@ -92,6 +92,15 @@ PYTHONPATH=src python3 -m skill2workflow.cli service \
 | `POST /runs/{run_id}/resume` | Requires Bearer authentication and exactly `{"approved": true|false}`, then resumes one waiting human gate through the existing control-plane executor. |
 | `POST /runs/{run_id}/cancel` | Requires Bearer authentication and an empty JSON object, then durably requests idempotent cooperative cancellation. |
 
+All non-probe routes share a fixed `MAX_CONCURRENT_BUSINESS_REQUESTS` budget of
+16 active handlers. When the budget is exhausted, the service fails fast with
+HTTP `429`, the fixed body `{"error":"service concurrency limit reached"}`,
+and `Retry-After: 1`; it does not create a run, append business audit state, or
+wait for a slot. `/healthz` and `/readyz` remain available so an external
+proxy can observe liveness and remove a draining instance. The budget is
+process-local and protects one single-tenant service; it is not a distributed
+queue or a guarantee of exactly-once execution.
+
 The webhook request and response contract remains documented in [`triggers.md`](triggers.md). Health does not imply readiness: during shutdown, readiness is withdrawn before the HTTP server closes.
 
 The live snapshot remains available before readiness when authentication and
@@ -105,7 +114,7 @@ and protected `service-show` client are documented in [`run-detail.md`](run-deta
 
 ## Shutdown And Restart Continuity
 
-`SIGINT` and `SIGTERM` begin graceful shutdown. The service stops accepting new work, lets already accepted concurrent handlers return, closes the listening socket, and exits normally. Operators should use `/readyz` for traffic removal and `/healthz` only for process liveness.
+`SIGINT` and `SIGTERM` begin graceful shutdown. The service stops accepting new work, lets already accepted concurrent handlers return, closes the listening socket, and exits normally. Operators should use `/readyz` for traffic removal and `/healthz` only for process liveness. A handler that already acquired an admission slot releases it on every response or socket failure path.
 
 Concurrent request handling allows a cancellation request to be persisted while another handler is blocked in a connector. Cancellation remains cooperative and does not interrupt an external request already in flight; see [`cancellation.md`](cancellation.md) before operating side-effecting connectors.
 

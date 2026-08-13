@@ -678,7 +678,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-67 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-68 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -739,6 +739,12 @@ published workflows may declare a bounded JSON-Schema-like `input_schema`.
 The control plane validates required fields, types, ranges, enums, nested
 objects, and arrays before idempotency claims, run creation, audit emission,
 or connector execution, while workflows without the field remain compatible.
+
+Loop 68 adds [bounded service request admission](docs/service.md): one
+single-tenant process permits at most 16 active non-probe HTTP handlers and
+returns a fixed retryable `429` when that budget is exhausted. Health and
+readiness probes remain available for safe traffic removal during overload or
+graceful drain.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-67
+- Completed delivery loops: 1-68
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 67 is complete with declarative trigger input contracts
+- Active loop: None; Loop 68 is complete with bounded service request admission
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the input-contract drill
+- Next decision: select the next Production Baseline loop after reviewing the service-admission drill
 
 ## Production Readiness Path
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-67 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-68 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, and declarative trigger input contracts became Loop 67 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, and bounded service request admission became Loop 68 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, and declarative trigger input contracts are achieved by Loops 44-67. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, and bounded service request admission are achieved by Loops 44-68. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -410,9 +410,50 @@ DSL version or the single-tenant service boundary. Current maturity remains
 Self-hosted Beta until the remaining Production Baseline evidence is explicitly
 completed and reviewed.
 
+### Loop 68: Bounded Service Request Admission
+
+**Status:** Complete.
+
+**Prior basis:** The self-hosted service used `ThreadingHTTPServer`, so every
+incoming non-probe request could enter authentication, projection, trigger,
+or connector execution without a process-local active-work budget. A slow
+connector or retry storm could therefore consume unbounded handler capacity
+before the external proxy had a chance to shed traffic.
+
+**Outcome:** All non-probe routes now acquire one of 16 fixed process-local
+business-request slots without waiting. When no slot is available, the service
+returns HTTP `429`, a fixed error body, and `Retry-After: 1`. Health and
+readiness probes bypass the budget, and every admitted slot is released on
+normal response and socket-failure paths. Rejection occurs before auth,
+trigger normalization, SQLite idempotency claims, run creation, or business
+audit writes.
+
+**Evidence:** [`docs/service.md`](docs/service.md) defines the fixed budget,
+response contract, probe behavior, and graceful-drain boundary. Service tests
+exhaust the budget, verify a fixed `429`, verify probe availability, and cover
+the existing full service suite; telemetry still records the bounded status.
+
+**Safety boundary:** This is one process-local admission budget for one
+single-tenant service. It is not a distributed queue, client identity quota,
+rate limiter, back-pressure protocol, or exactly-once execution guarantee.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_service.RuntimeServiceTests.test_business_routes_fail_fast_when_admission_budget_is_exhausted_but_probes_remain_available \
+  tests.test_service_docs \
+  -v
+```
+
+Loop 68 makes overload behavior explicit without changing the service schema,
+Workflow DSL version, or single-tenant network boundary. Current maturity
+remains Self-hosted Beta until the remaining Production Baseline evidence is
+explicitly completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 67 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the input-contract drill.
+This rolling queue is ordered. Loop 68 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the service-admission drill.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -445,6 +486,7 @@ This rolling queue is ordered. Loop 67 is complete and there is no active delive
 | Loop 65: SQLite Audit Integrity | Complete | Make durable SQLite audit evidence independently verifiable across operation, backup/restore, and retention | `sha256-chain-v1` links, payload-free `audit-verify`, legacy-column upgrade, invalid-backup rejection, and retained-copy rechain |
 | Loop 66: Bounded Trigger Inputs | Complete | Bound durable trigger context and idempotency fingerprint work consistently across all trigger entry paths | Shared 1 MiB canonical input limit, fixed oversize errors, and CLI/schedule/recurring/webhook contract tests |
 | Loop 67: Declarative Trigger Input Contracts | Complete | Make published workflow business inputs explicit without breaking open-object legacy workflows | Bounded `input_schema`, publication/runtime validation, pre-idempotency rejection, fixed errors, and contract/SQLite compatibility tests |
+| Loop 68: Bounded Service Request Admission | Complete | Prevent unbounded active HTTP business work while keeping liveness and readiness probes available | Fixed 16-slot process-local admission, fixed `429`/`Retry-After`, slot release, and service regression evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -506,6 +548,11 @@ Loop 67 covers only the documented bounded `input_schema` subset and its
 pre-idempotency runtime validation. It excludes full JSON Schema, coercion,
 secret classification, encryption, redaction, hosted validation, rate
 limiting, historical-state rewriting, and exactly-once execution.
+
+Loop 68 covers only a fixed process-local active-handler budget for non-probe
+service routes. It excludes distributed coordination, per-client quotas,
+token-bucket rate limiting, queue persistence, admission of scheduler work,
+provider cancellation, and exactly-once execution.
 
 Selection rules:
 
@@ -608,6 +655,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 65: SQLite Audit Integrity | Complete | SHA-256 audit links, compact verification result, legacy-column upgrade, backup rejection, and retained-copy rechain |
 | Loop 66: Bounded Trigger Inputs | Complete | Shared canonical input limit and fixed oversize failure contract across CLI, schedules, recurring schedules, and webhooks |
 | Loop 67: Declarative Trigger Input Contracts | Complete | Optional bounded `input_schema`, publication/runtime validation, fixed path-only errors, and legacy open-object compatibility |
+| Loop 68: Bounded Service Request Admission | Complete | Fixed 16-slot process-local business-handler budget, retryable `429`, probe availability, and slot-release regression evidence |
 
 ## Release Direction
 

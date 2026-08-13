@@ -51,6 +51,7 @@ LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
 MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
 
 @dataclass(frozen=True)
@@ -256,6 +257,9 @@ class RuntimeService:
         mark_service_state_initialized(config.state_dir)
         self.telemetry = RuntimeTelemetry(config.state_dir)
         self.event_logger = event_logger
+        self._request_admission = threading.BoundedSemaphore(
+            MAX_CONCURRENT_BUSINESS_REQUESTS
+        )
         self._status = "starting"
         self._server = _http_server(config.host, config.port, _handler_for(self))
         self._server.timeout = 0.2
@@ -498,8 +502,15 @@ def _handler_for(service: RuntimeService):
             path = urlsplit(self.path).path
             route = _request_route(self.command, path)
             self._response_status = 500
+            admitted = route in {"health", "readiness"} or self._try_admit_request()
             try:
-                if self.command == "GET" and path == "/healthz":
+                if not admitted:
+                    self._send_json(
+                        429,
+                        {"error": "service concurrency limit reached"},
+                        headers={"Retry-After": "1"},
+                    )
+                elif self.command == "GET" and path == "/healthz":
                     self._send_json(200, {"service": "skill2workflow", "status": "ok"})
                 elif self.command == "GET" and path == "/readyz":
                     status_code, payload = service.readiness()
@@ -521,6 +532,8 @@ def _handler_for(service: RuntimeService):
                 else:
                     self._handle_webhook()
             finally:
+                if admitted and route not in {"health", "readiness"}:
+                    service._request_admission.release()
                 service.telemetry.observe_http(route, self._response_status)
                 if service.event_logger is not None:
                     service.event_logger.request_completed(
@@ -529,6 +542,9 @@ def _handler_for(service: RuntimeService):
                         status_code=self._response_status,
                         duration_ms=(time.monotonic() - started_at) * 1000,
                     )
+
+        def _try_admit_request(self) -> bool:
+            return service._request_admission.acquire(blocking=False)
 
         def _handle_metrics(self):
             authenticated, reason = service.authenticator.authenticate(

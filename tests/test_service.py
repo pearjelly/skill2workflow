@@ -21,6 +21,7 @@ from skill2workflow.service import (
     SERVICE_SCHEMA_VERSION,
     FileBearerTokenAuthenticator,
     MAX_AUTH_TOKEN_BYTES,
+    MAX_CONCURRENT_BUSINESS_REQUESTS,
     MAX_LIVE_CONTROL_SNAPSHOT_BYTES,
     RuntimeService,
     ServiceScheduleLoop,
@@ -109,6 +110,42 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_business_routes_fail_fast_when_admission_budget_is_exhausted_but_probes_remain_available(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            host, port = service.server_address
+            held = [
+                service._request_admission.acquire(blocking=False)
+                for _ in range(MAX_CONCURRENT_BUSINESS_REQUESTS)
+            ]
+            self.assertTrue(all(held))
+            try:
+                metrics_thread = threading.Thread(target=service._server.handle_request, daemon=True)
+                metrics_thread.start()
+                metrics_status, metrics_payload = _get_json(
+                    f"http://{host}:{port}/metrics",
+                    token=AUTH_TOKEN,
+                )
+                metrics_thread.join(timeout=2)
+
+                health_thread = threading.Thread(target=service._server.handle_request, daemon=True)
+                health_thread.start()
+                health_status, health_payload = _get_json(f"http://{host}:{port}/healthz")
+                health_thread.join(timeout=2)
+            finally:
+                for acquired in held:
+                    if acquired:
+                        service._request_admission.release()
+                service._server.server_close()
+
+        self.assertEqual(metrics_status, 429)
+        self.assertEqual(metrics_payload, {"error": "service concurrency limit reached"})
+        self.assertEqual(health_status, 200)
+        self.assertEqual(health_payload, {"service": "skill2workflow", "status": "ok"})
+        self.assertFalse(metrics_thread.is_alive())
+        self.assertFalse(health_thread.is_alive())
+
     def test_live_control_snapshot_is_authenticated_bounded_and_read_only(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

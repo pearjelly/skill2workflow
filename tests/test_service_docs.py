@@ -17,11 +17,14 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("SQLite", guide)
         self.assertIn("loopback", guide)
         self.assertIn("Bearer authentication", guide)
+        self.assertIn("MAX_CONCURRENT_BUSINESS_REQUESTS", guide)
+        self.assertIn("Retry-After: 1", guide)
+        self.assertIn("service concurrency limit reached", guide)
         self.assertIn("service_boundary_smoke.py", guide)
 
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-67 are complete", readme)
+        self.assertIn("Delivery Loops 1-68 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
