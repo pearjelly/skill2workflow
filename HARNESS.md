@@ -187,6 +187,12 @@ skill2workflow service-workflow-publish /path/to/workflow.workflow.json \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-workflow-promote workflow_approval_flow \
+  --version 0.2.0 --alias production \
+  --expected-current-version 0.1.0 \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
 skill2workflow service-trigger workflow_approval_flow \
   --version production \
   --service-url https://service.example \

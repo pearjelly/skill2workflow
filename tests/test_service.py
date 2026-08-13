@@ -36,6 +36,7 @@ from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringSched
 from skill2workflow.service_client import (
     ServiceActionError,
     post_workflow_release,
+    post_workflow_promotion,
     post_workflow_trigger,
 )
 
@@ -1719,6 +1720,108 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("artifact", published)
         self.assertEqual(raised.exception.status_code, 409)
         self.assertEqual(len(records), 1)
+        self.assertFalse(thread.is_alive())
+
+    def test_remote_workflow_promotion_is_authenticated_cas_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            url = f"{base_url}/api/v1/workflow-promotions"
+            workflow_v1 = _workflow()
+            workflow_v2 = json.loads(json.dumps(workflow_v1))
+            workflow_v2["workflow"]["version"] = "0.2.0"
+            try:
+                denied_status, denied = _post_json(
+                    url,
+                    {
+                        "workflow_id": "workflow_service",
+                        "version": "0.1.0",
+                        "alias": "production",
+                        "expected_current_version": "",
+                    },
+                )
+                malformed_status, malformed = _post_json(
+                    url,
+                    {"workflow_id": "workflow_service"},
+                    token=AUTH_TOKEN,
+                )
+                post_workflow_release(base_url, config.auth_token_file, workflow_v1)
+                post_workflow_release(base_url, config.auth_token_file, workflow_v2)
+                first = post_workflow_promotion(
+                    base_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.1.0",
+                )
+                second = post_workflow_promotion(
+                    base_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.2.0",
+                    expected_current_version="0.1.0",
+                )
+                replay = post_workflow_promotion(
+                    base_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.2.0",
+                    expected_current_version="0.2.0",
+                )
+                with self.assertRaises(ServiceActionError) as raised:
+                    post_workflow_promotion(
+                        base_url,
+                        config.auth_token_file,
+                        "workflow_service",
+                        "0.1.0",
+                        expected_current_version="0.1.0",
+                    )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            records = LocalControlPlane(state_dir, storage="sqlite").list_workflows()
+            audit = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "workflow promotion rejected"})
+        self.assertEqual(first["status"], "promoted")
+        self.assertEqual(second, replay)
+        self.assertEqual(
+            set(second),
+            {"schema_version", "workflow_id", "version", "alias", "status", "checksum"},
+        )
+        self.assertNotIn("artifact", second)
+        self.assertEqual(raised.exception.status_code, 409)
+        promoted = {
+            record["version"]: record
+            for record in records
+            if record.get("workflow_id") == "workflow_service"
+        }
+        self.assertNotIn("aliases", promoted["0.1.0"])
+        self.assertEqual(promoted["0.2.0"]["aliases"], ["production"])
+        self.assertEqual(
+            sum(event.get("type") == "workflow_promoted" for event in audit),
+            2,
+        )
         self.assertFalse(thread.is_alive())
 
     def test_business_routes_require_rotatable_bearer_auth_and_write_compact_audit(self):

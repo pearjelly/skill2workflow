@@ -58,6 +58,7 @@ SERVICE_SCHEMA_VERSION = "skill2workflow-service-0.2.0"
 RUNTIME_INFO_SCHEMA_VERSION = "skill2workflow-runtime-info-0.1.0"
 WORKFLOW_DSL_SCHEMA_VERSION = "0.1.0"
 WORKFLOW_RELEASE_SCHEMA_VERSION = "skill2workflow-workflow-release-0.1.0"
+WORKFLOW_PROMOTION_SCHEMA_VERSION = "skill2workflow-workflow-promotion-0.1.0"
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 MAX_AUTH_TOKEN_BYTES = 16 * 1024
 LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
@@ -72,6 +73,7 @@ MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
+MAX_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
@@ -551,6 +553,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_runtime_info()
                 elif self.command == "POST" and path == "/api/v1/workflow-releases":
                     self._handle_workflow_release()
+                elif self.command == "POST" and path == "/api/v1/workflow-promotions":
+                    self._handle_workflow_promotion()
                 elif self.command == "GET" and path == "/api/v1/recurring-schedules":
                     self._handle_recurring_schedule_list()
                 elif self.command == "POST" and _recurring_schedule_action(path):
@@ -1183,6 +1187,98 @@ def _handler_for(service: RuntimeService):
             except (OSError, sqlite3.Error):
                 self._send_json(503, {"error": "workflow publication unavailable"})
 
+        def _handle_workflow_promotion(self):
+            """Move one stable alias through the authenticated service boundary."""
+
+            readiness_status, _ = service.readiness()
+            if readiness_status != 200:
+                self._send_json(503, {"error": "service is not ready"})
+                return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                service.control_plane.record_ingress_authentication(
+                    False,
+                    self.command,
+                    "workflow_promotion",
+                    reason=reason,
+                )
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            service.control_plane.record_ingress_authentication(
+                True,
+                self.command,
+                "workflow_promotion",
+            )
+            try:
+                body = self.rfile.read(_content_length(self))
+                payload = json.loads(body.decode("utf-8"))
+                fields = {
+                    "workflow_id",
+                    "version",
+                    "alias",
+                    "expected_current_version",
+                }
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != fields
+                    or any(not isinstance(payload.get(field), str) for field in fields)
+                ):
+                    raise ValueError("workflow promotion request is malformed")
+                if not payload["expected_current_version"]:
+                    expected_current_version = ""
+                else:
+                    expected_current_version = payload["expected_current_version"]
+                record = service.control_plane.promote_workflow(
+                    payload["workflow_id"],
+                    payload["version"],
+                    alias=payload["alias"],
+                    expected_current_version=expected_current_version,
+                )
+                aliases = record.get("aliases", [])
+                if not isinstance(aliases, list) or payload["alias"] not in aliases:
+                    raise ValueError("workflow promotion did not retain alias")
+                response = {
+                    "schema_version": WORKFLOW_PROMOTION_SCHEMA_VERSION,
+                    "workflow_id": str(record.get("workflow_id", "")),
+                    "version": str(record.get("version", "")),
+                    "alias": payload["alias"],
+                    "status": "promoted",
+                    "checksum": str(record.get("checksum", "")),
+                }
+                encoded = json.dumps(response, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_WORKFLOW_PROMOTION_RESPONSE_BYTES:
+                    raise ValueError("workflow promotion response exceeds response limit")
+                self._send_json(200, response)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except ValueError as error:
+                message = str(error).lower()
+                if "precondition failed" in message:
+                    self._send_json(409, {"error": "workflow alias precondition failed"})
+                elif "version not found" in message:
+                    self._send_json(404, {"error": "workflow version not found"})
+                elif "not published" in message:
+                    self._send_json(409, {"error": "workflow version is not published"})
+                else:
+                    self._send_json(400, {"error": "workflow promotion rejected"})
+            except (UnicodeDecodeError, json.JSONDecodeError, TypeError, OverflowError, RecursionError):
+                self._send_json(400, {"error": "workflow promotion rejected"})
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "workflow promotion unavailable"})
+
         def _handle_audit_consistency(self, run_id: str = ""):
             """Serve the bounded, value-free run/audit consistency projection."""
 
@@ -1507,6 +1603,8 @@ def _request_route(method: str, path: str) -> str:
         return "runtime_info"
     if method == "POST" and path == "/api/v1/workflow-releases":
         return "workflow_release"
+    if method == "POST" and path == "/api/v1/workflow-promotions":
+        return "workflow_promotion"
     if method == "GET" and path == "/api/v1/recurring-schedules":
         return "recurring_schedule_list"
     if method == "GET" and _recurring_schedule_dispatch_list(path) is not None:

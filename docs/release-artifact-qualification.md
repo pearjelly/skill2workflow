@@ -29,6 +29,7 @@ The installed command set also includes the protected `service-resume`,
 `service-workflow-artifacts`, bounded `service-backup-readiness`, bounded
 `service-audit-integrity`, bounded `service-runtime-info`, protected
 `service-workflow-publish`, protected
+`service-workflow-promote`, protected
 `service-trigger`, protected
 `service-schedule-enable` and
 `service-schedule-disable`, and owner-only `service-support-bundle` operator

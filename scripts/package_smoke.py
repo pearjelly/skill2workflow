@@ -57,6 +57,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-audit-integrity",
     "service-runtime-info",
     "service-workflow-publish",
+    "service-workflow-promote",
     "service-trigger",
     "service-schedule-enable",
     "service-schedule-disable",

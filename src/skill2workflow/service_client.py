@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -32,6 +33,7 @@ from .service import (
     RUNTIME_INFO_SCHEMA_VERSION,
     SERVICE_SCHEMA_VERSION,
     WORKFLOW_RELEASE_SCHEMA_VERSION,
+    WORKFLOW_PROMOTION_SCHEMA_VERSION,
     WORKFLOW_DSL_SCHEMA_VERSION,
     read_service_bearer_token,
 )
@@ -52,7 +54,10 @@ MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_TRIGGER_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_RELEASE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
+MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+_WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 
 
 class ServiceActionError(ValueError):
@@ -318,6 +323,51 @@ def post_workflow_release(
         max_response_bytes=MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTES,
     )
     _validate_workflow_release_response(payload)
+    return payload
+
+
+def post_workflow_promotion(
+    service_url: str,
+    token_file: Path,
+    workflow_id: str,
+    version: str,
+    *,
+    alias: str = "production",
+    expected_current_version: str = "",
+) -> Dict[str, object]:
+    """Promote one immutable workflow version through the service boundary."""
+
+    normalized_workflow_id = _validate_workflow_ref(workflow_id, "workflow_id")
+    normalized_version = _validate_workflow_ref(version, "version")
+    normalized_alias = _validate_workflow_alias(alias)
+    if not isinstance(expected_current_version, str):
+        raise ValueError("expected_current_version must be a string")
+    normalized_expected = (
+        ""
+        if not expected_current_version
+        else _validate_workflow_ref(expected_current_version, "expected_current_version")
+    )
+    payload = _post_json(
+        service_url,
+        token_file,
+        "/api/v1/workflow-promotions",
+        {
+            "workflow_id": normalized_workflow_id,
+            "version": normalized_version,
+            "alias": normalized_alias,
+            "expected_current_version": normalized_expected,
+        },
+        conflict_message="workflow alias precondition failed",
+        not_found_message="workflow version not found",
+        max_request_bytes=MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES,
+        max_response_bytes=MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES,
+    )
+    _validate_workflow_promotion_response(
+        payload,
+        workflow_id=normalized_workflow_id,
+        version=normalized_version,
+        alias=normalized_alias,
+    )
     return payload
 
 
@@ -1306,6 +1356,45 @@ def _validate_workflow_release_response(payload: Dict[str, object]) -> None:
         _validate_workflow_ref(payload["version"], "version")
     except ValueError as error:
         raise ServiceActionError() from error
+
+
+def _validate_workflow_promotion_response(
+    payload: Dict[str, object],
+    *,
+    workflow_id: str,
+    version: str,
+    alias: str,
+) -> None:
+    """Reject responses outside the fixed redacted promotion contract."""
+
+    fields = {
+        "schema_version",
+        "workflow_id",
+        "version",
+        "alias",
+        "status",
+        "checksum",
+    }
+    if set(payload) != fields or payload.get("schema_version") != WORKFLOW_PROMOTION_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if (
+        payload.get("workflow_id") != workflow_id
+        or payload.get("version") != version
+        or payload.get("alias") != alias
+        or payload.get("status") != "promoted"
+        or not _is_hex_digest(payload.get("checksum"))
+    ):
+        raise ServiceActionError()
+
+
+def _validate_workflow_alias(alias: str) -> str:
+    value = str(alias).strip()
+    if len(value.encode("utf-8")) > 64 or not _WORKFLOW_ALIAS_PATTERN.fullmatch(value):
+        raise ValueError(
+            "workflow alias must start with a lowercase letter and contain only "
+            "lowercase letters, numbers, ., _, or - (at most 64 UTF-8 bytes)"
+        )
+    return value
 
 
 def _validate_schedule_id(schedule_id: str) -> str:

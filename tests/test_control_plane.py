@@ -612,6 +612,30 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(records["2.0.0"]["aliases"], ["production"])
         self.assertEqual(audit_types.count("workflow_promoted"), 2)
 
+    def test_repeating_same_promotion_is_a_noop_without_duplicate_audit(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            control.promote_workflow("workflow_control", "1.0.0", alias="production")
+            first_audit_count = len(control.list_audit_events())
+            repeated = control.promote_workflow(
+                "workflow_control",
+                "1.0.0",
+                alias="production",
+                expected_current_version="1.0.0",
+            )
+            second_audit_count = len(control.list_audit_events())
+            with self.assertRaisesRegex(ValueError, "workflow alias precondition failed"):
+                control.promote_workflow(
+                    "workflow_control",
+                    "1.0.0",
+                    alias="production",
+                    expected_current_version="0.9.0",
+                )
+
+        self.assertEqual(repeated["aliases"], ["production"])
+        self.assertEqual(second_audit_count, first_audit_count)
+
     def test_sqlite_promotion_cas_is_atomic_across_concurrent_operators(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

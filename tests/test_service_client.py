@@ -33,6 +33,7 @@ from skill2workflow.service_client import (
     fetch_audit_consistency,
     post_workflow_trigger,
     post_workflow_release,
+    post_workflow_promotion,
 )
 
 
@@ -41,6 +42,75 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_service_workflow_promote_uses_fixed_contract(self):
+        observed = {}
+        payload = {
+            "schema_version": "skill2workflow-workflow-promotion-0.1.0",
+            "workflow_id": "workflow_remote_release",
+            "version": "1.2.3",
+            "alias": "production",
+            "status": "promoted",
+            "checksum": "b" * 64,
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = post_workflow_promotion(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "workflow_remote_release",
+                "1.2.3",
+                alias="production",
+                expected_current_version="1.2.2",
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed["path"], "/api/v1/workflow-promotions")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(
+            observed["body"],
+            {
+                "workflow_id": "workflow_remote_release",
+                "version": "1.2.3",
+                "alias": "production",
+                "expected_current_version": "1.2.2",
+            },
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_service_workflow_promote_rejects_unsafe_alias_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaisesRegex(ValueError, "workflow alias"):
+                post_workflow_promotion(
+                    "https://service.example",
+                    token_file,
+                    "workflow_remote_release",
+                    "1.2.3",
+                    alias="../production",
+                )
+
     def test_service_workflow_publish_uses_fixed_contract(self):
         observed = {}
         payload = {

@@ -212,6 +212,15 @@ class LocalControlPlane:
         # Verify before changing alias metadata so a corrupted release cannot
         # become reachable through a stable production target.
         self.get_workflow(workflow_id, version)
+        current_versions = _published_alias_versions(
+            index, workflow_id, normalized_alias
+        )
+        if expected_current_version and current_versions != [str(expected_current_version)]:
+            raise ValueError(
+                f"workflow alias precondition failed: {workflow_id}@{normalized_alias}"
+            )
+        if current_versions == [version] and normalized_alias in _record_aliases(target):
+            return target
         if self.storage == "sqlite" and hasattr(self.store, "promote_workflow_alias"):
             return self.store.promote_workflow_alias(
                 workflow_id,
@@ -226,15 +235,6 @@ class LocalControlPlane:
                     "timestamp": _now(),
                 },
             )
-        if expected_current_version:
-            current_versions = _published_alias_versions(
-                index, workflow_id, normalized_alias
-            )
-            if current_versions != [str(expected_current_version)]:
-                raise ValueError(
-                    f"workflow alias precondition failed: {workflow_id}@{normalized_alias}"
-                )
-
         changed = False
         for key, existing in list(index.items()):
             if str(existing.get("workflow_id", "")) != str(workflow_id):

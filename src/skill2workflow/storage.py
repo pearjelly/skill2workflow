@@ -781,6 +781,8 @@ class SqliteControlStore:
                 raise ValueError(
                     f"workflow alias precondition failed: {workflow_id}@{alias}"
                 )
+            if current_versions == [version] and alias in _sqlite_record_aliases(target):
+                return target
 
             changed_keys = []
             for key, existing in list(index.items()):

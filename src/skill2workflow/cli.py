@@ -38,6 +38,7 @@ from .service_client import (
     post_run_cancel,
     post_run_resume,
     post_workflow_release,
+    post_workflow_promotion,
     post_workflow_trigger,
 )
 from .systemd_service import write_systemd_service_unit
@@ -395,6 +396,21 @@ def main(argv=None) -> int:
     service_release_cmd.add_argument("workflow", type=Path)
     service_release_cmd.add_argument("--service-url", required=True)
     service_release_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_promotion_cmd = subparsers.add_parser(
+        "service-workflow-promote",
+        help="Promote one published Workflow DSL version through the authenticated service",
+    )
+    service_promotion_cmd.add_argument("workflow_id")
+    service_promotion_cmd.add_argument("--version", required=True)
+    service_promotion_cmd.add_argument("--alias", default="production")
+    service_promotion_cmd.add_argument(
+        "--expected-current-version",
+        default="",
+        help="Require the alias to still point at this version before promotion",
+    )
+    service_promotion_cmd.add_argument("--service-url", required=True)
+    service_promotion_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_trigger_cmd = subparsers.add_parser(
         "service-trigger",
@@ -873,6 +889,18 @@ def main(argv=None) -> int:
                 args.service_url,
                 args.auth_token_file,
                 _load_json(args.workflow),
+            )
+        )
+
+    if args.command == "service-workflow-promote":
+        return _service_action(
+            lambda: post_workflow_promotion(
+                args.service_url,
+                args.auth_token_file,
+                args.workflow_id,
+                args.version,
+                alias=args.alias,
+                expected_current_version=args.expected_current_version,
             )
         )
 

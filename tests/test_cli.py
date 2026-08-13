@@ -512,6 +512,50 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         publish.assert_called_once_with("https://service.example", token_file, workflow)
 
+    def test_service_workflow_promote_command_uses_cas_options(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-workflow-promotion-0.1.0",
+            "workflow_id": "workflow_demo",
+            "version": "0.2.0",
+            "alias": "production",
+            "status": "promoted",
+            "checksum": "b" * 64,
+        }
+        with patch(
+            "skill2workflow.cli.post_workflow_promotion",
+            return_value=expected,
+        ) as promote:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-workflow-promote",
+                        "workflow_demo",
+                        "--version",
+                        "0.2.0",
+                        "--alias",
+                        "production",
+                        "--expected-current-version",
+                        "0.1.0",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        promote.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            "workflow_demo",
+            "0.2.0",
+            alias="production",
+            expected_current_version="0.1.0",
+        )
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

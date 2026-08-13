@@ -51,6 +51,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added protected `POST /api/v1/workflow-releases` and the
   `service-workflow-publish` CLI, reusing immutable SQLite publication with a
   1 MiB request bound and a fixed path-free checksum response.
+- Added protected `POST /api/v1/workflow-promotions` and the
+  `service-workflow-promote` CLI, reusing transactional SQLite alias promotion,
+  an optional compare-and-swap guard, and a fixed path-free summary response.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

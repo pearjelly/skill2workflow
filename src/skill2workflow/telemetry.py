@@ -35,6 +35,7 @@ _ROUTES = (
     "run_detail",
     "workflow_trigger",
     "workflow_release",
+    "workflow_promotion",
     "run_cancel",
     "run_resume",
     "unknown",
