@@ -141,7 +141,6 @@ def rotate_service_token(
         ):
             raise ValueError("service auth token file changed while being rotated")
         os.replace(temporary, path)
-        os.chmod(path, 0o600)
         _fsync_directory(parent)
     finally:
         try:
@@ -203,6 +202,8 @@ def _require_private_token_file(path: Path):
 
 
 def _fsync_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
     flags = os.O_RDONLY
     if hasattr(os, "O_DIRECTORY"):
         flags |= os.O_DIRECTORY

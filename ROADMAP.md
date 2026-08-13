@@ -1514,7 +1514,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, bounded active timeout policy, human gates, retry/recovery policy, run context, connector events, and verifiable SQLite audit evidence |
-| Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish and promote one bounded version through the authenticated service, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, and write a redacted support bundle |
+| Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish and promote one bounded version through the authenticated service, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, write a redacted support bundle, and rotate the local ingress token atomically |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:
