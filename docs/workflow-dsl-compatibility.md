@@ -48,6 +48,10 @@ fields. They may point a trigger or schedule at one published immutable
 artifact, but promotion never mutates the artifact or changes the DSL schema;
 an exact version remains a valid and deterministic target.
 
+The `workflow-diff` output and `--expected-current-version` promotion guard are
+additive control-plane interfaces. They do not change Workflow DSL `0.1.0` or
+the meaning of an existing published version.
+
 The runtime integrity guard is additive control-plane behavior. It does not
 change the Workflow DSL schema or canonical checksum algorithm used at
 publication. Existing records without a checksum are not executed

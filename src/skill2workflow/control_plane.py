@@ -28,6 +28,7 @@ from .triggers import (
 Workflow = Dict[str, object]
 WorkflowRecord = Dict[str, object]
 AuditEvent = Dict[str, object]
+WORKFLOW_DIFF_SCHEMA_VERSION = "skill2workflow-workflow-diff-0.1.0"
 
 
 class LocalControlPlane:
@@ -137,9 +138,13 @@ class LocalControlPlane:
         return record
 
     def promote_workflow(
-        self, workflow_id: str, version: str, alias: str = "production"
+        self,
+        workflow_id: str,
+        version: str,
+        alias: str = "production",
+        expected_current_version: str = "",
     ) -> WorkflowRecord:
-        """Point a stable control-plane alias at one published immutable version."""
+        """Point a stable alias at one version with an optional CAS guard."""
 
         normalized_alias = _normalize_workflow_alias(alias)
         index = self._load_index()
@@ -152,6 +157,14 @@ class LocalControlPlane:
         # Verify before changing alias metadata so a corrupted release cannot
         # become reachable through a stable production target.
         self.get_workflow(workflow_id, version)
+        if expected_current_version:
+            current_versions = _published_alias_versions(
+                index, workflow_id, normalized_alias
+            )
+            if current_versions != [str(expected_current_version)]:
+                raise ValueError(
+                    f"workflow alias precondition failed: {workflow_id}@{normalized_alias}"
+                )
 
         changed = False
         for key, existing in list(index.items()):
@@ -193,6 +206,24 @@ class LocalControlPlane:
     def list_workflows(self) -> List[WorkflowRecord]:
         records = list(self._load_index().values())
         return sorted(records, key=lambda record: (str(record["workflow_id"]), str(record["version"])))
+
+    def diff_workflow_versions(
+        self, workflow_id: str, from_version: str, to_version: str
+    ) -> Dict[str, object]:
+        """Return a bounded structural diff without copying workflow values."""
+
+        from_record = self._workflow_record(workflow_id, from_version)
+        to_record = self._workflow_record(workflow_id, to_version)
+        from_workflow = self.get_workflow(workflow_id, from_version)
+        to_workflow = self.get_workflow(workflow_id, to_version)
+        return {
+            "schema_version": WORKFLOW_DIFF_SCHEMA_VERSION,
+            "workflow_id": str(workflow_id),
+            "from": _workflow_diff_record(from_record),
+            "to": _workflow_diff_record(to_record),
+            "changed": _workflow_diff_changed(from_workflow, to_workflow),
+            "changes": _workflow_diff_changes(from_workflow, to_workflow),
+        }
 
     def get_workflow(self, workflow_id: str, version: str) -> Workflow:
         record = self._workflow_record(workflow_id, version)
@@ -634,6 +665,131 @@ def _record_aliases(record: WorkflowRecord) -> List[str]:
             aliases.append(text)
             seen.add(text)
     return aliases
+
+
+def _published_alias_versions(
+    index: Dict[str, WorkflowRecord], workflow_id: str, alias: str
+) -> List[str]:
+    versions = {
+        str(record.get("version", ""))
+        for record in index.values()
+        if str(record.get("workflow_id", "")) == str(workflow_id)
+        and record.get("status") == "published"
+        and alias in _record_aliases(record)
+    }
+    return sorted(version for version in versions if version)
+
+
+def _workflow_diff_record(record: WorkflowRecord) -> Dict[str, object]:
+    return {
+        "version": str(record.get("version", "")),
+        "status": str(record.get("status", "")),
+        "checksum": str(record.get("checksum", "")),
+        "aliases": sorted(_record_aliases(record)),
+    }
+
+
+def _workflow_diff_changed(from_workflow: Workflow, to_workflow: Workflow) -> bool:
+    return bool(_workflow_diff_changes(from_workflow, to_workflow)["sections"])
+
+
+def _workflow_diff_changes(
+    from_workflow: Workflow, to_workflow: Workflow
+) -> Dict[str, object]:
+    from_meta = from_workflow.get("workflow", {})
+    to_meta = to_workflow.get("workflow", {})
+    workflow_changed = _canonical_without(from_meta, {"id", "version", "status"}) != _canonical_without(
+        to_meta, {"id", "version", "status"}
+    )
+    entry_changed = from_workflow.get("entry") != to_workflow.get("entry")
+    input_schema_changed = _field_changed(from_workflow, to_workflow, "input_schema")
+    policies_changed = _field_changed(from_workflow, to_workflow, "policies")
+    other_changed = _canonical_without(
+        from_workflow,
+        {
+            "schema_version",
+            "workflow",
+            "entry",
+            "nodes",
+            "edges",
+            "input_schema",
+            "policies",
+        },
+    ) != _canonical_without(
+        to_workflow,
+        {
+            "schema_version",
+            "workflow",
+            "entry",
+            "nodes",
+            "edges",
+            "input_schema",
+            "policies",
+        },
+    )
+    node_changes = _named_item_changes(from_workflow.get("nodes"), to_workflow.get("nodes"))
+    edge_changes = _named_item_changes(from_workflow.get("edges"), to_workflow.get("edges"))
+    sections = []
+    for name, changed in (
+        ("workflow", workflow_changed),
+        ("entry", entry_changed),
+        ("input_schema", input_schema_changed),
+        ("policies", policies_changed),
+        ("nodes", bool(node_changes["added"] or node_changes["removed"] or node_changes["changed"])),
+        ("edges", bool(edge_changes["added"] or edge_changes["removed"] or edge_changes["changed"])),
+        ("other", other_changed),
+    ):
+        if changed:
+            sections.append(name)
+    return {
+        "sections": sections,
+        "workflow_changed": workflow_changed,
+        "entry_changed": entry_changed,
+        "input_schema_changed": input_schema_changed,
+        "policies_changed": policies_changed,
+        "other_changed": other_changed,
+        "nodes": node_changes,
+        "edges": edge_changes,
+    }
+
+
+def _named_item_changes(from_value: object, to_value: object) -> Dict[str, List[str]]:
+    from_items = _named_item_map(from_value)
+    to_items = _named_item_map(to_value)
+    added = sorted(set(to_items) - set(from_items))
+    removed = sorted(set(from_items) - set(to_items))
+    changed = sorted(
+        key
+        for key in set(from_items) & set(to_items)
+        if _canonical_without(from_items[key], {"id"})
+        != _canonical_without(to_items[key], {"id"})
+    )
+    return {"added": added, "removed": removed, "changed": changed}
+
+
+def _named_item_map(value: object) -> Dict[str, Dict[str, object]]:
+    if not isinstance(value, list):
+        return {}
+    result: Dict[str, Dict[str, object]] = {}
+    for item in value:
+        if not isinstance(item, dict) or not isinstance(item.get("id"), str):
+            continue
+        result[str(item["id"])] = item
+    return result
+
+
+def _field_changed(from_value: Dict[str, object], to_value: Dict[str, object], key: str) -> bool:
+    return _field_marker(from_value, key) != _field_marker(to_value, key)
+
+
+def _field_marker(value: Dict[str, object], key: str) -> object:
+    return {"present": key in value, "value": value.get(key)}
+
+
+def _canonical_without(value: object, excluded: set) -> object:
+    if not isinstance(value, dict):
+        return value
+    return {key: item for key, item in value.items() if key not in excluded}
 
 
 def _checksum(value: object) -> str:

@@ -33,6 +33,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added a fixed process-local service admission budget of 16 active business handlers, with a fixed retryable `429` response and probe availability under overload.
 - Added stable workflow version promotion aliases with a `promote` CLI command, exact-version precedence, deprecation cleanup, and alias-scoped SQLite idempotency replay across later promotions.
 - Added runtime published-artifact integrity verification: reads, promotions, triggers, and executions now compare each artifact with its control-plane checksum and fail closed before side effects when state is missing, malformed, or modified.
+- Added reviewable published workflow releases with a bounded `workflow-diff` contract and an optional compare-and-swap precondition for alias promotion.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

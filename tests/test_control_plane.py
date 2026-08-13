@@ -146,6 +146,61 @@ class ControlPlaneTests(TestCase):
                 ["workflow_published", "workflow_published", "workflow_promoted"],
             )
 
+    def test_workflow_diff_is_structural_and_does_not_expose_node_values(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp))
+            first = _workflow(version="1.0.0")
+            second = _workflow(version="2.0.0")
+            second["workflow"]["name"] = "Changed customer workflow"
+            second["nodes"][0]["title"] = "Private customer escalation text"
+            second["policies"] = {"default_timeout_ms": 5000}
+            control.publish_workflow(first)
+            control.publish_workflow(second)
+
+            diff = control.diff_workflow_versions(
+                "workflow_control", "1.0.0", "2.0.0"
+            )
+            serialized = json.dumps(diff, ensure_ascii=False)
+
+        self.assertEqual(diff["schema_version"], "skill2workflow-workflow-diff-0.1.0")
+        self.assertEqual(diff["workflow_id"], "workflow_control")
+        self.assertEqual(diff["from"]["version"], "1.0.0")
+        self.assertEqual(diff["to"]["version"], "2.0.0")
+        self.assertTrue(diff["changed"])
+        self.assertEqual(diff["changes"]["sections"], ["workflow", "policies", "nodes"])
+        self.assertEqual(diff["changes"]["nodes"]["changed"], ["start"])
+        self.assertNotIn("Private customer escalation text", serialized)
+        self.assertNotIn("Changed customer workflow", serialized)
+
+    def test_promotion_expected_version_precondition_is_compare_and_swap(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            control.publish_workflow(_workflow(version="2.0.0"))
+            control.promote_workflow("workflow_control", "1.0.0", alias="production")
+            promoted = control.promote_workflow(
+                "workflow_control",
+                "2.0.0",
+                alias="production",
+                expected_current_version="1.0.0",
+            )
+
+            with self.assertRaisesRegex(ValueError, "workflow alias precondition failed"):
+                control.promote_workflow(
+                    "workflow_control",
+                    "1.0.0",
+                    alias="production",
+                    expected_current_version="1.0.0",
+                )
+
+            records = {record["version"]: record for record in control.list_workflows()}
+            audit_types = [event["type"] for event in control.list_audit_events()]
+
+        self.assertEqual(promoted["aliases"], ["production"])
+        self.assertNotIn("aliases", records["1.0.0"])
+        self.assertEqual(records["2.0.0"]["aliases"], ["production"])
+        self.assertEqual(audit_types.count("workflow_promoted"), 2)
+
     def test_publish_rejects_reserved_path_segments_in_workflow_identity(self):
         for field in ("id", "version"):
             with self.subTest(field=field), TemporaryDirectory() as tmp:

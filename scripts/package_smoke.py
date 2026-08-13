@@ -28,6 +28,8 @@ APACHE_2_0_LICENSE_SHA256 = (
 REQUIRED_CONSOLE_COMMANDS = (
     "validate",
     "publish",
+    "promote",
+    "workflow-diff",
     "run-published",
     "quickstart",
     "service-init",

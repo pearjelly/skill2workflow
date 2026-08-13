@@ -126,6 +126,13 @@ matches an alias. Deprecating a version clears its aliases; an alias never
 silently falls back to another version. JSON and SQLite registry metadata both
 retain aliases, while the published Workflow DSL artifact remains untouched.
 
+For a reviewed multi-operator release, pass
+`--expected-current-version <version>` to `promote`. The alias is moved only if
+it still points to that exact published version; otherwise the command returns
+`workflow alias precondition failed: <workflow_id>@<alias>` without changing
+registry or audit state. See [`workflow-releases.md`](workflow-releases.md) for
+the structural diff command and bounded output contract.
+
 Alias resolution happens before input validation and execution. For SQLite
 idempotency, the requested alias is the durable scope: retrying the same key
 after a later promotion replays the original compact response (and does not

@@ -17,6 +17,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Published workflow artifact immutability
 - Published artifact checksum verification before read, promotion, trigger, or execution, documented in [`published-artifact-integrity.md`](published-artifact-integrity.md)
 - Control-plane workflow version aliases and the `promote`/trigger resolution contract documented in `docs/triggers.md`
+- Reviewable published workflow diffs and the optional compare-and-swap promotion precondition documented in [`workflow-releases.md`](workflow-releases.md)
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`

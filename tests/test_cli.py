@@ -1117,6 +1117,116 @@ class CliTests(TestCase):
         self.assertEqual(trigger_exit, 0)
         self.assertEqual(json.loads(trigger_stdout.getvalue())["workflow_version"], "0.1.0")
 
+    def test_workflow_diff_and_expected_promotion_version_are_safe_cli_contracts(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            first_path = root / "workflow-v1.json"
+            second_path = root / "workflow-v2.json"
+            first_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            second = _workflow()
+            second["workflow"]["version"] = "0.2.0"
+            second["nodes"][0]["title"] = "Sensitive customer instruction"
+            second_path.write_text(json.dumps(second), encoding="utf-8")
+
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(first_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(second_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+
+            diff_stdout = StringIO()
+            with redirect_stdout(diff_stdout):
+                diff_exit = main(
+                    [
+                        "workflow-diff",
+                        "workflow_demo",
+                        "--from-version",
+                        "0.1.0",
+                        "--to-version",
+                        "0.2.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            with redirect_stdout(StringIO()):
+                first_promote_exit = main(
+                    [
+                        "promote",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+                second_promote_exit = main(
+                    [
+                        "promote",
+                        "workflow_demo",
+                        "--version",
+                        "0.2.0",
+                        "--expected-current-version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            stale_stderr = StringIO()
+            with redirect_stderr(stale_stderr):
+                stale_exit = main(
+                    [
+                        "promote",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--expected-current-version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        diff = json.loads(diff_stdout.getvalue())
+        self.assertEqual(diff_exit, 0)
+        self.assertTrue(diff["changed"])
+        self.assertEqual(diff["changes"]["nodes"]["changed"], ["start"])
+        self.assertNotIn("Sensitive customer instruction", diff_stdout.getvalue())
+        self.assertEqual(first_promote_exit, 0)
+        self.assertEqual(second_promote_exit, 0)
+        self.assertEqual(stale_exit, 1)
+        self.assertIn("workflow alias precondition failed", stale_stderr.getvalue())
+
     def test_published_run_resume_detail_and_audit_filters(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

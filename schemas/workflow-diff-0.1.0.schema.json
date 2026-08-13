@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",
+  "title": "skill2workflow Published Workflow Diff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "workflow_id", "from", "to", "changed", "changes"],
+  "properties": {
+    "schema_version": {"const": "skill2workflow-workflow-diff-0.1.0"},
+    "workflow_id": {"type": "string", "minLength": 1},
+    "from": {"$ref": "#/$defs/version_record"},
+    "to": {"$ref": "#/$defs/version_record"},
+    "changed": {"type": "boolean"},
+    "changes": {"$ref": "#/$defs/changes"}
+  },
+  "$defs": {
+    "version_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "status", "checksum", "aliases"],
+      "properties": {
+        "version": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "enum": ["published", "deprecated"]},
+        "checksum": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "aliases": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "named_changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "removed", "changed"],
+      "properties": {
+        "added": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "removed": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "changed": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sections",
+        "workflow_changed",
+        "entry_changed",
+        "input_schema_changed",
+        "policies_changed",
+        "other_changed",
+        "nodes",
+        "edges"
+      ],
+      "properties": {
+        "sections": {
+          "type": "array",
+          "items": {"type": "string", "enum": ["workflow", "entry", "input_schema", "policies", "nodes", "edges", "other"]},
+          "uniqueItems": true
+        },
+        "workflow_changed": {"type": "boolean"},
+        "entry_changed": {"type": "boolean"},
+        "input_schema_changed": {"type": "boolean"},
+        "policies_changed": {"type": "boolean"},
+        "other_changed": {"type": "boolean"},
+        "nodes": {"$ref": "#/$defs/named_changes"},
+        "edges": {"$ref": "#/$defs/named_changes"}
+      }
+    }
+  }
+}

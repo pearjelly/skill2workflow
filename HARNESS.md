@@ -48,6 +48,11 @@ checksum before promotion, trigger validation, idempotency claims, or
 execution. Missing or changed artifacts fail closed with fixed redacted errors;
 see [`docs/published-artifact-integrity.md`](docs/published-artifact-integrity.md).
 
+Before moving a stable alias, operators can use `workflow-diff` for a bounded
+structural review and pass `--expected-current-version` to `promote` for an
+optimistic-concurrency check. The diff contains checksums and structural
+identifiers, never workflow content; see [`docs/workflow-releases.md`](docs/workflow-releases.md).
+
 Run the local scheduled-trigger smoke:
 
 ```bash
@@ -340,6 +345,8 @@ Implemented:
 - Minimal local control plane
   - publishes immutable workflow artifacts
   - promotes published versions behind bounded control-plane aliases such as `production`
+  - compares exact published versions through the bounded `workflow-diff` review contract
+  - supports an optional expected-current-version compare-and-swap promotion guard
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions
   - triggers published workflow versions or stable aliases through a compact local API envelope

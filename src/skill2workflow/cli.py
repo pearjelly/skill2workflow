@@ -100,6 +100,11 @@ def main(argv=None) -> int:
     promote_cmd.add_argument("workflow_id")
     promote_cmd.add_argument("--version", required=True)
     promote_cmd.add_argument("--alias", default="production")
+    promote_cmd.add_argument(
+        "--expected-current-version",
+        default="",
+        help="Require the alias to still point at this version before promotion",
+    )
     promote_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     promote_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
@@ -112,6 +117,15 @@ def main(argv=None) -> int:
     workflow_cmd.add_argument("--version", required=True)
     workflow_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     workflow_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
+    workflow_diff_cmd = subparsers.add_parser(
+        "workflow-diff", help="Compare two published workflow versions without printing values"
+    )
+    workflow_diff_cmd.add_argument("workflow_id")
+    workflow_diff_cmd.add_argument("--from-version", required=True)
+    workflow_diff_cmd.add_argument("--to-version", required=True)
+    workflow_diff_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    workflow_diff_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     run_published_cmd = subparsers.add_parser("run-published", help="Run a published workflow version")
     run_published_cmd.add_argument("workflow_id")
@@ -466,7 +480,10 @@ def main(argv=None) -> int:
     if args.command == "promote":
         return _control_action(
             lambda: LocalControlPlane(args.state_dir, storage=args.storage).promote_workflow(
-                args.workflow_id, args.version, alias=args.alias
+                args.workflow_id,
+                args.version,
+                alias=args.alias,
+                expected_current_version=args.expected_current_version,
             )
         )
 
@@ -478,6 +495,13 @@ def main(argv=None) -> int:
         return _control_action(
             lambda: LocalControlPlane(args.state_dir, storage=args.storage).get_workflow(
                 args.workflow_id, args.version
+            )
+        )
+
+    if args.command == "workflow-diff":
+        return _control_action(
+            lambda: LocalControlPlane(args.state_dir, storage=args.storage).diff_workflow_versions(
+                args.workflow_id, args.from_version, args.to_version
             )
         )
 
