@@ -46,6 +46,37 @@ class RunDetailDocumentationTests(TestCase):
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(encoding="utf-8")
 
         self.assertIn("docs/run-detail.md", readme)
+        self.assertIn("docs/run-list.md", readme)
         self.assertIn("GET /runs/{run_id}", service)
+        self.assertIn("GET /runs", service)
         self.assertIn("service-show", stability)
+        self.assertIn("service-runs", stability)
         self.assertIn('"service-show"', package_smoke)
+        self.assertIn('"service-runs"', package_smoke)
+
+    def test_run_list_schema_and_guide_publish_discovery_contract(self):
+        schema = json.loads(
+            (ROOT / "schemas" / "run-list-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        guide = (ROOT / "docs" / "run-list.md").read_text(encoding="utf-8")
+        self.assertEqual(
+            schema["$id"],
+            "https://skill2workflow.dev/schemas/run-list-0.1.0.schema.json",
+        )
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-run-list-0.1.0",
+        )
+        self.assertEqual(schema["properties"]["runs"]["maxItems"], 100)
+        for phrase in (
+            "GET /runs",
+            "latest 100",
+            "fixed status counts",
+            "does not acquire the scheduler lease",
+            "does not append audit events",
+            "service-runs",
+            "service-show",
+        ):
+            self.assertIn(phrase, guide)

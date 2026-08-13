@@ -309,6 +309,7 @@ class LocalControlPlane:
             "workflow_trigger",
             "run_cancel",
             "run_resume",
+            "run_list",
             "run_detail",
             "unknown",
         }:

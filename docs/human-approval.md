@@ -97,8 +97,9 @@ The client refuses remote plain HTTP, embedded URL credentials, query strings,
 redirects, oversized or non-JSON responses, and unsafe run identifiers. It
 does not retry a decision or cancellation automatically.
 
-Before choosing a run, use the authenticated, redacted [`service-show`](run-detail.md)
-client to inspect one run without fetching the full control snapshot:
+Before choosing a run, use the authenticated, redacted [`service-runs`](run-list.md)
+client to discover candidates, then [`service-show`](run-detail.md) to inspect
+one run without fetching the full control snapshot:
 
 ```bash
 skill2workflow service-show run_example \

@@ -11,6 +11,7 @@ from skill2workflow.dashboard import (
     build_control_snapshot,
     build_control_snapshot_from_control,
     build_run_detail,
+    build_run_list,
 )
 
 
@@ -262,6 +263,49 @@ class DashboardTests(TestCase):
         ):
             self.assertNotIn(private_value, serialized)
         self.assertIn("has_error", projected["run"]["node_overlays"]["start"])
+
+    def test_run_list_is_bounded_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            first = control.run_published_workflow("workflow_dashboard", "1.0.0")
+            second = control.run_published_workflow("workflow_dashboard", "1.0.0")
+            state = control.get_run(first["run_id"])
+            state["context"] = {"private_input": "private-list-input"}
+            state["node_results"]["start"]["output"] = "private-list-output"
+            control.executor.store.save(state)
+
+            projected = build_run_list(state_dir, storage="sqlite", max_items=1)
+
+        self.assertEqual(projected["schema_version"], "skill2workflow-run-list-0.1.0")
+        self.assertEqual(projected["summary"]["total"], 2)
+        self.assertEqual(sum(projected["summary"]["status_counts"].values()), 2)
+        self.assertEqual(projected["window"], {
+            "max_items": 1,
+            "total": 2,
+            "returned": 1,
+            "truncated": True,
+        })
+        self.assertEqual(len(projected["runs"]), 1)
+        self.assertEqual(
+            set(projected["runs"][0]),
+            {
+                "run_id",
+                "workflow_id",
+                "workflow_version",
+                "status",
+                "current_node",
+                "event_count",
+                "node_result_count",
+            },
+        )
+        serialized = json.dumps(projected, ensure_ascii=False)
+        self.assertNotIn("private-list-input", serialized)
+        self.assertNotIn("private-list-output", serialized)
+        self.assertNotIn("context", serialized)
+        self.assertNotEqual(projected["runs"][0]["run_id"], "")
+        self.assertIn(projected["runs"][0]["run_id"], {first["run_id"], second["run_id"]})
 
 
 def _workflow(version: str, node_title: str):

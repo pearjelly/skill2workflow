@@ -23,7 +23,12 @@ from .schedules import LocalScheduleRunner
 from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace
 from .service_doctor import diagnose_service
-from .service_client import fetch_run_detail, post_run_cancel, post_run_resume
+from .service_client import (
+    fetch_run_detail,
+    fetch_run_list,
+    post_run_cancel,
+    post_run_resume,
+)
 from .systemd_service import write_systemd_service_unit
 from .telemetry import OperationalEventLogger
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
@@ -287,6 +292,13 @@ def main(argv=None) -> int:
     service_show_cmd.add_argument("run_id")
     service_show_cmd.add_argument("--service-url", required=True)
     service_show_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_runs_cmd = subparsers.add_parser(
+        "service-runs",
+        help="List bounded redacted run summaries through the authenticated service",
+    )
+    service_runs_cmd.add_argument("--service-url", required=True)
+    service_runs_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -611,6 +623,14 @@ def main(argv=None) -> int:
                 args.service_url,
                 args.auth_token_file,
                 args.run_id,
+            )
+        )
+
+    if args.command == "service-runs":
+        return _service_action(
+            lambda: fetch_run_list(
+                args.service_url,
+                args.auth_token_file,
             )
         )
 

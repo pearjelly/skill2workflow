@@ -22,6 +22,7 @@ _ROUTES = (
     "readiness",
     "metrics",
     "control_snapshot",
+    "run_list",
     "run_detail",
     "workflow_trigger",
     "run_cancel",

@@ -43,6 +43,10 @@ skill2workflow service-show run_example \
 The command prints only the redacted detail contract. It does not retry, write
 state, or place the token in argv.
 
+To discover a suitable `run_id` first, use the bounded [`service-runs`](run-list.md)
+client. The list → detail → decision sequence keeps broad registry and audit
+collections out of a routine operator handoff.
+
 ## Verification
 
 ```bash

@@ -11,9 +11,11 @@ from .visualizer import run_overlay_for_nodes
 
 SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
 RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
+RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 MAX_RUN_DETAIL_EVENTS = 50
+MAX_RUN_LIST_ITEMS = 100
 
 
 def build_control_snapshot(
@@ -113,6 +115,101 @@ def build_run_detail(
 
     control = LocalControlPlane(Path(state_dir), storage=storage)
     return build_run_detail_from_control(control, run_id, max_events=max_events)
+
+
+def build_run_list(
+    state_dir: Path,
+    storage: str = "json",
+    max_items: int = MAX_RUN_LIST_ITEMS,
+) -> Dict[str, object]:
+    """Build a bounded, operator-safe list of recent run summaries."""
+
+    control = LocalControlPlane(Path(state_dir), storage=storage)
+    return build_run_list_from_control(control, max_items=max_items)
+
+
+def build_run_list_from_control(
+    control: LocalControlPlane,
+    max_items: int = MAX_RUN_LIST_ITEMS,
+) -> Dict[str, object]:
+    """Project recent runs without loading workflow, context, or result payloads."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or max_items <= 0
+        or max_items > MAX_RUN_LIST_ITEMS
+    ):
+        raise ValueError("max_items must be a positive bounded integer")
+    bounded_sqlite = hasattr(control.executor.store, "snapshot_window")
+    if bounded_sqlite:
+        window = control.executor.snapshot_window(max_items)
+        total = int(window["total"])
+        selected = window["items"]
+        status_counts = _fixed_run_status_counts(window.get("status_counts", {}))
+    else:
+        all_runs = control.list_runs()
+        total = len(all_runs)
+        selected = _tail(all_runs, max_items)
+        status_counts = _fixed_run_status_counts(all_runs)
+    runs = [_safe_run_summary(run) for run in selected if isinstance(run, dict)]
+    return {
+        "schema_version": RUN_LIST_SCHEMA_VERSION,
+        "summary": {
+            "total": total,
+            "status_counts": status_counts,
+        },
+        "runs": runs,
+        "window": {
+            "max_items": max_items,
+            "total": total,
+            "returned": len(runs),
+            "truncated": len(runs) < total,
+        },
+    }
+
+
+_RUN_STATUS_VALUES = (
+    "created",
+    "running",
+    "waiting",
+    "completed",
+    "failed",
+    "cancelled",
+    "interrupted",
+    "other",
+)
+
+
+def _safe_run_summary(run: Dict[str, object]) -> Dict[str, object]:
+    """Normalize one executor summary and discard every unlisted field."""
+
+    status = _safe_string(run.get("status", ""))
+    if status not in _RUN_STATUS_VALUES[:-1]:
+        status = "other"
+    return {
+        "run_id": _safe_string(run.get("run_id", "")),
+        "workflow_id": _safe_string(run.get("workflow_id", "")),
+        "workflow_version": _safe_string(run.get("workflow_version", "")),
+        "status": status,
+        "current_node": _safe_string(run.get("current_node", "")),
+        "event_count": _safe_non_negative_int(run.get("event_count", 0)),
+        "node_result_count": _safe_non_negative_int(run.get("node_result_count", 0)),
+    }
+
+
+def _fixed_run_status_counts(value: object) -> Dict[str, int]:
+    counts = {status: 0 for status in _RUN_STATUS_VALUES}
+    if isinstance(value, list):
+        for run in value:
+            if isinstance(run, dict):
+                status = _safe_string(run.get("status", ""))
+                counts[status if status in _RUN_STATUS_VALUES[:-1] else "other"] += 1
+    elif isinstance(value, dict):
+        for status, count in value.items():
+            normalized = status if status in _RUN_STATUS_VALUES[:-1] else "other"
+            counts[normalized] += _safe_non_negative_int(count)
+    return counts
 
 
 def build_run_detail_from_control(

@@ -11,6 +11,7 @@ from skill2workflow.service_client import (
     post_run_cancel,
     post_run_resume,
     fetch_run_detail,
+    fetch_run_list,
 )
 
 
@@ -19,6 +20,84 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_run_list_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(
+                    self,
+                    200,
+                    {
+                        "schema_version": "skill2workflow-run-list-0.1.0",
+                        "summary": {
+                            "total": 1,
+                            "status_counts": {
+                                "created": 0,
+                                "running": 0,
+                                "waiting": 1,
+                                "completed": 0,
+                                "failed": 0,
+                                "cancelled": 0,
+                                "interrupted": 0,
+                                "other": 0,
+                            },
+                        },
+                        "runs": [
+                            {
+                                "run_id": RUN_ID,
+                                "workflow_id": "workflow",
+                                "workflow_version": "0.1.0",
+                                "status": "waiting",
+                                "current_node": "review",
+                                "event_count": 2,
+                                "node_result_count": 0,
+                            }
+                        ],
+                        "window": {
+                            "max_items": 100,
+                            "total": 1,
+                            "returned": 1,
+                            "truncated": False,
+                        },
+                    },
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            listing = fetch_run_list(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(listing["runs"][0]["run_id"], RUN_ID)
+        self.assertEqual(
+            observed,
+            [
+                {
+                    "path": "/runs",
+                    "authorization": f"Bearer {AUTH_TOKEN}",
+                }
+            ],
+        )
+        self.assertFalse(thread.is_alive())
+
     def test_run_detail_uses_authenticated_get_and_validates_redacted_contract(self):
         observed = []
 

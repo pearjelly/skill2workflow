@@ -24,8 +24,10 @@ from .credentials import DirectoryCredentialProvider
 from .dashboard import (
     MAX_LIVE_SNAPSHOT_BYTES,
     MAX_RUN_DETAIL_EVENTS,
+    MAX_RUN_LIST_ITEMS,
     build_control_snapshot_from_control,
     build_run_detail_from_control,
+    build_run_list_from_control,
 )
 from .schedules import RecurringScheduleDispatcher, SchedulerLeaseError
 from .state_layout import ensure_service_state_layout, mark_service_state_initialized
@@ -45,6 +47,7 @@ MAX_AUTH_TOKEN_BYTES = 16 * 1024
 LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
 MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
+MAX_RUN_LIST_RESPONSE_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -502,6 +505,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_metrics()
                 elif self.command == "GET" and path == "/api/v1/control-snapshot":
                     self._handle_control_snapshot()
+                elif self.command == "GET" and path == "/runs":
+                    self._handle_run_list()
                 elif self.command == "GET" and _run_detail_id(path):
                     self._handle_run_detail(_run_detail_id(path))
                 elif self.command == "POST" and _resume_run_id(path):
@@ -643,6 +648,47 @@ def _handler_for(service: RuntimeService):
                 self._send_json(503, {"error": "run detail unavailable"})
                 return
             self._send_json(200, detail)
+
+        def _handle_run_list(self):
+            """Serve a bounded, redacted list for run discovery."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(400, {"error": "run list request must not include a body"})
+                return
+            try:
+                payload = build_run_list_from_control(
+                    service.control_plane,
+                    max_items=MAX_RUN_LIST_ITEMS,
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_RUN_LIST_RESPONSE_BYTES:
+                    raise ValueError("run list exceeds response limit")
+            except (ValueError, OSError, sqlite3.Error):
+                self._send_json(503, {"error": "run list unavailable"})
+                return
+            self._send_json(200, payload)
 
         def _handle_webhook(self):
             readiness_status, _ = service.readiness()
@@ -865,6 +911,8 @@ def _request_route(method: str, path: str) -> str:
         return "metrics"
     if method == "GET" and path == "/api/v1/control-snapshot":
         return "control_snapshot"
+    if method == "GET" and path == "/runs":
+        return "run_list"
     if method == "GET" and _run_detail_id(path):
         return "run_detail"
     if path.startswith("/webhooks/"):

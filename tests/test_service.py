@@ -330,6 +330,71 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("private-run-detail-value", json.dumps(payload))
         self.assertFalse(thread.is_alive())
 
+    def test_run_list_is_authenticated_bounded_and_read_only(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            run = control.run_published_workflow("workflow_service", "0.1.0")
+            state = control.get_run(run["run_id"])
+            state["context"] = {"private_input": "private-list-input"}
+            state["node_results"]["start"]["output"] = "private-list-output"
+            control.executor.store.save(state)
+            audit_count_before = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/runs"
+
+            denied_status, denied = _get_json(url)
+            accepted_status, listing = _get_json(url, token=AUTH_TOKEN)
+            body_connection = http.client.HTTPConnection(host, port, timeout=2)
+            body_connection.request(
+                "GET",
+                "/runs",
+                body=b"{}",
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            )
+            body_response = body_connection.getresponse()
+            body_payload = json.loads(body_response.read().decode("utf-8"))
+            body_status = body_response.status
+            body_connection.close()
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+            audit_count_after = len(
+                LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+            )
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(listing["schema_version"], "skill2workflow-run-list-0.1.0")
+        self.assertEqual(listing["summary"]["total"], 1)
+        self.assertEqual(len(listing["runs"]), 1)
+        serialized = json.dumps(listing, ensure_ascii=False)
+        self.assertNotIn("private-list-input", serialized)
+        self.assertNotIn("private-list-output", serialized)
+        self.assertNotIn("context", serialized)
+        self.assertEqual(body_status, 400)
+        self.assertEqual(body_payload, {"error": "run list request must not include a body"})
+        self.assertEqual(audit_count_after, audit_count_before)
+        self.assertFalse(thread.is_alive())
+
     def test_auth_token_read_is_descriptor_bound_against_path_replacement(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

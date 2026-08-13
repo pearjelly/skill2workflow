@@ -22,6 +22,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added an authenticated human-gate decision endpoint with an exact boolean body, durable success/failure branching, and waiting-only conflict semantics.
 - Added protected `service-resume` and `service-cancel` CLI clients that read Bearer tokens from owner-only files and reject unsafe origins, redirects, and unbounded responses.
 - Added authenticated redacted run detail at `GET /runs/{run_id}` and the protected `service-show` CLI with a fixed 50-event window and no raw workflow, input, connector, credential, or error payloads.
+- Added authenticated redacted run discovery at `GET /runs` and the protected `service-runs` CLI with fixed status counts, a 100-item window, and no payload or credential export.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

@@ -44,6 +44,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-resume",
     "service-cancel",
     "service-show",
+    "service-runs",
     "control-snapshot",
 )
 

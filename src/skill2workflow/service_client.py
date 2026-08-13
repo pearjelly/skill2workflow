@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from urllib.parse import urlsplit, urlunsplit
 
-from .dashboard import RUN_DETAIL_SCHEMA_VERSION
+from .dashboard import RUN_DETAIL_SCHEMA_VERSION, RUN_LIST_SCHEMA_VERSION
 from .service import read_service_bearer_token
 
 
@@ -100,6 +100,22 @@ def fetch_run_detail(
         conflict_message="run detail unavailable",
     )
     _validate_run_detail(payload, normalized_run_id)
+    return payload
+
+
+def fetch_run_list(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch the bounded, authenticated run-discovery projection."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/runs",
+        conflict_message="run list unavailable",
+    )
+    _validate_run_list(payload)
     return payload
 
 
@@ -227,35 +243,17 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
         raise ServiceActionError()
     run = payload.get("run")
     if not isinstance(run, dict) or set(run) != {
-        "run_id",
-        "workflow_id",
-        "workflow_version",
-        "status",
-        "current_node",
-        "event_count",
-        "node_result_count",
-        "node_overlays",
-        "created_at",
-        "updated_at",
+        "run_id", "workflow_id", "workflow_version", "status", "current_node",
+        "event_count", "node_result_count", "node_overlays", "created_at", "updated_at",
     }:
         raise ServiceActionError()
     if run.get("run_id") != run_id or any(
         not isinstance(run.get(field), str)
-        for field in (
-            "run_id",
-            "workflow_id",
-            "workflow_version",
-            "status",
-            "current_node",
-            "created_at",
-            "updated_at",
-        )
+        for field in ("run_id", "workflow_id", "workflow_version", "status", "current_node", "created_at", "updated_at")
     ):
         raise ServiceActionError()
     if any(
-        isinstance(run.get(field), bool)
-        or not isinstance(run.get(field), int)
-        or run.get(field) < 0
+        isinstance(run.get(field), bool) or not isinstance(run.get(field), int) or run.get(field) < 0
         for field in ("event_count", "node_result_count")
     ):
         raise ServiceActionError()
@@ -263,51 +261,20 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
     if not isinstance(overlays, dict) or any(
         not isinstance(node_id, str) or not isinstance(overlay, dict)
         or set(overlay) != {
-            "node_id",
-            "status",
-            "current",
-            "event_count",
-            "latest_event_type",
-            "result_status",
-            "attempts",
-            "max_attempts",
-            "retry_count",
-            "recovered",
-            "connector_id",
-            "connector_kind",
-            "connector_status",
-            "audit_event_count",
-            "has_error",
+            "node_id", "status", "current", "event_count", "latest_event_type", "result_status",
+            "attempts", "max_attempts", "retry_count", "recovered", "connector_id", "connector_kind",
+            "connector_status", "audit_event_count", "has_error",
         }
         or overlay.get("node_id") != node_id
         or any(
             not isinstance(overlay.get(field), str)
-            for field in (
-                "node_id",
-                "status",
-                "latest_event_type",
-                "result_status",
-                "connector_id",
-                "connector_kind",
-                "connector_status",
-            )
+            for field in ("node_id", "status", "latest_event_type", "result_status", "connector_id", "connector_kind", "connector_status")
         )
         or any(
-            isinstance(overlay.get(field), bool)
-            or not isinstance(overlay.get(field), int)
-            or overlay.get(field) < 0
-            for field in (
-                "event_count",
-                "attempts",
-                "max_attempts",
-                "retry_count",
-                "audit_event_count",
-            )
+            isinstance(overlay.get(field), bool) or not isinstance(overlay.get(field), int) or overlay.get(field) < 0
+            for field in ("event_count", "attempts", "max_attempts", "retry_count", "audit_event_count")
         )
-        or any(
-            not isinstance(overlay.get(field), bool)
-            for field in ("current", "recovered", "has_error")
-        )
+        or any(not isinstance(overlay.get(field), bool) for field in ("current", "recovered", "has_error"))
         for node_id, overlay in overlays.items()
     ):
         raise ServiceActionError()
@@ -315,41 +282,13 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
     if not isinstance(events, list) or any(
         not isinstance(event, dict)
         or set(event) - {
-            "sequence",
-            "type",
-            "node_id",
-            "timestamp",
-            "approved",
-            "attempt",
-            "max_attempts",
-            "connector_id",
-            "connector_kind",
-            "connector_status",
-            "has_error",
+            "sequence", "type", "node_id", "timestamp", "approved", "attempt", "max_attempts",
+            "connector_id", "connector_kind", "connector_status", "has_error",
         }
-        or not isinstance(event.get("sequence"), int)
-        or isinstance(event.get("sequence"), bool)
-        or not isinstance(event.get("type"), str)
-        or not isinstance(event.get("has_error"), bool)
-        or any(
-            field in event and not isinstance(event.get(field), str)
-            for field in (
-                "node_id",
-                "timestamp",
-                "connector_id",
-                "connector_kind",
-                "connector_status",
-            )
-        )
-        or any(
-            field in event
-            and (
-                isinstance(event.get(field), bool)
-                or not isinstance(event.get(field), int)
-                or event.get(field) < 0
-            )
-            for field in ("attempt", "max_attempts")
-        )
+        or not isinstance(event.get("sequence"), int) or isinstance(event.get("sequence"), bool)
+        or not isinstance(event.get("type"), str) or not isinstance(event.get("has_error"), bool)
+        or any(field in event and not isinstance(event.get(field), str) for field in ("node_id", "timestamp", "connector_id", "connector_kind", "connector_status"))
+        or any(field in event and (isinstance(event.get(field), bool) or not isinstance(event.get(field), int) or event.get(field) < 0) for field in ("attempt", "max_attempts"))
         or ("approved" in event and not isinstance(event.get("approved"), bool))
         for event in events
     ):
@@ -358,14 +297,8 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
     if (
         not isinstance(window, dict)
         or set(window) != {"max_events", "total", "returned", "truncated"}
-        or any(
-            isinstance(window.get(field), bool)
-            or not isinstance(window.get(field), int)
-            or window.get(field) < 0
-            for field in ("max_events", "total", "returned")
-        )
-        or window.get("max_events") < 1
-        or window.get("max_events") > 50
+        or any(isinstance(window.get(field), bool) or not isinstance(window.get(field), int) or window.get(field) < 0 for field in ("max_events", "total", "returned"))
+        or window.get("max_events") < 1 or window.get("max_events") > 50
         or window.get("returned") > window.get("max_events")
         or not isinstance(window.get("truncated"), bool)
         or window.get("returned") != len(events)
@@ -373,6 +306,68 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
         or window.get("truncated") != (window.get("returned") < window.get("total"))
     ):
         raise ServiceActionError()
+
+
+def _validate_run_list(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed redacted run-list contract."""
+
+    if set(payload) != {"schema_version", "summary", "runs", "window"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RUN_LIST_SCHEMA_VERSION:
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    statuses = {"created", "running", "waiting", "completed", "failed", "cancelled", "interrupted", "other"}
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != {"total", "status_counts"}
+        or not _is_non_negative_integer(summary.get("total"))
+        or not isinstance(summary.get("status_counts"), dict)
+        or set(summary["status_counts"]) != statuses
+        or any(not _is_non_negative_integer(value) for value in summary["status_counts"].values())
+        or sum(summary["status_counts"].values()) != summary["total"]
+    ):
+        raise ServiceActionError()
+    runs = payload.get("runs")
+    run_fields = {"run_id", "workflow_id", "workflow_version", "status", "current_node", "event_count", "node_result_count"}
+    if not isinstance(runs, list) or any(
+        not isinstance(run, dict)
+        or set(run) != run_fields
+        or not _is_safe_run_identifier(run.get("run_id"))
+        or any(not isinstance(run.get(field), str) for field in ("run_id", "workflow_id", "workflow_version", "status", "current_node"))
+        or run.get("status") not in statuses
+        or any(not _is_non_negative_integer(run.get(field)) for field in ("event_count", "node_result_count"))
+        for run in runs
+    ):
+        raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_items", "total", "returned", "truncated"}
+        or not _is_non_negative_integer(window.get("max_items"))
+        or window.get("max_items") < 1 or window.get("max_items") > 100
+        or not _is_non_negative_integer(window.get("total"))
+        or not _is_non_negative_integer(window.get("returned"))
+        or window.get("returned") != len(runs)
+        or window.get("returned") > window.get("total")
+        or window.get("returned") > window.get("max_items")
+        or not isinstance(window.get("truncated"), bool)
+        or window.get("truncated") != (window.get("returned") < window.get("total"))
+        or window.get("total") != summary.get("total")
+    ):
+        raise ServiceActionError()
+
+
+def _is_non_negative_integer(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _is_safe_run_identifier(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and value.startswith("run_")
+        and 5 <= len(value) <= 128
+        and all(char.isalnum() or char in {"_", "-"} for char in value)
+    )
 
 
 def _safe_json_response_headers(response) -> bool:

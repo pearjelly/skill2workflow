@@ -24,7 +24,8 @@ workflow validation, production-module imports, and help for the minimum
 release command set: publish/run, service, recurring dispatch, backup/restore,
 state upgrade, retention, cancellation, and operator snapshot export.
 The installed command set also includes the protected `service-resume`,
-`service-cancel`, and redacted `service-show` operator clients.
+`service-cancel`, redacted `service-show`, and bounded `service-runs` operator
+clients.
 
 The qualification also starts a strict loopback fixture and makes the installed
 `control-snapshot` command perform one authenticated live fetch. It verifies the

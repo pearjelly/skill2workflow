@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/run-list-0.1.0.schema.json",
+  "title": "skill2workflow authenticated run list",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "summary", "runs", "window"],
+  "properties": {
+    "schema_version": {"const": "skill2workflow-run-list-0.1.0"},
+    "summary": {"$ref": "#/$defs/summary"},
+    "runs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/run"},
+      "maxItems": 100
+    },
+    "window": {"$ref": "#/$defs/window"}
+  },
+  "$defs": {
+    "nonNegativeInteger": {"type": "integer", "minimum": 0},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "status_counts"],
+      "properties": {
+        "total": {"$ref": "#/$defs/nonNegativeInteger"},
+        "status_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "created", "running", "waiting", "completed", "failed",
+            "cancelled", "interrupted", "other"
+          ],
+          "properties": {
+            "created": {"$ref": "#/$defs/nonNegativeInteger"},
+            "running": {"$ref": "#/$defs/nonNegativeInteger"},
+            "waiting": {"$ref": "#/$defs/nonNegativeInteger"},
+            "completed": {"$ref": "#/$defs/nonNegativeInteger"},
+            "failed": {"$ref": "#/$defs/nonNegativeInteger"},
+            "cancelled": {"$ref": "#/$defs/nonNegativeInteger"},
+            "interrupted": {"$ref": "#/$defs/nonNegativeInteger"},
+            "other": {"$ref": "#/$defs/nonNegativeInteger"}
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id", "workflow_id", "workflow_version", "status", "current_node",
+        "event_count", "node_result_count"
+      ],
+      "properties": {
+        "run_id": {"type": "string", "pattern": "^run_[A-Za-z0-9_-]{1,123}$"},
+        "workflow_id": {"type": "string"},
+        "workflow_version": {"type": "string"},
+        "status": {
+          "enum": [
+            "created", "running", "waiting", "completed", "failed",
+            "cancelled", "interrupted", "other"
+          ]
+        },
+        "current_node": {"type": "string"},
+        "event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "node_result_count": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_items", "total", "returned", "truncated"],
+      "properties": {
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 100},
+        "total": {"$ref": "#/$defs/nonNegativeInteger"},
+        "returned": {"$ref": "#/$defs/nonNegativeInteger"},
+        "truncated": {"type": "boolean"}
+      }
+    }
+  }
+}
