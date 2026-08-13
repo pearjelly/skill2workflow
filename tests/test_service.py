@@ -441,6 +441,54 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("claim_expires_at", serialized)
         self.assertFalse(thread.is_alive())
 
+    def test_workflow_artifact_report_is_authenticated_bounded_and_value_free(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            service = RuntimeService(config)
+            workflow = _workflow()
+            workflow["workflow"]["name"] = "Private workflow title"
+            service.control_plane.publish_workflow(workflow)
+            (state_dir / "workflows" / "orphan.json").write_text("{}", encoding="utf-8")
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            denied_status, denied = _get_json(
+                f"http://{host}:{port}/api/v1/workflow-artifacts"
+            )
+            accepted_status, accepted = _get_json(
+                f"http://{host}:{port}/api/v1/workflow-artifacts",
+                token=AUTH_TOKEN,
+            )
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted["schema_version"],
+            "skill2workflow-workflow-artifact-report-0.1.0",
+        )
+        self.assertEqual(accepted["status"], "attention")
+        self.assertEqual(accepted["summary"]["issue_count"], 1)
+        self.assertEqual(len(accepted["issues"]), 1)
+        self.assertNotIn("Private workflow title", json.dumps(accepted, ensure_ascii=False))
+        self.assertFalse(thread.is_alive())
+
     def test_audit_consistency_can_target_one_run_beyond_the_global_window(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -26,6 +26,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Targeted `GET /api/v1/audit-consistency/{run_id}` and `service-audit-consistency --run-id` reuse the same report contract and safe `run_` identifier grammar to inspect one run beyond the global report window
 - Authenticated `GET /api/v1/recurring-schedules` and `service-recurring-schedules` reuse the fixed `skill2workflow-recurring-schedule-list-0.1.0` redacted inventory contract with a 64 KiB response bound and no schedule mutation
 - Authenticated recurring-schedule dispatch reads and `service-recurring-dispatches` reuse the fixed `skill2workflow-recurring-schedule-dispatch-list-0.1.0` redacted diagnostics contract with 100-item/64 KiB bounds and no scheduler mutation
+- Authenticated `GET /api/v1/workflow-artifacts` and `service-workflow-artifacts` reuse the fixed `skill2workflow-workflow-artifact-report-0.1.0` value-free consistency contract with a 64-issue/64 KiB remote bound and no repair mutation
 - Authenticated `POST /api/v1/recurring-schedules/{schedule_id}/enable|disable` and protected `service-schedule-enable`/`service-schedule-disable` reuse the fixed `skill2workflow-recurring-schedule-action-0.1.0` contract, exact empty-body boundary, idempotent state transitions, and bounded audit evidence documented in [`remote-schedule-actions.md`](remote-schedule-actions.md)
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode

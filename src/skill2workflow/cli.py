@@ -27,6 +27,7 @@ from .service_client import (
     fetch_audit_consistency,
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
+    fetch_workflow_artifact_report,
     fetch_run_detail,
     fetch_run_list,
     fetch_support_bundle,
@@ -353,6 +354,13 @@ def main(argv=None) -> int:
     service_dispatches_cmd.add_argument("--service-url", required=True)
     service_dispatches_cmd.add_argument("--auth-token-file", type=Path, required=True)
     service_dispatches_cmd.add_argument("--schedule-id", default="")
+
+    service_artifacts_cmd = subparsers.add_parser(
+        "service-workflow-artifacts",
+        help="Inspect bounded workflow artifact consistency through the authenticated service",
+    )
+    service_artifacts_cmd.add_argument("--service-url", required=True)
+    service_artifacts_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     for command, help_text in (
         ("service-schedule-enable", "Enable one recurring schedule through the authenticated service"),
@@ -770,6 +778,14 @@ def main(argv=None) -> int:
                 args.service_url,
                 args.auth_token_file,
                 args.schedule_id,
+            )
+        )
+
+    if args.command == "service-workflow-artifacts":
+        return _service_action(
+            lambda: fetch_workflow_artifact_report(
+                args.service_url,
+                args.auth_token_file,
             )
         )
 

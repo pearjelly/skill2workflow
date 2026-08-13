@@ -13,6 +13,7 @@ from urllib.parse import urlsplit, urlunsplit
 from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
+    MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
     RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION,
     RUN_DETAIL_SCHEMA_VERSION,
     RUN_LIST_SCHEMA_VERSION,
@@ -24,6 +25,7 @@ from .control_plane import (
     MAX_RUN_AUDIT_REPORT_RUNS,
     MAX_RUN_AUDIT_REPORT_TYPES,
     RUN_AUDIT_REPORT_SCHEMA_VERSION,
+    WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
 )
 from .service import read_service_bearer_token
 
@@ -33,6 +35,7 @@ MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -152,6 +155,23 @@ def fetch_recurring_schedule_list(
         max_response_bytes=MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES,
     )
     _validate_recurring_schedule_list(payload)
+    return payload
+
+
+def fetch_workflow_artifact_report(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch the bounded, authenticated workflow artifact consistency report."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/workflow-artifacts",
+        conflict_message="workflow artifact report unavailable",
+        max_response_bytes=MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
+    )
+    _validate_workflow_artifact_report(payload)
     return payload
 
 
@@ -554,6 +574,70 @@ def _validate_recurring_schedule_list(payload: Dict[str, object]) -> None:
         or window.get("truncated") != (window.get("returned") < window.get("total"))
         or window.get("total") != summary.get("total")
     ):
+        raise ServiceActionError()
+
+
+def _validate_workflow_artifact_report(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed value-free artifact report contract."""
+
+    if set(payload) != {"schema_version", "status", "summary", "issues"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if payload.get("status") not in {"clean", "attention"}:
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    summary_fields = {
+        "registry_records", "referenced_artifacts", "filesystem_artifacts", "healthy",
+        "issue_count", "missing", "unsafe_reference", "unsafe_artifact", "invalid_json",
+        "oversized", "checksum_mismatch", "orphaned", "truncated",
+    }
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != summary_fields
+        or any(
+            not _is_non_negative_integer(summary.get(field))
+            for field in summary_fields
+            if field != "truncated"
+        )
+        or not isinstance(summary.get("truncated"), bool)
+    ):
+        raise ServiceActionError()
+    issue_counts = {
+        "missing", "unsafe_reference", "unsafe_artifact", "invalid_json",
+        "oversized", "checksum_mismatch", "orphaned",
+    }
+    if sum(summary.get(field, 0) for field in issue_counts) != summary["issue_count"]:
+        raise ServiceActionError()
+    issues = payload.get("issues")
+    if (
+        not isinstance(issues, list)
+        or len(issues) > MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES
+    ):
+        raise ServiceActionError()
+    allowed_kinds = issue_counts
+    for issue in issues:
+        if (
+            not isinstance(issue, dict)
+            or "kind" not in issue
+            or "artifact" not in issue
+            or set(issue) - {"kind", "artifact", "workflow_id", "version"}
+            or issue.get("kind") not in allowed_kinds
+            or not isinstance(issue.get("artifact"), str)
+            or len(issue.get("artifact")) > 1024
+            or ("workflow_id" in issue and (
+                not isinstance(issue.get("workflow_id"), str)
+                or len(issue.get("workflow_id")) > 256
+            ))
+            or ("version" in issue and (
+                not isinstance(issue.get("version"), str)
+                or len(issue.get("version")) > 128
+            ))
+        ):
+            raise ServiceActionError()
+    if payload["status"] != ("clean" if summary["issue_count"] == 0 else "attention"):
+        raise ServiceActionError()
+    if summary["truncated"] != (len(issues) < summary["issue_count"]):
         raise ServiceActionError()
 
 

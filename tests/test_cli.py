@@ -285,6 +285,48 @@ class CliTests(TestCase):
             "https://service.example", token_file, "schedule_hourly_report"
         )
 
+    def test_service_workflow_artifacts_command_prints_report(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-workflow-artifact-report-0.1.0",
+            "status": "clean",
+            "summary": {
+                "registry_records": 0,
+                "referenced_artifacts": 0,
+                "filesystem_artifacts": 0,
+                "healthy": 0,
+                "issue_count": 0,
+                "missing": 0,
+                "unsafe_reference": 0,
+                "unsafe_artifact": 0,
+                "invalid_json": 0,
+                "oversized": 0,
+                "checksum_mismatch": 0,
+                "orphaned": 0,
+                "truncated": False,
+            },
+            "issues": [],
+        }
+        with patch(
+            "skill2workflow.cli.fetch_workflow_artifact_report",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-workflow-artifacts",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example", token_file)
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

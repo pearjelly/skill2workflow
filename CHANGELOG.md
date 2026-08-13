@@ -30,6 +30,10 @@ release; Roadmap loop completion alone does not publish a new version.
   `GET /api/v1/recurring-schedule-dispatches` and the targeted schedule route,
   plus the protected `service-recurring-dispatches` CLI, with uncertain-state
   visibility and lease/input redaction.
+- Added authenticated remote workflow artifact consistency diagnostics at
+  `GET /api/v1/workflow-artifacts` and the protected
+  `service-workflow-artifacts` CLI, reusing the fixed value-free report with
+  bounded issue and response windows.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

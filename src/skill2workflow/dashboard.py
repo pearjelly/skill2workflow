@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .control_plane import LocalControlPlane
+from .control_plane import (
+    LocalControlPlane,
+    WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
+)
 from .visualizer import run_overlay_for_nodes
 
 
@@ -23,6 +26,7 @@ MAX_RUN_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
+MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES = 64
 
 
 def build_control_snapshot(
@@ -325,6 +329,32 @@ def build_recurring_schedule_dispatch_list_from_store(
     }
 
 
+def build_workflow_artifact_report_from_control(
+    control: LocalControlPlane,
+    max_issues: int = MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
+) -> Dict[str, object]:
+    """Project the value-free artifact report for a bounded remote read."""
+
+    if (
+        isinstance(max_issues, bool)
+        or not isinstance(max_issues, int)
+        or max_issues <= 0
+        or max_issues > 256
+    ):
+        raise ValueError("max_issues must be a positive bounded integer")
+    report = control.inspect_workflow_artifacts()
+    summary = dict(report.get("summary", {}))
+    issues = list(report.get("issues", []))
+    issue_count = int(summary.get("issue_count", len(issues)))
+    summary["truncated"] = bool(summary.get("truncated", False)) or len(issues) > max_issues
+    return {
+        "schema_version": WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
+        "status": report.get("status", "attention" if issue_count else "clean"),
+        "summary": summary,
+        "issues": issues[:max_issues],
+    }
+
+
 def build_support_bundle_from_control(
     control: LocalControlPlane,
     telemetry,
@@ -353,6 +383,7 @@ def build_support_bundle_from_control(
     http_requests.pop("recurring_schedule_list", None)
     http_requests.pop("recurring_schedule_action", None)
     http_requests.pop("recurring_schedule_dispatch_list", None)
+    http_requests.pop("workflow_artifact_report", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests
     return {

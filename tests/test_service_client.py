@@ -11,6 +11,7 @@ from skill2workflow.service_client import (
     MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES,
+    MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
     ServiceActionError,
     post_recurring_schedule_state,
     post_run_cancel,
@@ -19,6 +20,7 @@ from skill2workflow.service_client import (
     fetch_run_list,
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
+    fetch_workflow_artifact_report,
     fetch_support_bundle,
     fetch_audit_consistency,
 )
@@ -375,6 +377,80 @@ class ServiceClientTests(TestCase):
             thread.start()
             with self.assertRaises(ServiceActionError):
                 fetch_recurring_schedule_list(
+                    f"http://127.0.0.1:{server.server_port}", token_file
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
+    def test_workflow_artifact_report_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+        payload = _workflow_artifact_report_payload()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_workflow_artifact_report(
+                f"http://127.0.0.1:{server.server_port}", token_file
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(
+            observed,
+            [{
+                "path": "/api/v1/workflow-artifacts",
+                "authorization": f"Bearer {AUTH_TOKEN}",
+            }],
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_workflow_artifact_report_rejects_oversized_response(self):
+        body = b"x" * (MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_workflow_artifact_report(
                     f"http://127.0.0.1:{server.server_port}", token_file
                 )
             thread.join(timeout=2)
@@ -1000,6 +1076,29 @@ def _recurring_schedule_dispatch_list_payload(schedule_id=""):
             "returned": 1,
             "truncated": False,
         },
+    }
+
+
+def _workflow_artifact_report_payload():
+    return {
+        "schema_version": "skill2workflow-workflow-artifact-report-0.1.0",
+        "status": "attention",
+        "summary": {
+            "registry_records": 2,
+            "referenced_artifacts": 2,
+            "filesystem_artifacts": 3,
+            "healthy": 1,
+            "issue_count": 1,
+            "missing": 0,
+            "unsafe_reference": 0,
+            "unsafe_artifact": 0,
+            "invalid_json": 0,
+            "oversized": 0,
+            "checksum_mismatch": 0,
+            "orphaned": 1,
+            "truncated": False,
+        },
+        "issues": [{"kind": "orphaned", "artifact": "workflows/orphan.json"}],
     }
 
 

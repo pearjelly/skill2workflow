@@ -12,6 +12,7 @@ from skill2workflow.dashboard import (
     build_control_snapshot_from_control,
     build_recurring_schedule_list_from_store,
     build_recurring_schedule_dispatch_list_from_store,
+    build_workflow_artifact_report_from_control,
     build_run_detail,
     build_run_list,
     build_support_bundle_from_control,
@@ -394,6 +395,27 @@ class DashboardTests(TestCase):
         self.assertNotIn("private-dispatch-input", serialized)
         self.assertNotIn("private-dispatch-owner", serialized)
         self.assertNotIn("claim_expires_at", serialized)
+
+    def test_remote_workflow_artifact_report_is_bounded_and_reuses_fixed_contract(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Private title"))
+            workflows_dir = state_dir / "workflows"
+            for index in range(5):
+                (workflows_dir / f"orphan-{index}.json").write_text("{}", encoding="utf-8")
+
+            projected = build_workflow_artifact_report_from_control(control, max_issues=2)
+
+        self.assertEqual(
+            projected["schema_version"],
+            "skill2workflow-workflow-artifact-report-0.1.0",
+        )
+        self.assertEqual(projected["status"], "attention")
+        self.assertEqual(projected["summary"]["issue_count"], 5)
+        self.assertEqual(len(projected["issues"]), 2)
+        self.assertTrue(projected["summary"]["truncated"])
+        self.assertNotIn("Private title", json.dumps(projected, ensure_ascii=False))
 
     def test_support_bundle_is_fixed_and_redacted(self):
         with TemporaryDirectory() as tmp:

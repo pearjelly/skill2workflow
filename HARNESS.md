@@ -167,6 +167,10 @@ skill2workflow service-recurring-dispatches \
   --auth-token-file /run/secrets/skill2workflow-ingress-token \
   --schedule-id schedule_hourly_report
 
+skill2workflow service-workflow-artifacts \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
 skill2workflow service-schedule-disable schedule_hourly_report \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
