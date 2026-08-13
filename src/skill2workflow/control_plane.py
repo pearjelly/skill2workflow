@@ -9,6 +9,7 @@ import os
 import re
 import stat
 import tempfile
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from pathlib import PurePosixPath
@@ -36,8 +37,11 @@ WORKFLOW_DIFF_SCHEMA_VERSION = "skill2workflow-workflow-diff-0.1.0"
 WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION = (
     "skill2workflow-workflow-artifact-report-0.1.0"
 )
+RUN_AUDIT_REPORT_SCHEMA_VERSION = "skill2workflow-run-audit-report-0.1.0"
 MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES = 256
 MAX_WORKFLOW_ARTIFACT_BYTES = 2 * 1024 * 1024
+MAX_RUN_AUDIT_REPORT_RUNS = 256
+MAX_RUN_AUDIT_REPORT_TYPES = 64
 
 
 class LocalControlPlane:
@@ -340,6 +344,99 @@ class LocalControlPlane:
             "issues": issues,
         }
 
+    def inspect_run_audit(self, run_id: str = "") -> Dict[str, object]:
+        """Compare durable run-state event counts with control-plane audit counts.
+
+        This is intentionally diagnostic only. It never replays a connector or
+        rewrites an audit chain; it exposes enough bounded metadata for an
+        operator to identify a cross-database interruption safely.
+        """
+
+        summaries = self.executor.list_runs()
+        if run_id:
+            summaries = [
+                summary
+                for summary in summaries
+                if str(summary.get("run_id", "")) == str(run_id)
+            ]
+            if not summaries:
+                raise ValueError(f"run not found: {run_id}")
+        total_runs = len(summaries)
+        truncated = total_runs > MAX_RUN_AUDIT_REPORT_RUNS
+        summaries = summaries[:MAX_RUN_AUDIT_REPORT_RUNS]
+        run_ids = [str(summary.get("run_id", "")) for summary in summaries]
+        audit_by_run = self.store.audit_event_type_counts(run_ids)
+
+        reports = []
+        attention_runs = 0
+        missing_events = 0
+        duplicate_events = 0
+        unexpected_events = 0
+        for summary in summaries:
+            current_run_id = str(summary.get("run_id", ""))
+            state = self.executor.get_run(current_run_id)
+            expected = _expected_run_audit_counts(state)
+            observed = Counter(audit_by_run.get(current_run_id, {}))
+            missing = _counter_differences(expected, observed)
+            duplicate = _counter_differences(observed, expected)
+            missing_total = sum(missing.values())
+            duplicate_total = sum(
+                count for event_type, count in duplicate.items() if event_type in expected
+            )
+            unexpected = [
+                {"type": event_type, "count": count}
+                for event_type, count in sorted(duplicate.items())
+                if event_type not in expected
+            ]
+            unexpected_total = sum(item["count"] for item in unexpected)
+            duplicate = [
+                {"type": event_type, "count": count}
+                for event_type, count in sorted(duplicate.items())
+                if event_type in expected
+            ]
+            missing = [
+                {"type": event_type, "count": count}
+                for event_type, count in sorted(missing.items())
+            ]
+            missing = missing[:MAX_RUN_AUDIT_REPORT_TYPES]
+            duplicate = duplicate[:MAX_RUN_AUDIT_REPORT_TYPES]
+            unexpected = unexpected[:MAX_RUN_AUDIT_REPORT_TYPES]
+            has_attention = bool(missing or duplicate or unexpected)
+            if has_attention:
+                attention_runs += 1
+            missing_events += missing_total
+            duplicate_events += duplicate_total
+            unexpected_events += unexpected_total
+            reports.append(
+                {
+                    "run_id": current_run_id,
+                    "workflow_id": str(summary.get("workflow_id", "")),
+                    "workflow_version": str(summary.get("workflow_version", "")),
+                    "run_status": str(summary.get("status", "")),
+                    "status": "attention" if has_attention else "clean",
+                    "expected_event_count": sum(expected.values()),
+                    "observed_event_count": sum(observed.values()),
+                    "missing": missing,
+                    "duplicate": duplicate,
+                    "unexpected": unexpected,
+                }
+            )
+
+        return {
+            "schema_version": RUN_AUDIT_REPORT_SCHEMA_VERSION,
+            "status": "attention" if attention_runs or truncated else "clean",
+            "summary": {
+                "run_count": total_runs,
+                "checked_runs": len(reports),
+                "attention_runs": attention_runs,
+                "missing_events": missing_events,
+                "duplicate_events": duplicate_events,
+                "unexpected_events": unexpected_events,
+                "truncated": truncated,
+            },
+            "runs": reports,
+        }
+
     def diff_workflow_versions(
         self, workflow_id: str, from_version: str, to_version: str
     ) -> Dict[str, object]:
@@ -403,8 +500,6 @@ class LocalControlPlane:
         }
         if trigger:
             started_event.update(trigger_audit_fields(trigger))
-        self._append_audit(started_event)
-        self._append_runtime_audit_events(state, workflow_id, version)
         terminal_event = {
             "type": f"run_{state['status']}",
             "run_id": state["run_id"],
@@ -414,7 +509,11 @@ class LocalControlPlane:
         }
         if state.get("error_code"):
             terminal_event["error_code"] = str(state["error_code"])
-        self._append_audit(terminal_event)
+        self._append_audit_batch(
+            [started_event]
+            + self._runtime_audit_events(state, workflow_id, version)
+            + [terminal_event]
+        )
         return state
 
     def trigger_workflow(self, request: Dict[str, object]) -> Dict[str, object]:
@@ -520,27 +619,40 @@ class LocalControlPlane:
         previous_event_count = len(current.get("events", [])) if isinstance(current.get("events"), list) else 0
         self._workflow_record(workflow_id, workflow_version)
         state = self.executor.resume(run_id, approved=approved)
-        self._append_audit(
-            {
-                "type": "run_resumed",
-                "run_id": run_id,
-                "workflow_id": workflow_id,
-                "workflow_version": workflow_version,
-                "approved": approved,
-                "timestamp": _now(),
-            }
-        )
-        self._append_runtime_audit_events(state, workflow_id, workflow_version, start_index=previous_event_count)
+        resumed_timestamp = _last_run_event_timestamp(
+            state, "human_gate_resumed"
+        ) or _now()
+        terminal_timestamp = _last_run_event_timestamp(
+            state, f"run_{state.get('status', '')}"
+        ) or _now()
         terminal_event = {
             "type": f"run_{state['status']}",
             "run_id": run_id,
             "workflow_id": workflow_id,
             "workflow_version": workflow_version,
-            "timestamp": _now(),
+            "timestamp": terminal_timestamp,
         }
         if state.get("error_code"):
             terminal_event["error_code"] = str(state["error_code"])
-        self._append_audit(terminal_event)
+        self._append_audit_batch(
+            [
+                {
+                    "type": "run_resumed",
+                    "run_id": run_id,
+                    "workflow_id": workflow_id,
+                    "workflow_version": workflow_version,
+                    "approved": approved,
+                    "timestamp": resumed_timestamp,
+                }
+            ]
+            + self._runtime_audit_events(
+                state,
+                workflow_id,
+                workflow_version,
+                start_index=previous_event_count,
+            )
+            + [terminal_event]
+        )
         return state
 
     def cancel_published_run(self, run_id: str) -> RunState:
@@ -552,7 +664,7 @@ class LocalControlPlane:
         self._workflow_record(workflow_id, workflow_version)
         state, newly_requested = self.executor.request_cancel(run_id)
         if newly_requested:
-            self._append_audit(
+            events = [
                 {
                     "type": "run_cancel_requested",
                     "run_id": run_id,
@@ -560,9 +672,9 @@ class LocalControlPlane:
                     "workflow_version": workflow_version,
                     "timestamp": _now(),
                 }
-            )
+            ]
             if state["status"] == "cancelled":
-                self._append_audit(
+                events.append(
                     {
                         "type": "run_cancelled",
                         "run_id": run_id,
@@ -571,6 +683,7 @@ class LocalControlPlane:
                         "timestamp": _now(),
                     }
                 )
+            self._append_audit_batch(events)
         return state
 
     def list_runs(self) -> List[RunState]:
@@ -594,6 +707,7 @@ class LocalControlPlane:
             run_id = str(summary.get("run_id", ""))
             if run_id and run_id not in candidates:
                 candidates[run_id] = self.executor.get_run(run_id)
+        reconciliation_events = []
         for run_id, state in candidates.items():
             interruption = next(
                 (
@@ -606,7 +720,7 @@ class LocalControlPlane:
             )
             if not interruption or run_id in existing:
                 continue
-            self._append_audit(
+            reconciliation_events.append(
                 {
                     "type": "run_interrupted",
                     "run_id": run_id,
@@ -617,6 +731,8 @@ class LocalControlPlane:
                     "timestamp": str(interruption.get("timestamp", "")) or _now(),
                 }
             )
+        if reconciliation_events:
+            self._append_audit_batch(reconciliation_events)
         return len(recovered)
 
     def list_audit_events(
@@ -705,6 +821,11 @@ class LocalControlPlane:
     def _append_audit(self, event: AuditEvent) -> None:
         self.store.append_audit(event)
 
+    def _append_audit_batch(self, events: List[AuditEvent]) -> None:
+        if not events:
+            return
+        self.store.append_audit_batch(events)
+
     def _append_runtime_audit_events(
         self,
         state: RunState,
@@ -712,9 +833,26 @@ class LocalControlPlane:
         workflow_version: str,
         start_index: int = 0,
     ) -> None:
+        self._append_audit_batch(
+            self._runtime_audit_events(
+                state,
+                workflow_id,
+                workflow_version,
+                start_index=start_index,
+            )
+        )
+
+    def _runtime_audit_events(
+        self,
+        state: RunState,
+        workflow_id: str,
+        workflow_version: str,
+        start_index: int = 0,
+    ) -> List[AuditEvent]:
         events = state.get("events", [])
+        projected = []
         if not isinstance(events, list):
-            return
+            return projected
         run_id = str(state.get("run_id", ""))
         for event in events[start_index:]:
             if not isinstance(event, dict):
@@ -748,7 +886,8 @@ class LocalControlPlane:
             ):
                 if key in event:
                     audit_event[key] = event[key]
-            self._append_audit(audit_event)
+            projected.append(audit_event)
+        return projected
 
 
 def _workflow_identity(workflow: Workflow) -> tuple:
@@ -1120,4 +1259,62 @@ def _promote_runtime_event(event_type: str) -> bool:
         "node_recovered",
         "node_failed",
         "node_fallback",
+    }
+
+
+def _expected_run_audit_counts(state: RunState) -> Counter:
+    """Derive the bounded audit projection expected from one durable run state."""
+
+    expected = Counter({"run_started": 1})
+    events = state.get("events", [])
+    if isinstance(events, list):
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            event_type = str(event.get("type", ""))
+            if _promote_runtime_event(event_type):
+                expected[event_type] += 1
+            elif event_type == "human_gate_resumed":
+                expected["run_resumed"] += 1
+            elif event_type == "human_gate_waiting":
+                expected["run_waiting"] += 1
+            elif event_type in {
+                "run_cancel_requested",
+                "run_cancelled",
+                "run_interrupted",
+            }:
+                expected[event_type] += 1
+
+    status = str(state.get("status", ""))
+    if status == "cancel_requested":
+        expected["run_cancel_requested"] = max(
+            1, expected.get("run_cancel_requested", 0)
+        )
+    elif status in {"waiting", "completed", "failed", "interrupted"}:
+        expected[f"run_{status}"] += 1
+    elif status == "cancelled" and expected.get("run_cancelled", 0) == 0:
+        expected["run_cancelled"] = 1
+    return expected
+
+
+def _last_run_event_timestamp(state: RunState, event_type: str) -> str:
+    events = state.get("events", [])
+    if not isinstance(events, list):
+        return ""
+    for event in reversed(events):
+        if not isinstance(event, dict) or str(event.get("type", "")) != event_type:
+            continue
+        timestamp = event.get("timestamp", "")
+        if timestamp:
+            return str(timestamp)
+    return ""
+
+
+def _counter_differences(left: Counter, right: Counter) -> Dict[str, int]:
+    """Return positive count differences without exposing event payloads."""
+
+    return {
+        event_type: count
+        for event_type, count in (left - right).items()
+        if count > 0
     }

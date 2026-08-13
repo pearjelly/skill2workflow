@@ -6,6 +6,7 @@ import hashlib
 import json
 import sqlite3
 import stat
+from collections import Counter
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -483,9 +484,20 @@ class JsonControlStore:
         self.index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def append_audit(self, event: AuditEvent) -> None:
+        self.append_audit_batch([event])
+
+    def append_audit_batch(self, events: List[AuditEvent]) -> None:
+        """Append one logical audit emission as a single file write."""
+
+        if not isinstance(events, list):
+            raise ValueError("audit events must be a list")
+        payload = "".join(
+            json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n"
+            for event in events
+        )
         self.audit_path.parent.mkdir(parents=True, exist_ok=True)
         with self.audit_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+            handle.write(payload)
 
     def list_audit_events(self) -> List[AuditEvent]:
         if not self.audit_path.exists():
@@ -495,6 +507,27 @@ class JsonControlStore:
             if line.strip():
                 events.append(json.loads(line))
         return events
+
+    def audit_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
+        """Count audit event types for selected runs without retaining payloads."""
+
+        selected = {str(run_id) for run_id in run_ids if str(run_id)}
+        counts = {}
+        if not selected or not self.audit_path.exists():
+            return counts
+        with self.audit_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                event = json.loads(line)
+                if not isinstance(event, dict):
+                    raise ValueError("audit event must be an object")
+                run_id = str(event.get("run_id", ""))
+                if run_id not in selected:
+                    continue
+                run_counts = counts.setdefault(run_id, Counter())
+                run_counts[str(event.get("type", "event"))] += 1
+        return {run_id: dict(counter) for run_id, counter in counts.items()}
 
     def verify_audit_integrity(self) -> Dict[str, object]:
         """Report that JSON audit storage has no durable chain contract."""
@@ -789,9 +822,17 @@ class SqliteControlStore:
             return target
 
     def append_audit(self, event: AuditEvent) -> None:
+        self.append_audit_batch([event])
+
+    def append_audit_batch(self, events: List[AuditEvent]) -> None:
+        """Append one logical audit emission in one SQLite transaction."""
+
+        if not isinstance(events, list):
+            raise ValueError("audit events must be a list")
         with self._connection() as connection:
             connection.execute("begin immediate")
-            _append_audit_connection(connection, event)
+            for event in events:
+                _append_audit_connection(connection, event)
 
     def verify_audit_integrity(self) -> Dict[str, object]:
         with self._connection() as connection:
@@ -911,6 +952,29 @@ class SqliteControlStore:
         with self._connection() as connection:
             rows = connection.execute("select payload_json from audit_events order by sequence").fetchall()
         return [json.loads(str(row[0])) for row in rows]
+
+    def audit_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
+        """Count audit event types for selected runs without loading payloads."""
+
+        selected = [str(run_id) for run_id in run_ids if str(run_id)]
+        if not selected:
+            return {}
+        placeholders = ",".join("?" for _ in selected)
+        with self._connection() as connection:
+            rows = connection.execute(
+                f"""
+                select run_id, event_type, count(*)
+                from audit_events
+                where run_id in ({placeholders})
+                group by run_id, event_type
+                order by run_id, event_type
+                """,
+                selected,
+            ).fetchall()
+        counts = {}
+        for run_id, event_type, count in rows:
+            counts.setdefault(str(run_id), {})[str(event_type)] = int(count)
+        return counts
 
     def snapshot_window(self, limit: int) -> Dict[str, object]:
         """Read recent registry and audit rows plus totals in one SQLite view."""

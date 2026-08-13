@@ -31,6 +31,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "promote",
     "workflow-diff",
     "workflow-artifacts",
+    "audit-consistency",
     "run-published",
     "quickstart",
     "service-init",

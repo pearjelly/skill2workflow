@@ -710,7 +710,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-74 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-75 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -805,6 +805,13 @@ SQLite publication failures clean up only a newly-created matching artifact
 whose registry key is still absent; the command does not perform automatic
 repair or garbage collection.
 
+Loop 75 adds [run-audit consistency diagnostics](docs/run-audit-consistency.md):
+one control-plane action emits its lifecycle/runtime audit as one batch, while
+`audit-consistency` compares durable run-state event counts with observed audit
+counts and reports missing, duplicate, or unexpected projections without
+workflow or business values. It does not make the two SQLite databases atomic
+or replay external connectors.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -848,6 +855,7 @@ See:
 - `docs/workflow-dsl-contract.md`
 - `docs/workflow-dsl-compatibility.md`
 - `docs/workflow-artifacts.md`
+- `docs/run-audit-consistency.md`
 - `docs/superpowers/specs/2026-07-01-skill2workflow-design.md`
 
 ## License

@@ -29,6 +29,14 @@ class WorkflowReleaseDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
+        run_audit_guide = (ROOT / "docs" / "run-audit-consistency.md").read_text(
+            encoding="utf-8"
+        )
+        run_audit_schema = json.loads(
+            (ROOT / "schemas" / "run-audit-report-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -64,6 +72,17 @@ class WorkflowReleaseDocumentationTests(TestCase):
             "skill2workflow-workflow-artifact-report-0.1.0",
         )
         self.assertIn("Loop 74: Workflow Artifact Consistency", roadmap)
+        self.assertIn("audit-consistency", run_audit_guide)
+        self.assertIn("cross-database", run_audit_guide)
+        self.assertEqual(
+            run_audit_schema["$id"],
+            "https://skill2workflow.dev/schemas/run-audit-report-0.1.0.json",
+        )
+        self.assertEqual(
+            run_audit_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-run-audit-report-0.1.0",
+        )
+        self.assertIn("Loop 75: Run Audit Consistency", roadmap)
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",
@@ -82,6 +101,8 @@ class WorkflowReleaseDocumentationTests(TestCase):
         )
         self.assertIn('"workflow-diff"', cli)
         self.assertIn('"workflow-artifacts"', cli)
+        self.assertIn('"audit-consistency"', cli)
         self.assertIn("--expected-current-version", cli)
         self.assertIn('"workflow-diff"', package_smoke)
         self.assertIn('"workflow-artifacts"', package_smoke)
+        self.assertIn('"audit-consistency"', package_smoke)

@@ -228,6 +228,75 @@ class ControlPlaneTests(TestCase):
 
         self.assertEqual(record["version"], "1.0.0")
 
+    def test_published_run_audit_batch_is_all_or_nothing(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            with patch(
+                "skill2workflow.storage._append_audit_connection",
+                side_effect=[None, RuntimeError("run audit append failed")],
+            ):
+                with self.assertRaisesRegex(RuntimeError, "run audit append failed"):
+                    control.run_published_workflow("workflow_control", "1.0.0")
+
+            runs = control.list_runs()
+            audit_types = [event["type"] for event in control.list_audit_events()]
+
+        self.assertEqual(runs[0]["status"], "completed")
+        self.assertEqual(audit_types, ["workflow_published"])
+
+    def test_run_audit_consistency_report_detects_missing_and_duplicate_events(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            state = control.run_published_workflow("workflow_control", "1.0.0")
+            run_id = state["run_id"]
+
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection, connection:
+                connection.execute(
+                    "delete from audit_events where run_id = ? and event_type = 'run_completed'",
+                    (run_id,),
+                )
+            control.store.append_audit(
+                {
+                    "type": "run_started",
+                    "run_id": run_id,
+                    "workflow_id": "workflow_control",
+                    "workflow_version": "1.0.0",
+                    "timestamp": "synthetic-duplicate",
+                }
+            )
+
+            report = control.inspect_run_audit(run_id=run_id)
+
+        self.assertEqual(
+            report["schema_version"],
+            "skill2workflow-run-audit-report-0.1.0",
+        )
+        self.assertEqual(report["status"], "attention")
+        self.assertEqual(report["summary"]["checked_runs"], 1)
+        run_report = report["runs"][0]
+        self.assertEqual(run_report["missing"], [{"type": "run_completed", "count": 1}])
+        self.assertEqual(run_report["duplicate"], [{"type": "run_started", "count": 1}])
+        self.assertEqual(run_report["unexpected"], [])
+        self.assertNotIn("synthetic-duplicate", json.dumps(report))
+
+    def test_run_audit_consistency_report_is_clean_for_waiting_and_resumed_run(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_approval_workflow(version="1.0.0"))
+            waiting = control.run_published_workflow("workflow_control", "1.0.0")
+            control.resume_published_run(waiting["run_id"], approved=True)
+
+            report = control.inspect_run_audit()
+
+        self.assertEqual(report["status"], "clean")
+        self.assertEqual(report["summary"]["checked_runs"], 1)
+        self.assertEqual(report["summary"]["attention_runs"], 0)
+
     def test_workflow_artifact_report_is_bounded_and_finds_registry_and_orphan_gaps(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)
@@ -961,6 +1030,10 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(
             [event["type"] for event in audit_events],
             ["run_started", "run_waiting", "run_resumed", "run_completed"],
+        )
+        self.assertLessEqual(
+            datetime.fromisoformat(audit_events[2]["timestamp"]),
+            datetime.fromisoformat(audit_events[3]["timestamp"]),
         )
         self.assertEqual(completed_events[0]["run_id"], waiting["run_id"])
 

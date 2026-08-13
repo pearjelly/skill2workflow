@@ -1157,6 +1157,63 @@ class CliTests(TestCase):
         self.assertNotIn("Start", output.getvalue())
         self.assertNotIn("Sensitive", output.getvalue())
 
+    def test_audit_consistency_command_reports_run_evidence_without_values(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            workflow_path = root / "workflow.json"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(workflow_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "run-published",
+                            "workflow_demo",
+                            "--version",
+                            "0.1.0",
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "audit-consistency",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        report = json.loads(output.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            report["schema_version"],
+            "skill2workflow-run-audit-report-0.1.0",
+        )
+        self.assertEqual(report["status"], "clean")
+        self.assertNotIn("Start", output.getvalue())
+
     def test_workflow_diff_and_expected_promotion_version_are_safe_cli_contracts(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

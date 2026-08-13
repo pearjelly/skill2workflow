@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-74
+- Completed delivery loops: 1-75
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 74 is complete with workflow artifact consistency diagnostics
+- Active loop: None; Loop 75 is complete with atomic run-audit emission and consistency diagnostics
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the artifact consistency drill
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-74 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-75 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; atomic workflow alias promotion became Loop 72 after review of the release-review drill; atomic workflow registry mutations became Loop 73 after review of the promotion transaction drill; workflow artifact consistency diagnostics became Loop 74 after review of the registry mutation drill; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; atomic workflow alias promotion became Loop 72 after review of the release-review drill; atomic workflow registry mutations became Loop 73 after review of the promotion transaction drill; workflow artifact consistency diagnostics became Loop 74 after review of the registry mutation drill; atomic run-audit emission and consistency diagnostics became Loop 75 after review of the artifact consistency drill; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, and workflow artifact consistency diagnostics, are achieved by Loops 44-74. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, workflow artifact consistency diagnostics, and atomic run-audit emission/consistency diagnostics, are achieved by Loops 44-75. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -699,9 +699,52 @@ PYTHONPATH=src python3 -m unittest \
   -v
 ```
 
+### Loop 75: Run Audit Consistency
+
+**Status:** Complete.
+
+**Prior basis:** Durable run state and control-plane audit evidence live in
+separate SQLite databases. A process stop after run-state persistence could
+leave a partial lifecycle trail, and the prior multi-call emission could make
+one failed append visible while later events were absent.
+
+**Outcome:** Lifecycle and runtime audit for one control-plane action now emits
+as one JSON append or one SQLite transaction. `audit-consistency` compares
+bounded expected event counts derived from durable run state with observed
+control audit counts and reports missing, duplicate, or unexpected event types
+without workflow or business values.
+
+**Evidence:** [`docs/run-audit-consistency.md`](docs/run-audit-consistency.md)
+and [`schemas/run-audit-report-0.1.0.schema.json`](schemas/run-audit-report-0.1.0.schema.json)
+define the report, 256-run/64-type bounds, and explicit cross-database
+diagnostic boundary. Control-plane, CLI, schema, documentation, package, and
+full-suite tests cover all-or-nothing audit emission, missing/duplicate
+diagnostics, waiting/resume continuity, and redaction.
+
+**Safety boundary:** This closes partial audit emission within one control
+store transaction. It does not make the two SQLite databases atomic, repair or
+rewrite audit history, replay connectors, add signatures, or claim exactly-once
+provider effects.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_control_plane.ControlPlaneTests.test_published_run_audit_batch_is_all_or_nothing \
+  tests.test_control_plane.ControlPlaneTests.test_run_audit_consistency_report_detects_missing_and_duplicate_events \
+  tests.test_control_plane.ControlPlaneTests.test_run_audit_consistency_report_is_clean_for_waiting_and_resumed_run \
+  tests.test_cli.CliTests.test_audit_consistency_command_reports_run_evidence_without_values \
+  -v
+```
+
+Loop 75 closes the partial control-audit emission gap while keeping the
+cross-database recovery boundary explicit. Current maturity remains
+Self-hosted Beta until the remaining Production Baseline evidence is selected
+and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 74 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the artifact consistency evidence.
+This rolling queue is ordered. Loop 75 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the run-audit consistency evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -741,6 +784,7 @@ This rolling queue is ordered. Loop 74 is complete and there is no active delive
 | Loop 72: Atomic Workflow Alias Promotion | Complete | Prevent concurrent SQLite operators from overwriting a newer reviewed alias target | Transactional compare-and-swap, alias mutation, audit append, concurrent-operator test, and valid-chain evidence |
 | Loop 73: Atomic Workflow Registry Mutations | Complete | Preserve concurrent immutable publication and deprecation changes with their audit evidence | Transactional single-record insert/update, exclusive artifact creation, idempotent matching publish, conflict and rollback tests |
 | Loop 74: Workflow Artifact Consistency | Complete | Diagnose registry/file divergence and clean up only known-failure unregistered publication artifacts | Bounded `workflow-artifacts` report, orphan/mismatch detection, transactional artifact recheck, guarded cleanup, CLI/schema/package evidence |
+| Loop 75: Run Audit Consistency | Complete | Preserve one control-plane run-audit emission and diagnose cross-database evidence gaps | Atomic audit batch, bounded `audit-consistency` report, missing/duplicate detection, CLI/schema/package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -841,6 +885,12 @@ of a newly-created unregistered SQLite publication artifact after a known
 failure. It excludes automatic repair, historical artifact garbage collection,
 distributed filesystem transactions, signatures, remote artifact stores, and
 JSON cross-process guarantees.
+
+Loop 75 covers only atomic emission of one control-plane run-audit batch and a
+bounded comparison of durable run-state event counts with observed audit event
+counts. It excludes cross-database atomicity, automatic repair, audit rewriting,
+connector replay, digital signatures, remote replication, and exactly-once
+provider effects.
 
 Selection rules:
 
@@ -950,6 +1000,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 72: Atomic Workflow Alias Promotion | Complete | SQLite transactionally couples compare-and-swap validation, alias mutation, and the promotion audit append under concurrent operators |
 | Loop 73: Atomic Workflow Registry Mutations | Complete | SQLite transactionally couples immutable publication/deprecation registry changes with audit evidence and preserves concurrent versions |
 | Loop 74: Workflow Artifact Consistency | Complete | Bounded registry/file consistency report, guarded known-failure cleanup, and installed CLI/schema contract |
+| Loop 75: Run Audit Consistency | Complete | Atomic run-audit batches, bounded cross-database consistency report, and installed CLI/schema contract |
 
 ## Release Direction
 

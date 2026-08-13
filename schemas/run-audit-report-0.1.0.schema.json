@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/run-audit-report-0.1.0.json",
+  "title": "skill2workflow durable run audit consistency report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "summary", "runs"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-run-audit-report-0.1.0"
+    },
+    "status": {
+      "enum": ["clean", "attention"]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_count",
+        "checked_runs",
+        "attention_runs",
+        "missing_events",
+        "duplicate_events",
+        "unexpected_events",
+        "truncated"
+      ],
+      "properties": {
+        "run_count": {"type": "integer", "minimum": 0},
+        "checked_runs": {"type": "integer", "minimum": 0, "maximum": 256},
+        "attention_runs": {"type": "integer", "minimum": 0},
+        "missing_events": {"type": "integer", "minimum": 0},
+        "duplicate_events": {"type": "integer", "minimum": 0},
+        "unexpected_events": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "runs": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "workflow_id",
+          "workflow_version",
+          "run_status",
+          "status",
+          "expected_event_count",
+          "observed_event_count",
+          "missing",
+          "duplicate",
+          "unexpected"
+        ],
+        "properties": {
+          "run_id": {"type": "string", "maxLength": 128},
+          "workflow_id": {"type": "string", "maxLength": 256},
+          "workflow_version": {"type": "string", "maxLength": 128},
+          "run_status": {"type": "string", "maxLength": 32},
+          "status": {"enum": ["clean", "attention"]},
+          "expected_event_count": {"type": "integer", "minimum": 0},
+          "observed_event_count": {"type": "integer", "minimum": 0},
+          "missing": {"$ref": "#/$defs/eventCounts"},
+          "duplicate": {"$ref": "#/$defs/eventCounts"},
+          "unexpected": {"$ref": "#/$defs/eventCounts"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "eventCounts": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "count"],
+        "properties": {
+          "type": {"type": "string", "maxLength": 128},
+          "count": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  }
+}
