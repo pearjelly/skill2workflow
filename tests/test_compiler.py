@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from unittest import TestCase
 
 from skill2workflow.compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
@@ -211,6 +213,18 @@ class CompilerTests(TestCase):
                 errors = validate_workflow_structured(workflow)
 
                 self.assertTrue(any(error["code"] == code for error in errors), errors)
+
+    def test_default_timeout_policy_has_a_bounded_contract(self):
+        root = Path(__file__).resolve().parents[1]
+        schema = json.loads((root / "schemas" / "workflow.schema.json").read_text(encoding="utf-8"))
+        timeout_schema = schema["$defs"]["policies"]["properties"]["default_timeout_ms"]
+        self.assertEqual(timeout_schema["minimum"], 0)
+        self.assertEqual(timeout_schema["maximum"], 86400000)
+
+        workflow = _http_mapping_workflow([])
+        workflow["policies"] = {"default_timeout_ms": 86400001}
+        errors = validate_workflow_structured(workflow)
+        self.assertIn("policy_timeout_invalid", {error["code"] for error in errors})
 
 
 def _http_mapping_workflow(input_mapping):

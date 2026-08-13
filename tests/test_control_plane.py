@@ -2,6 +2,7 @@ import json
 import importlib.util
 import sqlite3
 import threading
+from datetime import datetime, timedelta, timezone
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -16,6 +17,23 @@ from skill2workflow.triggers import TriggerIdempotencyError
 
 
 class ControlPlaneTests(TestCase):
+    def test_timeout_terminal_audit_contains_fixed_error_code(self):
+        clock = _TestClock()
+        workflow = _connector_workflow("8.0.0", "https://unused.invalid")
+        workflow["policies"] = {"default_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(workflow)
+            control.executor._clock = clock
+            control.executor.connector_runtime = _AdvancingConnectorRuntime(clock)
+            state = control.run_published_workflow("workflow_connector", "8.0.0")
+            events = control.list_audit_events(run_id=state["run_id"])
+
+        self.assertEqual(state["status"], "failed")
+        self.assertEqual(events[-1]["type"], "run_failed")
+        self.assertEqual(events[-1]["error_code"], "execution_timeout")
+
     def test_ingress_authentication_audit_is_strictly_allowlisted(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp), storage="sqlite")
@@ -556,6 +574,30 @@ def _workflow(version: str):
         ],
         "edges": [{"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}],
     }
+
+
+class _TestClock:
+    def __init__(self):
+        self.current = datetime(2026, 8, 13, tzinfo=timezone.utc)
+
+    def __call__(self):
+        return self.current.isoformat()
+
+    def advance(self, milliseconds):
+        self.current += timedelta(milliseconds=milliseconds)
+
+
+class _AdvancingConnectorRuntime:
+    def __init__(self, clock):
+        self.clock = clock
+
+    def execute_connector(self, node, credential_provider=None, context=None):
+        self.clock.advance(10)
+        return {
+            "status": "completed",
+            "connector": {"id": "http", "kind": "http"},
+            "output": {"ok": True},
+        }
 
 
 def _approval_workflow(version: str):

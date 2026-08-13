@@ -32,6 +32,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Authenticated `GET /runs`, redacted run-list schema `skill2workflow-run-list-0.1.0`, and protected `service-runs` CLI documented in `docs/run-list.md`
 - Authenticated `GET /api/v1/support-bundle`, redacted support-bundle schema `skill2workflow-support-bundle-0.1.0`, and protected `service-support-bundle` CLI documented in `docs/support-bundle.md`
 - SQLite trigger idempotency for keyed service/control-plane requests, including durable replay, fixed `409` conflicts, and unresolved-outcome fail-closed behavior documented in `docs/triggers.md`
+- Bounded active execution timeout semantics for `policies.default_timeout_ms`, including fixed `execution_timeout` evidence and human-gate pause behavior documented in `docs/runtime-policy.md`
 - Authenticated Prometheus text metric names, fixed label vocabularies, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`
 - Control snapshot `skill2workflow-control-snapshot-0.1.0`, `schemas/control-snapshot-0.1.0.schema.json`, authenticated `GET /api/v1/control-snapshot`, and live `window` semantics documented in `docs/live-control-snapshot.md`
 - Retention policies `skill2workflow-retention-policy-0.1.0`, `skill2workflow-retention-policy-0.2.0`, and `skill2workflow-retention-policy-0.3.0`, aggregate plan/apply summaries, and protected state semantics documented in `docs/data-retention.md`

@@ -405,7 +405,7 @@ Invalid request metadata, unsupported URL schemes, JSON body serialization failu
 
 ## Retry And Timeout Boundary
 
-`connector.request.timeout_ms` is the per-request timeout for the built-in HTTP connector. It is not a whole-node deadline and does not include queueing, human approval, or downstream workflow execution time.
+`connector.request.timeout_ms` is the per-request timeout for the built-in HTTP connector. It is not a whole-node deadline and does not include queueing, human approval, or downstream workflow execution time. The separate top-level `policies.default_timeout_ms` budget bounds active workflow execution segments; see [`runtime-policy.md`](runtime-policy.md).
 
 `retry.max_attempts` and `policies.default_retry.max_attempts` are Workflow DSL policy fields. The local executor honors them for connector nodes. `max_attempts` means retries after the first attempt; `1` allows two total connector attempts.
 

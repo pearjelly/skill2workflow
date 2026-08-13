@@ -155,15 +155,16 @@ class LocalControlPlane:
             started_event.update(trigger_audit_fields(trigger))
         self._append_audit(started_event)
         self._append_runtime_audit_events(state, workflow_id, version)
-        self._append_audit(
-            {
-                "type": f"run_{state['status']}",
-                "run_id": state["run_id"],
-                "workflow_id": workflow_id,
-                "workflow_version": version,
-                "timestamp": _now(),
-            }
-        )
+        terminal_event = {
+            "type": f"run_{state['status']}",
+            "run_id": state["run_id"],
+            "workflow_id": workflow_id,
+            "workflow_version": version,
+            "timestamp": _now(),
+        }
+        if state.get("error_code"):
+            terminal_event["error_code"] = str(state["error_code"])
+        self._append_audit(terminal_event)
         return state
 
     def trigger_workflow(self, request: Dict[str, object]) -> Dict[str, object]:
@@ -247,15 +248,16 @@ class LocalControlPlane:
             }
         )
         self._append_runtime_audit_events(state, workflow_id, workflow_version, start_index=previous_event_count)
-        self._append_audit(
-            {
-                "type": f"run_{state['status']}",
-                "run_id": run_id,
-                "workflow_id": workflow_id,
-                "workflow_version": workflow_version,
-                "timestamp": _now(),
-            }
-        )
+        terminal_event = {
+            "type": f"run_{state['status']}",
+            "run_id": run_id,
+            "workflow_id": workflow_id,
+            "workflow_version": workflow_version,
+            "timestamp": _now(),
+        }
+        if state.get("error_code"):
+            terminal_event["error_code"] = str(state["error_code"])
+        self._append_audit(terminal_event)
         return state
 
     def cancel_published_run(self, run_id: str) -> RunState:

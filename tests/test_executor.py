@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import threading
+from datetime import datetime, timedelta, timezone
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -12,6 +13,68 @@ from skill2workflow.executor import LocalExecutor
 
 
 class ExecutorTests(TestCase):
+    def test_default_timeout_fails_closed_at_a_safe_point_and_persists_fixed_error(self):
+        clock = _TestClock()
+        runtime = _AdvancingConnectorRuntime(clock, milliseconds=10)
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["policies"] = {"default_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(
+                Path(tmp),
+                storage="sqlite",
+                connector_runtime=runtime,
+                clock=clock,
+            ).run(workflow)
+            persisted = LocalExecutor(Path(tmp), storage="sqlite").get_run(state["run_id"])
+
+        self.assertEqual(state["status"], "failed")
+        self.assertEqual(state["error_code"], "execution_timeout")
+        self.assertEqual(state["node_results"]["call_api"]["error_code"], "execution_timeout")
+        self.assertEqual(state["events"][-1]["type"], "run_failed")
+        self.assertEqual(state["events"][-1]["error_code"], "execution_timeout")
+        self.assertEqual(persisted["error_code"], "execution_timeout")
+        self.assertEqual(persisted["execution"]["timeout_ms"], 5)
+        self.assertEqual(persisted["execution"]["deadline_at"], "")
+        self.assertEqual(runtime.calls, 1)
+
+    def test_default_timeout_pauses_while_waiting_for_human_gate(self):
+        clock = _TestClock()
+        workflow = _approval_workflow()
+        workflow["policies"] = {"default_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp), clock=clock)
+            waiting = executor.run(workflow)
+            clock.advance(1000)
+            self.assertEqual(waiting["status"], "waiting")
+            self.assertEqual(waiting["execution"]["deadline_at"], "")
+            completed = executor.resume(waiting["run_id"], approved=True)
+
+        self.assertEqual(completed["status"], "completed")
+        self.assertNotIn("error_code", completed)
+
+    def test_malformed_persisted_deadline_fails_closed(self):
+        workflow = _approval_workflow()
+        workflow["policies"] = {"default_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            executor = LocalExecutor(state_dir, storage="sqlite")
+            waiting = executor.run(workflow)
+            corrupted = executor.get_run(waiting["run_id"])
+            corrupted["status"] = "running"
+            corrupted["execution"]["started_at"] = "2026-08-13T00:00:00+00:00"
+            corrupted["execution"]["deadline_at"] = "not-a-timestamp"
+            executor.store.save(corrupted)
+
+            restarted = LocalExecutor(state_dir, storage="sqlite")
+            failed = restarted._drive(restarted.get_run(waiting["run_id"]))
+
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(failed["error_code"], "execution_timeout")
+        self.assertEqual(failed["execution"]["deadline_at"], "")
+
     def test_run_pauses_at_human_gate_and_resume_completes(self):
         workflow = {
             "schema_version": "0.1.0",
@@ -282,6 +345,33 @@ class ExecutorTests(TestCase):
         self.assertEqual(runtime.contexts[0]["input"], {"title": "Durable title"})
         self.assertEqual(state["context"], original_context)
         self.assertEqual(persisted["context"], original_context)
+
+
+class _TestClock:
+    def __init__(self):
+        self.current = datetime(2026, 8, 13, tzinfo=timezone.utc)
+
+    def __call__(self):
+        return self.current.isoformat()
+
+    def advance(self, milliseconds):
+        self.current += timedelta(milliseconds=milliseconds)
+
+
+class _AdvancingConnectorRuntime:
+    def __init__(self, clock, milliseconds):
+        self.clock = clock
+        self.milliseconds = milliseconds
+        self.calls = 0
+
+    def execute_connector(self, node, credential_provider=None, context=None):
+        self.calls += 1
+        self.clock.advance(self.milliseconds)
+        return {
+            "status": "completed",
+            "connector": {"id": "http", "kind": "http"},
+            "output": {"ok": True},
+        }
 
 
 class _CapturingConnectorRuntime:

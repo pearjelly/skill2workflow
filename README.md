@@ -671,7 +671,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-62 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-63 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -718,6 +718,8 @@ Loop 60 adds authenticated [redacted run discovery](docs/run-list.md): `GET /run
 Loop 61 adds an authenticated [redacted support bundle](docs/support-bundle.md): `GET /api/v1/support-bundle` and the installed `service-support-bundle` command produce one bounded `0600` diagnostic artifact from fixed lifecycle, aggregate observability, and run-list data without exporting payloads or credentials.
 
 Loop 62 adds [durable trigger idempotency](docs/triggers.md#durable-trigger-idempotency): SQLite service and control-plane triggers claim a safe key before execution, replay identical requests without a second run, and fail closed on conflicts or unknown outcomes.
+
+Loop 63 adds [bounded active execution timeout](docs/runtime-policy.md): the existing `policies.default_timeout_ms` field is validated and enforced at durable executor safe points, persisted with the run, paused during human-gate review, and recorded as fixed timeout failure evidence.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

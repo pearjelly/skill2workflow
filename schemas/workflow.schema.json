@@ -248,7 +248,9 @@
         },
         "default_timeout_ms": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 86400000,
+          "description": "Maximum active execution segment in milliseconds; zero disables the boundary. Human-gate waiting is paused."
         }
       }
     }

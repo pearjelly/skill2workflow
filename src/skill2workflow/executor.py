@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import copy
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Callable, Dict, List
 
 from .connectors import ConnectorExecutionError, ConnectorRuntime, connector_ref
 from .storage import create_run_store
 
 
 RunState = Dict[str, object]
+MAX_ACTIVE_TIMEOUT_MS = 86_400_000
 
 
 class LocalExecutor:
@@ -25,12 +26,14 @@ class LocalExecutor:
         credential_provider=None,
         connector_runtime=None,
         execution_owner: str = "",
+        clock: Callable[[], str] = None,
     ):
         self.state_dir = Path(state_dir)
         self.store = create_run_store(self.state_dir, storage)
         self.credential_provider = credential_provider
         self.connector_runtime = connector_runtime or ConnectorRuntime()
         self.execution_owner = str(execution_owner or "")
+        self._clock = clock or _now
         self._execution_ids: Dict[str, str] = {}
 
     def run(self, workflow: Dict[str, object], context: Dict[str, object] = None) -> RunState:
@@ -44,6 +47,8 @@ class LocalExecutor:
         else:
             raise ValueError("run context must be a JSON object")
 
+        timeout_ms = _execution_timeout_ms(workflow)
+
         state: RunState = {
             "run_id": f"run_{uuid.uuid4().hex[:12]}",
             "workflow_id": workflow_meta.get("id", "workflow"),
@@ -54,6 +59,11 @@ class LocalExecutor:
             "node_results": {},
             "events": [],
             "workflow": workflow,
+            "execution": {
+                "timeout_ms": timeout_ms,
+                "started_at": "",
+                "deadline_at": "",
+            },
         }
         if self.execution_owner:
             execution_id = f"execution_{uuid.uuid4().hex}"
@@ -90,7 +100,7 @@ class LocalExecutor:
             "status": "approved" if approved else "rejected",
             "title": node.get("title", node["id"]),
             "approved": approved,
-            "timestamp": _now(),
+            "timestamp": self._now(),
         }
         if node.get("type") == "human_gate":
             result["connector"] = connector_ref(node.get("connector") or {"id": "manual", "kind": "manual"})
@@ -102,11 +112,12 @@ class LocalExecutor:
                 "approved": approved,
                 "connector_id": "manual",
                 "connector_kind": "manual",
-                "timestamp": _now(),
+                "timestamp": self._now(),
             }
         )
         state["status"] = "running"
         state["current_node"] = next_node
+        self._clear_execution_window(state)
         try:
             self._save(state)
             if state["status"] == "cancelled":
@@ -153,6 +164,7 @@ class LocalExecutor:
         workflow = state["workflow"]
         node_map = self._node_map(workflow)
         state["status"] = "running"
+        self._start_execution_window(state)
         self._save(state)
         if state["status"] == "cancelled":
             return state
@@ -165,6 +177,9 @@ class LocalExecutor:
             cancelled = self._cancel_if_requested(state)
             if cancelled is not None:
                 return cancelled
+            timed_out = self._timeout_if_exceeded(state)
+            if timed_out is not None:
+                return timed_out
             self._ensure_execution_active(state)
             current_id = state["current_node"]
             node = node_map[current_id]
@@ -172,10 +187,11 @@ class LocalExecutor:
 
             if node_type == "end":
                 state["status"] = "completed"
+                self._clear_execution_window(state)
                 state["node_results"][current_id] = {
                     "status": "completed",
                     "title": node.get("title", current_id),
-                    "timestamp": _now(),
+                    "timestamp": self._now(),
                 }
                 self._event(state, "run_completed", current_id)
                 self._save(state)
@@ -183,10 +199,11 @@ class LocalExecutor:
 
             if node_type == "failure":
                 state["status"] = "failed"
+                self._clear_execution_window(state)
                 state["node_results"][current_id] = {
                     "status": "failed",
                     "title": node.get("title", current_id),
-                    "timestamp": _now(),
+                    "timestamp": self._now(),
                 }
                 self._event(state, "run_failed", current_id)
                 self._save(state)
@@ -194,6 +211,7 @@ class LocalExecutor:
 
             if node_type == "human_gate":
                 state["status"] = "waiting"
+                self._clear_execution_window(state)
                 self._event(
                     state,
                     "human_gate_waiting",
@@ -213,7 +231,7 @@ class LocalExecutor:
             state["node_results"][current_id] = {
                 "status": "completed",
                 "title": node.get("title", current_id),
-                "timestamp": _now(),
+                "timestamp": self._now(),
             }
             self._event(state, "node_completed", current_id)
 
@@ -248,7 +266,7 @@ class LocalExecutor:
                 "status": "failed",
                 "title": node.get("title", current_id),
                 "error": state["error"],
-                "timestamp": _now(),
+                "timestamp": self._now(),
             }
             self._event(state, "run_failed", current_id)
             self._save(state)
@@ -297,6 +315,20 @@ class LocalExecutor:
                     "output": {},
                 }
 
+            timed_out = self._timeout_if_exceeded(state)
+            if timed_out is not None:
+                timed_out["node_results"][current_id] = {
+                    "status": "failed",
+                    "title": node.get("title", current_id),
+                    "connector": ref,
+                    "attempts": attempts,
+                    "max_attempts": max_attempts,
+                    "error_code": "execution_timeout",
+                    "timestamp": self._now(),
+                }
+                self._save(timed_out)
+                return timed_out
+
             result_status = str(connector_result.get("status", "failed"))
             if result_status == "completed":
                 recovered = attempt > 1
@@ -343,7 +375,7 @@ class LocalExecutor:
             "output": connector_result.get("output", {}),
             "attempts": attempts,
             "max_attempts": max_attempts,
-            "timestamp": _now(),
+            "timestamp": self._now(),
         }
         mapping_summary = connector_result.get("input_mapping")
         if isinstance(mapping_summary, dict) and mapping_summary:
@@ -433,6 +465,7 @@ class LocalExecutor:
             return None
         self._event(state, "run_cancel_requested", str(state.get("current_node", "")))
         state["status"] = "cancelled"
+        self._clear_execution_window(state)
         self._event(state, "run_cancelled", str(state.get("current_node", "")))
         self._save(state)
         self.store.mark_cancellation_applied(run_id)
@@ -442,11 +475,66 @@ class LocalExecutor:
         event = {
             "type": event_type,
             "node_id": node_id,
-            "timestamp": _now(),
+            "timestamp": self._now(),
         }
         if extra:
             event.update(extra)
         state["events"].append(event)
+
+    def _now(self) -> str:
+        return str(self._clock())
+
+    def _start_execution_window(self, state: RunState) -> None:
+        execution = state.get("execution")
+        if not isinstance(execution, dict):
+            execution = {
+                "timeout_ms": _execution_timeout_ms(state.get("workflow", {})),
+                "started_at": "",
+                "deadline_at": "",
+            }
+            state["execution"] = execution
+        timeout_ms = _non_negative_int(execution.get("timeout_ms"))
+        if timeout_ms <= 0 or str(execution.get("deadline_at", "")):
+            return
+        started_at = self._now()
+        execution["started_at"] = started_at
+        execution["deadline_at"] = _deadline_after(started_at, timeout_ms)
+
+    @staticmethod
+    def _clear_execution_window(state: RunState) -> None:
+        execution = state.get("execution")
+        if not isinstance(execution, dict):
+            return
+        execution["started_at"] = ""
+        execution["deadline_at"] = ""
+
+    def _timeout_if_exceeded(self, state: RunState):
+        execution = state.get("execution")
+        if not isinstance(execution, dict):
+            return None
+        deadline_at = str(execution.get("deadline_at", ""))
+        if not deadline_at:
+            return None
+        try:
+            expired = _parse_timestamp(self._now()) >= _parse_timestamp(deadline_at)
+        except ValueError:
+            expired = True
+        if not expired:
+            return None
+        current_id = str(state.get("current_node", ""))
+        timeout_ms = _non_negative_int(execution.get("timeout_ms"))
+        state["status"] = "failed"
+        state["error_code"] = "execution_timeout"
+        state["error"] = "workflow active execution exceeded default_timeout_ms"
+        self._clear_execution_window(state)
+        self._event(
+            state,
+            "run_failed",
+            current_id,
+            {"error_code": "execution_timeout", "timeout_ms": timeout_ms},
+        )
+        self._save(state)
+        return state
 
     def _save(self, state: RunState) -> None:
         run_id = str(state.get("run_id", ""))
@@ -488,6 +576,41 @@ def _connector_context(state: RunState, node_id: str) -> Dict[str, object]:
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _execution_timeout_ms(workflow: object) -> int:
+    if not isinstance(workflow, dict):
+        return 0
+    policies = workflow.get("policies")
+    if policies is None:
+        return 0
+    if not isinstance(policies, dict):
+        raise ValueError("workflow.policies must be an object")
+    if "default_timeout_ms" not in policies:
+        return 0
+    value = policies.get("default_timeout_ms")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 0
+        or value > MAX_ACTIVE_TIMEOUT_MS
+    ):
+        raise ValueError(
+            "policies.default_timeout_ms must be an integer between 0 and "
+            f"{MAX_ACTIVE_TIMEOUT_MS}"
+        )
+    return value
+
+
+def _parse_timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must include a timezone")
+    return parsed.astimezone(timezone.utc)
+
+
+def _deadline_after(started_at: str, timeout_ms: int) -> str:
+    return (_parse_timestamp(started_at) + timedelta(milliseconds=timeout_ms)).isoformat()
 
 
 def _retry_max_attempts(node: Dict[str, object], workflow: object) -> int:

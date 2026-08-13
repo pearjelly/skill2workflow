@@ -36,7 +36,15 @@ Missing, invalid, negative, and boolean retry values are treated as `0`.
 
 ## Timeout Boundary
 
-`connector.request.timeout_ms` is the built-in HTTP connector request timeout. It is not a whole-workflow deadline and does not cover queueing, human approval, retry backoff, downstream systems, or local process scheduling.
+`connector.request.timeout_ms` is the built-in HTTP connector request timeout. The
+top-level `policies.default_timeout_ms` is a separate active-execution segment
+budget: `0` disables it, positive values are bounded to 24 hours, and the
+executor checks it before each node and after connector returns. A timeout
+fails the run with fixed `error_code: "execution_timeout"` evidence; it never
+interrupts an outbound request already in flight. The budget is persisted with
+the run and is cleared while a human gate is waiting, so operator review time
+does not consume execution budget. It does not cover queueing, retry backoff,
+downstream systems after a returned connector call, or local process scheduling.
 
 The local executor does not yet implement global workflow deadlines, node-level wall-clock deadlines, delayed retry backoff, or scheduled recovery. Those remain future runtime policy work.
 
@@ -87,7 +95,7 @@ The local runtime intentionally does not yet provide:
 - background workers
 - distributed scheduling
 - delayed retry backoff
-- idempotency keys
+- automatic idempotency enforcement for JSON/local evaluation (SQLite service enforcement is documented in `docs/triggers.md`)
 - compensation or rollback handlers
 - global workflow deadlines
 - enterprise credential management

@@ -25,6 +25,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added authenticated redacted run discovery at `GET /runs` and the protected `service-runs` CLI with fixed status counts, a 100-item window, and no payload or credential export.
 - Added an authenticated redacted support bundle at `GET /api/v1/support-bundle` and the protected `service-support-bundle` CLI with fixed aggregate observability, a nested run list, and owner-only atomic output.
 - Added durable SQLite trigger idempotency: identical keyed retries replay the compact result without a second run, mismatched requests return fixed conflicts, and unresolved outcomes fail closed without storing input values.
+- Enforced the existing bounded `policies.default_timeout_ms` runtime boundary at executor safe points, with persisted deadlines, human-gate pause semantics, and fixed timeout failure evidence.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

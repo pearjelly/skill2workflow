@@ -263,6 +263,8 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
                 )
             )
 
+    _validate_policies(workflow.get("policies"), errors)
+
     return errors
 
 
@@ -381,6 +383,36 @@ def _validate_connector_binding(
         )
     if connector.get("id") == "http":
         _validate_http_connector_request(node, index, connector, errors)
+
+
+def _validate_policies(policies: object, errors: List[ValidationError]) -> None:
+    if policies is None:
+        return
+    if not isinstance(policies, dict):
+        errors.append(
+            _validation_error(
+                "policies_invalid",
+                "workflow.policies must be an object",
+                ["policies"],
+            )
+        )
+        return
+    if "default_timeout_ms" not in policies:
+        return
+    value = policies.get("default_timeout_ms")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 0
+        or value > 86_400_000
+    ):
+        errors.append(
+            _validation_error(
+                "policy_timeout_invalid",
+                "policies.default_timeout_ms must be an integer between 0 and 86400000",
+                ["policies", "default_timeout_ms"],
+            )
+        )
 
 
 def _validate_http_connector_request(

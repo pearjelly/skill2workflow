@@ -80,7 +80,7 @@ The editor must not change:
 
 Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on `tool_call` nodes. The current local runtime supports method, URL, headers, body, per-request timeout metadata, optional body-only `input_mapping` metadata, and optional credential handle metadata as documented in `docs/connectors.md`.
 
-`retry.max_attempts` and `policies.default_retry` are policy metadata honored by the current local executor for connector nodes. They are preserved by readers, editable through the visual layer, and documented in `docs/runtime-policy.md`.
+`retry.max_attempts` and `policies.default_retry` are policy metadata honored by the current local executor for connector nodes. `policies.default_timeout_ms` is a bounded active-execution segment budget: zero disables it, human-gate waiting pauses it, and an expiry fails closed with `error_code: "execution_timeout"`. These fields are preserved by readers, editable through the visual layer where supported, and documented in `docs/runtime-policy.md`.
 
 Workflow DSL examples and fixtures must not store secrets. They may reference credential handles under connector metadata, but resolved credential values must stay in a local provider boundary outside Workflow DSL, LiteGraph fixtures, trigger input, run state, and audit events. Hosted credential storage, secret redaction, IAM, connector marketplaces, and product-specific SaaS connectors are outside the `0.1.x` built-in connector boundary.
 
