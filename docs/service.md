@@ -120,6 +120,11 @@ Concurrent request handling allows a cancellation request to be persisted while 
 
 SQLite is mandatory on this service path. Published workflow records, run state, audit events, recurring definitions, and dispatch records therefore remain available when a new process starts with the same `runtime.state_dir`. A renewable SQLite lease provides active/standby coordination for local processes sharing that directory. It is not a distributed lock and does not provide exactly-once delivery.
 
+Loop 70 verifies each published artifact against its control-plane checksum
+before a service trigger or run can proceed. Missing or mismatched artifacts
+fail closed before idempotency claims, run creation, or audit emission; see
+[`published-artifact-integrity.md`](published-artifact-integrity.md).
+
 Run the real-process evidence smoke with:
 
 ```bash

@@ -32,6 +32,9 @@ Within the `0.1.x` release line:
 - Existing top-level fields keep their current meaning.
 - Existing node ids, edge endpoints, and transition fields keep their semantics.
 - Published workflow artifacts remain immutable after publication.
+- Published artifact reads verify the registry checksum before promotion or
+  execution; missing, unavailable, malformed, or mismatched artifacts fail
+  closed with a fixed redacted error.
 - Structured validation errors keep the `code`, `message`, `path`, and `severity` keys.
 - New metadata may be added through additional properties.
 - New node types may be added when schema and validator tests document their contract.
@@ -44,6 +47,12 @@ Workflow version aliases are control-plane registry metadata, not Workflow DSL
 fields. They may point a trigger or schedule at one published immutable
 artifact, but promotion never mutates the artifact or changes the DSL schema;
 an exact version remains a valid and deterministic target.
+
+The runtime integrity guard is additive control-plane behavior. It does not
+change the Workflow DSL schema or canonical checksum algorithm used at
+publication. Existing records without a checksum are not executed
+unverified; operators must use the documented state-upgrade and backup/restore
+paths or publish a new immutable version.
 
 ## Breaking Changes
 

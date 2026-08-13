@@ -48,6 +48,11 @@ The backup contains only:
 
 Each declared file has a byte length and lowercase SHA-256 digest. Verification rejects unknown fields, an unsupported or mismatched state layout marker, duplicate or unsafe paths, undeclared files, missing files, size or digest mismatches, invalid workflow JSON, workflow/control checksum disagreement, missing or incompatible core table columns, a malformed optional `run_cancellations` table, an invalid current SQLite audit chain, and any SQLite `integrity_check` result other than `ok`.
 
+After restore, Loop 70 performs the same workflow/control checksum check every
+time a published artifact is read for inspection, promotion, trigger, or
+execution. A restored artifact with a missing or mismatched registry checksum
+is rejected rather than executed; see [`published-artifact-integrity.md`](published-artifact-integrity.md).
+
 Scheduler lease rows are cleared in the snapshot. Durable dispatch claims are preserved; after restore, the scheduler applies its normal stale-claim `uncertain` recovery semantics. A recognized legacy `v0.1.0` source without `scheduler.sqlite3` is still backed up safely: the manifest sets `scheduler_database_synthesized: true` and the snapshot contains a new empty scheduler database while the source remains untouched.
 
 Service configuration, Bearer token files, mounted credential directories, unrelated state-directory files, local JSON schedules, and legacy JSON/JSONL state are not copied. In particular, credentials are not included. Back up and restore external secrets through the operator's secret manager, then rotate them according to policy.

@@ -149,6 +149,9 @@ class LocalControlPlane:
         target = dict(index[target_key])
         if target.get("status") != "published":
             raise ValueError(f"workflow version is not published: {workflow_id}@{version}")
+        # Verify before changing alias metadata so a corrupted release cannot
+        # become reachable through a stable production target.
+        self.get_workflow(workflow_id, version)
 
         changed = False
         for key, existing in list(index.items()):
@@ -193,7 +196,24 @@ class LocalControlPlane:
 
     def get_workflow(self, workflow_id: str, version: str) -> Workflow:
         record = self._workflow_record(workflow_id, version)
-        return _load_json(self.state_dir / str(record["artifact"]))
+        artifact_path = self.state_dir / str(record.get("artifact", ""))
+        try:
+            workflow = _load_json(artifact_path)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError(
+                f"published workflow artifact unavailable: {workflow_id}@{version}"
+            ) from error
+
+        expected_checksum = str(record.get("checksum", ""))
+        if not expected_checksum:
+            raise ValueError(
+                f"published workflow artifact checksum unavailable: {workflow_id}@{version}"
+            )
+        if _checksum(workflow) != expected_checksum:
+            raise ValueError(
+                f"published workflow artifact checksum mismatch: {workflow_id}@{version}"
+            )
+        return workflow
 
     def run_published_workflow(self, workflow_id: str, version: str, trigger: Dict[str, object] = None) -> RunState:
         record = self._workflow_record(workflow_id, version)

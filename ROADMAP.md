@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-69
+- Completed delivery loops: 1-70
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 69 is complete with stable workflow version promotion aliases
+- Active loop: None; Loop 70 is complete with published artifact integrity verification
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the service-admission drill
+- Next decision: select the next Production Baseline loop after reviewing the published-artifact integrity drill
 
 ## Production Readiness Path
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-69 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-70 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, and stable workflow version promotion aliases became Loop 69 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, and published artifact integrity verification became Loop 70 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, and stable workflow version promotion aliases are achieved by Loops 44-69. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, and published artifact integrity verification are achieved by Loops 44-70. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -493,9 +493,51 @@ artifacts or expanding the single-tenant service boundary. Current maturity
 remains Self-hosted Beta until the remaining Production Baseline evidence is
 explicitly completed and reviewed.
 
+### Loop 70: Published Artifact Integrity Verification
+
+**Status:** Complete.
+
+**Prior basis:** Publication stored a canonical checksum in the control-plane
+registry and backup verification checked it, but ordinary artifact reads did
+not recheck that value. A local file replacement could therefore be consumed
+by inspection, execution, trigger validation, or alias promotion before an
+operator noticed the mismatch.
+
+**Outcome:** `get_workflow()` now verifies every published JSON artifact against
+the registry checksum and returns fixed redacted failures for missing,
+unreadable, malformed, checksum-less, or modified artifacts. Version
+promotion verifies the target before alias metadata changes. Trigger, webhook,
+schedule, and exact-version execution paths reuse the same guard, so a failed
+check happens before input validation, idempotency claims, run creation, audit
+emission, or alias mutation.
+
+**Evidence:** [`docs/published-artifact-integrity.md`](docs/published-artifact-integrity.md)
+defines the failure and operator-response contract. Control-plane tests cover
+tampered reads, runs, keyed SQLite triggers, and promotion side-effect
+suppression; the existing backup/restore and JSON/SQLite compatibility suite
+remains green.
+
+**Safety boundary:** This is a local checksum guard, not a digital signature,
+remote attestation, automatic repair mechanism, or protection against an
+operator who can rewrite both the artifact and its control database.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_control_plane.ControlPlaneTests.test_tampered_published_artifact_is_rejected_before_execution \
+  tests.test_control_plane.ControlPlaneTests.test_tampered_published_artifact_cannot_be_promoted \
+  -v
+```
+
+Loop 70 closes the published-artifact read gap without changing Workflow DSL
+`0.1.0`, artifact layout, or the single-tenant service boundary. Current
+maturity remains Self-hosted Beta until remaining Production Baseline evidence
+is explicitly completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 69 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the version-promotion evidence.
+This rolling queue is ordered. Loop 70 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the artifact-integrity evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -530,6 +572,7 @@ This rolling queue is ordered. Loop 69 is complete and there is no active delive
 | Loop 67: Declarative Trigger Input Contracts | Complete | Make published workflow business inputs explicit without breaking open-object legacy workflows | Bounded `input_schema`, publication/runtime validation, pre-idempotency rejection, fixed errors, and contract/SQLite compatibility tests |
 | Loop 68: Bounded Service Request Admission | Complete | Prevent unbounded active HTTP business work while keeping liveness and readiness probes available | Fixed 16-slot process-local admission, fixed `429`/`Retry-After`, slot release, and service regression evidence |
 | Loop 69: Stable Workflow Version Promotion Aliases | Complete | Let operators roll an immutable workflow release forward without editing every trigger target | Bounded alias metadata, `promote` CLI, exact-version precedence, deprecation cleanup, alias-scoped idempotency replay, and JSON/SQLite evidence |
+| Loop 70: Published Artifact Integrity Verification | Complete | Refuse modified or unverifiable published artifacts before they can be inspected, promoted, triggered, or executed | Canonical registry checksum verification, fixed redacted failures, promotion side-effect suppression, and JSON/SQLite runtime tests |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -601,6 +644,12 @@ Loop 69 covers only explicit aliases scoped to one workflow and one local
 control plane. It excludes health-based canaries, traffic splitting, automatic
 rollback, alias garbage collection, hosted release orchestration, multi-tenant
 routing, and exactly-once provider effects.
+
+Loop 70 covers only canonical checksum verification against the local
+control-plane registry before artifact reads, promotion, trigger validation, or
+execution. It excludes digital signatures, remote attestation, automatic
+repair, remote replication, and protection from an operator who can rewrite
+both the artifact and its registry record.
 
 Selection rules:
 
@@ -705,6 +754,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 67: Declarative Trigger Input Contracts | Complete | Optional bounded `input_schema`, publication/runtime validation, fixed path-only errors, and legacy open-object compatibility |
 | Loop 68: Bounded Service Request Admission | Complete | Fixed 16-slot process-local business-handler budget, retryable `429`, probe availability, and slot-release regression evidence |
 | Loop 69: Stable Workflow Version Promotion Aliases | Complete | Bounded workflow aliases, explicit promotion, exact-version precedence, deprecation cleanup, and alias-scoped replay-safe trigger resolution |
+| Loop 70: Published Artifact Integrity Verification | Complete | Registry checksum verification before artifact reads, promotion, trigger validation, and execution, with fixed redacted failures and side-effect suppression |
 
 ## Release Direction
 

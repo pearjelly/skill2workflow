@@ -693,7 +693,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-69 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-70 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -762,6 +762,8 @@ readiness probes remain available for safe traffic removal during overload or
 graceful drain.
 
 Loop 69 adds [stable workflow version promotion aliases](docs/triggers.md#stable-workflow-version-aliases): operators can move a bounded `production`-style alias between immutable published versions, trigger and schedule through the alias, and retain safe SQLite idempotency replay semantics across a later promotion. It does not add health-based rollout, automatic rollback, or exactly-once provider effects.
+
+Loop 70 adds [published artifact integrity verification](docs/published-artifact-integrity.md): every published artifact is checked against its control-plane checksum before inspection, promotion, trigger, or execution. Missing or modified artifacts fail closed before idempotency, run, audit, or alias side effects; this is not a digital signature or remote-attestation system.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

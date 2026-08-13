@@ -89,6 +89,63 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(audit_events[0]["workflow_id"], "workflow_control")
         self.assertIn("checksum", record)
 
+    def test_tampered_published_artifact_is_rejected_before_execution(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            record = control.publish_workflow(_workflow(version="1.0.0"))
+            artifact_path = state_dir / record["artifact"]
+            tampered = json.loads(artifact_path.read_text(encoding="utf-8"))
+            tampered["nodes"][0]["title"] = "Tampered start"
+            artifact_path.write_text(
+                json.dumps(tampered, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(ValueError, "published workflow artifact checksum mismatch"):
+                control.get_workflow("workflow_control", "1.0.0")
+            with self.assertRaisesRegex(ValueError, "published workflow artifact checksum mismatch"):
+                control.run_published_workflow("workflow_control", "1.0.0")
+            with self.assertRaisesRegex(ValueError, "published workflow artifact checksum mismatch"):
+                control.trigger_workflow(
+                    {
+                        "workflow_id": "workflow_control",
+                        "version": "1.0.0",
+                        "idempotency_key": "tampered-001",
+                        "input": {},
+                    }
+                )
+
+            self.assertEqual(control.list_runs(), [])
+            self.assertEqual(
+                [event["type"] for event in control.list_audit_events()],
+                ["workflow_published"],
+            )
+
+    def test_tampered_published_artifact_cannot_be_promoted(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir)
+            first = control.publish_workflow(_workflow(version="1.0.0"))
+            second = control.publish_workflow(_workflow(version="2.0.0"))
+            control.promote_workflow("workflow_control", "1.0.0", alias="production")
+            artifact_path = state_dir / second["artifact"]
+            tampered = json.loads(artifact_path.read_text(encoding="utf-8"))
+            tampered["nodes"][0]["title"] = "Tampered release"
+            artifact_path.write_text(
+                json.dumps(tampered, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+
+            with self.assertRaisesRegex(ValueError, "published workflow artifact checksum mismatch"):
+                control.promote_workflow("workflow_control", "2.0.0", alias="production")
+
+            records = {record["version"]: record for record in control.list_workflows()}
+            self.assertEqual(records["1.0.0"]["aliases"], ["production"])
+            self.assertNotIn("aliases", records["2.0.0"])
+            self.assertEqual(
+                [event["type"] for event in control.list_audit_events()],
+                ["workflow_published", "workflow_published", "workflow_promoted"],
+            )
+
     def test_publish_rejects_reserved_path_segments_in_workflow_identity(self):
         for field in ("id", "version"):
             with self.subTest(field=field), TemporaryDirectory() as tmp:

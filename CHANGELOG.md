@@ -32,6 +32,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added optional bounded declarative `input_schema` contracts for published workflows, with publication validation and pre-idempotency trigger rejection for missing, mistyped, out-of-range, and undeclared input values.
 - Added a fixed process-local service admission budget of 16 active business handlers, with a fixed retryable `429` response and probe availability under overload.
 - Added stable workflow version promotion aliases with a `promote` CLI command, exact-version precedence, deprecation cleanup, and alias-scoped SQLite idempotency replay across later promotions.
+- Added runtime published-artifact integrity verification: reads, promotions, triggers, and executions now compare each artifact with its control-plane checksum and fail closed before side effects when state is missing, malformed, or modified.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed
@@ -44,6 +45,7 @@ release; Roadmap loop completion alone does not publish a new version.
 ### Security
 
 - Required authenticated business routes, file-backed ingress secrets, runtime credential-handle resolution, and external TLS termination for network exposure.
+- Added a fixed redacted published-artifact integrity failure boundary; the checksum guard detects local artifact tampering but is not a signature or remote-attestation mechanism.
 - Added repository security, support, moderation, pull-request, and CI supply-chain policies; GitHub Actions now use fixed reviewed commits, read-only permissions, bounded jobs, and non-persistent checkout credentials.
 - Added repository-wide pre-commit hygiene scanning that rejects private paths, runtime state, key material, misplaced binary media, and symbolic links without reading rejected artifacts or echoing suspected secret values.
 - Hardened explicit JSON hygiene scans to reject symbolic links, non-regular or unavailable files, invalid UTF-8, invalid JSON, and inputs above 2 MiB with fixed redacted findings instead of tracebacks.

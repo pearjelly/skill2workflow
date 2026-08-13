@@ -43,6 +43,11 @@ admission budget to non-probe routes. Exhaustion returns a fixed `429` with
 `Retry-After: 1`; `/healthz` and `/readyz` remain available for traffic
 management. See [`docs/service.md`](docs/service.md).
 
+Published workflow reads are integrity-checked against the control-plane
+checksum before promotion, trigger validation, idempotency claims, or
+execution. Missing or changed artifacts fail closed with fixed redacted errors;
+see [`docs/published-artifact-integrity.md`](docs/published-artifact-integrity.md).
+
 Run the local scheduled-trigger smoke:
 
 ```bash
