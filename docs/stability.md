@@ -99,6 +99,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Retention policies `skill2workflow-retention-policy-0.1.0`, `skill2workflow-retention-policy-0.2.0`, and `skill2workflow-retention-policy-0.3.0`, aggregate plan/apply summaries, and protected state semantics documented in `docs/data-retention.md`
 - Additive SQLite `run_executions` ownership tickets, terminal `interrupted` run state, and no-replay recovery semantics documented in `docs/interrupted-recovery.md`
 - Interrupted-run takeover streams foreign active-execution rows through the existing SQLite recovery transaction; fencing, returned recovered states, and no-replay semantics remain unchanged
+- Interrupted-run audit reconciliation streams interrupted states and checks one `(run_id,event_type)` projection at a time; startup recovery no longer enumerates the complete run table or audit history
 - File-backed single-team Bearer and execution-time directory credential contracts documented in `docs/security-boundary.md`
 - Durable recurring schedule input contract `skill2workflow-schedule-0.2.0` and its published JSON Schema
 - Recurring dispatch states, missed-run policies, and single-SQLite lease semantics documented in `docs/recurring-scheduling.md`

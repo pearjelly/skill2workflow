@@ -37,6 +37,12 @@ transaction and converted one at a time. Recovery therefore avoids materializing
 the full execution ledger before fencing runs; the returned recovered-state list
 and takeover semantics remain compatible.
 
+After takeover, control-plane audit reconciliation streams the durable
+`interrupted` run states and checks each `(run_id, run_interrupted)` projection
+with a bounded existence query. It does not reload the complete run table or
+audit history during service startup, so an old interrupted-run backlog cannot
+turn recovery into an unbounded diagnostic read.
+
 The executor rechecks the ticket before every node and connector attempt and
 persists `connector_started` before transport. If takeover occurs between two
 nodes, the old owner cannot start the successor. A tiny check-to-send interval

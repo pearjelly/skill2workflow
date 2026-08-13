@@ -128,6 +128,57 @@ class InterruptedRunRecoveryTests(TestCase):
         self.assertIn("execution ownership was fenced", str(outcome["error"]))
         self.assertEqual(runtime.calls, 1)
 
+    def test_recovery_reconciliation_does_not_enumerate_full_runs_or_audit(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            runtime = _BlockingConnectorRuntime()
+            active = LocalControlPlane(
+                state_dir,
+                storage="sqlite",
+                connector_runtime=runtime,
+                execution_owner="service-owner-a",
+            )
+            active.publish_workflow(_tool_workflow())
+            outcome = {}
+
+            def execute():
+                try:
+                    active.run_published_workflow(
+                        "workflow_interrupted", "0.1.0"
+                    )
+                except Exception as error:
+                    outcome["error"] = error
+
+            worker = threading.Thread(
+                target=execute,
+                daemon=True,
+            )
+            worker.start()
+            self.assertTrue(runtime.started.wait(timeout=2))
+            takeover = LocalControlPlane(
+                state_dir,
+                storage="sqlite",
+                execution_owner="service-owner-b",
+            )
+            original_audit = takeover.list_audit_events
+            original_runs = takeover.executor.list_runs
+            takeover.list_audit_events = lambda **_kwargs: (_ for _ in ()).throw(
+                AssertionError("recovery loaded the full audit history")
+            )
+            takeover.executor.list_runs = lambda **_kwargs: (_ for _ in ()).throw(
+                AssertionError("recovery loaded the full run table")
+            )
+            try:
+                self.assertEqual(takeover.recover_interrupted_runs(), 1)
+            finally:
+                takeover.list_audit_events = original_audit
+                takeover.executor.list_runs = original_runs
+                runtime.release.set()
+                worker.join(timeout=2)
+
+        self.assertFalse(worker.is_alive())
+        self.assertIn("execution ownership was fenced", str(outcome["error"]))
+
     def test_fenced_old_owner_cannot_start_the_next_connector(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"

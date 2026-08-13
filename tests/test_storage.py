@@ -12,6 +12,7 @@ from skill2workflow.storage import (
     SqliteControlStore,
     SqliteRunStore,
     _iter_foreign_active_execution_rows,
+    _iter_interrupted_run_rows,
     _iter_workflow_records_for_id,
 )
 
@@ -71,6 +72,26 @@ class StorageTests(TestCase):
                     rows = list(_iter_workflow_records_for_id(connection, "workflow_stream"))
 
         self.assertEqual(rows[0][0], "workflow_stream@1.0.0")
+
+    def test_interrupted_run_states_stream_without_fetchall(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteRunStore(Path(tmp) / "sqlite")
+            store.save(
+                {
+                    "run_id": "run_stream_interrupted_state",
+                    "workflow_id": "workflow_storage",
+                    "workflow_version": "0.1.0",
+                    "status": "interrupted",
+                    "current_node": "node",
+                    "events": [{"type": "run_interrupted"}],
+                }
+            )
+            with closing(sqlite3.connect(store.db_path)) as raw:
+                connection = _NoInterruptedStateFetchAllConnection(raw)
+                with raw:
+                    rows = list(_iter_interrupted_run_rows(connection))
+
+        self.assertEqual(len(rows), 1)
 
     def test_run_count_does_not_load_all_states(self):
         with TemporaryDirectory() as tmp:
@@ -382,6 +403,32 @@ class _NoRegistryFetchAllConnection:
         normalized = " ".join(str(query).lower().split())
         if "select record_key, record_json from workflow_versions" in normalized:
             return _NoRegistryFetchAllCursor(cursor)
+        return cursor
+
+
+class _NoInterruptedStateFetchAllCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+    def fetchall(self):
+        raise AssertionError("interrupted run states must be streamed")
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _NoInterruptedStateFetchAllConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query, parameters=()):
+        cursor = self._connection.execute(query, parameters)
+        normalized = " ".join(str(query).lower().split())
+        if "select state_json from runs where status = 'interrupted'" in normalized:
+            return _NoInterruptedStateFetchAllCursor(cursor)
         return cursor
 
 

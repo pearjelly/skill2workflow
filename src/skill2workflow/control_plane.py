@@ -805,19 +805,8 @@ class LocalControlPlane:
         """Fence abandoned service executions and expose their unknown outcome."""
 
         recovered = self.executor.recover_interrupted_runs()
-        existing = {
-            str(event.get("run_id", ""))
-            for event in self.list_audit_events(event_type="run_interrupted")
-        }
-        candidates = {str(state.get("run_id", "")): state for state in recovered}
-        for summary in self.executor.list_runs():
-            if str(summary.get("status", "")) != "interrupted":
-                continue
-            run_id = str(summary.get("run_id", ""))
-            if run_id and run_id not in candidates:
-                candidates[run_id] = self.executor.get_run(run_id)
-        reconciliation_events = []
-        for run_id, state in candidates.items():
+        for state in self.executor.iter_interrupted_runs():
+            run_id = str(state.get("run_id", ""))
             interruption = next(
                 (
                     event
@@ -827,21 +816,30 @@ class LocalControlPlane:
                 ),
                 None,
             )
-            if not interruption or run_id in existing:
+            if (
+                not run_id
+                or not interruption
+                or self.store.audit_event_type_exists_for_run(
+                    run_id, "run_interrupted"
+                )
+            ):
                 continue
-            reconciliation_events.append(
-                {
-                    "type": "run_interrupted",
-                    "run_id": run_id,
-                    "workflow_id": str(state.get("workflow_id", "workflow")),
-                    "workflow_version": str(
-                        state.get("workflow_version", "0.1.0")
-                    ),
-                    "timestamp": str(interruption.get("timestamp", "")) or _now(),
-                }
+            self._append_audit_batch(
+                [
+                    {
+                        "type": "run_interrupted",
+                        "run_id": run_id,
+                        "workflow_id": str(
+                            state.get("workflow_id", "workflow")
+                        ),
+                        "workflow_version": str(
+                            state.get("workflow_version", "0.1.0")
+                        ),
+                        "timestamp": str(interruption.get("timestamp", ""))
+                        or _now(),
+                    }
+                ]
             )
-        if reconciliation_events:
-            self._append_audit_batch(reconciliation_events)
         return len(recovered)
 
     def expire_workflow_deadlines(

@@ -154,6 +154,16 @@ class JsonRunStore:
     def recover_interrupted(self, current_owner: str) -> List[RunState]:
         raise ValueError("interrupted run recovery requires sqlite storage")
 
+    def iter_interrupted_runs(self):
+        """Stream interrupted run states for recovery reconciliation."""
+
+        for path in sorted(self.runs_dir.glob("*.json")):
+            if not path.is_file():
+                continue
+            state = json.loads(path.read_text(encoding="utf-8"))
+            if str(state.get("status", "")) == "interrupted":
+                yield state
+
     def expire_waiting_workflow_deadlines(
         self, now: str, limit: int = 256
     ) -> List[RunState]:
@@ -406,6 +416,14 @@ class SqliteRunStore:
                 )
                 recovered.append(interrupted)
         return recovered
+
+    def iter_interrupted_runs(self):
+        """Stream interrupted run states without materializing the run table."""
+
+        with self._connection() as connection:
+            rows = _iter_interrupted_run_rows(connection)
+            for (raw_state,) in rows:
+                yield json.loads(str(raw_state))
 
     def load(self, run_id: str) -> RunState:
         with self._connection() as connection:
@@ -843,6 +861,27 @@ class JsonControlStore:
                     return True
         return False
 
+    def audit_event_type_exists_for_run(self, run_id: str, event_type: str) -> bool:
+        """Check one run/event projection without retaining audit history."""
+
+        if not self.audit_path.exists():
+            return False
+        with self.audit_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    candidate = json.loads(line)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    continue
+                if _audit_event_matches(
+                    candidate,
+                    run_id=str(run_id),
+                    event_type=str(event_type),
+                ):
+                    return True
+        return False
+
     def audit_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
         """Count audit event types for selected runs without retaining payloads."""
 
@@ -955,6 +994,16 @@ class SqliteControlStore:
             row = connection.execute(
                 "select 1 from workflow_versions where artifact = ? limit 1",
                 (str(relative),),
+            ).fetchone()
+        return row is not None
+
+    def audit_event_type_exists_for_run(self, run_id: str, event_type: str) -> bool:
+        """Check one run/event projection without loading audit payloads."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                "select 1 from audit_events where run_id = ? and event_type = ? limit 1",
+                (str(run_id), str(event_type)),
             ).fetchone()
         return row is not None
 
@@ -1933,6 +1982,19 @@ def _iter_foreign_active_execution_rows(connection, current_owner: str):
         order by e.run_id
         """,
         (str(current_owner),),
+    )
+
+
+def _iter_interrupted_run_rows(connection):
+    """Return a cursor for interrupted run states in stable recovery order."""
+
+    return connection.execute(
+        """
+        select state_json
+        from runs
+        where status = 'interrupted'
+        order by updated_at, run_id
+        """
     )
 
 

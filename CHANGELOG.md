@@ -37,6 +37,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - SQLite workflow alias promotion now reads the target directly and streams
   only the selected workflow's registry rows, avoiding unrelated-version
   materialization while preserving CAS and audit atomicity.
+- Interrupted-run audit reconciliation now streams interrupted states and
+  checks one `(run_id,event_type)` projection at a time, avoiding complete
+  run-table and audit-history materialization during startup recovery.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.

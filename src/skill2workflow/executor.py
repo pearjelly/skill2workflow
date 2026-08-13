@@ -210,6 +210,11 @@ class LocalExecutor:
             raise ValueError("interrupted run recovery requires an execution owner")
         return self.store.recover_interrupted(self.execution_owner)
 
+    def iter_interrupted_runs(self):
+        """Stream interrupted run states for control-plane reconciliation."""
+
+        return self.store.iter_interrupted_runs()
+
     def expire_workflow_deadlines(
         self, now: str = None, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS
     ) -> List[RunState]:
