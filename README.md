@@ -741,7 +741,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-130 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-131 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1126,6 +1126,12 @@ Loop 130 bounds the source reads behind [run-audit consistency](docs/run-audit-c
 global inspection counts durable runs and loads only the newest 256 summaries,
 while `--run-id` reads one run directly. The fixed redacted report contract and
 diagnostic-only boundary remain unchanged.
+
+Loop 131 hardens [workflow artifact diagnostics](docs/workflow-artifacts.md)
+for SQLite production state: registry rows stream in stable order and orphan
+checks query exact references one artifact at a time, avoiding a full registry
+or filesystem-path set in memory. The report contract and JSON evaluation path
+remain compatible.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

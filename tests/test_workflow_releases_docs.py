@@ -33,6 +33,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         self.assertIn("fixed issue window", guide)
         self.assertIn("complete issue set", guide)
+        self.assertIn("registry rows are streamed", guide)
         self.assertIn("1-256", stability)
 
     def test_review_contract_and_cas_boundary_are_published(self):

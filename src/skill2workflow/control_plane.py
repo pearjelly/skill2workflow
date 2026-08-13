@@ -287,9 +287,26 @@ class LocalControlPlane:
 
         _validate_artifact_issue_limit(max_issues)
 
-        index = self._load_index()
+        bounded_sqlite = all(
+            hasattr(self.store, name)
+            for name in (
+                "count_workflow_records",
+                "iter_workflow_records",
+                "count_referenced_artifacts",
+                "artifact_reference_exists",
+            )
+        )
+        if bounded_sqlite:
+            registry_records = self.store.count_workflow_records()
+            records = self.store.iter_workflow_records()
+            referenced_count = self.store.count_referenced_artifacts()
+        else:
+            index = self._load_index()
+            registry_records = len(index)
+            records = sorted(index.items(), key=lambda item: str(item[0]))
+            referenced = set()
+            referenced_count = None
         issues = []
-        referenced = set()
         healthy = 0
         issue_counts = {
             kind: 0
@@ -308,7 +325,7 @@ class LocalControlPlane:
             issue_counts[str(issue["kind"])] += 1
             _retain_artifact_issue(issues, issue, max_issues)
 
-        for key, record in sorted(index.items(), key=lambda item: str(item[0])):
+        for key, record in records:
             workflow_id = str(record.get("workflow_id", ""))
             version = str(record.get("version", ""))
             artifact_value = record.get("artifact")
@@ -320,7 +337,8 @@ class LocalControlPlane:
                     )
                 )
                 continue
-            referenced.add(relative)
+            if not bounded_sqlite:
+                referenced.add(relative)
             path = self.state_dir.joinpath(*PurePosixPath(relative).parts)
             issue_kind = _inspect_artifact_file(
                 self.state_dir,
@@ -332,9 +350,18 @@ class LocalControlPlane:
             else:
                 healthy += 1
 
-        filesystem = set(_iter_workflow_artifacts(self.workflows_dir, self.state_dir))
-        for relative in sorted(filesystem - referenced):
-            record_issue(_artifact_issue("orphaned", relative))
+        filesystem_count = 0
+        filesystem = [] if not bounded_sqlite else None
+        for relative in _iter_workflow_artifacts(self.workflows_dir, self.state_dir):
+            filesystem_count += 1
+            if bounded_sqlite:
+                if not self.store.artifact_reference_exists(relative):
+                    record_issue(_artifact_issue("orphaned", relative))
+            else:
+                filesystem.append(relative)
+        if not bounded_sqlite:
+            for relative in sorted(set(filesystem) - referenced):
+                record_issue(_artifact_issue("orphaned", relative))
 
         issues.sort(key=lambda issue: (str(issue["kind"]), str(issue["artifact"])))
 
@@ -344,9 +371,9 @@ class LocalControlPlane:
             "schema_version": WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
             "status": "clean" if issue_count == 0 else "attention",
             "summary": {
-                "registry_records": len(index),
-                "referenced_artifacts": len(referenced),
-                "filesystem_artifacts": len(filesystem),
+                "registry_records": registry_records,
+                "referenced_artifacts": referenced_count if bounded_sqlite else len(referenced),
+                "filesystem_artifacts": filesystem_count,
                 "healthy": healthy,
                 "issue_count": issue_count,
                 **issue_counts,
@@ -1373,8 +1400,7 @@ def _path_has_symlink_component(root: Path, path: Path) -> bool:
 
 def _iter_workflow_artifacts(root: Path, state_dir: Path):
     if not root.exists() or root.is_symlink():
-        return []
-    paths = []
+        return
     for base, directories, filenames in os.walk(root, topdown=True, followlinks=False):
         directories[:] = [
             name for name in directories
@@ -1389,8 +1415,7 @@ def _iter_workflow_artifacts(root: Path, state_dir: Path):
             except ValueError:
                 continue
             if relative != "workflows/index.json":
-                paths.append(relative)
-    return paths
+                yield relative
 
 
 def _artifact_issue(kind: str, artifact: object, workflow_id: str = "", version: str = ""):

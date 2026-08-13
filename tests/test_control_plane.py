@@ -556,6 +556,24 @@ class ControlPlaneTests(TestCase):
         )
         self.assertNotIn("must-not-be-returned", json.dumps(report))
 
+    def test_sqlite_workflow_artifact_report_streams_registry_without_loading_index(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="3.0.0"))
+
+            with patch.object(
+                control,
+                "_load_index",
+                side_effect=AssertionError("unbounded workflow registry read"),
+            ):
+                report = control.inspect_workflow_artifacts()
+
+        self.assertEqual(report["status"], "clean")
+        self.assertEqual(report["summary"]["registry_records"], 1)
+        self.assertEqual(report["summary"]["referenced_artifacts"], 1)
+        self.assertEqual(report["summary"]["filesystem_artifacts"], 1)
+
     def test_workflow_artifact_report_redacts_unsafe_registry_path(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

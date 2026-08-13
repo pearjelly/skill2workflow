@@ -901,6 +901,53 @@ class SqliteControlStore:
             ).fetchall()
         return {str(row[0]): json.loads(str(row[1])) for row in rows}
 
+    def count_workflow_records(self) -> int:
+        """Count published registry rows without loading their JSON records."""
+
+        with self._connection() as connection:
+            return int(
+                connection.execute("select count(*) from workflow_versions").fetchone()[0]
+            )
+
+    def iter_workflow_records(self):
+        """Stream published registry records in stable key order."""
+
+        with self._connection() as connection:
+            rows = connection.execute(
+                "select record_key, record_json from workflow_versions order by record_key"
+            )
+            for record_key, record_json in rows:
+                yield str(record_key), json.loads(str(record_json))
+
+    def count_referenced_artifacts(self) -> int:
+        """Count distinct safe-looking artifact references in SQLite."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                select count(distinct artifact)
+                from workflow_versions
+                where artifact like 'workflows/%'
+                  and artifact like '%.json'
+                  and artifact <> 'workflows/index.json'
+                  and artifact not like '%\\%'
+                  and artifact not like '%//%'
+                  and artifact not like '%/./%'
+                  and artifact not like '%/../%'
+                """
+            ).fetchone()
+        return int(row[0])
+
+    def artifact_reference_exists(self, relative: str) -> bool:
+        """Check one normalized artifact reference without loading the registry."""
+
+        with self._connection() as connection:
+            row = connection.execute(
+                "select 1 from workflow_versions where artifact = ? limit 1",
+                (str(relative),),
+            ).fetchone()
+        return row is not None
+
     def save_index(self, index: Dict[str, WorkflowRecord]) -> None:
         with self._connection() as connection:
             connection.execute("delete from workflow_versions")

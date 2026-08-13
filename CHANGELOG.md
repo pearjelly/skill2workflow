@@ -21,6 +21,9 @@ release; Roadmap loop completion alone does not publish a new version.
   workflow content while preserving complete-list compatibility.
 - Bounded workflow artifact diagnostics now retain only the fixed issue window
   while preserving full issue counts and truncation status.
+- SQLite workflow artifact diagnostics now stream registry rows and check
+  filesystem artifacts by exact reference, avoiding a full registry/path-set
+  materialization on long-running production instances.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.

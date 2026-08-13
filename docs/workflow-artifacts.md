@@ -40,6 +40,10 @@ leave a new registry row pointing at a removed file.
 
 The report is diagnostic. It counts the complete issue set but retains only the
 fixed issue window, so issue memory does not grow with the number of failures.
+On the production SQLite path, registry rows are streamed and filesystem
+artifacts are checked one at a time against the registry; the diagnostic does
+not materialize the complete registry or artifact path set. JSON remains the
+dependency-light evaluation path and keeps its existing compatibility behavior.
 It does not delete historical artifacts, repair a registry, rewrite a checksum,
 or make JSON storage multi-process safe. Stop the service, preserve the private
 state, and follow the backup/restore or migration procedure before manually
@@ -50,6 +54,7 @@ repairing any `attention` result.
 ```bash
 PYTHONPATH=src python3 -m unittest \
   tests.test_control_plane.ControlPlaneTests.test_workflow_artifact_report_is_bounded_and_finds_registry_and_orphan_gaps \
+  tests.test_control_plane.ControlPlaneTests.test_sqlite_workflow_artifact_report_streams_registry_without_loading_index \
   tests.test_control_plane.ControlPlaneTests.test_sqlite_publication_rolls_back_registry_when_audit_append_fails \
   tests.test_cli.CliTests.test_workflow_artifacts_command_reports_bounded_consistency_without_values \
   -v
