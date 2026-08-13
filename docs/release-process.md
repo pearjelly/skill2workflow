@@ -88,6 +88,11 @@ python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-release-can
 
 Release notes must state that cancellation is cooperative, that an already sent external request is not forcefully interrupted, and whether the retention policy version changes.
 
+For cross-database operator-action recovery changes, also run the focused
+resume/cancellation reconciliation tests and document that a `503` can follow
+a durable state commit; operators retry the same idempotent action rather than
+starting a new workflow or decision.
+
 When a release changes service configuration, ingress-token handling,
 credential/state directory checks, SQLite startup validation, or bind behavior,
 also include:

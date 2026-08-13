@@ -65,12 +65,14 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("best-effort both after the response path", guide)
         self.assertIn("Loop 99 makes service teardown structural", guide)
         self.assertIn("force the observable lifecycle state to `stopped`", guide)
+        self.assertIn("Loop 101 makes remote operator retries cross-database safe", guide)
+        self.assertIn("retrying the same decision repairs only missing evidence", guide)
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         self.assertIn("five-second socket deadline", stability)
 
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-100 are complete", readme)
+        self.assertIn("Delivery Loops 1-101 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

@@ -54,6 +54,16 @@ durable `run_resumed` audit evidence, the declared success/failure branch, and
 connector retry policy. It does not claim exactly-once effects for a provider
 request that was already sent before a process failure.
 
+Run state and control audit are separate SQLite databases. If the gate decision
+is committed but the audit transaction fails, the request can return `503`
+after the run has already advanced. Retrying the same boolean decision is safe:
+the control plane recognizes the committed `human_gate_resumed` event and
+repairs only missing bounded audit evidence; it does not execute the gate a
+second time. If the decision has already been fully audited, the normal `409`
+non-waiting response remains in force. When a resumed workflow reaches a later
+human gate, repair of an earlier evidence gap is completed before accepting the
+later decision.
+
 ## Example
 
 Keep the token outside source files and avoid putting real secrets in shell

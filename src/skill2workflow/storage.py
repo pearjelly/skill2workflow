@@ -499,6 +499,13 @@ class JsonControlStore:
         with self.audit_path.open("a", encoding="utf-8") as handle:
             handle.write(payload)
 
+    def append_audit_batch_if_missing(self, events: List[AuditEvent]) -> None:
+        """Append only canonical payloads not already present."""
+
+        missing = [event for event in events if not self.audit_event_exists(event)]
+        if missing:
+            self.append_audit_batch(missing)
+
     def list_audit_events(self) -> List[AuditEvent]:
         if not self.audit_path.exists():
             return []
@@ -507,6 +514,24 @@ class JsonControlStore:
             if line.strip():
                 events.append(json.loads(line))
         return events
+
+    def audit_event_exists(self, event: AuditEvent) -> bool:
+        """Return whether one canonical audit payload is already persisted."""
+
+        expected = json.dumps(event, ensure_ascii=False, sort_keys=True)
+        if not self.audit_path.exists():
+            return False
+        with self.audit_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                try:
+                    candidate = json.loads(line)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    continue
+                if json.dumps(candidate, ensure_ascii=False, sort_keys=True) == expected:
+                    return True
+        return False
 
     def audit_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
         """Count audit event types for selected runs without retaining payloads."""
@@ -836,6 +861,22 @@ class SqliteControlStore:
             for event in events:
                 _append_audit_connection(connection, event)
 
+    def append_audit_batch_if_missing(self, events: List[AuditEvent]) -> None:
+        """Atomically append only canonical payloads not already present."""
+
+        if not isinstance(events, list):
+            raise ValueError("audit events must be a list")
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            for event in events:
+                payload_json = json.dumps(event, ensure_ascii=False, sort_keys=True)
+                exists = connection.execute(
+                    "select 1 from audit_events where payload_json = ? limit 1",
+                    (payload_json,),
+                ).fetchone()
+                if exists is None:
+                    _append_audit_connection(connection, event)
+
     def verify_audit_integrity(self) -> Dict[str, object]:
         with self._connection() as connection:
             return _verify_audit_integrity_connection(connection)
@@ -954,6 +995,17 @@ class SqliteControlStore:
         with self._connection() as connection:
             rows = connection.execute("select payload_json from audit_events order by sequence").fetchall()
         return [json.loads(str(row[0])) for row in rows]
+
+    def audit_event_exists(self, event: AuditEvent) -> bool:
+        """Return whether one canonical audit payload is already persisted."""
+
+        payload_json = json.dumps(event, ensure_ascii=False, sort_keys=True)
+        with self._connection() as connection:
+            row = connection.execute(
+                "select 1 from audit_events where payload_json = ? limit 1",
+                (payload_json,),
+            ).fetchone()
+        return row is not None
 
     def audit_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
         """Count audit event types for selected runs without loading payloads."""

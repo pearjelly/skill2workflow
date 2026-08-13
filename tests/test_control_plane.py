@@ -1079,6 +1079,34 @@ class ControlPlaneTests(TestCase):
         )
         self.assertEqual(completed_events[0]["run_id"], waiting["run_id"])
 
+    def test_resume_retry_reconciles_audit_after_run_state_commit(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_approval_workflow(version="5.1.0"))
+            waiting = control.run_published_workflow("workflow_control", "5.1.0")
+
+            with patch(
+                "skill2workflow.storage._append_audit_connection",
+                side_effect=RuntimeError("resume audit append failed"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "resume audit append failed"):
+                    control.resume_published_run(waiting["run_id"], approved=True)
+
+            retried = control.resume_published_run(waiting["run_id"], approved=True)
+            events = control.list_audit_events(run_id=waiting["run_id"])
+            report = control.inspect_run_audit(run_id=waiting["run_id"])
+
+            with self.assertRaisesRegex(ValueError, "not waiting"):
+                control.resume_published_run(waiting["run_id"], approved=True)
+
+        self.assertEqual(retried["status"], "completed")
+        self.assertEqual(
+            [event["type"] for event in events],
+            ["run_started", "run_waiting", "run_resumed", "run_completed"],
+        )
+        self.assertEqual(report["status"], "clean")
+
     def test_audit_events_can_filter_by_workflow_version_and_run_id(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp), storage="sqlite")

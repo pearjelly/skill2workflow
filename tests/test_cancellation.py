@@ -7,6 +7,7 @@ import urllib.request
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.executor import LocalExecutor
@@ -154,6 +155,31 @@ class CancellationTests(TestCase):
             )
             self.assertNotIn("reason", json.dumps(events))
 
+    def test_control_plane_retries_cancellation_to_reconcile_audit_after_state_commit(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_waiting_workflow())
+            waiting = control.run_published_workflow("workflow_cancel", "0.1.0")
+
+            with patch(
+                "skill2workflow.storage._append_audit_connection",
+                side_effect=RuntimeError("audit append failed"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "audit append failed"):
+                    control.cancel_published_run(waiting["run_id"])
+
+            retried = control.cancel_published_run(waiting["run_id"])
+            events = control.list_audit_events(run_id=waiting["run_id"])
+            report = control.inspect_run_audit(run_id=waiting["run_id"])
+
+        self.assertEqual(retried["status"], "cancelled")
+        self.assertEqual(
+            [event["type"] for event in events],
+            ["run_started", "run_waiting", "run_cancel_requested", "run_cancelled"],
+        )
+        self.assertEqual(report["status"], "clean")
+
     def test_authenticated_service_route_cancels_waiting_run(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -208,6 +234,56 @@ class CancellationTests(TestCase):
             self.assertEqual(terminal_status, 409)
             self.assertEqual(accepted["status"], "cancelled")
             self.assertEqual(accepted["run_id"], waiting["run_id"])
+
+    def test_authenticated_cancel_retry_repairs_audit_after_service_503(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            token_file = root / "auth.token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            credential_dir = root / "credentials"
+            credential_dir.mkdir()
+            credential_dir.chmod(0o700)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_waiting_workflow())
+            waiting = control.run_published_workflow("workflow_cancel", "0.1.0")
+            service = RuntimeService(
+                ServiceConfig(
+                    host="127.0.0.1",
+                    port=0,
+                    state_dir=state_dir,
+                    storage="sqlite",
+                    auth_token_file=token_file,
+                    credential_dir=credential_dir,
+                )
+            )
+            thread = threading.Thread(target=service.serve, daemon=True)
+            thread.start()
+            host, port = service.server_address
+            url = f"http://{host}:{port}/runs/{waiting['run_id']}/cancel"
+            try:
+                with patch.object(
+                    service.control_plane,
+                    "_append_missing_audit_events",
+                    side_effect=RuntimeError("audit append failed"),
+                ):
+                    failed_status, failed = _post(url, token=AUTH_TOKEN)
+                retried_status, retried = _post(url, token=AUTH_TOKEN)
+            finally:
+                service.begin_shutdown()
+                thread.join(timeout=3)
+
+            report = LocalControlPlane(state_dir, storage="sqlite").inspect_run_audit(
+                run_id=waiting["run_id"]
+            )
+
+        self.assertEqual(failed_status, 503)
+        self.assertEqual(failed, {"error": "service unavailable"})
+        self.assertEqual(retried_status, 200)
+        self.assertEqual(retried["status"], "cancelled")
+        self.assertEqual(report["status"], "clean")
+        self.assertFalse(thread.is_alive())
 
 
 class _BlockingRuntime:

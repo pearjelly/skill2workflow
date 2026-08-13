@@ -50,6 +50,14 @@ A `waiting` human gate is safe and becomes `cancelled` immediately. It cannot th
 
 The runtime uses a `run_cancellations` table in `runs.sqlite3`, separate from the whole-run JSON snapshot. This avoids losing a request when an executor saves state it loaded earlier. The ledger contains only `run_id`, request/apply timestamps, and the fixed `requested` or `applied` status. It is an additive table within the current layout: older valid state can start without it, and the service creates it before accepting work; backup verification validates its exact columns whenever it is present.
 
+The run state and control audit are separate SQLite databases. A process can
+commit the cancellation request before the audit append completes; in that
+small failure window the service may return `503` even though the request is
+already durable. Retry the same cancellation after the service is healthy.
+The retry does not execute the workflow again and only fills missing bounded
+audit evidence. Use `service-show` or `service-audit-consistency` after a
+repeated `503` to distinguish an unavailable service from an evidence gap.
+
 ## External Side-effect Boundary
 
 Cancellation does not interrupt an external request that a connector already sent. Python threads, HTTP servers, and remote providers do not offer a portable safe kill primitive, and closing a local socket would not prove that the provider abandoned the operation.

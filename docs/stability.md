@@ -40,6 +40,10 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Protected `POST /api/v1/workflow-deprecations` and `service-workflow-deprecate` reuse the fixed `skill2workflow-workflow-deprecation-0.1.0` redacted registry-retirement contract with a 1 MiB request bound, idempotent SQLite status/alias mutation, one audit event, and no artifact deletion documented in [`remote-workflow-deprecation.md`](remote-workflow-deprecation.md)
 - Protected `GET /api/v1/workflows` and `service-workflows` reuse the fixed `skill2workflow-workflow-inventory-0.1.0` redacted version-inventory contract with a 100-item/64 KiB bound, no scheduler lease acquisition, and no state mutation documented in [`remote-workflow-inventory.md`](remote-workflow-inventory.md)
 - Authenticated `POST /api/v1/recurring-schedules/{schedule_id}/enable|disable` and protected `service-schedule-enable`/`service-schedule-disable` reuse the fixed `skill2workflow-recurring-schedule-action-0.1.0` contract, exact empty-body boundary, idempotent state transitions, and bounded audit evidence documented in [`remote-schedule-actions.md`](remote-schedule-actions.md)
+- Resume, cancellation, and recurring schedule action retries reconcile a
+  committed SQLite state mutation with missing control-plane audit evidence
+  without replaying workflow execution or a human decision; this is a retry
+  recovery contract, not a distributed transaction or provider compensation
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
@@ -104,7 +108,7 @@ These surfaces may change while the project learns from real workflows:
 - Executor event taxonomy beyond documented audit examples
 - Future remote mutation APIs, browser credential sessions, and live UI polling beyond the fixed read-only snapshot boundary
 - Observability backends, alert rules, dashboards, tracing, histograms, and per-node telemetry beyond the fixed Loop 46 export contract
-- Forceful connector abort, provider compensation, bulk cancellation, cancellation deadlines, automatic replay/reconciliation, distributed ownership, and exactly-once execution beyond the fixed Loop 48 cancellation and Loop 49 interruption contracts
+- Forceful connector abort, provider compensation, bulk cancellation, cancellation deadlines, automatic workflow replay or provider reconciliation, distributed ownership, and exactly-once execution beyond the fixed Loop 48 cancellation, Loop 49 interruption, and Loop 101 operator-retry contracts
 - Legal-policy automation, backup expiration, media erasure, and online retention beyond the fixed copy-on-write contract
 
 ## Extension Rules

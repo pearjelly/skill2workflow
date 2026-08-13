@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added cross-database operator-action reconciliation for resume and
+  cancellation: when durable run state commits before control-plane audit
+  evidence, a safe retry repairs only the missing bounded evidence instead of
+  re-executing a workflow or gate decision. The same failure-window retry
+  contract is documented for recurring schedule enable/disable actions.
 - Added production-boundary CI gates for every supported Python matrix entry:
   security isolation, authenticated observability, and two-cycle SQLite service
   restart continuity now run on every push and pull request.

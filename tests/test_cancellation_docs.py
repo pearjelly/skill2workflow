@@ -23,6 +23,9 @@ class CancellationDocumentationTests(TestCase):
             "run_cancellations",
             "backup",
             "retention",
+            "failure window",
+            "service-audit-consistency",
+            "missing bounded",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, guide)
@@ -50,11 +53,20 @@ class CancellationDocumentationTests(TestCase):
         service = (ROOT / "docs/service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs/stability.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-100 are complete", readme)
+        self.assertIn("Delivery Loops 1-101 are complete", readme)
         self.assertIn("Loop 48", readme)
-        self.assertIn("- Completed delivery loops: 1-100", roadmap)
+        self.assertIn("- Completed delivery loops: 1-101", roadmap)
         self.assertIn("Loop 48: Durable Cooperative Run Cancellation", roadmap)
         self.assertIn("Current maturity remains Self-hosted Beta", roadmap)
         self.assertIn("/runs/{run_id}/cancel", service)
         self.assertIn("cooperative", service)
         self.assertIn("retention-policy-0.2.0", stability)
+
+    def test_public_docs_record_cross_database_retry_reconciliation(self):
+        approval = (ROOT / "docs" / "human-approval.md").read_text(encoding="utf-8")
+        schedule = (ROOT / "docs" / "remote-schedule-actions.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("repairs only missing bounded audit evidence", approval)
+        self.assertIn("changed: false", schedule)
+        self.assertIn("scheduler commit succeeds", schedule)

@@ -44,6 +44,12 @@ control and scheduler databases remain separate; the mutation transaction is
 the source of truth for scheduler state, while the control audit records the
 operator evidence after that state transaction succeeds.
 
+If the scheduler commit succeeds but the control-audit append fails, the action
+can return `503` after the requested enabled state is already durable. Retry the
+same enable/disable endpoint after recovery. Because the transition is
+idempotent, the retry returns `200` with `changed: false` and completes the
+missing operator evidence; it never manufactures a second state transition.
+
 ## CLI
 
 ```bash

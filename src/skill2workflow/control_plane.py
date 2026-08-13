@@ -616,9 +616,73 @@ class LocalControlPlane:
         current = self.executor.get_run(run_id)
         workflow_id = str(current.get("workflow_id", "workflow"))
         workflow_version = str(current.get("workflow_version", "0.1.0"))
-        previous_event_count = len(current.get("events", [])) if isinstance(current.get("events"), list) else 0
         self._workflow_record(workflow_id, workflow_version)
+
+        latest_resumed = _last_run_event(current, "human_gate_resumed")
+        if latest_resumed is not None:
+            recovery_events = self._resume_audit_events(
+                current,
+                workflow_id,
+                workflow_version,
+                start_index=_run_event_index(current, "human_gate_resumed"),
+                approved=bool(latest_resumed.get("approved")),
+            )
+            missing = self._missing_audit_events(recovery_events)
+            if missing:
+                # A previous decision committed to runs.sqlite3 but its
+                # control-plane evidence did not. Repair that evidence first;
+                # the caller can submit a later gate decision explicitly.
+                self._append_missing_audit_events(missing)
+                return current
+
+        # The run-state and control-audit databases are intentionally separate.
+        # If the executor committed the decision but the audit append failed,
+        # a safe retry must repair only the missing evidence rather than trying
+        # to execute the gate a second time. Preserve the historical 409
+        # contract when the audit projection is already complete.
+        if str(current.get("status", "")) != "waiting":
+            resumed_event = _last_run_event(current, "human_gate_resumed")
+            if resumed_event is None or resumed_event.get("approved") is not approved:
+                raise ValueError(f"run {run_id} is not waiting")
+            resume_events = self._resume_audit_events(
+                current,
+                workflow_id,
+                workflow_version,
+                start_index=_run_event_index(current, "human_gate_resumed"),
+                approved=approved,
+            )
+            missing = self._missing_audit_events(resume_events)
+            if not missing:
+                raise ValueError(f"run {run_id} is not waiting")
+            self._append_missing_audit_events(missing)
+            return current
+
+        previous_event_count = (
+            len(current.get("events", []))
+            if isinstance(current.get("events"), list)
+            else 0
+        )
         state = self.executor.resume(run_id, approved=approved)
+        self._append_missing_audit_events(
+            self._resume_audit_events(
+                state,
+                workflow_id,
+                workflow_version,
+                start_index=previous_event_count,
+                approved=approved,
+            )
+        )
+        return state
+
+    def _resume_audit_events(
+        self,
+        state: RunState,
+        workflow_id: str,
+        workflow_version: str,
+        start_index: int,
+        approved: bool,
+    ) -> List[AuditEvent]:
+        run_id = str(state.get("run_id", ""))
         resumed_timestamp = _last_run_event_timestamp(
             state, "human_gate_resumed"
         ) or _now()
@@ -634,7 +698,7 @@ class LocalControlPlane:
         }
         if state.get("error_code"):
             terminal_event["error_code"] = str(state["error_code"])
-        self._append_audit_batch(
+        return (
             [
                 {
                     "type": "run_resumed",
@@ -649,11 +713,10 @@ class LocalControlPlane:
                 state,
                 workflow_id,
                 workflow_version,
-                start_index=previous_event_count,
+                start_index=start_index,
             )
             + [terminal_event]
         )
-        return state
 
     def cancel_published_run(self, run_id: str) -> RunState:
         """Request an idempotent cancellation without accepting arbitrary reason text."""
@@ -662,28 +725,31 @@ class LocalControlPlane:
         workflow_id = str(current.get("workflow_id", "workflow"))
         workflow_version = str(current.get("workflow_version", "0.1.0"))
         self._workflow_record(workflow_id, workflow_version)
-        state, newly_requested = self.executor.request_cancel(run_id)
-        if newly_requested:
-            events = [
+        state, _newly_requested = self.executor.request_cancel(run_id)
+        events = [
+            {
+                "type": "run_cancel_requested",
+                "run_id": run_id,
+                "workflow_id": workflow_id,
+                "workflow_version": workflow_version,
+                "timestamp": _last_run_event_timestamp(
+                    state, "run_cancel_requested"
+                )
+                or _now(),
+            }
+        ]
+        if state["status"] == "cancelled":
+            events.append(
                 {
-                    "type": "run_cancel_requested",
+                    "type": "run_cancelled",
                     "run_id": run_id,
                     "workflow_id": workflow_id,
                     "workflow_version": workflow_version,
-                    "timestamp": _now(),
+                    "timestamp": _last_run_event_timestamp(state, "run_cancelled")
+                    or _now(),
                 }
-            ]
-            if state["status"] == "cancelled":
-                events.append(
-                    {
-                        "type": "run_cancelled",
-                        "run_id": run_id,
-                        "workflow_id": workflow_id,
-                        "workflow_version": workflow_version,
-                        "timestamp": _now(),
-                    }
-                )
-            self._append_audit_batch(events)
+            )
+        self._append_missing_audit_event_types(run_id, events)
         return state
 
     def list_runs(self) -> List[RunState]:
@@ -856,6 +922,36 @@ class LocalControlPlane:
         if not events:
             return
         self.store.append_audit_batch(events)
+
+    def _missing_audit_events(self, events: List[AuditEvent]) -> List[AuditEvent]:
+        """Return only canonical audit payloads absent from the control store."""
+
+        return [event for event in events if not self.store.audit_event_exists(event)]
+
+    def _append_missing_audit_events(self, events: List[AuditEvent]) -> None:
+        missing = self._missing_audit_events(events)
+        if not missing:
+            return
+        append_if_missing = getattr(self.store, "append_audit_batch_if_missing", None)
+        if callable(append_if_missing):
+            append_if_missing(missing)
+            return
+        self._append_audit_batch(missing)
+
+    def _append_missing_audit_event_types(
+        self, run_id: str, events: List[AuditEvent]
+    ) -> None:
+        """Repair one-run lifecycle evidence without duplicating old timestamps."""
+
+        observed = Counter(self.store.audit_event_type_counts([str(run_id)]).get(str(run_id), {}))
+        missing = []
+        for event in events:
+            event_type = str(event.get("type", "event"))
+            if observed.get(event_type, 0):
+                observed[event_type] -= 1
+            else:
+                missing.append(event)
+        self._append_missing_audit_events(missing)
 
     def _append_runtime_audit_events(
         self,
@@ -1339,6 +1435,26 @@ def _last_run_event_timestamp(state: RunState, event_type: str) -> str:
         if timestamp:
             return str(timestamp)
     return ""
+
+
+def _last_run_event(state: RunState, event_type: str):
+    events = state.get("events", [])
+    if not isinstance(events, list):
+        return None
+    for event in reversed(events):
+        if isinstance(event, dict) and str(event.get("type", "")) == event_type:
+            return event
+    return None
+
+
+def _run_event_index(state: RunState, event_type: str) -> int:
+    events = state.get("events", [])
+    if not isinstance(events, list):
+        return 0
+    for index, event in enumerate(events):
+        if isinstance(event, dict) and str(event.get("type", "")) == event_type:
+            return index
+    return 0
 
 
 def _counter_differences(left: Counter, right: Counter) -> Dict[str, int]:
