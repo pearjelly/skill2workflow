@@ -4,6 +4,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import threading
 from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -35,6 +36,29 @@ class StateMigrationTests(TestCase):
 
         self.assertEqual(marker["state_layout_version"], CURRENT_STATE_LAYOUT_VERSION)
         self.assertEqual(state_mode, 0o700)
+
+    def test_concurrent_fresh_sqlite_initialization_never_reads_partial_marker(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            failures = []
+
+            def initialize():
+                try:
+                    LocalControlPlane(state_dir, storage="sqlite")
+                except BaseException as error:
+                    failures.append(error)
+
+            threads = [threading.Thread(target=initialize) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=5)
+
+            self.assertFalse(any(thread.is_alive() for thread in threads))
+            marker = validate_current_state_marker(state_dir)
+
+        self.assertEqual(failures, [])
+        self.assertEqual(marker["state_layout_version"], CURRENT_STATE_LAYOUT_VERSION)
 
     def test_runtime_rejects_legacy_and_future_state_without_mutating_it(self):
         with TemporaryDirectory() as tmp:

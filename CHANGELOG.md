@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added atomic first-use SQLite state-layout marker publication. Concurrent
+  starters now observe either no marker or a complete owner-only marker, never
+  a partially-written JSON document.
+- Added a fixed 1 MiB payload boundary to the built-in HTTP connector. Oversized
+  serialized request bodies fail before network I/O; oversized or invalid-UTF-8
+  success/error responses fail before partial payloads enter run state.
 - Added bounded per-node active execution deadlines through node `timeout_ms`.
   Expiry records fixed `node_timeout` evidence, counts retry backoff inside the
   same node window, pauses while human gates wait, and never follows a

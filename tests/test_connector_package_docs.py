@@ -30,6 +30,18 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("explicit local connector fixture loading", stability)
         self.assertIn("automatic connector discovery and product-specific connector packages", stability)
 
+    def test_builtin_http_payload_boundary_is_documented(self):
+        connectors = _read("docs/connectors.md")
+        compatibility = _read("docs/workflow-dsl-compatibility.md")
+        stability = _read("docs/stability.md")
+
+        self.assertIn("### HTTP Payload Boundary", connectors)
+        self.assertIn("1,048,576`-byte (`1 MiB`)", connectors)
+        self.assertIn("http connector response body must be valid", connectors)
+        self.assertIn("UTF-8", connectors)
+        self.assertIn("Built-in HTTP request and UTF-8 response bodies are bounded to 1 MiB", compatibility)
+        self.assertIn("Built-in HTTP connector request/response payloads are bounded to 1 MiB", stability)
+
 
 def _read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")

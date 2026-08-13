@@ -87,7 +87,7 @@ def write_state_layout_marker(
     state_dir: Path,
     service_initialized: bool = False,
 ) -> Dict[str, object]:
-    """Create the current owner-only marker without replacing an existing path."""
+    """Create the current owner-only marker without exposing a partial file."""
 
     root = Path(state_dir)
     if root.is_symlink():
@@ -100,27 +100,42 @@ def write_state_layout_marker(
         "service_initialized": bool(service_initialized),
     }
     payload = (json.dumps(marker, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
+    temporary_path = None
+    temporary_descriptor = None
     try:
-        descriptor = os.open(marker_path, flags, 0o600)
-    except FileExistsError:
-        if inspect_state_layout(root) != CURRENT_STATE_LAYOUT_VERSION:
-            raise ValueError("state layout marker already exists with an incompatible value")
-        return validate_current_state_marker(root)
-    try:
-        with os.fdopen(descriptor, "wb") as handle:
+        temporary_descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{STATE_LAYOUT_MARKER}.",
+            dir=str(root),
+        )
+        temporary_path = Path(temporary_name)
+        os.fchmod(temporary_descriptor, 0o600)
+        with os.fdopen(temporary_descriptor, "wb") as handle:
+            temporary_descriptor = None
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-    except Exception:
         try:
-            marker_path.unlink()
-        except OSError:
-            pass
-        raise
-    return marker
+            # Linking a fully-written temporary inode publishes the marker
+            # without replacing a concurrently-created marker.
+            os.link(temporary_path, marker_path)
+        except FileExistsError:
+            if inspect_state_layout(root) != CURRENT_STATE_LAYOUT_VERSION:
+                raise ValueError("state layout marker already exists with an incompatible value")
+            return validate_current_state_marker(root)
+        return marker
+    finally:
+        if temporary_descriptor is not None:
+            try:
+                os.close(temporary_descriptor)
+            except OSError:
+                pass
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
 
 
 def mark_service_state_initialized(state_dir: Path) -> Dict[str, object]:

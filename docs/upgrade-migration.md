@@ -62,7 +62,7 @@ Rollback is a directory and binary switch, not a reverse migration:
 
 Writes accepted after cutover exist only in the new state. Rolling back to the old directory loses those post-cutover writes unless an operator reconciles them separately. For that reason, keep the validation window short and control ingress during cutover.
 
-The current binary intentionally refuses legacy state and any future layout it does not understand. A future layout requires a separately shipped, forward-only migration step and corresponding evidence; operators must never edit `state-layout.json` to bypass compatibility checks.
+The current binary intentionally refuses legacy state and any future layout it does not understand. A future layout requires a separately shipped, forward-only migration step and corresponding evidence; operators must never edit `state-layout.json` to bypass compatibility checks. Fresh current markers are written through an atomic, non-overwriting publication path so concurrent first-use processes never parse a partial marker.
 
 ## Evidence
 

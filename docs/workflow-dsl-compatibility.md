@@ -117,7 +117,7 @@ The editor must not change:
 
 ## Connector Runtime Boundary
 
-Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on `tool_call` nodes. The current local runtime supports method, URL, headers, body, per-request timeout metadata, optional body-only `input_mapping` metadata, and optional credential handle metadata as documented in `docs/connectors.md`.
+Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on `tool_call` nodes. The current local runtime supports method, URL, headers, body, per-request timeout metadata, optional body-only `input_mapping` metadata, and optional credential handle metadata as documented in `docs/connectors.md`. Built-in HTTP request and UTF-8 response bodies are bounded to 1 MiB at execution time; the bound is runtime safety metadata and does not change the DSL shape.
 
 `retry.max_attempts`, optional fixed `retry.backoff_ms`, and their
 `policies.default_retry` counterparts are policy metadata honored by the

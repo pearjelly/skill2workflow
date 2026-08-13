@@ -50,6 +50,8 @@ These surfaces should remain compatible during the `0.1.x` line:
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
+- Built-in HTTP connector request/response payloads are bounded to 1 MiB with fixed overflow and invalid-UTF-8 failures, as documented in `docs/connectors.md`
+- Fresh SQLite state-layout markers are atomically published without replacing a concurrent marker; startup remains single-directory and non-distributed
 - Credential placeholder and fixture hygiene boundary documented in `docs/credential-boundary.md`
 - Local credential handle boundary documented in `docs/credential-boundary.md`
 - Local trigger command and envelope documented in `docs/triggers.md`

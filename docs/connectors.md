@@ -1,6 +1,6 @@
 # Connector Runtime
 
-`skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace.
+`skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace. Built-in HTTP payloads are bounded to protect the self-hosted process from untrusted response sizes and oversized serialized request bodies.
 Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. Loop 38 readiness review approved only a scoped live `create_task` follow-up, documented in `docs/lark-live-connector-readiness.md`. Loop 39 implements that one opt-in live action while preserving explicit loading and the dry-run default; it does not add automatic discovery, OAuth, token refresh, or marketplace behavior.
 
 Workflow DSL remains the execution truth source. Connector bindings live on workflow nodes, and the local executor records connector lifecycle events in run state and control-plane audit logs.
@@ -46,9 +46,25 @@ Supported request metadata:
 | `method` | Optional HTTP method. Defaults to `GET` and is uppercased before execution. |
 | `url` | Required `http://` or `https://` URL. Other schemes fail before a network call. |
 | `headers` | Optional object. Keys and values are stringified. |
-| `body` | Optional JSON-serializable value. When present, it is encoded as UTF-8 JSON. |
+| `body` | Optional JSON-serializable value. When present, it is encoded as UTF-8 JSON and must be at most 1 MiB. |
 | `input_mapping` | Optional body-only mapping from durable trigger input into request body fields. |
 | `timeout_ms` | Optional positive millisecond timeout. Missing or invalid values default to 5000 ms. |
+
+### HTTP Payload Boundary
+
+The built-in HTTP connector applies one fixed `1,048,576`-byte (`1 MiB`) bound
+to both directions. A serialized request body that exceeds the bound fails
+before `urlopen` is called. A successful or error response is read at most one
+byte beyond the bound so an oversized body is rejected before it is returned
+or persisted in run state. Response bodies must be valid UTF-8; invalid bytes
+produce the fixed connector error `http connector response body must be valid
+UTF-8`. Oversized bodies produce the fixed request/response errors and never
+return a partial payload. This is a memory and state-size boundary, not a
+content-redaction or provider-side cancellation guarantee.
+
+External connector packages own their own I/O limits; this built-in bound does
+not silently constrain code loaded through the explicit external-connector
+fixture boundary.
 
 If `body` is present and no case-insensitive `Content-Type` header is supplied, the connector adds `Content-Type: application/json`.
 

@@ -21,6 +21,7 @@ ExternalConnectorPreflight = Callable[..., ConnectorResult]
 
 CONNECTOR_MANIFEST_VERSION = "skill2workflow-connector-0.1.0"
 CONNECTOR_EXECUTION_CONTRACT_VERSION = "skill2workflow-connector-execution-0.1.0"
+MAX_HTTP_PAYLOAD_BYTES = 1_048_576
 
 
 DEFAULT_CONNECTORS: List[Dict[str, object]] = [
@@ -57,7 +58,7 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
         "kind": "http",
         "status": "active",
         "node_types": ["tool_call"],
-        "description": "Built-in connector for minimal HTTP requests from tool-call nodes.",
+        "description": "Built-in connector for bounded HTTP requests from tool-call nodes.",
         "config_schema": {
             "type": "object",
             "properties": {
@@ -355,6 +356,10 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
             data = json.dumps(body, ensure_ascii=False).encode("utf-8")
         except (TypeError, ValueError) as error:
             raise ConnectorExecutionError(f"http connector request.body must be JSON serializable: {error}")
+        if len(data) > MAX_HTTP_PAYLOAD_BYTES:
+            raise ConnectorExecutionError(
+                f"http connector request body exceeds {MAX_HTTP_PAYLOAD_BYTES} bytes"
+            )
         if not any(key.lower() == "content-type" for key in headers):
             headers["Content-Type"] = "application/json"
 
@@ -364,7 +369,7 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
 
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = response.read().decode("utf-8")
+            payload = _read_http_payload(response, "response")
             return {
                 "status": "completed",
                 "connector": {"id": "http", "kind": "http"},
@@ -377,7 +382,7 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
             }
     except urllib.error.HTTPError as error:
         with closing(error):
-            payload = error.read().decode("utf-8")
+            payload = _read_http_payload(error, "response")
             return {
                 "status": "failed",
                 "connector": {"id": "http", "kind": "http"},
@@ -395,6 +400,38 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
         if isinstance(error.reason, (TimeoutError, socket.timeout)):
             raise ConnectorExecutionError(f"http connector timed out: {error.reason}")
         raise ConnectorExecutionError(str(error.reason))
+
+
+def _read_http_payload(response: object, kind: str) -> str:
+    """Read one bounded UTF-8 HTTP payload without retaining an oversized body."""
+
+    try:
+        raw = bytearray()
+        while len(raw) < MAX_HTTP_PAYLOAD_BYTES + 1:
+            chunk = response.read(MAX_HTTP_PAYLOAD_BYTES + 1 - len(raw))
+            if not chunk:
+                break
+            if not isinstance(chunk, (bytes, bytearray)):
+                raise ConnectorExecutionError(
+                    f"http connector {kind} body could not be read"
+                )
+            raw.extend(chunk)
+    except ConnectorExecutionError:
+        raise
+    except Exception as error:
+        raise ConnectorExecutionError(
+            f"http connector {kind} body could not be read"
+        ) from error
+    if len(raw) > MAX_HTTP_PAYLOAD_BYTES:
+        raise ConnectorExecutionError(
+            f"http connector {kind} body exceeds {MAX_HTTP_PAYLOAD_BYTES} bytes"
+        )
+    try:
+        return bytes(raw).decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ConnectorExecutionError(
+            f"http connector {kind} body must be valid UTF-8"
+        ) from error
 
 
 def _string_map(value: object) -> Dict[str, str]:

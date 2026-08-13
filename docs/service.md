@@ -82,6 +82,17 @@ declared bound; human-gate waiting is paused, and a `node_timeout` failure is
 persisted without following a successor. This does not forcefully abort a
 provider request already in flight.
 
+Loop 119 adds a fixed 1 MiB payload boundary to the built-in HTTP connector.
+Serialized request bodies fail before network I/O when oversized, and success
+or error response bodies are bounded before they can enter run state. Invalid
+UTF-8 responses use a fixed connector failure. External connector fixtures
+retain their own explicit I/O contract.
+
+Loop 120 publishes a fresh SQLite `state-layout.json` through a fully-written,
+fsynced temporary file and a non-overwriting link. Concurrent starters sharing
+one empty state directory therefore cannot parse a partial marker; this does
+not add distributed locking or replication.
+
 This boundary is intentionally loopback-only and uses SQLite. Loop 42 adds mandatory single-team Bearer authentication and execution-time directory credentials. Loop 43 adds durable recurring dispatch and an active/standby lease for processes sharing one state directory. Loop 46 adds low-cardinality metrics and allowlisted operational NDJSON. Loop 48 adds authenticated, idempotent, cooperative cancellation. Loop 57 adds the authenticated human-gate decision route documented in [`human-approval.md`](human-approval.md). Loop 59 adds the bounded redacted run detail route documented in [`run-detail.md`](run-detail.md). Loop 60 adds bounded redacted run discovery documented in [`run-list.md`](run-list.md). Loop 61 adds the bounded redacted support bundle documented in [`support-bundle.md`](support-bundle.md). Loop 78 adds the read-only recurring schedule inventory documented in [`remote-schedule-inventory.md`](remote-schedule-inventory.md). Loop 79 adds protected, idempotent recurring schedule state actions documented in [`remote-schedule-actions.md`](remote-schedule-actions.md). Loop 80 adds bounded, redacted recurring dispatch diagnostics documented in [`remote-schedule-dispatches.md`](remote-schedule-dispatches.md). Loop 81 adds remote workflow artifact consistency diagnostics documented in [`remote-workflow-artifacts.md`](remote-workflow-artifacts.md). Loop 82 adds remote backup readiness documented in [`remote-backup-readiness.md`](remote-backup-readiness.md). Loop 83 adds remote audit-chain verification documented in [`remote-audit-integrity.md`](remote-audit-integrity.md). Loop 84 adds remote runtime identity documented in [`remote-runtime-info.md`](remote-runtime-info.md). Loop 86 adds protected remote Workflow publication documented in [`remote-workflow-release.md`](remote-workflow-release.md). Loop 89 adds local ingress-token rotation documented in [`service-token-rotation.md`](service-token-rotation.md). Loop 90 adds protected remote Workflow deprecation documented in [`remote-workflow-deprecation.md`](remote-workflow-deprecation.md). Loop 91 adds bounded remote Workflow inventory documented in [`remote-workflow-inventory.md`](remote-workflow-inventory.md). Loop 92 adds authenticated, policy-bound retention readiness documented in [`remote-retention-readiness.md`](remote-retention-readiness.md). The complete security and external TLS termination contract is documented in [`security-boundary.md`](security-boundary.md), scheduler semantics in [`recurring-scheduling.md`](recurring-scheduling.md), telemetry semantics in [`observability.md`](observability.md), and cancellation semantics in [`cancellation.md`](cancellation.md).
 
 ## Configuration

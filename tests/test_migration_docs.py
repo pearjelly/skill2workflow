@@ -43,6 +43,7 @@ class MigrationDocumentationTests(TestCase):
             "old binary",
             "future layout",
             "state_upgrade_smoke.py",
+            "atomic, non-overwriting publication path",
         ):
             self.assertIn(text, normalized)
 
@@ -50,10 +51,10 @@ class MigrationDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-118 are complete", readme)
+        self.assertIn("Delivery Loops 1-120 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("docs/upgrade-migration.md", readme)
-        self.assertIn("- Completed delivery loops: 1-118", roadmap)
+        self.assertIn("- Completed delivery loops: 1-120", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 45: State Upgrade And Migration | Complete |", roadmap)
         self.assertIn("Production Baseline remains directional", roadmap)

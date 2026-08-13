@@ -116,6 +116,7 @@ explicit connector boundaries. It currently supports:
 - Bind `human_gate` nodes to the built-in manual connector
 - Bind and validate `tool_call` connector metadata
 - Execute minimal HTTP connector calls from connector-bound `tool_call` nodes
+- Bound built-in HTTP request and response payloads to 1 MiB with fixed overflow and invalid-UTF-8 failures
 - Resolve local credential handles for HTTP connector request headers without storing secret values in Workflow DSL or audit output
 - Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
 - Honor connector-node `retry.max_attempts` and bounded `retry.backoff_ms`, recording retry/recovery events
@@ -722,7 +723,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-118 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-120 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1047,6 +1048,18 @@ Loop 118 adds bounded [per-node active execution deadlines](docs/runtime-policy.
 Nodes can declare `timeout_ms` up to 24 hours; connector returns and retry
 backoff are checked at safe points, human-gate waiting is paused, and expiry
 records fixed `node_timeout` evidence without running a successor.
+
+Loop 119 adds a bounded [HTTP connector payload boundary](docs/connectors.md).
+Built-in HTTP request bodies are capped before network I/O, and success/error
+response bodies are capped before entering run state; invalid UTF-8 and
+oversized payloads use fixed connector failures. Explicit external connector
+fixtures keep their own I/O contract.
+
+Loop 120 hardens [first-use SQLite initialization](docs/upgrade-migration.md).
+The owner-only state-layout marker is fully written and fsynced before a
+non-overwriting publication, so concurrent starters never parse a partial
+marker. This remains a single-directory startup boundary, not distributed
+locking or replication.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

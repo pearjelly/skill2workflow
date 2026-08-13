@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from skill2workflow.connectors import (
     CONNECTOR_MANIFEST_VERSION,
+    MAX_HTTP_PAYLOAD_BYTES,
     ConnectorRuntime,
     ConnectorExecutionError,
     ExternalConnector,
@@ -269,6 +270,67 @@ class ConnectorTests(TestCase):
                 )
             )
 
+    def test_http_connector_rejects_oversized_request_body_before_network_call(self):
+        oversized_body = {"payload": "x" * MAX_HTTP_PAYLOAD_BYTES}
+
+        with self.assertRaisesRegex(
+            ConnectorExecutionError,
+            f"http connector request body exceeds {MAX_HTTP_PAYLOAD_BYTES} bytes",
+        ):
+            execute_connector(
+                _http_node(
+                    "http://127.0.0.1:1/not-called",
+                    method="POST",
+                    body=oversized_body,
+                )
+            )
+
+    def test_http_connector_rejects_oversized_success_response_before_persisting_it(self):
+        response = _FakeHTTPResponse(200, b"x" * (MAX_HTTP_PAYLOAD_BYTES + 1))
+
+        with patch("skill2workflow.connectors.urllib.request.urlopen", return_value=response):
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                f"http connector response body exceeds {MAX_HTTP_PAYLOAD_BYTES} bytes",
+            ):
+                execute_connector(_http_node("https://example.test/large"))
+
+        self.assertTrue(response.closed)
+
+    def test_http_connector_rejects_oversized_error_response_before_persisting_it(self):
+        response_body = BytesIO(b"x" * (MAX_HTTP_PAYLOAD_BYTES + 1))
+        error = urllib.error.HTTPError(
+            "https://example.test/large-error",
+            503,
+            "Service Unavailable",
+            {"Content-Type": "text/plain"},
+            response_body,
+        )
+
+        with patch(
+            "skill2workflow.connectors.urllib.request.urlopen",
+            side_effect=error,
+        ):
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                f"http connector response body exceeds {MAX_HTTP_PAYLOAD_BYTES} bytes",
+            ):
+                execute_connector(_http_node("https://example.test/large-error"))
+
+        self.assertTrue(response_body.closed)
+
+    def test_http_connector_normalizes_invalid_utf8_response(self):
+        response = _FakeHTTPResponse(200, b"\xff\xfe")
+
+        with patch("skill2workflow.connectors.urllib.request.urlopen", return_value=response):
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                "http connector response body must be valid UTF-8",
+            ):
+                execute_connector(_http_node("https://example.test/invalid"))
+
+        self.assertTrue(response.closed)
+
     def test_http_connector_resolves_header_credentials_without_returning_secret(self):
         server = _ConnectorTestServer()
 
@@ -437,3 +499,28 @@ class _ConnectorTestServer:
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=2)
+
+
+class _FakeHTTPResponse:
+    def __init__(self, status, payload):
+        self.status = status
+        self.headers = {"Content-Type": "application/octet-stream"}
+        self._payload = payload
+        self._offset = 0
+        self.closed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def read(self, amount=-1):
+        if amount is None or amount < 0:
+            amount = len(self._payload) - self._offset
+        start = self._offset
+        self._offset += amount
+        return self._payload[start:self._offset]
+
+    def close(self):
+        self.closed = True
