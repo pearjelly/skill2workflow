@@ -642,6 +642,14 @@ def _handler_for(service: RuntimeService):
             self._response_status = 500
             self._response_started = False
             admission = service.admit_request(route)
+            tracked_request = False
+            if admission == "admitted":
+                try:
+                    tracked_request = service.telemetry.begin_request(route)
+                except Exception:
+                    # Metrics are best-effort and must never change request
+                    # admission or turn a successful handler into a failure.
+                    tracked_request = False
             try:
                 try:
                     if admission == "draining":
@@ -722,6 +730,10 @@ def _handler_for(service: RuntimeService):
                     self._send_internal_error()
             finally:
                 if admission == "admitted":
+                    try:
+                        service.telemetry.end_request(tracked_request)
+                    except Exception:
+                        pass
                     service._request_admission.release()
                 try:
                     service.telemetry.observe_http(route, self._response_status)

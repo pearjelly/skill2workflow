@@ -1663,6 +1663,88 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(audit_count, 1)
         self.assertFalse(thread.is_alive())
 
+    def test_metrics_exposes_admitted_inflight_request_pressure(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            entered = threading.Event()
+            release = threading.Event()
+            result = {}
+
+            def blocking_webhook(*_args, **_kwargs):
+                entered.set()
+                self.assertTrue(release.wait(timeout=2))
+                return {"run_id": "run_inflight_metrics"}
+
+            def send_blocked_request():
+                status_code, payload = _post_json(
+                    f"http://{service.server_address[0]}:{service.server_address[1]}"
+                    "/webhooks/workflow_service/0.1.0",
+                    {},
+                    token=AUTH_TOKEN,
+                )
+                result.update({"status": status_code, "payload": payload})
+
+            with patch(
+                "skill2workflow.service.handle_webhook_request",
+                side_effect=blocking_webhook,
+            ), patch.object(
+                service,
+                "readiness",
+                return_value=(200, {"service": "skill2workflow", "status": "ready"}),
+            ):
+                request_thread = threading.Thread(
+                    target=send_blocked_request,
+                    daemon=True,
+                )
+                request_server_thread = threading.Thread(
+                    target=service._server.handle_request,
+                    daemon=True,
+                )
+                request_server_thread.start()
+                request_thread.start()
+                self.assertTrue(entered.wait(timeout=2))
+
+                metrics_thread = threading.Thread(
+                    target=service._server.handle_request,
+                    daemon=True,
+                )
+                metrics_thread.start()
+                status, _, metrics = _get_raw(
+                    f"http://{service.server_address[0]}:{service.server_address[1]}"
+                    "/metrics",
+                    token=AUTH_TOKEN,
+                )
+                metrics_thread.join(timeout=2)
+                self.assertIn(
+                    "skill2workflow_service_inflight_requests 1",
+                    metrics,
+                )
+
+                release.set()
+                request_thread.join(timeout=2)
+
+                final_metrics_thread = threading.Thread(
+                    target=service._server.handle_request,
+                    daemon=True,
+                )
+                final_metrics_thread.start()
+                _, _, final_metrics = _get_raw(
+                    f"http://{service.server_address[0]}:{service.server_address[1]}"
+                    "/metrics",
+                    token=AUTH_TOKEN,
+                )
+                final_metrics_thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(result, {"status": 200, "payload": {"run_id": "run_inflight_metrics"}})
+        self.assertIn("skill2workflow_service_inflight_requests 0", final_metrics)
+        self.assertFalse(request_thread.is_alive())
+        self.assertFalse(request_server_thread.is_alive())
+        self.assertFalse(metrics_thread.is_alive())
+        self.assertFalse(final_metrics_thread.is_alive())
+
     def test_metrics_remain_authenticated_and_available_while_service_is_not_ready(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

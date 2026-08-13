@@ -106,6 +106,9 @@ def main(argv=None) -> int:
                 and 'skill2workflow_http_requests_total{route="workflow_trigger",status_class="2xx"} 1'
                 in second_metrics
             ),
+            "inflight_request_gauge_visible": (
+                "skill2workflow_service_inflight_requests 0" in second_metrics
+            ),
             "low_cardinality_labels": label_keys <= {"status", "route", "status_class"},
             "private_values_absent": all(
                 value not in combined_metrics and value not in serialized_logs

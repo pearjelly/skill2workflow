@@ -70,6 +70,10 @@ class RuntimeTelemetry:
         self._monotonic = monotonic
         self._started_at = monotonic()
         self._http_counts = Counter()
+        # This is deliberately process-local and route-free.  The metrics
+        # handler itself is excluded so a scrape reports the workload that was
+        # already in flight when the scrape began rather than counting itself.
+        self._inflight_requests = 0
         self._lock = threading.Lock()
 
     def observe_http(self, route: str, status_code: int) -> None:
@@ -78,8 +82,38 @@ class RuntimeTelemetry:
         with self._lock:
             self._http_counts[(normalized_route, status_class)] += 1
 
+    def begin_request(self, route: str) -> bool:
+        """Track one admitted non-metrics request for live pressure telemetry."""
+
+        if route == "metrics":
+            return False
+        with self._lock:
+            self._inflight_requests += 1
+        return True
+
+    def end_request(self, tracked: bool) -> None:
+        """Release one request previously admitted through :meth:`begin_request`."""
+
+        if not tracked:
+            return
+        with self._lock:
+            # A boolean token from begin_request prevents normal double
+            # release.  Keep the guard fail-safe for embedding callers.
+            if self._inflight_requests > 0:
+                self._inflight_requests -= 1
+
+    def inflight_requests(self) -> int:
+        """Return the current fixed-cardinality in-flight request gauge."""
+
+        with self._lock:
+            return int(self._inflight_requests)
+
     def aggregate(self, *, service_status: str, ready: bool, scheduler_lease_owned: bool) -> Dict[str, object]:
-        """Return the same fixed, value-free aggregates used by metrics export."""
+        """Return the fixed, value-free persisted aggregates used by snapshots.
+
+        The live in-flight gauge is intentionally rendered separately so the
+        versioned support-bundle aggregate contract remains stable.
+        """
 
         workflow_counts = self._grouped_counts(
             "control.sqlite3", "workflow_versions", "status", _WORKFLOW_STATUSES
@@ -130,6 +164,7 @@ class RuntimeTelemetry:
         uptime = aggregate["uptime_seconds"]
         lifecycle = aggregate["service_status"]
         http_requests = aggregate["http_requests"]
+        inflight_requests = self.inflight_requests()
         lines = [
             "# HELP skill2workflow_service_ready Whether the service is ready to accept workflow traffic.",
             "# TYPE skill2workflow_service_ready gauge",
@@ -140,6 +175,9 @@ class RuntimeTelemetry:
             "# HELP skill2workflow_service_uptime_seconds Monotonic process uptime in seconds.",
             "# TYPE skill2workflow_service_uptime_seconds gauge",
             f"skill2workflow_service_uptime_seconds {uptime:.3f}",
+            "# HELP skill2workflow_service_inflight_requests Number of admitted non-metrics requests currently in flight.",
+            "# TYPE skill2workflow_service_inflight_requests gauge",
+            f"skill2workflow_service_inflight_requests {inflight_requests}",
             "# HELP skill2workflow_service_state Current service lifecycle state.",
             "# TYPE skill2workflow_service_state gauge",
         ]

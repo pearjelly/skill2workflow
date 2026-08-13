@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added the authenticated, label-free `skill2workflow_service_inflight_requests`
+  gauge to `/metrics`, aligned with the fixed request-admission budget while
+  excluding probes and the scrape itself; the versioned support-bundle
+  contract remains unchanged.
 - Closed the scheduler shutdown window: once `draining` begins, no new
   recurring scheduled trigger is admitted, while an already admitted dispatch
   retains the existing completion/uncertain-outcome semantics.

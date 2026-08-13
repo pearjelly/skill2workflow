@@ -19,6 +19,40 @@ from skill2workflow.telemetry import (
 
 
 class RuntimeTelemetryTests(TestCase):
+    def test_inflight_request_gauge_is_live_route_free_and_excludes_scrape(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            LocalControlPlane(state_dir, storage="sqlite")
+            RecurringScheduleStore(state_dir)
+            telemetry = RuntimeTelemetry(state_dir)
+
+            self.assertFalse(telemetry.begin_request("metrics"))
+            self.assertEqual(telemetry.inflight_requests(), 0)
+            tracked = telemetry.begin_request("workflow_trigger")
+            self.assertTrue(tracked)
+            rendered = telemetry.render(
+                service_status="ready",
+                ready=True,
+                scheduler_lease_owned=False,
+            )
+            self.assertIn(
+                "skill2workflow_service_inflight_requests 1",
+                rendered,
+            )
+
+            telemetry.end_request(tracked)
+            telemetry.end_request(False)
+            self.assertEqual(telemetry.inflight_requests(), 0)
+            rendered = telemetry.render(
+                service_status="ready",
+                ready=True,
+                scheduler_lease_owned=False,
+            )
+            self.assertIn(
+                "skill2workflow_service_inflight_requests 0",
+                rendered,
+            )
+
     def test_cancelled_runs_have_a_fixed_aggregate_status(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"
@@ -270,6 +304,7 @@ class RuntimeTelemetryTests(TestCase):
         self.assertTrue(evidence["checks"]["unauthenticated_metrics_denied"])
         self.assertTrue(evidence["checks"]["authenticated_metrics_exported"])
         self.assertTrue(evidence["checks"]["aggregate_state_visible"])
+        self.assertTrue(evidence["checks"]["inflight_request_gauge_visible"])
         self.assertTrue(evidence["checks"]["low_cardinality_labels"])
         self.assertTrue(evidence["checks"]["private_values_absent"])
         self.assertTrue(evidence["checks"]["structured_lifecycle_logs"])

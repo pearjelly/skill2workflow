@@ -1,6 +1,6 @@
 # Runtime Observability
 
-Loop 46 adds a dependency-free, machine-consumable observability boundary to the self-hosted service. It exposes authenticated Prometheus text metrics and emits structured operational lifecycle/request events as NDJSON. Both surfaces are deliberately aggregate and low-cardinality: they do not export workflow IDs, versions, run IDs, schedule IDs, request paths, bodies, credentials, remote addresses, or connector payloads.
+Loop 46 adds a dependency-free, machine-consumable observability boundary to the self-hosted service. Loop 108 adds one live in-flight-request pressure gauge to that boundary. It exposes authenticated Prometheus text metrics and emits structured operational lifecycle/request events as NDJSON. Both surfaces are deliberately aggregate and low-cardinality: they do not export workflow IDs, versions, run IDs, schedule IDs, request paths, bodies, credentials, remote addresses, or connector payloads.
 
 Workflow audit events remain the durable business evidence. Operational metrics and logs answer a narrower question: whether the service is healthy enough for an operator to detect and investigate runtime problems.
 
@@ -27,6 +27,15 @@ authentication or request bodies are processed, but `/metrics` remains a
 read-only diagnostic surface. Its `service_state` gauge therefore continues to
 expose the transition through `draining` until the listener stops.
 
+The live `skill2workflow_service_inflight_requests` gauge reports admitted
+non-metrics handlers that have not completed. It is process-local, has no
+labels, and is sampled from the same handler boundary as the fixed 16-request
+admission budget. Health/readiness probes are not budgeted and are not counted;
+the `/metrics` scrape is excluded so a scrape reports existing workload rather
+than counting itself. The value is intentionally omitted from the versioned
+support bundle 0.1.0, whose aggregate snapshot contract remains stable and
+whose durable run evidence is safer for incident handoff.
+
 The response content type is:
 
 ```text
@@ -40,6 +49,7 @@ text/plain; version=0.0.4; charset=utf-8
 | `skill2workflow_service_ready` | gauge | none | `1` only when normal readiness passes |
 | `skill2workflow_scheduler_lease_owned` | gauge | none | `1` when this process currently owns the local scheduler lease |
 | `skill2workflow_service_uptime_seconds` | gauge | none | Monotonic process uptime; resets at restart |
+| `skill2workflow_service_inflight_requests` | gauge | none | Admitted non-metrics handlers currently in flight; process-local and resets at restart |
 | `skill2workflow_service_state` | gauge | fixed `status` | One-hot lifecycle state: `starting`, `ready`, `draining`, `stopped`, or `unknown` |
 | `skill2workflow_workflows` | gauge | fixed `status` | SQLite workflow-version counts: `published`, `deprecated`, or `other` |
 | `skill2workflow_runs` | gauge | fixed `status` | SQLite run counts: `created`, `running`, `waiting`, `completed`, `failed`, `cancelled`, `interrupted`, or `other` |
@@ -87,11 +97,16 @@ Run the real-process observability drill:
 
 ```bash
 python3 scripts/observability_smoke.py \
-  --work-dir /tmp/skill2workflow-observability-loop46
+  --work-dir /tmp/skill2workflow-observability-loop108
 ```
 
 The drill starts the CLI service, proves unauthenticated denial, performs authenticated scrapes and a workflow trigger, verifies aggregate SQLite state and the fixed label vocabulary, terminates the process, and validates starting/ready/draining/stopped NDJSON events. Its evidence file contains booleans and counts only.
 
 ## Deferred Boundary
 
-Loop 46 does not add tracing, per-node latency, exemplars, histograms, alert rules, dashboards, log rotation, remote metric storage, OpenTelemetry, or multi-process metric aggregation. In-memory HTTP counters and uptime reset on restart. Durable workflow diagnosis continues to use the existing audit and run-state surfaces.
+The in-flight gauge is a live pressure signal, not a queue, admission lease, or
+execution outcome. It may fall to zero while a connector's external outcome is
+still uncertain after a handler returns; use durable dispatch/run/audit evidence
+for recovery decisions.
+
+Loop 46 does not add tracing, per-node latency, exemplars, histograms, alert rules, dashboards, log rotation, remote metric storage, OpenTelemetry, or multi-process metric aggregation. In-memory HTTP counters, in-flight requests, and uptime reset on restart. Durable workflow diagnosis continues to use the existing audit and run-state surfaces.
