@@ -20,6 +20,9 @@ class ContinuousIntegrationContractTests(TestCase):
         self.assertIn("python -m unittest discover -s tests -v", workflow)
         self.assertIn("python -m py_compile src/skill2workflow/*.py", workflow)
         self.assertIn("python scripts/package_smoke.py", workflow)
+        self.assertIn("python scripts/security_boundary_smoke.py", workflow)
+        self.assertIn("python scripts/observability_smoke.py", workflow)
+        self.assertIn("python scripts/service_boundary_smoke.py", workflow)
         self.assertIn("python scripts/secret_hygiene.py examples/workflows", workflow)
         self.assertIn(
             "python scripts/secret_hygiene.py --repository-root .", workflow
@@ -42,3 +45,16 @@ class ContinuousIntegrationContractTests(TestCase):
         self.assertIn("systemd-verify:", workflow)
         self.assertIn("systemd_service_smoke.py", workflow)
         self.assertIn("--systemd-analyze-verify", workflow)
+
+    def test_contributor_and_release_docs_reproduce_production_boundary_drills(self):
+        root = Path(__file__).resolve().parents[1]
+        contributing = (root / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        release = (root / "docs" / "release-process.md").read_text(encoding="utf-8")
+
+        for script in (
+            "security_boundary_smoke.py",
+            "observability_smoke.py",
+            "service_boundary_smoke.py",
+        ):
+            self.assertIn(script, contributing)
+            self.assertIn(script, release)

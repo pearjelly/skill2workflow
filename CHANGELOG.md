@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added production-boundary CI gates for every supported Python matrix entry:
+  security isolation, authenticated observability, and two-cycle SQLite service
+  restart continuity now run on every push and pull request.
 - Added deterministic service teardown: scheduler startup failures now close the
   listener, and scheduler cleanup failures cannot leave the port bound or stop
   the service from reaching the final `stopped` lifecycle state.

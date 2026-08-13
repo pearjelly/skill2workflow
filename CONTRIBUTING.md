@@ -27,9 +27,11 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
 CI repeats the full release-relevant checks on Python 3.9 and 3.14, covering
-the supported floor and the current stable interpreter. Contributors may use
-any supported Python locally; compatibility-sensitive changes should be
-reviewed against both matrix endpoints.
+the supported floor and the current stable interpreter. Each matrix entry also
+runs the security-boundary, observability, and service restart-continuity
+smokes, so a green unit suite cannot hide a broken real-process boundary.
+Contributors may use any supported Python locally; compatibility-sensitive
+changes should be reviewed against both matrix endpoints.
 
 Optionally install the checkout in editable mode to use the `skill2workflow` console script:
 
@@ -51,6 +53,14 @@ python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 On Linux, run the systemd smoke with `--systemd-analyze-verify` to exercise the
 host parser against the generated unit. This check never installs, enables, or
 starts a service; the same verification runs in the Linux CI job.
+
+To reproduce the production-boundary CI drills locally:
+
+```bash
+python3 scripts/security_boundary_smoke.py --work-dir /tmp/skill2workflow-security-ci
+python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-ci
+python3 scripts/service_boundary_smoke.py --work-dir /tmp/skill2workflow-service-boundary-ci
+```
 
 Run a fresh-checkout CLI smoke:
 

@@ -98,6 +98,8 @@ python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-release-d
 PYTHONPATH=src python3 -m unittest tests.test_credentials tests.test_security_docs -v
 python3 scripts/security_boundary_smoke.py --work-dir /tmp/skill2workflow-release-security
 python3 scripts/live_control_snapshot_smoke.py --work-dir /tmp/skill2workflow-release-live-snapshot
+python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-release-observability
+python3 scripts/service_boundary_smoke.py --work-dir /tmp/skill2workflow-release-service-boundary
 ```
 
 Release notes must preserve the fixed secret-free check vocabulary, stable exit
