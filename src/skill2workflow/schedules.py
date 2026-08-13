@@ -15,6 +15,7 @@ from typing import Dict, List
 
 from .control_plane import LocalControlPlane
 from .state_layout import ensure_current_state_layout
+from .triggers import normalize_trigger_input
 
 
 SCHEDULE_SCHEMA_VERSION = "skill2workflow-schedule-0.1.0"
@@ -215,7 +216,7 @@ def normalize_schedule_definition(definition: object) -> Schedule:
         trigger_input = {}
     if not isinstance(trigger_input, dict):
         raise ValueError("schedule trigger input must be a JSON object")
-    normalized_input = _json_object_copy(trigger_input)
+    normalized_input = normalize_trigger_input(trigger_input, "schedule trigger input")
 
     return {
         "schema_version": schema_version,
@@ -299,16 +300,6 @@ def _optional_text(mapping: Dict[str, object], key: str) -> str:
     if value is None:
         return ""
     return str(value)
-
-
-def _json_object_copy(value: Dict[str, object]) -> Dict[str, object]:
-    try:
-        copied = json.loads(json.dumps(value, ensure_ascii=False))
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"schedule trigger input must be JSON serializable: {error}")
-    if not isinstance(copied, dict):
-        raise ValueError("schedule trigger input must be a JSON object")
-    return copied
 
 
 def _safe_schedule_id(schedule_id: str) -> str:
@@ -788,7 +779,7 @@ def normalize_recurring_schedule_definition(definition: object, persisted: bool 
         "trigger": {
             "source": derived_source,
             "idempotency_key_prefix": prefix,
-            "input": _json_object_copy(input_value),
+            "input": normalize_trigger_input(input_value, "recurring schedule trigger input"),
         },
     }
 

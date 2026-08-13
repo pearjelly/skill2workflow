@@ -11,6 +11,7 @@ from skill2workflow.schedules import (
     LocalScheduleStore,
     normalize_schedule_definition,
 )
+from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
 
 
 class ScheduleTests(TestCase):
@@ -68,6 +69,20 @@ class ScheduleTests(TestCase):
                 {
                     "schema_version": "skill2workflow-schedule-0.1.0",
                     "schedule": {"workflow_id": "workflow_control", "version": "1.0.0", "run_at": "2026-07-06T00:00:00Z"},
+                }
+            )
+
+        with self.assertRaisesRegex(ValueError, "schedule trigger input exceeds"):
+            normalize_schedule_definition(
+                {
+                    "schema_version": "skill2workflow-schedule-0.1.0",
+                    "schedule": {
+                        "id": "schedule_daily_report",
+                        "workflow_id": "workflow_control",
+                        "version": "1.0.0",
+                        "run_at": "2026-07-06T00:00:00Z",
+                    },
+                    "trigger": {"input": {"payload": "x" * MAX_TRIGGER_INPUT_BYTES}},
                 }
             )
         with self.assertRaisesRegex(ValueError, "schedule.run_at must be an ISO-8601 timestamp"):

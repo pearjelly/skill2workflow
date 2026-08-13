@@ -35,7 +35,7 @@ Supported fields:
 | `idempotency_key` | No | In SQLite, a safe non-empty key is durably enforced per workflow version; JSON/local evaluation records it as metadata only. |
 | `input` | No | JSON object accepted as trigger input. Values are persisted in run context; audit and trigger responses expose only keys. |
 
-`input` must be a JSON object when supplied. Trigger input keys are normalized as strings. The input payload is copied into durable run state and should contain local-pilot business metadata, identifiers, and other non-secret values.
+`input` must be a JSON object when supplied. Trigger input keys are normalized as strings. The canonical UTF-8 JSON representation of the object is capped at **1 MiB (1,048,576 bytes)** before it is copied into durable run state or used to compute a SQLite idempotency fingerprint. CLI, one-shot schedule, and recurring schedule paths share this limit and reject oversized input with a fixed `ValueError`. The webhook parser maps that validation failure to HTTP 400; its earlier transport body bound may reject the larger wire request with HTTP 413. The limit bounds durable context and fingerprint work; it is not a confidentiality or redaction feature.
 
 Do not put secrets, credentials, access tokens, private keys, or long confidential documents in trigger input. Connector credentials should use the separate local credential-provider boundary documented in `docs/credential-boundary.md`. The current runtime does not provide secret redaction, encryption, or IAM.
 

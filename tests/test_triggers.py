@@ -1,7 +1,9 @@
+import json
 from unittest import TestCase
 
 from skill2workflow.triggers import (
     MAX_IDEMPOTENCY_KEY_BYTES,
+    MAX_TRIGGER_INPUT_BYTES,
     normalize_trigger_request,
     trigger_request_fingerprint,
     trigger_audit_fields,
@@ -77,6 +79,38 @@ class TriggerTests(TestCase):
                     "idempotency_key": "a" * (MAX_IDEMPOTENCY_KEY_BYTES + 1),
                 }
             )
+
+    def test_normalize_trigger_request_rejects_oversized_input_before_persistence(self):
+        with self.assertRaisesRegex(ValueError, "trigger input exceeds"):
+            normalize_trigger_request(
+                {
+                    "workflow_id": "workflow_control",
+                    "version": "1.0.0",
+                    "input": {"payload": "x" * MAX_TRIGGER_INPUT_BYTES},
+                }
+            )
+
+    def test_normalize_trigger_input_accepts_exact_canonical_byte_limit(self):
+        from skill2workflow.triggers import normalize_trigger_input
+
+        overhead = len(
+            json.dumps(
+                {"payload": ""},
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        accepted = normalize_trigger_input(
+            {"payload": "x" * (MAX_TRIGGER_INPUT_BYTES - overhead)}
+        )
+        encoded = json.dumps(
+            accepted,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        self.assertEqual(len(encoded), MAX_TRIGGER_INPUT_BYTES)
 
     def test_trigger_request_fingerprint_is_stable_and_excludes_trigger_id(self):
         first = normalize_trigger_request(

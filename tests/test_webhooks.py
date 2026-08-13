@@ -116,6 +116,17 @@ class WebhookTests(TestCase):
                 self.assertEqual(raised.exception.status_code, status_code)
                 self.assertEqual(str(raised.exception), message)
 
+    def test_parse_webhook_request_rejects_oversized_input_with_fixed_error(self):
+        with self.assertRaises(WebhookError) as raised:
+            parse_webhook_request(
+                "POST",
+                "/webhooks/workflow_demo/0.1.0",
+                json.dumps({"input": {"payload": "x" * (MAX_REQUEST_BODY_BYTES + 1)}}).encode("utf-8"),
+            )
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertIn("webhook input exceeds", str(raised.exception))
+
     def test_handle_webhook_request_triggers_published_workflow_with_compact_audit(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp))

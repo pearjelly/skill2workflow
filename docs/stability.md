@@ -22,6 +22,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Local credential handle boundary documented in `docs/credential-boundary.md`
 - Local trigger command and envelope documented in `docs/triggers.md`
 - Local trigger run-context shape documented in `docs/triggers.md`
+- Shared 1 MiB canonical UTF-8 JSON-object trigger-input limit and fixed oversize failure boundary documented in `docs/triggers.md`
 - Local webhook route and response shape documented in `docs/triggers.md`
 - Self-hosted service configuration `skill2workflow-service-0.2.0` and its published JSON Schema
 - Loopback service health/readiness paths and authenticated workflow-trigger boundary documented in `docs/service.md`

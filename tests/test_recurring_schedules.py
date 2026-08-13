@@ -10,6 +10,7 @@ from skill2workflow.schedules import (
     RecurringScheduleStore,
     normalize_recurring_schedule_definition,
 )
+from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
 
 
 class RecurringScheduleContractTests(TestCase):
@@ -55,6 +56,11 @@ class RecurringScheduleContractTests(TestCase):
             with self.subTest(pattern=pattern):
                 with self.assertRaisesRegex(ValueError, pattern):
                     normalize_recurring_schedule_definition(payload)
+
+        with self.assertRaisesRegex(ValueError, "recurring schedule trigger input exceeds"):
+            normalize_recurring_schedule_definition(
+                _recurring_definition(input_value={"payload": "x" * MAX_TRIGGER_INPUT_BYTES})
+            )
 
 
 class RecurringSchedulePersistenceTests(TestCase):
@@ -219,6 +225,7 @@ def _recurring_definition(
     interval_seconds=60,
     missed_run_policy="latest",
     extra_schedule=None,
+    input_value=None,
 ):
     schedule = {
         "id": "schedule_hourly_report",
@@ -232,7 +239,7 @@ def _recurring_definition(
     return {
         "schema_version": "skill2workflow-schedule-0.2.0",
         "schedule": schedule,
-        "trigger": {"input": {"report": "hourly"}},
+        "trigger": {"input": input_value if input_value is not None else {"report": "hourly"}},
     }
 
 

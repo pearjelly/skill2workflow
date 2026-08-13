@@ -22,6 +22,8 @@ class TriggerDocumentationTests(TestCase):
             "stores trigger input values, credentials",
             "backup and restore",
             "evaluation remains metadata-only",
+            "1 MiB (1,048,576 bytes)",
+            "idempotency fingerprint",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("Loop 62: Durable SQLite Trigger Idempotency", roadmap)
@@ -44,3 +46,11 @@ class TriggerDocumentationTests(TestCase):
         self.assertIn("request_fingerprint", source)
         self.assertIn("response_json", source)
         self.assertNotIn("input_json", source)
+
+    def test_trigger_input_limit_is_published_as_a_stable_runtime_boundary(self):
+        stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
+        source = (ROOT / "src" / "skill2workflow" / "triggers.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("Shared 1 MiB canonical UTF-8 JSON-object trigger-input limit", stability)
+        self.assertIn("MAX_TRIGGER_INPUT_BYTES = 1024 * 1024", source)

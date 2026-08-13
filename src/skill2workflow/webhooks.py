@@ -8,6 +8,7 @@ from typing import Callable, Dict
 from urllib.parse import unquote, urlsplit
 
 from .triggers import TriggerIdempotencyError
+from .triggers import normalize_trigger_input
 
 
 MAX_REQUEST_BODY_BYTES = 1024 * 1024
@@ -33,8 +34,10 @@ def parse_webhook_request(method: str, path: str, body: bytes) -> Dict[str, obje
     trigger_input = payload.get("input", {})
     if trigger_input is None:
         trigger_input = {}
-    if not isinstance(trigger_input, dict):
-        raise WebhookError("webhook input must be a JSON object", status_code=400)
+    try:
+        trigger_input = normalize_trigger_input(trigger_input, "webhook input")
+    except ValueError as error:
+        raise WebhookError(str(error), status_code=400)
 
     return {
         "workflow_id": workflow_id,

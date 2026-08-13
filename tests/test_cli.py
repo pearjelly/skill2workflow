@@ -11,6 +11,7 @@ from unittest.mock import patch
 from skill2workflow.cli import main
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.state_layout import STATE_LAYOUT_MARKER
+from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
 
 
 class CliTests(TestCase):
@@ -728,6 +729,34 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn("trigger input must be a JSON object", stderr.getvalue())
+
+    def test_trigger_command_rejects_oversized_input_before_opening_state(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            input_path = root / "trigger-input.json"
+            state_dir = root / "state"
+            input_path.write_text(
+                json.dumps({"payload": "x" * MAX_TRIGGER_INPUT_BYTES}),
+                encoding="utf-8",
+            )
+            stderr = StringIO()
+            with redirect_stdout(StringIO()), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "trigger",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--state-dir",
+                        str(state_dir),
+                        "--input",
+                        str(input_path),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("trigger input exceeds", stderr.getvalue())
+        self.assertFalse(state_dir.exists())
 
     def test_schedule_commands_add_list_and_run_due(self):
         with TemporaryDirectory() as tmp:

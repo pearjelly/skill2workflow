@@ -28,6 +28,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Enforced the existing bounded `policies.default_timeout_ms` runtime boundary at executor safe points, with persisted deadlines, human-gate pause semantics, and fixed timeout failure evidence.
 - Added explicit `tool_call.on_fallback` transitions after exhausted connector retries, preserving failed-attempt evidence and promoting fixed fallback audit events.
 - Added SQLite `sha256-chain-v1` audit integrity links, compact `audit-verify` verification, legacy-column upgrade, backup rejection for invalid current chains, and retained-copy re-chaining.
+- Added a shared 1 MiB canonical UTF-8 trigger-input limit across CLI, webhook, one-shot schedule, and recurring schedule entry paths, with fixed oversize errors and no Workflow DSL compatibility change.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

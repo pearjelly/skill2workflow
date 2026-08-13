@@ -39,6 +39,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("SQLite lease", guide)
         self.assertIn("standby", guide)
         self.assertIn("not exactly-once", guide)
+        self.assertIn("capped at 1 MiB", guide)
         self.assertIn("recurring_scheduler_smoke.py", guide)
 
     def test_readme_and_roadmap_advance_only_after_all_beta_loops(self):
@@ -46,7 +47,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-65 are complete", readme)
+        self.assertIn("Delivery Loops 1-66 are complete", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete |", roadmap)

@@ -12,6 +12,7 @@ from typing import Dict
 
 Trigger = Dict[str, object]
 MAX_IDEMPOTENCY_KEY_BYTES = 128
+MAX_TRIGGER_INPUT_BYTES = 1024 * 1024
 _IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_.:+-]+$")
 
 
@@ -44,7 +45,7 @@ def normalize_trigger_request(request: object) -> Trigger:
         trigger_input = {}
     if not isinstance(trigger_input, dict):
         raise ValueError("trigger input must be a JSON object")
-    normalized_input = _json_object_copy(trigger_input)
+    normalized_input = normalize_trigger_input(trigger_input)
     idempotency_key = _optional_text(request, "idempotency_key")
     if idempotency_key:
         encoded_key = idempotency_key.encode("utf-8")
@@ -66,6 +67,14 @@ def normalize_trigger_request(request: object) -> Trigger:
         "input": normalized_input,
         "input_keys": sorted(normalized_input.keys()),
     }
+
+
+def normalize_trigger_input(value: object, label: str = "trigger input") -> Dict[str, object]:
+    """Copy one JSON object under the shared bounded trigger-input contract."""
+
+    if not isinstance(value, dict):
+        raise ValueError(f"{label} must be a JSON object")
+    return _json_object_copy(value, label)
 
 
 def trigger_request_fingerprint(trigger: Trigger) -> str:
@@ -143,11 +152,25 @@ def _optional_text(request: Dict[str, object], key: str) -> str:
     return str(value)
 
 
-def _json_object_copy(value: Dict[str, object]) -> Dict[str, object]:
+def _json_object_copy(value: Dict[str, object], label: str) -> Dict[str, object]:
     try:
-        copied = json.loads(json.dumps(value, ensure_ascii=False))
-    except (TypeError, ValueError) as error:
-        raise ValueError(f"trigger input must be JSON serializable: {error}")
+        serialized = json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+    except (TypeError, ValueError, OverflowError, RecursionError) as error:
+        raise ValueError(f"{label} must be JSON serializable: {error}")
+    encoded = serialized.encode("utf-8")
+    if len(encoded) > MAX_TRIGGER_INPUT_BYTES:
+        raise ValueError(
+            f"{label} exceeds {MAX_TRIGGER_INPUT_BYTES} bytes"
+        )
+    try:
+        copied = json.loads(serialized)
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError(f"{label} must be JSON serializable: {error}")
     if not isinstance(copied, dict):
-        raise ValueError("trigger input must be a JSON object")
+        raise ValueError(f"{label} must be a JSON object")
     return copied

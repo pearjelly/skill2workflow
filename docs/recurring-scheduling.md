@@ -31,7 +31,7 @@ Create a JSON document such as:
 
 `starts_at` must contain a timezone. `interval_seconds` accepts 1 through 31,536,000 seconds. `id` and `idempotency_key_prefix` use a constrained safe-character set. The published workflow version must already exist in the same SQLite state directory.
 
-The runtime derives the trigger source as `recurring-schedule:<schedule.id>` and derives one idempotency key per scheduled occurrence. Callers cannot override the source. Trigger input is persisted in run context, so it must not contain secrets.
+The runtime derives the trigger source as `recurring-schedule:<schedule.id>` and derives one idempotency key per scheduled occurrence. Callers cannot override the source. Trigger input is persisted in run context, so it must not contain secrets. The canonical UTF-8 JSON input object is capped at 1 MiB, matching CLI, webhook, and one-shot schedule triggers; oversized definitions are rejected before persistence.
 
 The public JSON Schema is [`schemas/recurring-schedule-0.2.0.schema.json`](../schemas/recurring-schedule-0.2.0.schema.json).
 
