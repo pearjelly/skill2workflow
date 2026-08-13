@@ -738,6 +738,13 @@ class JsonControlStore:
             raise ValueError("workflow index must be an object")
         return index
 
+    def get_workflow_record(self, workflow_id: str, version: str) -> WorkflowRecord:
+        index = self.load_index()
+        key = _workflow_record_key(workflow_id, version)
+        if key not in index:
+            raise ValueError(f"workflow version not found: {workflow_id}@{version}")
+        return index[key]
+
     def save_index(self, index: Dict[str, WorkflowRecord]) -> None:
         self.index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -892,6 +899,17 @@ class SqliteControlStore:
                 "select record_key, record_json from workflow_versions order by record_key"
             ).fetchall()
         return {str(row[0]): json.loads(str(row[1])) for row in rows}
+
+    def get_workflow_record(self, workflow_id: str, version: str) -> WorkflowRecord:
+        key = _workflow_record_key(workflow_id, version)
+        with self._connection() as connection:
+            row = connection.execute(
+                "select record_json from workflow_versions where record_key = ?",
+                (key,),
+            ).fetchone()
+        if row is None:
+            raise ValueError(f"workflow version not found: {workflow_id}@{version}")
+        return json.loads(str(row[0]))
 
     def count_workflow_records(self) -> int:
         """Count published registry rows without loading their JSON records."""
@@ -1131,25 +1149,37 @@ class SqliteControlStore:
 
         with self._connection() as connection:
             connection.execute("begin immediate")
-            rows = connection.execute(
-                "select record_key, record_json from workflow_versions order by record_key"
-            ).fetchall()
-            index = {
-                str(record_key): json.loads(str(record_json))
-                for record_key, record_json in rows
-            }
             target_key = _workflow_record_key(workflow_id, version)
-            if target_key not in index:
+            target_row = connection.execute(
+                "select record_json from workflow_versions where record_key = ?",
+                (target_key,),
+            ).fetchone()
+            if target_row is None:
                 raise ValueError(f"workflow version not found: {workflow_id}@{version}")
-            target = dict(index[target_key])
+            target = dict(json.loads(str(target_row[0])))
             if target.get("status") != "published":
                 raise ValueError(
                     f"workflow version is not published: {workflow_id}@{version}"
                 )
 
-            current_versions = _sqlite_published_alias_versions(
-                index, workflow_id, alias
-            )
+            current_versions = []
+            changed_records = []
+            rows = _iter_workflow_records_for_id(connection, workflow_id)
+            for record_key, raw_record in rows:
+                existing = json.loads(str(raw_record))
+                existing_aliases = _sqlite_record_aliases(existing)
+                if alias not in existing_aliases:
+                    continue
+                if existing.get("status") == "published":
+                    current_versions.append(str(existing.get("version", "")))
+                updated = dict(existing)
+                existing_aliases.remove(alias)
+                if existing_aliases:
+                    updated["aliases"] = existing_aliases
+                else:
+                    updated.pop("aliases", None)
+                changed_records.append((str(record_key), updated))
+            current_versions.sort()
             if expected_current_version and current_versions != [
                 str(expected_current_version)
             ]:
@@ -1159,40 +1189,25 @@ class SqliteControlStore:
             if current_versions == [version] and alias in _sqlite_record_aliases(target):
                 return target
 
-            changed_keys = []
-            for key, existing in list(index.items()):
-                if str(existing.get("workflow_id", "")) != str(workflow_id):
-                    continue
-                existing_aliases = _sqlite_record_aliases(existing)
-                if alias not in existing_aliases:
-                    continue
-                updated = dict(existing)
-                existing_aliases.remove(alias)
-                if existing_aliases:
-                    updated["aliases"] = existing_aliases
-                else:
-                    updated.pop("aliases", None)
-                index[key] = updated
-                changed_keys.append(key)
-
-            target = dict(index[target_key])
+            changed_keys = {key for key, _updated in changed_records}
+            updated_by_key = {key: updated for key, updated in changed_records}
+            target = dict(updated_by_key.get(target_key, target))
             target_aliases = _sqlite_record_aliases(target)
             if alias not in target_aliases:
                 target_aliases.append(alias)
                 target["aliases"] = sorted(set(target_aliases))
-                index[target_key] = target
-                if target_key not in changed_keys:
-                    changed_keys.append(target_key)
+                updated_by_key[target_key] = target
+                changed_keys.add(target_key)
 
             if changed_keys:
                 connection.executemany(
                     "update workflow_versions set record_json = ? where record_key = ?",
                     [
                         (
-                            json.dumps(index[key], ensure_ascii=False, sort_keys=True),
+                            json.dumps(updated_by_key[key], ensure_ascii=False, sort_keys=True),
                             key,
                         )
-                        for key in changed_keys
+                        for key in sorted(changed_keys)
                     ],
                 )
                 _append_audit_connection(connection, audit_event)
@@ -1615,15 +1630,17 @@ def _sqlite_record_aliases(record: WorkflowRecord) -> List[str]:
     return [str(alias) for alias in aliases if str(alias)]
 
 
-def _sqlite_published_alias_versions(
-    index: Dict[str, WorkflowRecord], workflow_id: str, alias: str
-) -> List[str]:
-    return sorted(
-        str(record.get("version", ""))
-        for record in index.values()
-        if str(record.get("workflow_id", "")) == str(workflow_id)
-        and record.get("status") == "published"
-        and alias in _sqlite_record_aliases(record)
+def _iter_workflow_records_for_id(connection, workflow_id: str):
+    """Stream one workflow's registry records without loading other workflows."""
+
+    return connection.execute(
+        """
+        select record_key, record_json
+        from workflow_versions
+        where workflow_id = ?
+        order by record_key
+        """,
+        (str(workflow_id),),
     )
 
 

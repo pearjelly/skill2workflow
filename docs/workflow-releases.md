@@ -69,6 +69,12 @@ both the alias registry and the audit chain unchanged. This is the production
 concurrency contract; JSON storage remains the dependency-light local
 evaluation mode and does not provide cross-process transaction coordination.
 
+SQLite promotion reads the target directly and streams only records belonging to
+that workflow while removing the alias. It does not materialize unrelated
+workflow versions in the global registry before the transaction. This bounds
+promotion source memory by the selected workflow's version history while
+preserving the same alias uniqueness and CAS semantics.
+
 ## Atomic Publication and Deprecation
 
 SQLite publication inserts one immutable workflow registry record and its

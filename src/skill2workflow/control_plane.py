@@ -206,6 +206,26 @@ class LocalControlPlane:
         """Point a stable alias at one version with an optional CAS guard."""
 
         normalized_alias = _normalize_workflow_alias(alias)
+        if self.storage == "sqlite" and hasattr(self.store, "promote_workflow_alias"):
+            target = dict(self._workflow_record(workflow_id, version))
+            if target.get("status") != "published":
+                raise ValueError(f"workflow version is not published: {workflow_id}@{version}")
+            # Verify before changing alias metadata so a corrupted release cannot
+            # become reachable through a stable production target.
+            self.get_workflow(workflow_id, version)
+            return self.store.promote_workflow_alias(
+                workflow_id,
+                version,
+                normalized_alias,
+                expected_current_version=expected_current_version,
+                audit_event={
+                    "type": "workflow_promoted",
+                    "workflow_id": workflow_id,
+                    "workflow_version": version,
+                    "alias": normalized_alias,
+                    "timestamp": _now(),
+                },
+            )
         index = self._load_index()
         target_key = _record_key(workflow_id, version)
         if target_key not in index:
@@ -225,20 +245,6 @@ class LocalControlPlane:
             )
         if current_versions == [version] and normalized_alias in _record_aliases(target):
             return target
-        if self.storage == "sqlite" and hasattr(self.store, "promote_workflow_alias"):
-            return self.store.promote_workflow_alias(
-                workflow_id,
-                version,
-                normalized_alias,
-                expected_current_version=expected_current_version,
-                audit_event={
-                    "type": "workflow_promoted",
-                    "workflow_id": workflow_id,
-                    "workflow_version": version,
-                    "alias": normalized_alias,
-                    "timestamp": _now(),
-                },
-            )
         changed = False
         for key, existing in list(index.items()):
             if str(existing.get("workflow_id", "")) != str(workflow_id):
@@ -968,6 +974,9 @@ class LocalControlPlane:
         return default_connectors()
 
     def _workflow_record(self, workflow_id: str, version: str) -> WorkflowRecord:
+        direct = getattr(self.store, "get_workflow_record", None)
+        if callable(direct):
+            return direct(workflow_id, version)
         index = self._load_index()
         key = _record_key(workflow_id, version)
         if key not in index:

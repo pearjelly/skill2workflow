@@ -20,6 +20,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Control-plane workflow version aliases and the `promote`/trigger resolution contract documented in `docs/triggers.md`
 - Reviewable published workflow diffs and the optional compare-and-swap promotion precondition documented in [`workflow-releases.md`](workflow-releases.md)
 - SQLite promotion transactionally couples the compare-and-swap check, alias mutation, and promotion audit append; JSON remains local-evaluation storage without cross-process coordination
+- SQLite promotion reads the target directly and streams only the selected workflow's registry rows; alias CAS, uniqueness, audit atomicity, and JSON compatibility remain unchanged
 - SQLite publication and deprecation transactionally couple single-record registry changes with their audit rows, preserving immutable-version and retry semantics
 - `workflow-artifacts` report contract `skill2workflow-workflow-artifact-report-0.1.0`, including bounded registry/file consistency issues and known-failure SQLite publication cleanup
 - `audit-consistency` report contract `skill2workflow-run-audit-report-0.1.0`, including bounded missing/duplicate/unexpected run-audit projections; one control-plane lifecycle/runtime emission is transactional in SQLite, while the two-database boundary remains diagnostic-only

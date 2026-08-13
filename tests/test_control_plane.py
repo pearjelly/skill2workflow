@@ -827,6 +827,25 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(repeated["aliases"], ["production"])
         self.assertEqual(second_audit_count, first_audit_count)
 
+    def test_sqlite_promotion_does_not_load_the_global_registry(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            control.publish_workflow(_workflow(version="2.0.0"))
+            control.promote_workflow("workflow_control", "1.0.0", alias="production")
+            control._load_index = lambda: (_ for _ in ()).throw(
+                AssertionError("sqlite promotion loaded the global registry")
+            )
+
+            promoted = control.promote_workflow(
+                "workflow_control",
+                "2.0.0",
+                alias="production",
+                expected_current_version="1.0.0",
+            )
+
+        self.assertEqual(promoted["aliases"], ["production"])
+
     def test_sqlite_promotion_cas_is_atomic_across_concurrent_operators(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

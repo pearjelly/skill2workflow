@@ -34,6 +34,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Interrupted-run takeover now streams foreign active-execution rows in the
   existing SQLite recovery transaction, avoiding full execution-ledger
   materialization while preserving fencing and no-replay semantics.
+- SQLite workflow alias promotion now reads the target directly and streams
+  only the selected workflow's registry rows, avoiding unrelated-version
+  materialization while preserving CAS and audit atomicity.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.

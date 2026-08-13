@@ -177,6 +177,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("expected-current-version", guide)
         self.assertIn("without copying", guide)
         self.assertIn("workflow alias precondition failed", guide)
+        self.assertIn("streams only records belonging to", guide)
         self.assertIn("BEGIN IMMEDIATE", guide)
         self.assertIn("cross-process transaction coordination", guide)
         self.assertIn("## Atomic Publication and Deprecation", guide)

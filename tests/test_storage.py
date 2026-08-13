@@ -12,6 +12,7 @@ from skill2workflow.storage import (
     SqliteControlStore,
     SqliteRunStore,
     _iter_foreign_active_execution_rows,
+    _iter_workflow_records_for_id,
 )
 
 
@@ -39,6 +40,37 @@ class StorageTests(TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0][0], "run_stream_interrupted")
+
+    def test_workflow_records_for_id_stream_without_fetchall(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "control")
+            with store._connection() as connection:
+                connection.execute(
+                    """
+                    insert into workflow_versions (
+                        record_key, workflow_id, name, version, status, checksum,
+                        artifact, published_at, deprecated_at, record_json
+                    ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "workflow_stream@1.0.0",
+                        "workflow_stream",
+                        "stream",
+                        "1.0.0",
+                        "published",
+                        "checksum",
+                        "workflows/workflow_stream/1.0.0.json",
+                        "2026-08-14T00:00:00Z",
+                        "",
+                        '{"workflow_id":"workflow_stream","version":"1.0.0"}',
+                    ),
+                )
+            with closing(sqlite3.connect(store.db_path)) as raw:
+                connection = _NoRegistryFetchAllConnection(raw)
+                with raw:
+                    rows = list(_iter_workflow_records_for_id(connection, "workflow_stream"))
+
+        self.assertEqual(rows[0][0], "workflow_stream@1.0.0")
 
     def test_run_count_does_not_load_all_states(self):
         with TemporaryDirectory() as tmp:
@@ -324,6 +356,32 @@ class _NoInterruptedFetchAllConnection:
         normalized = " ".join(str(query).lower().split())
         if "select e.run_id, r.state_json from run_executions" in normalized:
             return _NoInterruptedFetchAllCursor(cursor)
+        return cursor
+
+
+class _NoRegistryFetchAllCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+    def fetchall(self):
+        raise AssertionError("workflow registry rows must be streamed")
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _NoRegistryFetchAllConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query, parameters=()):
+        cursor = self._connection.execute(query, parameters)
+        normalized = " ".join(str(query).lower().split())
+        if "select record_key, record_json from workflow_versions" in normalized:
+            return _NoRegistryFetchAllCursor(cursor)
         return cursor
 
 
