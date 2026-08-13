@@ -29,6 +29,7 @@ from .control_plane import (
     WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
 )
 from .service import read_service_bearer_token
+from .storage import AUDIT_INTEGRITY_ALGORITHM, AUDIT_INTEGRITY_SCHEMA_VERSION
 
 
 MAX_SERVICE_ACTION_RESPONSE_BYTES = 64 * 1024
@@ -38,6 +39,7 @@ MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
+MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -191,6 +193,23 @@ def fetch_backup_readiness(
         max_response_bytes=MAX_BACKUP_READINESS_RESPONSE_BYTES,
     )
     _validate_backup_readiness(payload)
+    return payload
+
+
+def fetch_audit_integrity(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch the authenticated, payload-free SQLite audit-chain result."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/audit-integrity",
+        conflict_message="audit integrity unavailable",
+        max_response_bytes=MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
+    )
+    _validate_audit_integrity(payload)
     return payload
 
 
@@ -695,6 +714,64 @@ def _validate_backup_readiness(payload: Dict[str, object]) -> None:
         raise ServiceActionError()
 
 
+def _validate_audit_integrity(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed audit-integrity contract."""
+
+    fields = {
+        "schema_version", "status", "algorithm", "event_count",
+        "head_digest", "first_invalid_sequence", "reason",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    status = payload.get("status")
+    reason = payload.get("reason")
+    algorithm = payload.get("algorithm")
+    head_digest = payload.get("head_digest")
+    if (
+        payload.get("schema_version") != AUDIT_INTEGRITY_SCHEMA_VERSION
+        or status not in {"valid", "invalid", "legacy_unsealed"}
+        or algorithm not in {AUDIT_INTEGRITY_ALGORITHM, ""}
+        or not _is_non_negative_integer(payload.get("event_count"))
+        or not isinstance(head_digest, str)
+        or not _is_non_negative_integer(payload.get("first_invalid_sequence"))
+        or reason not in {
+            "", "sqlite_storage_required", "integrity_columns_missing",
+            "schema_mismatch", "sequence_invalid", "sequence_out_of_order",
+            "payload_invalid", "column_mismatch", "prev_digest_mismatch",
+            "digest_mismatch",
+        }
+    ):
+        raise ServiceActionError()
+    if status == "valid":
+        if (
+            algorithm != AUDIT_INTEGRITY_ALGORITHM
+            or reason != ""
+            or payload.get("first_invalid_sequence") != 0
+            or (
+                (payload.get("event_count") == 0 and head_digest != "")
+                or (
+                    payload.get("event_count") > 0
+                    and not _is_hex_digest(head_digest)
+                )
+            )
+        ):
+            raise ServiceActionError()
+    elif status == "legacy_unsealed":
+        if (
+            algorithm != ""
+            or reason != "sqlite_storage_required"
+            or payload.get("first_invalid_sequence") != 0
+            or head_digest != ""
+        ):
+            raise ServiceActionError()
+    elif (
+        algorithm != AUDIT_INTEGRITY_ALGORITHM
+        or reason == ""
+        or head_digest != ""
+    ):
+        raise ServiceActionError()
+
+
 def _validate_recurring_schedule_action(
     payload: Dict[str, object], schedule_id: str, enabled: bool
 ) -> None:
@@ -920,6 +997,14 @@ def _validate_audit_consistency(payload: Dict[str, object]) -> None:
 
 def _is_non_negative_integer(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _is_hex_digest(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(char.isdigit() or "a" <= char <= "f" for char in value)
+    )
 
 
 def _is_safe_run_identifier(value: object) -> bool:

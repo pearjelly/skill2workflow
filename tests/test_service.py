@@ -24,6 +24,7 @@ from skill2workflow.service import (
     MAX_CONCURRENT_BUSINESS_REQUESTS,
     MAX_LIVE_CONTROL_SNAPSHOT_BYTES,
     MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
+    MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     RuntimeService,
     ServiceScheduleLoop,
     ServiceConfig,
@@ -530,6 +531,94 @@ class RuntimeServiceTests(TestCase):
         self.assertTrue(accepted["active_scheduler_lease"])
         self.assertFalse(accepted["backup_allowed"])
         self.assertEqual(accepted["blocking_reasons"], ["active_scheduler_lease"])
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_integrity_is_authenticated_payload_free_and_read_only(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            denied_status, denied = _get_json(
+                f"http://{host}:{port}/api/v1/audit-integrity"
+            )
+            accepted_status, accepted = _get_json(
+                f"http://{host}:{port}/api/v1/audit-integrity",
+                token=AUTH_TOKEN,
+            )
+            body_connection = http.client.HTTPConnection(host, port, timeout=2)
+            body_connection.request(
+                "GET",
+                "/api/v1/audit-integrity",
+                body=b"{}",
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            )
+            body_response = body_connection.getresponse()
+            body_payload = json.loads(body_response.read().decode("utf-8"))
+            body_status = body_response.status
+            body_connection.close()
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted["schema_version"],
+            "skill2workflow-audit-integrity-0.1.0",
+        )
+        self.assertEqual(accepted["status"], "valid")
+        self.assertEqual(accepted["algorithm"], "sha256-chain-v1")
+        self.assertGreater(accepted["event_count"], 0)
+        self.assertEqual(len(accepted["head_digest"]), 64)
+        self.assertEqual(body_status, 400)
+        self.assertEqual(
+            body_payload,
+            {"error": "audit integrity request must not include a body"},
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_integrity_rejects_oversized_projection_without_disclosure(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            host, port = service.server_address
+            thread = threading.Thread(target=service._server.handle_request, daemon=True)
+            private_value = "private-audit-integrity-value-" + (
+                "x" * MAX_AUDIT_INTEGRITY_RESPONSE_BYTES
+            )
+            with patch.object(
+                service.control_plane,
+                "verify_audit_integrity",
+                return_value={"private": private_value},
+            ):
+                thread.start()
+                status, payload = _get_json(
+                    f"http://{host}:{port}/api/v1/audit-integrity",
+                    token=AUTH_TOKEN,
+                )
+                thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 503)
+        self.assertEqual(payload, {"error": "audit integrity unavailable"})
+        self.assertNotIn("private-audit-integrity-value", json.dumps(payload))
         self.assertFalse(thread.is_alive())
 
     def test_audit_consistency_can_target_one_run_beyond_the_global_window(self):

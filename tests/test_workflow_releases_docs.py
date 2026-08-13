@@ -115,6 +115,16 @@ class WorkflowReleaseDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
+        audit_integrity_remote_guide = (
+            ROOT / "docs" / "remote-audit-integrity.md"
+        ).read_text(encoding="utf-8")
+        audit_integrity_remote_plan = (
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-08-13-remote-audit-integrity.md"
+        ).read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -229,6 +239,10 @@ class WorkflowReleaseDocumentationTests(TestCase):
             "skill2workflow-backup-readiness-0.1.0",
         )
         self.assertIn("Loop 82: Remote Backup Readiness", roadmap)
+        self.assertIn("GET /api/v1/audit-integrity", audit_integrity_remote_guide)
+        self.assertIn("16 KiB", audit_integrity_remote_guide)
+        self.assertIn("event payload", audit_integrity_remote_plan)
+        self.assertIn("Loop 83: Remote Audit Integrity", roadmap)
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",
@@ -253,6 +267,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-recurring-dispatches"', cli)
         self.assertIn('"service-workflow-artifacts"', cli)
         self.assertIn('"service-backup-readiness"', cli)
+        self.assertIn('"service-audit-integrity"', cli)
         self.assertIn('"service-schedule-enable"', cli)
         self.assertIn('"service-schedule-disable"', cli)
         self.assertIn("--expected-current-version", cli)
@@ -264,5 +279,6 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-recurring-dispatches"', package_smoke)
         self.assertIn('"service-workflow-artifacts"', package_smoke)
         self.assertIn('"service-backup-readiness"', package_smoke)
+        self.assertIn('"service-audit-integrity"', package_smoke)
         self.assertIn('"service-schedule-enable"', package_smoke)
         self.assertIn('"service-schedule-disable"', package_smoke)

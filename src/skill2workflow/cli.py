@@ -29,6 +29,7 @@ from .service_client import (
     fetch_recurring_schedule_dispatches,
     fetch_workflow_artifact_report,
     fetch_backup_readiness,
+    fetch_audit_integrity,
     fetch_run_detail,
     fetch_run_list,
     fetch_support_bundle,
@@ -369,6 +370,13 @@ def main(argv=None) -> int:
     )
     service_backup_cmd.add_argument("--service-url", required=True)
     service_backup_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_integrity_cmd = subparsers.add_parser(
+        "service-audit-integrity",
+        help="Verify the SQLite audit chain through the authenticated service",
+    )
+    service_integrity_cmd.add_argument("--service-url", required=True)
+    service_integrity_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     for command, help_text in (
         ("service-schedule-enable", "Enable one recurring schedule through the authenticated service"),
@@ -800,6 +808,14 @@ def main(argv=None) -> int:
     if args.command == "service-backup-readiness":
         return _service_action(
             lambda: fetch_backup_readiness(
+                args.service_url,
+                args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-audit-integrity":
+        return _service_action(
+            lambda: fetch_audit_integrity(
                 args.service_url,
                 args.auth_token_file,
             )

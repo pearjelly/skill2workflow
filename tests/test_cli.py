@@ -361,6 +361,37 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_audit_integrity_command_prints_report(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-audit-integrity-0.1.0",
+            "status": "valid",
+            "algorithm": "sha256-chain-v1",
+            "event_count": 3,
+            "head_digest": "a" * 64,
+            "first_invalid_sequence": 0,
+            "reason": "",
+        }
+        with patch(
+            "skill2workflow.cli.fetch_audit_integrity",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-audit-integrity",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example", token_file)
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

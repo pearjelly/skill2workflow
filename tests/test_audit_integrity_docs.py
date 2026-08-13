@@ -16,6 +16,9 @@ class AuditIntegrityDocumentationTests(TestCase):
         guide = (ROOT / "docs" / "audit-integrity.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        remote_guide = (ROOT / "docs" / "remote-audit-integrity.md").read_text(
+            encoding="utf-8"
+        )
 
         self.assertEqual(
             schema["$id"],
@@ -26,3 +29,6 @@ class AuditIntegrityDocumentationTests(TestCase):
         self.assertIn("backup-verify", guide)
         self.assertIn("Loop 65: SQLite Audit Integrity", roadmap)
         self.assertIn("audit integrity", changelog.lower())
+        self.assertIn("GET /api/v1/audit-integrity", remote_guide)
+        self.assertIn("service-audit-integrity", remote_guide)
+        self.assertIn("16 KiB", remote_guide)

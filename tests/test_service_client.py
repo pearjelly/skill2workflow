@@ -13,6 +13,7 @@ from skill2workflow.service_client import (
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES,
     MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
     MAX_BACKUP_READINESS_RESPONSE_BYTES,
+    MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     ServiceActionError,
     post_recurring_schedule_state,
     post_run_cancel,
@@ -23,6 +24,7 @@ from skill2workflow.service_client import (
     fetch_recurring_schedule_dispatches,
     fetch_workflow_artifact_report,
     fetch_backup_readiness,
+    fetch_audit_integrity,
     fetch_support_bundle,
     fetch_audit_consistency,
 )
@@ -527,6 +529,80 @@ class ServiceClientTests(TestCase):
             thread.start()
             with self.assertRaises(ServiceActionError):
                 fetch_backup_readiness(
+                    f"http://127.0.0.1:{server.server_port}", token_file
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_integrity_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+        payload = _audit_integrity_payload()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_audit_integrity(
+                f"http://127.0.0.1:{server.server_port}", token_file
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(
+            observed,
+            [{
+                "path": "/api/v1/audit-integrity",
+                "authorization": f"Bearer {AUTH_TOKEN}",
+            }],
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_integrity_rejects_oversized_response(self):
+        body = b"x" * (MAX_AUDIT_INTEGRITY_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_audit_integrity(
                     f"http://127.0.0.1:{server.server_port}", token_file
                 )
             thread.join(timeout=2)
@@ -1190,6 +1266,18 @@ def _backup_readiness_payload():
         "scheduler_database_synthesized": False,
         "backup_allowed": False,
         "blocking_reasons": ["active_scheduler_lease"],
+    }
+
+
+def _audit_integrity_payload():
+    return {
+        "schema_version": "skill2workflow-audit-integrity-0.1.0",
+        "status": "valid",
+        "algorithm": "sha256-chain-v1",
+        "event_count": 3,
+        "head_digest": "a" * 64,
+        "first_invalid_sequence": 0,
+        "reason": "",
     }
 
 

@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-82
+- Completed delivery loops: 1-83
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 82 is complete with remote backup readiness diagnostics
+- Active loop: None; Loop 83 is complete with remote audit-chain verification
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the remote backup readiness drill
+- Next decision: select the next Production Baseline loop after reviewing the remote audit-integrity drill
 
 ## Production Readiness Path
 
@@ -52,15 +52,15 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-82 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-83 complete, further loop numbers unassigned.
 
-Loop 82 adds remote backup readiness diagnostics after the remote workflow
-artifact consistency evidence; remaining capabilities become numbered loops
-only after preceding evidence is reviewed.
+Loop 83 adds remote audit-chain verification after the remote backup readiness
+evidence; remaining capabilities become numbered loops only after preceding
+evidence is reviewed.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; atomic workflow alias promotion became Loop 72 after review of the release-review drill; atomic workflow registry mutations became Loop 73 after review of the promotion transaction drill; workflow artifact consistency diagnostics became Loop 74 after review of the registry mutation drill; atomic run-audit emission and consistency diagnostics became Loop 75 after review of the artifact consistency drill; authenticated remote run-audit consistency became Loop 76 after review of the remote diagnostic drill; targeted remote run-audit inspection became Loop 77 after review of the global-window operator gap; remote recurring-schedule inventory became Loop 78 after review of the remote operator scheduling gap; protected remote recurring-schedule actions became Loop 79 after review of the inventory drill; remote recurring-schedule dispatch diagnostics became Loop 80 after review of the schedule action drill; remote workflow artifact consistency diagnostics became Loop 81 after review of the remote dispatch evidence; remote backup readiness diagnostics became Loop 82 after review of the remote artifact consistency evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; atomic workflow alias promotion became Loop 72 after review of the release-review drill; atomic workflow registry mutations became Loop 73 after review of the promotion transaction drill; workflow artifact consistency diagnostics became Loop 74 after review of the registry mutation drill; atomic run-audit emission and consistency diagnostics became Loop 75 after review of the artifact consistency drill; authenticated remote run-audit consistency became Loop 76 after review of the remote diagnostic drill; targeted remote run-audit inspection became Loop 77 after review of the global-window operator gap; remote recurring-schedule inventory became Loop 78 after review of the remote operator scheduling gap; protected remote recurring-schedule actions became Loop 79 after review of the inventory drill; remote recurring-schedule dispatch diagnostics became Loop 80 after review of the schedule action drill; remote workflow artifact consistency diagnostics became Loop 81 after review of the remote dispatch evidence; remote backup readiness diagnostics became Loop 82 after review of the remote artifact consistency evidence; remote audit-chain verification became Loop 83 after review of the backup-readiness evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux systemd unit, an authenticated human-gate decision endpoint, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, workflow artifact consistency diagnostics, atomic run-audit emission/consistency diagnostics, targeted remote run-audit inspection, remote recurring-schedule inventory, protected remote recurring-schedule actions, bounded remote recurring-schedule dispatch diagnostics, remote workflow artifact consistency diagnostics, and remote backup readiness diagnostics, are achieved by Loops 44-82. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux systemd unit, an authenticated human-gate decision endpoint, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, workflow artifact consistency diagnostics, atomic run-audit emission/consistency diagnostics, targeted remote run-audit inspection, remote recurring-schedule inventory, protected remote recurring-schedule actions, bounded remote recurring-schedule dispatch diagnostics, remote workflow artifact consistency diagnostics, remote backup readiness diagnostics, and remote audit-chain verification, are achieved by Loops 44-83. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -1014,9 +1014,43 @@ PYTHONWARNINGS=ignore::ResourceWarning PYTHONPATH=src python3 -m unittest \
   -v
 ```
 
+### Loop 83: Remote Audit Integrity
+
+**Status:** Complete.
+
+**Prior basis:** Loop 82 let remote operators confirm the state boundary and
+scheduler lease before a host-side backup, but audit-chain tampering still
+required shell access to run the local `audit-verify` command.
+
+**Outcome:** The authenticated service now exposes `GET
+/api/v1/audit-integrity`, and the installed `service-audit-integrity` client
+reuses the fixed `skill2workflow-audit-integrity-0.1.0` payload-free result.
+Valid, invalid, and legacy-unsealed states are reported within a 16 KiB bound;
+event payloads and identifiers never cross the service boundary.
+
+**Evidence:** [`docs/remote-audit-integrity.md`](docs/remote-audit-integrity.md)
+defines the route, schema reuse, fixed errors, redaction, and safe incident
+sequence. Service, client, CLI, telemetry, package, documentation, and
+full-suite tests cover authentication, body rejection, invalid-state redaction,
+response validation, and support-bundle compatibility.
+
+**Safety boundary:** This does not repair or rewrite audit rows, export event
+payloads, sign the chain, manage keys, create backups, restore state, or claim
+operator identity or hosted compliance.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONWARNINGS=ignore::ResourceWarning PYTHONPATH=src python3 -m unittest \
+  tests.test_service.RuntimeServiceTests.test_audit_integrity_is_authenticated_payload_free_and_read_only \
+  tests.test_service_client.ServiceClientTests.test_audit_integrity_uses_authenticated_get_and_validates_contract \
+  tests.test_cli.CliTests.test_service_audit_integrity_command_prints_report \
+  -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 82 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the remote backup readiness evidence.
+This rolling queue is ordered. Loop 83 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the remote audit-integrity evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -1064,6 +1098,7 @@ This rolling queue is ordered. Loop 82 is complete and there is no active delive
 | Loop 80: Remote Recurring-Schedule Dispatch Diagnostics | Complete | Let remote operators inspect bounded dispatch outcomes, including uncertain recovery, without shell access or trigger-input exposure | Authenticated global/targeted read routes, fixed redacted schema, bounded SQLite query/response, client/CLI, telemetry/docs/package evidence |
 | Loop 81: Remote Workflow Artifact Consistency | Complete | Let remote operators verify published workflow files and registry consistency without shell access or content export | Authenticated zero-write report route, fixed value-free schema reuse, bounded issue/response windows, client/CLI, telemetry/docs/package evidence |
 | Loop 82: Remote Backup Readiness | Complete | Let remote operators confirm SQLite layout and scheduler-lease conditions before a host-side offline backup | Authenticated zero-write readiness route, fixed redacted schema, 16 KiB response bound, client/CLI, telemetry/docs/package evidence |
+| Loop 83: Remote Audit Integrity | Complete | Let remote operators verify the SQLite audit chain without shell access or event-payload export | Authenticated zero-write integrity route, fixed contract reuse, 16 KiB response bound, client/CLI, telemetry/docs/package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -1204,6 +1239,11 @@ offline SQLite backup. It excludes remote backup creation or transport,
 encryption, restore, retention, service shutdown, scheduler mutation, paths,
 lease identities, credentials, and any guarantee that a later backup cannot
 fail after the report is read.
+
+Loop 83 covers only a bounded, authenticated projection of the existing local
+SQLite audit-chain verification result. It excludes repair or rewrite, event
+payload export, digital signatures, key management, backup transport, restore,
+RBAC, hosted compliance, and operator identity claims.
 
 Selection rules:
 

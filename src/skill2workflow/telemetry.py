@@ -24,6 +24,7 @@ _ROUTES = (
     "control_snapshot",
     "workflow_artifact_report",
     "backup_readiness",
+    "audit_integrity",
     "recurring_schedule_list",
     "recurring_schedule_action",
     "recurring_schedule_dispatch_list",
