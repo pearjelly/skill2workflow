@@ -54,6 +54,13 @@ the installed `systemd-unit` command against a fixed-port copy of the secure
 bootstrap configuration, checking the generated unit's permissions, journal
 output directives, state-only write path, sandboxing, and secret redaction.
 
+The wheel is also passed through `scripts/release_manifest.py`. The
+qualification writes `release-artifact-manifest.json` under its work directory
+and reports the archive SHA-256, member SHA-256 hashes, member count, and
+manifest status. The manifest is a public, value-free integrity companion; see
+[`release-artifact-manifest.md`](release-artifact-manifest.md) for the schema
+and independent verification sequence.
+
 Before installation, the qualification opens the wheel itself. It requires
 the byte-for-byte official Apache-2.0 license under the single `dist-info`
 directory, pinned by SHA-256, verifies the name, version, license expression,
@@ -87,5 +94,6 @@ unchanged until a separately approved release is prepared.
 
 This qualification does not upload a package, create a tag, publish a GitHub
 Release, sign an artifact, generate an SBOM, prove reproducible byte-for-byte
-builds, or certify every supported operating system and Python version. Those
-remain separate release and supply-chain decisions.
+builds, or certify every supported operating system and Python version. The
+manifest is not a signature or SBOM; those remain separate release and
+supply-chain decisions.

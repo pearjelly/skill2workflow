@@ -282,6 +282,9 @@ Run the isolated wheel and console-script smoke:
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 ```
 
+The package smoke also writes a value-free release artifact manifest with the
+wheel and member SHA-256 hashes under that work directory.
+
 On Linux, verify the generated supervisor with the host's real systemd parser
 without installing or starting it:
 

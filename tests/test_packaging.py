@@ -98,6 +98,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("systemd-unit", text)
         self.assertIn('"live_snapshot_status": live_snapshot_status', text)
         self.assertIn('"systemd_unit_status": systemd_unit_status', text)
+        self.assertIn('"release_manifest_status": True', text)
+        self.assertIn("release_manifest", text)
 
     def test_release_docs_define_isolated_wheel_qualification(self):
         root = Path(__file__).resolve().parents[1]
@@ -109,6 +111,7 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("isolated wheel", release_process)
         self.assertIn("scripts/package_smoke.py", release_process)
         self.assertIn("systemd-unit", release_process)
+        self.assertIn("release-artifact-manifest", release_process)
         self.assertIn("wheel", harness)
         self.assertNotIn("verifies editable install", harness)
 
@@ -130,12 +133,15 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("project URLs", guide)
         self.assertIn("Changelog", guide)
         self.assertIn("Security", guide)
+        self.assertIn("release-artifact-manifest.md", guide)
+        self.assertIn("member SHA-256 hashes", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
-        self.assertIn("- Completed delivery loops: 1-112", roadmap)
+        self.assertIn("- Completed delivery loops: 1-113", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 112 is complete with a Grafana dashboard starter pack",
+            "- Active loop: None; Loop 113 is complete with a release artifact provenance manifest",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-112 are complete", readme)
+        self.assertIn("Delivery Loops 1-113 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
+        self.assertIn("release artifact manifest", readme)

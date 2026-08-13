@@ -56,6 +56,11 @@ python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-release-package-
 git diff --check
 ```
 
+The package smoke output includes the generated
+`release-artifact-manifest.json`; attach or publish that companion file with a
+release when users need an independently verifiable wheel hash and member
+inventory. See [`release-artifact-manifest.md`](release-artifact-manifest.md).
+
 If the preflight command already ran the unit suite, compile check, and isolated
 wheel qualification, it is acceptable to cite that output once instead of
 duplicating the logs. The package smoke must build a wheel and install that

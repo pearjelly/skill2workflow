@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a dependency-free release artifact manifest for wheels, recording the
+  archive and member SHA-256 hashes plus fixed package metadata without source
+  paths or workflow values.
 - Added an importable, read-only Grafana dashboard starter pack for the fixed service metrics, with a dependency-free JSON/privacy smoke check.
 - Added a dependency-free Prometheus alert starter pack for the fixed service metrics, with a value-free repository smoke check.
 - Added the installed `service-wait` command for bounded startup and cutover

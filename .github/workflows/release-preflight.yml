@@ -12,7 +12,10 @@ on:
       - "pyproject.toml"
       - "tests/test_release_preflight.py"
       - "scripts/package_smoke.py"
+      - "scripts/release_manifest.py"
+      - "docs/release-artifact-manifest.md"
       - "tests/test_package_smoke.py"
+      - "tests/test_release_manifest.py"
       - "tests/test_packaging.py"
       - "tests/test_changelog.py"
   workflow_dispatch:

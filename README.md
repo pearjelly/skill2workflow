@@ -169,6 +169,7 @@ explicit connector boundaries. It currently supports:
 - Verify an isolated wheel, package metadata, and the installed `skill2workflow` console script
 - Check committed Workflow DSL and LiteGraph examples for obvious secret-like connector values
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
+- Generate a value-free wheel provenance manifest with archive/member SHA-256 hashes and package metadata
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 
 ## Quickstart
@@ -318,8 +319,9 @@ python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 
 This builds a wheel, installs it into a separate virtual environment, and runs
 the installed CLI outside the repository with source-import paths disabled.
-It is the release-artifact check; the editable install below remains a
-development convenience only.
+It also writes a value-free `release-artifact-manifest.json` containing the
+archive and member hashes. It is the release-artifact check; the editable
+install below remains a development convenience only.
 
 Run the committed-fixture secret hygiene check:
 
@@ -693,10 +695,11 @@ src/skill2workflow/
   release.py      # Read-only release preflight checks
   cli.py          # Command line interface
 scripts/          # Maintainer command helpers
+  release_manifest.py # Value-free wheel provenance manifest generator
 examples/skills/  # Example SKILL.md inputs
 examples/connectors/ # Explicit local external connector fixtures
 examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
-examples/observability/ # Operator-managed Prometheus alert starter pack
+examples/observability/ # Operator-managed Prometheus alerts and Grafana dashboard
 examples/control-plane-snapshot.json # Example control-plane UI snapshot
 schemas/           # Versioned Workflow DSL and service configuration JSON Schemas
 tests/            # Unit tests
@@ -716,7 +719,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-112 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-113 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1006,6 +1009,12 @@ the same metrics. It is importable and read-only, contains no environment or
 business identifiers, and leaves datasource, access, and notification policy
 under operator control.
 
+Loop 113 adds a [release artifact manifest](docs/release-artifact-manifest.md)
+to the wheel qualification path. It records the archive and every wheel member
+with SHA-256 hashes plus fixed package metadata, without embedding source paths,
+credentials, or workflow values. It is integrity evidence, not a signature or
+SBOM.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1050,6 +1059,7 @@ See:
 - `docs/observability.md`
 - [`docs/prometheus-alerts.md`](docs/prometheus-alerts.md)
 - [`docs/grafana-dashboard.md`](docs/grafana-dashboard.md)
+- [`docs/release-artifact-manifest.md`](docs/release-artifact-manifest.md)
 - `docs/pilot-playbook.md`
 - `docs/quickstart.md`
 - `docs/release-process.md`

@@ -19,6 +19,11 @@ from pathlib import PurePosixPath
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict, List
 
+try:
+    from release_manifest import build_release_manifest, write_release_manifest
+except ImportError:  # pragma: no cover - exercised when imported as scripts.package_smoke
+    from scripts.release_manifest import build_release_manifest, write_release_manifest
+
 
 DEFAULT_WORK_DIR = Path("/tmp/skill2workflow-package-smoke")
 MATURITY_CLASSIFIER = "Development Status :: 4 - Beta"
@@ -128,6 +133,9 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     )
     wheel = _built_wheel(wheel_dir)
     wheel_contents = _inspect_wheel(wheel)
+    release_manifest = build_release_manifest(wheel)
+    release_manifest_path = work_dir / "release-artifact-manifest.json"
+    write_release_manifest(release_manifest_path, release_manifest)
     install = _run(
         [
             str(python_bin),
@@ -306,6 +314,9 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "service_doctor_status": True,
         "systemd_unit_status": systemd_unit_status,
         "live_snapshot_status": live_snapshot_status,
+        "release_manifest_status": True,
+        "release_manifest_file_count": len(release_manifest["files"]),
+        "release_artifact_sha256": release_manifest["artifact"]["sha256"],
         **wheel_contents,
         "tooling_command": tooling.splitlines()[-1] if tooling.splitlines() else "",
         "build_command": build.splitlines()[-1] if build.splitlines() else "",
