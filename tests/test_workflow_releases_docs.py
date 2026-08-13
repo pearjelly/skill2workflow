@@ -177,6 +177,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("Loop 74: Workflow Artifact Consistency", roadmap)
         self.assertIn("audit-consistency", run_audit_guide)
         self.assertIn("cross-database", run_audit_guide)
+        self.assertIn("waiting` and `interrupted`", run_audit_guide)
         self.assertEqual(
             run_audit_schema["$id"],
             "https://skill2workflow.dev/schemas/run-audit-report-0.1.0.json",

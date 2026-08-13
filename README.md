@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-101 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-102 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -950,6 +950,11 @@ missing control-plane audit evidence without replaying workflow execution or a
 human decision. The same retry contract is documented for recurring schedule
 enable/disable actions, preserving idempotent state transitions and bounded
 operator evidence.
+
+Loop 102 corrects [run-audit consistency](docs/run-audit-consistency.md) for
+paused human-gate and recovered interrupted runs. Their durable lifecycle
+events are counted exactly once, eliminating false `attention` results without
+mutating runtime state or audit history.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

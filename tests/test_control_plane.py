@@ -315,6 +315,63 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(report["summary"]["checked_runs"], 1)
         self.assertEqual(report["summary"]["attention_runs"], 0)
 
+    def test_run_audit_consistency_report_is_clean_for_waiting_run(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_approval_workflow(version="1.1.0"))
+            waiting = control.run_published_workflow("workflow_control", "1.1.0")
+
+            report = control.inspect_run_audit(run_id=waiting["run_id"])
+
+        self.assertEqual(waiting["status"], "waiting")
+        self.assertEqual(report["status"], "clean")
+        self.assertEqual(report["summary"]["attention_runs"], 0)
+
+    def test_run_audit_consistency_report_is_clean_for_interrupted_run(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.2.0"))
+            state = control.run_published_workflow("workflow_control", "1.2.0")
+            state["status"] = "interrupted"
+            state["events"] = [
+                {
+                    "type": "run_interrupted",
+                    "node_id": "start",
+                    "timestamp": "2026-08-14T00:00:01Z",
+                }
+            ]
+            control.executor.store.save(state)
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection:
+                connection.execute(
+                    "delete from audit_events where run_id = ?",
+                    (state["run_id"],),
+                )
+                connection.commit()
+            control.store.append_audit_batch(
+                [
+                    {
+                        "type": "run_started",
+                        "run_id": state["run_id"],
+                        "workflow_id": "workflow_control",
+                        "workflow_version": "1.2.0",
+                        "timestamp": "2026-08-14T00:00:00Z",
+                    },
+                    {
+                        "type": "run_interrupted",
+                        "run_id": state["run_id"],
+                        "workflow_id": "workflow_control",
+                        "workflow_version": "1.2.0",
+                        "timestamp": "2026-08-14T00:00:01Z",
+                    },
+                ]
+            )
+
+            report = control.inspect_run_audit(run_id=state["run_id"])
+
+        self.assertEqual(report["status"], "clean")
+        self.assertEqual(report["summary"]["attention_runs"], 0)
+
     def test_workflow_artifact_report_is_bounded_and_finds_registry_and_orphan_gaps(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

@@ -1417,8 +1417,16 @@ def _expected_run_audit_counts(state: RunState) -> Counter:
         expected["run_cancel_requested"] = max(
             1, expected.get("run_cancel_requested", 0)
         )
-    elif status in {"waiting", "completed", "failed", "interrupted"}:
+    elif status in {"completed", "failed"}:
         expected[f"run_{status}"] += 1
+    elif status == "waiting" and expected.get("run_waiting", 0) == 0:
+        # A human_gate_waiting event already projects the terminal waiting
+        # evidence. Do not count the current status a second time.
+        expected["run_waiting"] = 1
+    elif status == "interrupted" and expected.get("run_interrupted", 0) == 0:
+        # Recovery persists run_interrupted in the run event stream; the
+        # event itself is the terminal projection.
+        expected["run_interrupted"] = 1
     elif status == "cancelled" and expected.get("run_cancelled", 0) == 0:
         expected["run_cancelled"] = 1
     return expected

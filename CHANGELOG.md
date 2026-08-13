@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Corrected run-audit consistency projections for waiting and interrupted
+  runs: lifecycle events are no longer counted twice, so healthy paused or
+  recovered runs no longer raise false operator attention.
 - Added cross-database operator-action reconciliation for resume and
   cancellation: when durable run state commits before control-plane audit
   evidence, a safe retry repairs only the missing bounded evidence instead of

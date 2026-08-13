@@ -37,6 +37,13 @@ projection permits. `unexpected` means the audit contains an event type that
 cannot be derived from the current run state. An `attention` result is an
 operator signal, not permission to replay the workflow or a connector.
 
+The current `waiting` and `interrupted` states are each represented by their
+durable lifecycle event (`human_gate_waiting` or `run_interrupted`); the report
+does not count the status field a second time. A waiting run and a recovered
+interrupted run therefore report `clean` when their single terminal projection
+is present. This diagnostic remains read-only and does not infer provider
+outcomes.
+
 Loop 75 also emits each run lifecycle/runtime audit batch in one control-store
 transaction. SQLite therefore cannot commit `run_started` while losing the
 terminal event because a later append failed. The cross-database boundary
