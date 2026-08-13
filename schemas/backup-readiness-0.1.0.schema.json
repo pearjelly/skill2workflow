@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/backup-readiness-0.1.0.json",
+  "title": "skill2workflow remote SQLite backup readiness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "storage",
+    "state_layout_version",
+    "database_count",
+    "workflow_artifact_count",
+    "active_scheduler_lease",
+    "scheduler_database_synthesized",
+    "backup_allowed",
+    "blocking_reasons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-backup-readiness-0.1.0"
+    },
+    "status": {
+      "enum": ["ready", "blocked"]
+    },
+    "storage": {
+      "const": "sqlite"
+    },
+    "state_layout_version": {
+      "enum": [
+        "skill2workflow-sqlite-layout-legacy-unversioned",
+        "skill2workflow-sqlite-layout-0.1.0"
+      ]
+    },
+    "database_count": {
+      "const": 3
+    },
+    "workflow_artifact_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "active_scheduler_lease": {
+      "type": "boolean"
+    },
+    "scheduler_database_synthesized": {
+      "type": "boolean"
+    },
+    "backup_allowed": {
+      "type": "boolean"
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "const": "active_scheduler_lease"
+      }
+    }
+  }
+}

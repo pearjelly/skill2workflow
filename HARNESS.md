@@ -171,6 +171,10 @@ skill2workflow service-workflow-artifacts \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-backup-readiness \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
 skill2workflow service-schedule-disable schedule_hourly_report \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token

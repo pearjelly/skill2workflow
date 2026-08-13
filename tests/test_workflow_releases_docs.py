@@ -93,6 +93,23 @@ class WorkflowReleaseDocumentationTests(TestCase):
             / "plans"
             / "2026-08-13-remote-workflow-artifacts.md"
         ).read_text(encoding="utf-8")
+        backup_readiness_guide = (
+            ROOT / "docs" / "remote-backup-readiness.md"
+        ).read_text(encoding="utf-8")
+        backup_readiness_plan = (
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-08-13-remote-backup-readiness.md"
+        ).read_text(encoding="utf-8")
+        backup_readiness_schema = json.loads(
+            (
+                ROOT
+                / "schemas"
+                / "backup-readiness-0.1.0.schema.json"
+            ).read_text(encoding="utf-8")
+        )
         run_audit_schema = json.loads(
             (ROOT / "schemas" / "run-audit-report-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -200,6 +217,18 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("64 KiB", artifact_remote_guide)
         self.assertIn("No artifact repair", artifact_remote_plan)
         self.assertIn("Loop 81: Remote Workflow Artifact Consistency", roadmap)
+        self.assertIn("GET /api/v1/backup-readiness", backup_readiness_guide)
+        self.assertIn("16 KiB", backup_readiness_guide)
+        self.assertIn("active scheduler lease", backup_readiness_plan)
+        self.assertEqual(
+            backup_readiness_schema["$id"],
+            "https://skill2workflow.dev/schemas/backup-readiness-0.1.0.json",
+        )
+        self.assertEqual(
+            backup_readiness_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-backup-readiness-0.1.0",
+        )
+        self.assertIn("Loop 82: Remote Backup Readiness", roadmap)
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",
@@ -223,6 +252,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-recurring-schedules"', cli)
         self.assertIn('"service-recurring-dispatches"', cli)
         self.assertIn('"service-workflow-artifacts"', cli)
+        self.assertIn('"service-backup-readiness"', cli)
         self.assertIn('"service-schedule-enable"', cli)
         self.assertIn('"service-schedule-disable"', cli)
         self.assertIn("--expected-current-version", cli)
@@ -233,5 +263,6 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-recurring-schedules"', package_smoke)
         self.assertIn('"service-recurring-dispatches"', package_smoke)
         self.assertIn('"service-workflow-artifacts"', package_smoke)
+        self.assertIn('"service-backup-readiness"', package_smoke)
         self.assertIn('"service-schedule-enable"', package_smoke)
         self.assertIn('"service-schedule-disable"', package_smoke)

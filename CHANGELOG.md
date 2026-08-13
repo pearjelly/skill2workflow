@@ -34,6 +34,9 @@ release; Roadmap loop completion alone does not publish a new version.
   `GET /api/v1/workflow-artifacts` and the protected
   `service-workflow-artifacts` CLI, reusing the fixed value-free report with
   bounded issue and response windows.
+- Added authenticated remote backup readiness at `GET /api/v1/backup-readiness`
+  and the protected `service-backup-readiness` CLI, reusing a fixed redacted
+  report with a 16 KiB bound and active-scheduler-lease blocking semantics.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

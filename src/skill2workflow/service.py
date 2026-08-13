@@ -18,7 +18,10 @@ from pathlib import Path
 from typing import Callable, Dict, Optional
 from urllib.parse import urlsplit
 
-from .backup import inspect_state_backup_readiness
+from .backup import (
+    build_state_backup_readiness_report,
+    inspect_state_backup_readiness,
+)
 from .control_plane import LocalControlPlane
 from .credentials import DirectoryCredentialProvider
 from .dashboard import (
@@ -61,6 +64,7 @@ MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
+MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
@@ -532,6 +536,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_control_snapshot()
                 elif self.command == "GET" and path == "/api/v1/workflow-artifacts":
                     self._handle_workflow_artifact_report()
+                elif self.command == "GET" and path == "/api/v1/backup-readiness":
+                    self._handle_backup_readiness()
                 elif self.command == "GET" and path == "/api/v1/recurring-schedules":
                     self._handle_recurring_schedule_list()
                 elif self.command == "POST" and _recurring_schedule_action(path):
@@ -959,6 +965,47 @@ def _handler_for(service: RuntimeService):
                 return
             self._send_json(200, payload)
 
+        def _handle_backup_readiness(self):
+            """Serve fixed read-only preflight data for an offline backup."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "backup readiness request must not include a body"},
+                )
+                return
+            try:
+                payload = build_state_backup_readiness_report(service.config.state_dir)
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_BACKUP_READINESS_RESPONSE_BYTES:
+                    raise ValueError("backup readiness exceeds response limit")
+            except (ValueError, OSError, sqlite3.Error):
+                self._send_json(503, {"error": "backup readiness unavailable"})
+                return
+            self._send_json(200, payload)
+
         def _handle_audit_consistency(self, run_id: str = ""):
             """Serve the bounded, value-free run/audit consistency projection."""
 
@@ -1275,6 +1322,8 @@ def _request_route(method: str, path: str) -> str:
         return "control_snapshot"
     if method == "GET" and path == "/api/v1/workflow-artifacts":
         return "workflow_artifact_report"
+    if method == "GET" and path == "/api/v1/backup-readiness":
+        return "backup_readiness"
     if method == "GET" and path == "/api/v1/recurring-schedules":
         return "recurring_schedule_list"
     if method == "GET" and _recurring_schedule_dispatch_list(path) is not None:

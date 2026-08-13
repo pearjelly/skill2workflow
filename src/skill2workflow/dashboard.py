@@ -384,6 +384,7 @@ def build_support_bundle_from_control(
     http_requests.pop("recurring_schedule_action", None)
     http_requests.pop("recurring_schedule_dispatch_list", None)
     http_requests.pop("workflow_artifact_report", None)
+    http_requests.pop("backup_readiness", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests
     return {

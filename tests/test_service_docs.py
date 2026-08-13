@@ -23,12 +23,14 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("service_boundary_smoke.py", guide)
         self.assertIn("GET /api/v1/recurring-schedules", guide)
         self.assertIn("GET /api/v1/workflow-artifacts", guide)
+        self.assertIn("GET /api/v1/backup-readiness", guide)
         self.assertIn("remote-workflow-artifacts.md", guide)
+        self.assertIn("remote-backup-readiness.md", guide)
         self.assertIn("remote-schedule-inventory.md", guide)
 
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-81 are complete", readme)
+        self.assertIn("Delivery Loops 1-82 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

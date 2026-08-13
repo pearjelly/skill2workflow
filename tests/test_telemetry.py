@@ -58,6 +58,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry.observe_http("audit_consistency", 200)
             telemetry.observe_http("recurring_schedule_dispatch_list", 200)
             telemetry.observe_http("workflow_artifact_report", 200)
+            telemetry.observe_http("backup_readiness", 200)
             telemetry.observe_http("support_bundle", 200)
             telemetry.observe_http("run_list", 200)
             telemetry.observe_http("run_detail", 200)
@@ -83,6 +84,7 @@ class RuntimeTelemetryTests(TestCase):
             'skill2workflow_http_requests_total{route="recurring_schedule_action",status_class="2xx"} 0',
             'skill2workflow_http_requests_total{route="recurring_schedule_dispatch_list",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_artifact_report",status_class="2xx"} 1',
+            'skill2workflow_http_requests_total{route="backup_readiness",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="support_bundle",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="run_list",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="run_detail",status_class="2xx"} 1',
@@ -136,6 +138,7 @@ class RuntimeTelemetryTests(TestCase):
                 "health", "readiness", "metrics", "control_snapshot", "recurring_schedule_list",
                 "recurring_schedule_action", "recurring_schedule_dispatch_list",
                 "workflow_artifact_report",
+                "backup_readiness",
                 "audit_consistency",
                 "support_bundle", "run_list", "run_detail", "workflow_trigger", "run_cancel",
                 "run_resume", "unknown",

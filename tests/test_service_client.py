@@ -12,6 +12,7 @@ from skill2workflow.service_client import (
     MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES,
     MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
+    MAX_BACKUP_READINESS_RESPONSE_BYTES,
     ServiceActionError,
     post_recurring_schedule_state,
     post_run_cancel,
@@ -21,6 +22,7 @@ from skill2workflow.service_client import (
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
     fetch_workflow_artifact_report,
+    fetch_backup_readiness,
     fetch_support_bundle,
     fetch_audit_consistency,
 )
@@ -451,6 +453,80 @@ class ServiceClientTests(TestCase):
             thread.start()
             with self.assertRaises(ServiceActionError):
                 fetch_workflow_artifact_report(
+                    f"http://127.0.0.1:{server.server_port}", token_file
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
+    def test_backup_readiness_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+        payload = _backup_readiness_payload()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_backup_readiness(
+                f"http://127.0.0.1:{server.server_port}", token_file
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(
+            observed,
+            [{
+                "path": "/api/v1/backup-readiness",
+                "authorization": f"Bearer {AUTH_TOKEN}",
+            }],
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_backup_readiness_rejects_oversized_response(self):
+        body = b"x" * (MAX_BACKUP_READINESS_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_backup_readiness(
                     f"http://127.0.0.1:{server.server_port}", token_file
                 )
             thread.join(timeout=2)
@@ -1099,6 +1175,21 @@ def _workflow_artifact_report_payload():
             "truncated": False,
         },
         "issues": [{"kind": "orphaned", "artifact": "workflows/orphan.json"}],
+    }
+
+
+def _backup_readiness_payload():
+    return {
+        "schema_version": "skill2workflow-backup-readiness-0.1.0",
+        "status": "blocked",
+        "storage": "sqlite",
+        "state_layout_version": "skill2workflow-sqlite-layout-0.1.0",
+        "database_count": 3,
+        "workflow_artifact_count": 2,
+        "active_scheduler_lease": True,
+        "scheduler_database_synthesized": False,
+        "backup_allowed": False,
+        "blocking_reasons": ["active_scheduler_lease"],
     }
 
 

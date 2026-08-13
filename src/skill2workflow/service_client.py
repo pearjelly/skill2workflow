@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Dict, Optional
 from urllib.parse import urlsplit, urlunsplit
 
+from .backup import BACKUP_READINESS_SCHEMA_VERSION
 from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
@@ -36,6 +37,7 @@ MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
+MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -172,6 +174,23 @@ def fetch_workflow_artifact_report(
         max_response_bytes=MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
     )
     _validate_workflow_artifact_report(payload)
+    return payload
+
+
+def fetch_backup_readiness(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch the authenticated, read-only offline-backup preflight report."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/backup-readiness",
+        conflict_message="backup readiness unavailable",
+        max_response_bytes=MAX_BACKUP_READINESS_RESPONSE_BYTES,
+    )
+    _validate_backup_readiness(payload)
     return payload
 
 
@@ -638,6 +657,41 @@ def _validate_workflow_artifact_report(payload: Dict[str, object]) -> None:
     if payload["status"] != ("clean" if summary["issue_count"] == 0 else "attention"):
         raise ServiceActionError()
     if summary["truncated"] != (len(issues) < summary["issue_count"]):
+        raise ServiceActionError()
+
+
+def _validate_backup_readiness(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed backup-readiness contract."""
+
+    fields = {
+        "schema_version", "status", "storage", "state_layout_version", "database_count",
+        "workflow_artifact_count", "active_scheduler_lease",
+        "scheduler_database_synthesized", "backup_allowed", "blocking_reasons",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    if (
+        payload.get("schema_version") != BACKUP_READINESS_SCHEMA_VERSION
+        or payload.get("status") not in {"ready", "blocked"}
+        or payload.get("storage") != "sqlite"
+        or payload.get("state_layout_version") not in {
+            "skill2workflow-sqlite-layout-legacy-unversioned",
+            "skill2workflow-sqlite-layout-0.1.0",
+        }
+        or payload.get("database_count") != 3
+        or not _is_non_negative_integer(payload.get("workflow_artifact_count"))
+        or not isinstance(payload.get("active_scheduler_lease"), bool)
+        or not isinstance(payload.get("scheduler_database_synthesized"), bool)
+        or not isinstance(payload.get("backup_allowed"), bool)
+        or payload.get("backup_allowed") is payload.get("active_scheduler_lease")
+        or not isinstance(payload.get("blocking_reasons"), list)
+        or payload.get("blocking_reasons")
+        not in ([], ["active_scheduler_lease"])
+        or payload.get("blocking_reasons")
+        != (["active_scheduler_lease"] if payload.get("active_scheduler_lease") else [])
+        or payload.get("status")
+        != ("blocked" if payload.get("active_scheduler_lease") else "ready")
+    ):
         raise ServiceActionError()
 
 

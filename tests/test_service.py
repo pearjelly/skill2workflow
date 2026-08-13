@@ -489,6 +489,49 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("Private workflow title", json.dumps(accepted, ensure_ascii=False))
         self.assertFalse(thread.is_alive())
 
+    def test_backup_readiness_is_authenticated_and_reports_active_lease(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            denied_status, denied = _get_json(
+                f"http://{host}:{port}/api/v1/backup-readiness"
+            )
+            accepted_status, accepted = _get_json(
+                f"http://{host}:{port}/api/v1/backup-readiness",
+                token=AUTH_TOKEN,
+            )
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted["schema_version"],
+            "skill2workflow-backup-readiness-0.1.0",
+        )
+        self.assertEqual(accepted["status"], "blocked")
+        self.assertTrue(accepted["active_scheduler_lease"])
+        self.assertFalse(accepted["backup_allowed"])
+        self.assertEqual(accepted["blocking_reasons"], ["active_scheduler_lease"])
+        self.assertFalse(thread.is_alive())
+
     def test_audit_consistency_can_target_one_run_beyond_the_global_window(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

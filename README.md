@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-81 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-82 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -851,6 +851,11 @@ the authenticated service and installed `service-workflow-artifacts` client
 report missing, orphaned, invalid, oversized, and checksum-mismatched published
 artifacts with fixed bounds and no repair mutation.
 
+Loop 82 adds [remote backup readiness](docs/remote-backup-readiness.md):
+the authenticated service and installed `service-backup-readiness` client
+expose a bounded, value-free preflight for SQLite layout, artifact references,
+and active scheduler leases before the existing host-side offline backup.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -873,6 +878,7 @@ See:
 - `docs/remote-schedule-actions.md`
 - `docs/remote-schedule-dispatches.md`
 - `docs/remote-workflow-artifacts.md`
+- `docs/remote-backup-readiness.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`
 - `docs/controlled-pilot-deferral-review.md`

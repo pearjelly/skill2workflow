@@ -25,6 +25,7 @@ from .storage import verify_audit_integrity
 
 
 BACKUP_SCHEMA_VERSION = "skill2workflow-state-backup-0.1.0"
+BACKUP_READINESS_SCHEMA_VERSION = "skill2workflow-backup-readiness-0.1.0"
 STATE_LAYOUT_VERSION = CURRENT_STATE_LAYOUT_VERSION
 _DATABASES = ("control.sqlite3", "runs.sqlite3", "scheduler.sqlite3")
 _REQUIRED_TABLES = {
@@ -157,6 +158,32 @@ def inspect_state_backup_readiness(
         "workflow_artifact_count": len(records),
         "active_scheduler_lease": active_lease,
         "scheduler_database_synthesized": scheduler_synthesized,
+    }
+
+
+def build_state_backup_readiness_report(
+    state_dir: Path,
+    now_epoch: float = None,
+) -> Dict[str, object]:
+    """Return the fixed, value-free preflight projection for remote operators."""
+
+    readiness = inspect_state_backup_readiness(
+        state_dir,
+        now_epoch=now_epoch,
+        require_stopped=False,
+    )
+    active_lease = bool(readiness["active_scheduler_lease"])
+    return {
+        "schema_version": BACKUP_READINESS_SCHEMA_VERSION,
+        "status": "blocked" if active_lease else "ready",
+        "storage": "sqlite",
+        "state_layout_version": readiness["state_layout_version"],
+        "database_count": readiness["database_count"],
+        "workflow_artifact_count": readiness["workflow_artifact_count"],
+        "active_scheduler_lease": active_lease,
+        "scheduler_database_synthesized": readiness["scheduler_database_synthesized"],
+        "backup_allowed": not active_lease,
+        "blocking_reasons": ["active_scheduler_lease"] if active_lease else [],
     }
 
 
