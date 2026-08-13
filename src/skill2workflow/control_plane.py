@@ -157,6 +157,20 @@ class LocalControlPlane:
         # Verify before changing alias metadata so a corrupted release cannot
         # become reachable through a stable production target.
         self.get_workflow(workflow_id, version)
+        if self.storage == "sqlite" and hasattr(self.store, "promote_workflow_alias"):
+            return self.store.promote_workflow_alias(
+                workflow_id,
+                version,
+                normalized_alias,
+                expected_current_version=expected_current_version,
+                audit_event={
+                    "type": "workflow_promoted",
+                    "workflow_id": workflow_id,
+                    "workflow_version": version,
+                    "alias": normalized_alias,
+                    "timestamp": _now(),
+                },
+            )
         if expected_current_version:
             current_versions = _published_alias_versions(
                 index, workflow_id, normalized_alias

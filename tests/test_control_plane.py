@@ -201,6 +201,61 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(records["2.0.0"]["aliases"], ["production"])
         self.assertEqual(audit_types.count("workflow_promoted"), 2)
 
+    def test_sqlite_promotion_cas_is_atomic_across_concurrent_operators(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            bootstrap = LocalControlPlane(state_dir, storage="sqlite")
+            for version in ("1.0.0", "2.0.0", "3.0.0"):
+                bootstrap.publish_workflow(_workflow(version=version))
+            bootstrap.promote_workflow(
+                "workflow_control", "1.0.0", alias="production"
+            )
+
+            barrier = threading.Barrier(2)
+            successes = []
+            failures = []
+
+            def promote(version):
+                operator = LocalControlPlane(state_dir, storage="sqlite")
+                barrier.wait()
+                try:
+                    operator.promote_workflow(
+                        "workflow_control",
+                        version,
+                        alias="production",
+                        expected_current_version="1.0.0",
+                    )
+                except ValueError as error:
+                    failures.append(str(error))
+                else:
+                    successes.append(version)
+
+            threads = [
+                threading.Thread(target=promote, args=(version,))
+                for version in ("2.0.0", "3.0.0")
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+            records = {
+                record["version"]: record for record in bootstrap.list_workflows()
+            }
+            audit_types = [event["type"] for event in bootstrap.list_audit_events()]
+            integrity = bootstrap.verify_audit_integrity()
+
+        self.assertEqual(len(successes), 1)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("workflow alias precondition failed", failures[0])
+        winning_version = successes[0]
+        self.assertEqual(records[winning_version]["aliases"], ["production"])
+        for version, record in records.items():
+            if version != winning_version:
+                self.assertNotIn("aliases", record)
+        self.assertEqual(audit_types.count("workflow_promoted"), 2)
+        self.assertEqual(integrity["status"], "valid")
+
     def test_publish_rejects_reserved_path_segments_in_workflow_identity(self):
         for field in ("id", "version"):
             with self.subTest(field=field), TemporaryDirectory() as tmp:

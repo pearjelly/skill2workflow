@@ -131,7 +131,11 @@ For a reviewed multi-operator release, pass
 it still points to that exact published version; otherwise the command returns
 `workflow alias precondition failed: <workflow_id>@<alias>` without changing
 registry or audit state. See [`workflow-releases.md`](workflow-releases.md) for
-the structural diff command and bounded output contract.
+the structural diff command and bounded output contract. In SQLite, the
+precondition check, alias mutation, and `workflow_promoted` audit append share
+one `BEGIN IMMEDIATE` transaction, so concurrent stale promotions cannot
+overwrite a newer target. JSON remains the local-evaluation mode without
+cross-process transaction coordination.
 
 Alias resolution happens before input validation and execution. For SQLite
 idempotency, the requested alias is the durable scope: retrying the same key

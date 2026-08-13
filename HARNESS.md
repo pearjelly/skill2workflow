@@ -52,6 +52,11 @@ Before moving a stable alias, operators can use `workflow-diff` for a bounded
 structural review and pass `--expected-current-version` to `promote` for an
 optimistic-concurrency check. The diff contains checksums and structural
 identifiers, never workflow content; see [`docs/workflow-releases.md`](docs/workflow-releases.md).
+SQLite-backed promotion performs that check, the alias mutation, and the
+`workflow_promoted` audit append in one transaction; concurrent stale
+promotions therefore fail without changing the alias or audit chain. JSON
+storage remains intended for local evaluation and does not provide
+cross-process transaction coordination.
 
 Run the local scheduled-trigger smoke:
 

@@ -52,6 +52,10 @@ The `workflow-diff` output and `--expected-current-version` promotion guard are
 additive control-plane interfaces. They do not change Workflow DSL `0.1.0` or
 the meaning of an existing published version.
 
+When SQLite is the control-plane backend, the promotion guard, alias metadata
+update, and promotion audit append commit in one transaction. This hardening
+does not change the artifact contract or add fields to Workflow DSL.
+
 The runtime integrity guard is additive control-plane behavior. It does not
 change the Workflow DSL schema or canonical checksum algorithm used at
 publication. Existing records without a checksum are not executed

@@ -708,7 +708,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-71 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-72 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -781,6 +781,13 @@ Loop 69 adds [stable workflow version promotion aliases](docs/triggers.md#stable
 Loop 70 adds [published artifact integrity verification](docs/published-artifact-integrity.md): every published artifact is checked against its control-plane checksum before inspection, promotion, trigger, or execution. Missing or modified artifacts fail closed before idempotency, run, audit, or alias side effects; this is not a digital signature or remote-attestation system.
 
 Loop 71 adds [reviewable workflow releases](docs/workflow-releases.md): `workflow-diff` reports bounded structural changes without workflow values, and `promote --expected-current-version` prevents a stale operator action from overwriting a newer alias target.
+
+Loop 72 hardens [workflow release promotion](docs/workflow-releases.md):
+SQLite-backed compare-and-swap validation, alias mutation, and the
+`workflow_promoted` audit row now commit in one `BEGIN IMMEDIATE` transaction,
+so concurrent operators cannot overwrite a newer alias target. JSON remains the
+dependency-light local evaluation mode and does not claim cross-process
+transaction coordination.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

@@ -567,47 +567,88 @@ class SqliteControlStore:
                 ],
             )
 
+    def promote_workflow_alias(
+        self,
+        workflow_id: str,
+        version: str,
+        alias: str,
+        *,
+        expected_current_version: str = "",
+        audit_event: AuditEvent,
+    ) -> WorkflowRecord:
+        """Atomically move one alias and append its audit event in SQLite."""
+
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            rows = connection.execute(
+                "select record_key, record_json from workflow_versions order by record_key"
+            ).fetchall()
+            index = {
+                str(record_key): json.loads(str(record_json))
+                for record_key, record_json in rows
+            }
+            target_key = _workflow_record_key(workflow_id, version)
+            if target_key not in index:
+                raise ValueError(f"workflow version not found: {workflow_id}@{version}")
+            target = dict(index[target_key])
+            if target.get("status") != "published":
+                raise ValueError(
+                    f"workflow version is not published: {workflow_id}@{version}"
+                )
+
+            current_versions = _sqlite_published_alias_versions(
+                index, workflow_id, alias
+            )
+            if expected_current_version and current_versions != [
+                str(expected_current_version)
+            ]:
+                raise ValueError(
+                    f"workflow alias precondition failed: {workflow_id}@{alias}"
+                )
+
+            changed_keys = []
+            for key, existing in list(index.items()):
+                if str(existing.get("workflow_id", "")) != str(workflow_id):
+                    continue
+                existing_aliases = _sqlite_record_aliases(existing)
+                if alias not in existing_aliases:
+                    continue
+                updated = dict(existing)
+                existing_aliases.remove(alias)
+                if existing_aliases:
+                    updated["aliases"] = existing_aliases
+                else:
+                    updated.pop("aliases", None)
+                index[key] = updated
+                changed_keys.append(key)
+
+            target = dict(index[target_key])
+            target_aliases = _sqlite_record_aliases(target)
+            if alias not in target_aliases:
+                target_aliases.append(alias)
+                target["aliases"] = sorted(set(target_aliases))
+                index[target_key] = target
+                if target_key not in changed_keys:
+                    changed_keys.append(target_key)
+
+            if changed_keys:
+                connection.executemany(
+                    "update workflow_versions set record_json = ? where record_key = ?",
+                    [
+                        (
+                            json.dumps(index[key], ensure_ascii=False, sort_keys=True),
+                            key,
+                        )
+                        for key in changed_keys
+                    ],
+                )
+                _append_audit_connection(connection, audit_event)
+            return target
+
     def append_audit(self, event: AuditEvent) -> None:
         with self._connection() as connection:
             connection.execute("begin immediate")
-            previous_row = connection.execute(
-                "select digest from audit_events order by sequence desc limit 1"
-            ).fetchone()
-            previous_digest = (
-                str(previous_row[0]) if previous_row and previous_row[0] is not None else ""
-            )
-            payload_json = json.dumps(event, ensure_ascii=False, sort_keys=True)
-            connection.execute(
-                """
-                insert into audit_events (
-                    event_type,
-                    workflow_id,
-                    workflow_version,
-                    run_id,
-                    timestamp,
-                    payload_json,
-                    prev_digest,
-                    digest
-                )
-                values (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    _event_value(event, "type", "event"),
-                    _event_value(event, "workflow_id", ""),
-                    _event_value(event, "workflow_version", ""),
-                    _event_value(event, "run_id", ""),
-                    _event_value(event, "timestamp", ""),
-                    payload_json,
-                    previous_digest,
-                    "",
-                ),
-            )
-            sequence = int(connection.execute("select last_insert_rowid()").fetchone()[0])
-            digest = _audit_digest(sequence, previous_digest, event)
-            connection.execute(
-                "update audit_events set digest = ? where sequence = ?",
-                (digest, sequence),
-            )
+            _append_audit_connection(connection, event)
 
     def verify_audit_integrity(self) -> Dict[str, object]:
         with self._connection() as connection:
@@ -876,6 +917,70 @@ def _sqlite_connection(db_path: Path):
 def _event_value(event: Dict[str, object], key: str, default: str) -> str:
     value = event.get(key, default)
     return str(value) if value is not None else default
+
+
+def _workflow_record_key(workflow_id: str, version: str) -> str:
+    return f"{workflow_id}@{version}"
+
+
+def _sqlite_record_aliases(record: WorkflowRecord) -> List[str]:
+    aliases = record.get("aliases", [])
+    if not isinstance(aliases, list):
+        return []
+    return [str(alias) for alias in aliases if str(alias)]
+
+
+def _sqlite_published_alias_versions(
+    index: Dict[str, WorkflowRecord], workflow_id: str, alias: str
+) -> List[str]:
+    return sorted(
+        str(record.get("version", ""))
+        for record in index.values()
+        if str(record.get("workflow_id", "")) == str(workflow_id)
+        and record.get("status") == "published"
+        and alias in _sqlite_record_aliases(record)
+    )
+
+
+def _append_audit_connection(connection, event: AuditEvent) -> None:
+    previous_row = connection.execute(
+        "select digest from audit_events order by sequence desc limit 1"
+    ).fetchone()
+    previous_digest = (
+        str(previous_row[0]) if previous_row and previous_row[0] is not None else ""
+    )
+    payload_json = json.dumps(event, ensure_ascii=False, sort_keys=True)
+    connection.execute(
+        """
+        insert into audit_events (
+            event_type,
+            workflow_id,
+            workflow_version,
+            run_id,
+            timestamp,
+            payload_json,
+            prev_digest,
+            digest
+        )
+        values (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _event_value(event, "type", "event"),
+            _event_value(event, "workflow_id", ""),
+            _event_value(event, "workflow_version", ""),
+            _event_value(event, "run_id", ""),
+            _event_value(event, "timestamp", ""),
+            payload_json,
+            previous_digest,
+            "",
+        ),
+    )
+    sequence = int(connection.execute("select last_insert_rowid()").fetchone()[0])
+    digest = _audit_digest(sequence, previous_digest, event)
+    connection.execute(
+        "update audit_events set digest = ? where sequence = ?",
+        (digest, sequence),
+    )
 
 
 def _ensure_audit_integrity_schema(connection) -> None:

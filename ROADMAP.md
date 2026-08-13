@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-71
+- Completed delivery loops: 1-72
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 71 is complete with reviewable workflow releases
+- Active loop: None; Loop 72 is complete with atomic workflow alias promotion
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the workflow-release review drill
+- Next decision: select the next Production Baseline loop after reviewing the atomic promotion drill
 
 ## Production Readiness Path
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-71 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-72 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; atomic workflow alias promotion became Loop 72 after review of the release-review drill; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases are achieved by Loops 44-71. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, are achieved by Loops 44-72. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -574,9 +574,51 @@ or the single-tenant service boundary. Current maturity remains Self-hosted
 Beta until remaining Production Baseline evidence is explicitly completed and
 reviewed.
 
+### Loop 72: Atomic Workflow Alias Promotion
+
+**Status:** Complete.
+
+**Prior basis:** Loop 71 added an exact expected-version check, but SQLite
+  promotion still read the registry and wrote the full index in separate
+  operations. Two concurrent operators could both pass the check and let the
+  stale writer replace the newer alias target.
+
+**Outcome:** SQLite-backed `promote` now performs the compare-and-swap check,
+  alias mutation, and `workflow_promoted` audit append inside one
+  `BEGIN IMMEDIATE` transaction. Exactly one of two concurrent promotions that
+  observed the same expected target can commit; the losing operation returns
+  the existing fixed precondition error without changing the registry or audit
+  chain.
+
+**Evidence:** The implementation plan at
+[`docs/superpowers/plans/2026-08-13-atomic-workflow-alias-promotion.md`](docs/superpowers/plans/2026-08-13-atomic-workflow-alias-promotion.md)
+and [`docs/workflow-releases.md`](docs/workflow-releases.md) define
+  the SQLite transaction boundary and keeps JSON explicitly in local-evaluation
+  scope. Control-plane tests run two concurrent SQLite operators, assert one
+  success and one stale-precondition failure, verify the single winning alias,
+  and verify the audit chain remains valid.
+
+**Safety boundary:** This is one local SQLite transaction for one
+  single-tenant control plane. It does not add distributed locks, JSON
+  cross-process coordination, release approvals, canaries, rollback, or
+  exactly-once provider effects.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_control_plane.ControlPlaneTests.test_sqlite_promotion_cas_is_atomic_across_concurrent_operators \
+  -v
+```
+
+Loop 72 closes the SQLite stale-writer gap without changing Workflow DSL
+`0.1.0` or the single-tenant service boundary. Current maturity remains
+Self-hosted Beta until remaining Production Baseline evidence is explicitly
+completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 71 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the workflow-release evidence.
+This rolling queue is ordered. Loop 72 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the atomic promotion evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -613,6 +655,7 @@ This rolling queue is ordered. Loop 71 is complete and there is no active delive
 | Loop 69: Stable Workflow Version Promotion Aliases | Complete | Let operators roll an immutable workflow release forward without editing every trigger target | Bounded alias metadata, `promote` CLI, exact-version precedence, deprecation cleanup, alias-scoped idempotency replay, and JSON/SQLite evidence |
 | Loop 70: Published Artifact Integrity Verification | Complete | Refuse modified or unverifiable published artifacts before they can be inspected, promoted, triggered, or executed | Canonical registry checksum verification, fixed redacted failures, promotion side-effect suppression, and JSON/SQLite runtime tests |
 | Loop 71: Reviewable Workflow Releases | Complete | Let operators inspect bounded version structure and prevent stale alias promotions | `workflow-diff` contract, structural redaction, compare-and-swap promotion precondition, and JSON/SQLite/CLI evidence |
+| Loop 72: Atomic Workflow Alias Promotion | Complete | Prevent concurrent SQLite operators from overwriting a newer reviewed alias target | Transactional compare-and-swap, alias mutation, audit append, concurrent-operator test, and valid-chain evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -696,6 +739,12 @@ expected-current-version check for one local alias. It excludes semantic
 business-risk analysis, approval policy, canary traffic, automatic rollback,
 signatures, hosted release orchestration, and multi-tenant coordination.
 
+Loop 72 covers only the SQLite transaction boundary for one local alias
+promotion: the exact expected-version check, registry mutation, and promotion
+audit append commit together. It excludes distributed locks, JSON
+cross-process coordination, release approvals, canary traffic, automatic
+rollback, signatures, and exactly-once provider effects.
+
 Selection rules:
 
 - Merge or explicitly defer the current loop before starting the next one.
@@ -713,7 +762,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, bounded active timeout policy, human gates, retry/recovery policy, run context, connector events, and verifiable SQLite audit evidence |
-| Control plane | Publish immutable workflow versions, promote stable aliases, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, and write a redacted support bundle |
+| Control plane | Publish immutable workflow versions, transactionally promote stable SQLite aliases, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, and write a redacted support bundle |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:
@@ -801,6 +850,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 69: Stable Workflow Version Promotion Aliases | Complete | Bounded workflow aliases, explicit promotion, exact-version precedence, deprecation cleanup, and alias-scoped replay-safe trigger resolution |
 | Loop 70: Published Artifact Integrity Verification | Complete | Registry checksum verification before artifact reads, promotion, trigger validation, and execution, with fixed redacted failures and side-effect suppression |
 | Loop 71: Reviewable Workflow Releases | Complete | Bounded structural `workflow-diff`, value redaction, and compare-and-swap alias promotion protection |
+| Loop 72: Atomic Workflow Alias Promotion | Complete | SQLite transactionally couples compare-and-swap validation, alias mutation, and the promotion audit append under concurrent operators |
 
 ## Release Direction
 
