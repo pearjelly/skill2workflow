@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added deterministic service teardown: scheduler startup failures now close the
+  listener, and scheduler cleanup failures cannot leave the port bound or stop
+  the service from reaching the final `stopped` lifecycle state.
 - Added lifecycle event-logger isolation: operational collector failures can no
   longer abort service startup, strand scheduler threads, raise from shutdown
   callbacks, or mask final cleanup; lifecycle logging remains best-effort.

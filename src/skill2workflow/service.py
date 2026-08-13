@@ -343,19 +343,35 @@ class RuntimeService:
             self._log_lifecycle("draining")
 
     def serve(self, ready_callback: Optional[Callable[["RuntimeService"], None]] = None) -> None:
-        self.scheduler.start()
-        self._status = "ready"
-        self._log_lifecycle("ready")
+        had_primary_error = False
         try:
-            if ready_callback:
-                ready_callback(self)
-            while self._status == "ready":
-                self._server.handle_request()
+            try:
+                self.scheduler.start()
+                self._status = "ready"
+                self._log_lifecycle("ready")
+                if ready_callback:
+                    ready_callback(self)
+                while self._status == "ready":
+                    self._server.handle_request()
+            except BaseException:
+                had_primary_error = True
+                raise
         finally:
-            self._server.server_close()
-            self.scheduler.stop()
-            self._status = "stopped"
-            self._log_lifecycle("stopped")
+            cleanup_error = None
+            try:
+                self._server.server_close()
+            except BaseException as error:
+                cleanup_error = error
+            try:
+                self.scheduler.stop()
+            except BaseException as error:
+                if cleanup_error is None:
+                    cleanup_error = error
+            finally:
+                self._status = "stopped"
+                self._log_lifecycle("stopped")
+            if cleanup_error is not None and not had_primary_error:
+                raise cleanup_error
 
     def _log_lifecycle(self, status: str) -> None:
         if self.event_logger is None:

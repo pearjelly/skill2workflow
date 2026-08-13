@@ -52,6 +52,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Fixed process-local business-request admission of 16 active handlers, `429`/`Retry-After` rejection, and probe availability documented in `docs/service.md`
 - Exact `Content-Length` request-body reads with a fixed five-second socket deadline, stable `408` `request timed out` and `400` `request body incomplete` errors, and no partial-trigger execution for the service and loopback webhook adapter, without changing connector execution deadlines
 - The authenticated service converts unexpected request-dispatch exceptions into the fixed `503` `service unavailable` response, suppresses exception details and second writes after connection aborts, and treats telemetry/event logging as best-effort across both request and lifecycle paths
+- Service startup and teardown always close the listener and publish `stopped` after scheduler cleanup attempts, while preserving the original scheduler failure for the caller
 - Local webhook route and response shape documented in `docs/triggers.md`
 - Self-hosted service configuration `skill2workflow-service-0.2.0` and its published JSON Schema
 - Local `service-token-rotate` and `skill2workflow-service-token-rotation-result-0.1.0` preserve owner-only atomic ingress-token replacement without returning the secret

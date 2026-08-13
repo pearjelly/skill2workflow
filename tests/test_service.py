@@ -1748,6 +1748,65 @@ class RuntimeServiceTests(TestCase):
 
         self.assertEqual(service.status, "stopped")
 
+    def test_scheduler_start_failure_closes_listener_and_marks_stopped(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+            host, port = service.server_address
+
+            with patch.object(
+                service.scheduler,
+                "start",
+                side_effect=RuntimeError("scheduler startup failed"),
+            ), self.assertRaisesRegex(RuntimeError, "scheduler startup failed"):
+                service.serve()
+
+            replacement = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                replacement.bind((host, port))
+            finally:
+                replacement.close()
+
+        self.assertEqual(service.status, "stopped")
+
+    def test_scheduler_cleanup_failure_does_not_mask_startup_failure(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+
+            with patch.object(
+                service.scheduler,
+                "start",
+                side_effect=RuntimeError("scheduler startup failed"),
+            ), patch.object(
+                service.scheduler,
+                "stop",
+                side_effect=RuntimeError("scheduler shutdown failed"),
+            ), self.assertRaisesRegex(RuntimeError, "scheduler startup failed"):
+                service.serve()
+
+        self.assertEqual(service.status, "stopped")
+
+    def test_scheduler_stop_failure_still_closes_listener_and_marks_stopped(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+            host, port = service.server_address
+
+            with patch.object(service.scheduler, "start"), patch.object(
+                service.scheduler,
+                "stop",
+                side_effect=RuntimeError("scheduler shutdown failed"),
+            ), self.assertRaisesRegex(RuntimeError, "scheduler shutdown failed"):
+                service.serve(
+                    ready_callback=lambda running: running.begin_shutdown(),
+                )
+
+            replacement = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                replacement.bind((host, port))
+            finally:
+                replacement.close()
+
+        self.assertEqual(service.status, "stopped")
+
     def test_service_exposes_health_readiness_and_graceful_draining(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

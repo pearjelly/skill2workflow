@@ -67,6 +67,10 @@ handler, or mask shutdown cleanup. Durable workflow audit events remain the
 source of business evidence; an operational log gap must be investigated as an
 observability incident rather than treated as a workflow-state failure.
 
+Lifecycle cleanup does not depend on successful event delivery: the listener
+and scheduler teardown path remain authoritative even when the collector is
+unavailable.
+
 ## Verification
 
 Run the real-process observability drill:
