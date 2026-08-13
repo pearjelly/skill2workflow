@@ -8,6 +8,7 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a dependency-free Prometheus alert starter pack for the fixed service metrics, with a value-free repository smoke check.
 - Added the installed `service-wait` command for bounded startup and cutover
   readiness polling using the existing unauthenticated probe contract; it
   prints only the final fixed probe payload and preserves stable exit codes.

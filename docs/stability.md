@@ -77,6 +77,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Optional `tool_call.on_fallback` transition semantics, edge validation, LiteGraph slot projection, and fixed `node_fallback` evidence documented in `docs/workflow-dsl-contract.md`
 - SQLite audit integrity result contract `skill2workflow-audit-integrity-0.1.0` and the payload-free `audit-verify` CLI; this does not claim signatures or JSON/JSONL chain guarantees
 - Authenticated Prometheus text metric names, fixed label vocabularies, live HTTP/scheduler pressure gauges, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`
+- The operator-managed `examples/observability/prometheus-alerts.yml` starter pack and its fixed-metric safety checks are documented in `docs/prometheus-alerts.md`; it adds no runtime route, dependency, or automatic remediation
 - Authenticated `GET /metrics` zero-body request validation: malformed,
   transfer-encoded, oversized, and non-empty scraper bodies use the shared
   bounded request error contract before telemetry rendering
@@ -115,7 +116,7 @@ These surfaces may change while the project learns from real workflows:
 - SQLite table internals beyond the published state-layout identity and supported migration path
 - Executor event taxonomy beyond documented audit examples
 - Future remote mutation APIs, browser credential sessions, and live UI polling beyond the fixed read-only snapshot boundary
-- Observability backends, alert rules, dashboards, tracing, histograms, and per-node telemetry beyond the fixed Loop 46 export contract
+- Observability backends, dashboards, tracing, histograms, and per-node telemetry beyond the fixed Loop 46 export contract and the Loop 111 alert starter pack
 - Forceful connector abort, provider compensation, bulk cancellation, cancellation deadlines, automatic workflow replay or provider reconciliation, distributed ownership, and exactly-once execution beyond the fixed Loop 48 cancellation, Loop 49 interruption, and Loop 101 operator-retry contracts
 - Legal-policy automation, backup expiration, media erasure, and online retention beyond the fixed copy-on-write contract
 

@@ -143,6 +143,7 @@ explicit connector boundaries. It currently supports:
 - Resolve connector credentials at execution time through private, bounded, descriptor-bound files while preserving atomic rotation
 - Require file-backed Bearer authentication for service business routes and resolve mounted connector credentials at execution time
 - Export authenticated low-cardinality Prometheus metrics and allowlisted operational NDJSON without workflow, run, request, or credential values
+- Ship a dependency-free Prometheus alert starter pack for readiness, lease, uncertain-dispatch, saturation, and server-error signals
 - Request authenticated, durable, idempotent cooperative cancellation without claiming that in-flight external requests were aborted
 - Fence process-lost executions as `interrupted` after lease takeover without replaying an unknown external side effect
 - Plan and publish verified retained SQLite copies that remove expired terminal run payloads while preserving waiting work and the source
@@ -685,6 +686,7 @@ src/skill2workflow/
   recurring_scheduler_smoke.py # Restart, missed-run, and lease-takeover evidence
   backup_restore_smoke.py # Point-in-time restore and restored-service drill
   observability_smoke.py # Authenticated metrics and operational-log drill
+  observability_rules_smoke.py # Fixed Prometheus alert-pack contract check
   retention_smoke.py # Stopped-state retention and cutover drill
   cancellation_smoke.py # Concurrent request and cooperative stop drill
   release.py      # Read-only release preflight checks
@@ -693,6 +695,7 @@ scripts/          # Maintainer command helpers
 examples/skills/  # Example SKILL.md inputs
 examples/connectors/ # Explicit local external connector fixtures
 examples/workflows/ # Example Workflow DSL and LiteGraph graph JSON
+examples/observability/ # Operator-managed Prometheus alert starter pack
 examples/control-plane-snapshot.json # Example control-plane UI snapshot
 schemas/           # Versioned Workflow DSL and service configuration JSON Schemas
 tests/            # Unit tests
@@ -712,7 +715,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-110 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-111 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -992,6 +995,11 @@ poller for startup and cutover automation. It reuses the existing public probe
 contract, prints only the final fixed payload, and never adds a new service
 route or credential requirement.
 
+Loop 111 adds a ready-to-review [Prometheus alert starter pack](docs/prometheus-alerts.md)
+for the fixed metrics surface. It stays operator-managed and dependency-free,
+uses only fixed low-cardinality labels, and never mutates workflow or service
+state.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1034,6 +1042,7 @@ See:
 - `docs/data-retention.md`
 - `docs/examples.md`
 - `docs/observability.md`
+- [`docs/prometheus-alerts.md`](docs/prometheus-alerts.md)
 - `docs/pilot-playbook.md`
 - `docs/quickstart.md`
 - `docs/release-process.md`

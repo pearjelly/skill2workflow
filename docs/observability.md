@@ -117,4 +117,4 @@ execution outcome. It may fall to zero while a connector's external outcome is
 still uncertain after a handler returns; use durable dispatch/run/audit evidence
 for recovery decisions.
 
-Loop 46 does not add tracing, per-node latency, exemplars, histograms, alert rules, dashboards, log rotation, remote metric storage, OpenTelemetry, or multi-process metric aggregation. In-memory HTTP counters, in-flight requests, and uptime reset on restart. Durable workflow diagnosis continues to use the existing audit and run-state surfaces.
+Loop 46 does not add tracing, per-node latency, exemplars, histograms, dashboards, log rotation, remote metric storage, OpenTelemetry, or multi-process metric aggregation. Loop 111 adds only the operator-managed, dependency-free alert starter pack in [`prometheus-alerts.md`](prometheus-alerts.md); it does not add an alert manager, notification routing, or automatic remediation. In-memory HTTP counters, in-flight requests, and uptime reset on restart. Durable workflow diagnosis continues to use the existing audit and run-state surfaces.

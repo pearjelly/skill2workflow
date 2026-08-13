@@ -28,6 +28,7 @@ jobs:
       - run: python scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
       - run: python scripts/security_boundary_smoke.py --work-dir /tmp/skill2workflow-security-ci
       - run: python scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-ci
+      - run: python scripts/observability_rules_smoke.py
       - run: python scripts/service_boundary_smoke.py --work-dir /tmp/skill2workflow-service-boundary-ci
       - run: python scripts/secret_hygiene.py examples/workflows
       - run: python scripts/secret_hygiene.py --repository-root .

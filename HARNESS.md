@@ -110,10 +110,11 @@ Run the authenticated observability evidence:
 
 ```bash
 python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-loop46
+python3 scripts/observability_rules_smoke.py
 python3 -m json.tool /tmp/skill2workflow-observability-loop46/observability-smoke.json >/tmp/skill2workflow-observability-check.json
 ```
 
-This real-process smoke proves default-deny metrics, authenticated Prometheus text export, aggregate workflow/run state, fixed low-cardinality labels, private-value exclusion, and structured lifecycle/request NDJSON.
+This real-process smoke proves default-deny metrics, authenticated Prometheus text export, aggregate workflow/run state, fixed low-cardinality labels, private-value exclusion, and structured lifecycle/request NDJSON. The companion rules smoke checks the operator-managed alert starter pack without requiring Prometheus or adding a runtime dependency.
 
 Run the data retention/disposal evidence:
 

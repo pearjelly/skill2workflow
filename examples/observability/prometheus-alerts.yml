@@ -1,0 +1,52 @@
+# Prometheus alerting rules for the fixed skill2workflow service metrics.
+#
+# Import this file into the operator-managed Prometheus configuration after
+# reviewing the notification policy. The rules intentionally use only the
+# fixed low-cardinality labels exported by the service.
+groups:
+  - name: skill2workflow.service
+    rules:
+      - alert: Skill2WorkflowServiceNotReady
+        expr: skill2workflow_service_ready == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: skill2workflow service is not ready
+          description: The service has not reported ready for five minutes; remove it from traffic and inspect service-doctor, runtime-info, and metrics.
+
+      - alert: Skill2WorkflowSchedulerLeaseLost
+        expr: skill2workflow_service_ready == 1 and skill2workflow_scheduler_lease_owned == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: skill2workflow scheduler lease is not owned
+          description: The service reports ready but does not own the recurring-scheduler lease; inspect scheduler state before enabling traffic that depends on recurring dispatch.
+
+      - alert: Skill2WorkflowUncertainDispatch
+        expr: skill2workflow_schedule_dispatches{status="uncertain"} > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: skill2workflow has an uncertain recurring dispatch
+          description: A recurring dispatch may have an unknown external outcome; follow the dispatch recovery procedure and do not blindly create a duplicate.
+
+      - alert: Skill2WorkflowBusinessRequestSaturation
+        expr: skill2workflow_service_inflight_requests >= 16
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: skill2workflow business request admission is saturated
+          description: All fixed business-request admission slots have been occupied for five minutes; inspect slow handlers, connector timeouts, and external traffic before increasing capacity.
+
+      - alert: Skill2WorkflowHttp5xxResponses
+        expr: increase(skill2workflow_http_requests_total{status_class="5xx"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: skill2workflow returned a server error
+          description: The service recorded at least one 5xx response in the last five minutes; correlate with redacted run and operational evidence without exporting request values.
