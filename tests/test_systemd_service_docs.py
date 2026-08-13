@@ -20,6 +20,7 @@ class SystemdServiceDocumentationTests(TestCase):
         self.assertIn("does not escalate to `SIGKILL`", guide)
         self.assertIn("does not provide system account provisioning", normalized)
         self.assertIn("scripts/systemd_service_smoke.py", guide)
+        self.assertIn("--systemd-analyze-verify", guide)
 
     def test_public_docs_and_roadmap_record_loop_56_without_overclaiming(self):
         root = Path(__file__).resolve().parents[1]

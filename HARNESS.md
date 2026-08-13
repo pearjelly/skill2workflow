@@ -119,6 +119,15 @@ Run the isolated wheel and console-script smoke:
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 ```
 
+On Linux, verify the generated supervisor with the host's real systemd parser
+without installing or starting it:
+
+```bash
+python3 scripts/systemd_service_smoke.py \
+  --work-dir /tmp/skill2workflow-systemd-service-linux \
+  --systemd-analyze-verify
+```
+
 Run the committed-fixture secret hygiene check:
 
 ```bash

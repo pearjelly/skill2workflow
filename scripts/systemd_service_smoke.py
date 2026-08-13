@@ -22,6 +22,11 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--work-dir", type=Path, default=DEFAULT_WORK_DIR)
     parser.add_argument("--no-reset", action="store_true")
+    parser.add_argument(
+        "--systemd-analyze-verify",
+        action="store_true",
+        help="also run systemd-analyze verify against the generated unit",
+    )
     args = parser.parse_args(argv)
 
     work_dir = args.work_dir.resolve()
@@ -39,6 +44,7 @@ def main(argv=None) -> int:
     config_file = Path(initialized["config_file"])
     token = Path(initialized["token_file"]).read_text(encoding="utf-8").strip()
     unit_file = work_dir / "skill2workflow-team-a.service"
+    service_user = "root" if args.systemd_analyze_verify else "skill2workflow"
     generated = _run_cli(
         "systemd-unit",
         "--config",
@@ -46,9 +52,9 @@ def main(argv=None) -> int:
         "--output",
         str(unit_file),
         "--service-user",
-        "skill2workflow",
+        service_user,
         "--service-group",
-        "skill2workflow",
+        service_user,
         "--executable",
         str(executable),
     )
@@ -61,10 +67,14 @@ def main(argv=None) -> int:
         "--output",
         str(unit_file),
         "--service-user",
-        "skill2workflow",
+        service_user,
         "--executable",
         str(executable),
     )
+
+    systemd_verification = None
+    if args.systemd_analyze_verify:
+        systemd_verification = _verify_systemd_unit(unit_file)
 
     checks = {
         "cli_wrote_expected_unit": (
@@ -99,11 +109,15 @@ def main(argv=None) -> int:
         and "must not already exist" in duplicate.stderr
         and token not in duplicate.stderr,
     }
+    if systemd_verification is not None:
+        checks["systemd_analyze_verify"] = systemd_verification["status"] == "passed"
     evidence = {
         "schema_version": "skill2workflow-systemd-service-evidence-0.1.0",
         "status": "passed" if all(checks.values()) else "failed",
         "checks": checks,
     }
+    if systemd_verification is not None:
+        evidence["systemd_analyze_verify"] = systemd_verification
     print(json.dumps(evidence, ensure_ascii=False, indent=2))
     return 0 if evidence["status"] == "passed" else 1
 
@@ -140,6 +154,26 @@ def _run_cli_process(*arguments):
         text=True,
         timeout=10,
     )
+
+
+def _verify_systemd_unit(unit_file: Path):
+    analyzer = shutil.which("systemd-analyze")
+    if not analyzer:
+        return {"status": "failed", "code": "systemd_analyze_missing"}
+    try:
+        process = subprocess.run(
+            [analyzer, "verify", str(unit_file)],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {"status": "failed", "code": "systemd_analyze_unavailable"}
+    return {
+        "status": "passed" if process.returncode == 0 else "failed",
+        "code": "verified" if process.returncode == 0 else "systemd_analyze_rejected",
+    }
 
 
 def _available_port() -> int:

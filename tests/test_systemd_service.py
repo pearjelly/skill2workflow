@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from skill2workflow.service_bootstrap import initialize_service_workspace
 from skill2workflow.systemd_service import write_systemd_service_unit
+from scripts.systemd_service_smoke import _verify_systemd_unit
 
 
 class SystemdServiceUnitTests(TestCase):
@@ -67,6 +68,29 @@ class SystemdServiceUnitTests(TestCase):
         self.assertIn("WantedBy=multi-user.target", content)
         self.assertNotIn("t" * 48, content)
         self.assertNotIn("Environment=", content)
+
+    @patch("scripts.systemd_service_smoke.shutil.which", return_value="/usr/bin/systemd-analyze")
+    @patch("scripts.systemd_service_smoke.subprocess.run")
+    def test_optional_systemd_verify_returns_only_bounded_status(self, run, _which):
+        run.return_value.returncode = 0
+
+        result = _verify_systemd_unit(Path("/tmp/example.service"))
+
+        self.assertEqual(result, {"status": "passed", "code": "verified"})
+        run.assert_called_once_with(
+            ["/usr/bin/systemd-analyze", "verify", "/tmp/example.service"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+
+    @patch("scripts.systemd_service_smoke.shutil.which", return_value=None)
+    def test_optional_systemd_verify_fails_closed_when_analyzer_is_missing(self, _which):
+        self.assertEqual(
+            _verify_systemd_unit(Path("/tmp/example.service")),
+            {"status": "failed", "code": "systemd_analyze_missing"},
+        )
 
     def test_rejects_existing_output_and_unsafe_service_identity_or_path(self):
         with TemporaryDirectory() as tmp:

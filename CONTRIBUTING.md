@@ -48,6 +48,10 @@ console script outside the checkout with source-import paths disabled:
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 ```
 
+On Linux, run the systemd smoke with `--systemd-analyze-verify` to exercise the
+host parser against the generated unit. This check never installs, enables, or
+starts a service; the same verification runs in the Linux CI job.
+
 Run a fresh-checkout CLI smoke:
 
 ```bash

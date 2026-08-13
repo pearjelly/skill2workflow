@@ -117,8 +117,19 @@ python3 scripts/systemd_service_smoke.py \
 ```
 
 This drill is generator evidence, not proof that a particular Linux host has
-accepted or started the unit. On each deployment target, run `service-doctor`,
-`systemd-analyze verify`, then explicitly review and enable the unit.
+accepted or started the unit. On Linux, the same smoke can include the real
+systemd parser and directive verifier without changing host state:
+
+```bash
+python3 scripts/systemd_service_smoke.py \
+  --work-dir /tmp/skill2workflow-systemd-service-linux \
+  --systemd-analyze-verify
+```
+
+The repository CI runs this Linux-only mode on every change. On each
+deployment target, still run `service-doctor`, `systemd-analyze verify`, then
+explicitly review and enable the unit because distribution versions and local
+account policy remain host-specific.
 
 ## Boundary
 

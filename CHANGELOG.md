@@ -18,6 +18,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added descriptor-bound connector credential reads with private-directory and file permissions, no-follow identity checks, a 64 KiB limit, and execution-time atomic rotation.
 - Added authenticated live Operator snapshots with a machine-readable schema, consistent collection windows, fixed byte bounds, a safe no-redirect CLI client, zero-write polling, and owner-only atomic output.
 - Added a manually reviewed Linux systemd unit generator with non-overwriting output, state-only write access, fixed hardening directives, restart backoff, and SIGTERM-only shutdown.
+- Added a Linux CI gate that runs `systemd-analyze verify` against a generated unit without installing or starting a service.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed
@@ -25,6 +26,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Advanced the documented maturity to Self-hosted Beta while retaining the single-tenant, one-team deployment boundary.
 - Qualified the distributed wheel through an isolated build and install, production CLI coverage, metadata inspection, license verification, and private-artifact exclusion.
 - Expanded the supported interpreter evidence to Python 3.9 through 3.14 while keeping runtime code dependency-light.
+- Updated the pinned GitHub Actions toolchain to the green Dependabot revisions for checkout 7.0.1 and setup-python 7.0.0.
 
 ### Security
 

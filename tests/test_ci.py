@@ -32,3 +32,13 @@ class ContinuousIntegrationContractTests(TestCase):
 
         self.assertIn("Python 3.9 and 3.14", guide)
         self.assertIn("supported floor", guide)
+        self.assertIn("--systemd-analyze-verify", guide)
+
+    def test_ci_verifies_generated_systemd_units_on_linux(self):
+        workflow = (
+            Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("systemd-verify:", workflow)
+        self.assertIn("systemd_service_smoke.py", workflow)
+        self.assertIn("--systemd-analyze-verify", workflow)
