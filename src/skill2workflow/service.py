@@ -520,8 +520,11 @@ def _handler_for(service: RuntimeService):
                     self._handle_metrics()
                 elif self.command == "GET" and path == "/api/v1/control-snapshot":
                     self._handle_control_snapshot()
-                elif self.command == "GET" and path == "/api/v1/audit-consistency":
-                    self._handle_audit_consistency()
+                elif self.command == "GET" and (
+                    path == "/api/v1/audit-consistency"
+                    or _audit_consistency_run_id(path)
+                ):
+                    self._handle_audit_consistency(_audit_consistency_run_id(path))
                 elif self.command == "GET" and path == "/api/v1/support-bundle":
                     self._handle_support_bundle()
                 elif self.command == "GET" and path == "/runs":
@@ -714,7 +717,7 @@ def _handler_for(service: RuntimeService):
                 return
             self._send_json(200, payload)
 
-        def _handle_audit_consistency(self):
+        def _handle_audit_consistency(self, run_id: str = ""):
             """Serve the bounded, value-free run/audit consistency projection."""
 
             authenticated, reason = service.authenticator.authenticate(
@@ -746,7 +749,7 @@ def _handler_for(service: RuntimeService):
                 )
                 return
             try:
-                payload = service.control_plane.inspect_run_audit()
+                payload = service.control_plane.inspect_run_audit(run_id=run_id)
                 encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
                 if len(encoded) > MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES:
                     raise ValueError("audit consistency exceeds response limit")
@@ -1030,6 +1033,8 @@ def _request_route(method: str, path: str) -> str:
         return "control_snapshot"
     if method == "GET" and path == "/api/v1/audit-consistency":
         return "audit_consistency"
+    if method == "GET" and _audit_consistency_run_id(path):
+        return "audit_consistency"
     if method == "GET" and path == "/api/v1/support-bundle":
         return "support_bundle"
     if method == "GET" and path == "/runs":
@@ -1071,6 +1076,20 @@ def _run_detail_id(path: str) -> str:
     if len(parts) != 3 or parts[0] or parts[1] != "runs":
         return ""
     run_id = parts[2]
+    if (
+        not run_id.startswith("run_")
+        or len(run_id) > 128
+        or any(not (char.isalnum() or char in {"_", "-"}) for char in run_id)
+    ):
+        return ""
+    return run_id
+
+
+def _audit_consistency_run_id(path: str) -> str:
+    parts = path.split("/")
+    if len(parts) != 5 or parts[:3] != ["", "api", "v1"] or parts[3] != "audit-consistency":
+        return ""
+    run_id = parts[4]
     if (
         not run_id.startswith("run_")
         or len(run_id) > 128

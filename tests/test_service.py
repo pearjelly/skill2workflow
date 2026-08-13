@@ -217,6 +217,42 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(report["summary"]["run_count"], 0)
         self.assertEqual(service.status, "starting")
         self.assertFalse(thread.is_alive())
+
+    def test_audit_consistency_can_target_one_run_beyond_the_global_window(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            run = control.run_published_workflow("workflow_service", "0.1.0")
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/api/v1/audit-consistency/{run['run_id']}"
+            status, report = _get_json(url, token=AUTH_TOKEN)
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(report["summary"]["run_count"], 1)
+        self.assertEqual(report["summary"]["checked_runs"], 1)
+        self.assertEqual(report["runs"][0]["run_id"], run["run_id"])
+        self.assertFalse(report["summary"]["truncated"])
+        self.assertFalse(thread.is_alive())
     def test_business_routes_fail_fast_when_admission_budget_is_exhausted_but_probes_remain_available(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -92,6 +92,63 @@ class ServiceClientTests(TestCase):
             server.server_close()
 
         self.assertFalse(thread.is_alive())
+
+    def test_audit_consistency_can_target_one_safe_run_id(self):
+        observed = []
+        payload = _audit_consistency_payload()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(self.path)
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_audit_consistency(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                run_id=RUN_ID,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed, [f"/api/v1/audit-consistency/{RUN_ID}"])
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_consistency_rejects_unsafe_target_before_network_access(self):
+        contacted = threading.Event()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                contacted.set()
+                _send_json(self, 200, _audit_consistency_payload())
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            with self.assertRaises(ValueError):
+                fetch_audit_consistency(
+                    f"http://127.0.0.1:{server.server_port}",
+                    token_file,
+                    run_id="../private",
+                )
+            server.server_close()
+
+        self.assertFalse(contacted.is_set())
     def test_support_bundle_uses_authenticated_get_and_validates_contract(self):
         observed = []
         payload = _support_bundle_payload()

@@ -14,6 +14,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added authenticated remote `GET /api/v1/audit-consistency` and the protected
   `service-audit-consistency` CLI, reusing the exact redacted report contract
   with a fixed response bound and zero-write/readiness-independent behavior.
+- Added targeted remote audit inspection with a safe `/run_id` path and
+  `service-audit-consistency --run-id`, avoiding global-window truncation while
+  preserving the fixed report and error boundaries.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

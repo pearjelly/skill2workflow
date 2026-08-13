@@ -151,13 +151,18 @@ def fetch_support_bundle(
 def fetch_audit_consistency(
     service_url: str,
     token_file: Path,
+    run_id: str = "",
 ) -> Dict[str, object]:
     """Fetch the bounded, authenticated run/audit consistency projection."""
 
+    normalized_run_id = _validate_run_id(run_id) if run_id else ""
+    path = "/api/v1/audit-consistency"
+    if normalized_run_id:
+        path += f"/{normalized_run_id}"
     payload = _get_json(
         service_url,
         token_file,
-        "/api/v1/audit-consistency",
+        path,
         conflict_message="audit consistency unavailable",
         max_response_bytes=MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
     )

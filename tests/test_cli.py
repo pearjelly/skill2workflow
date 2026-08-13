@@ -247,6 +247,44 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_audit_consistency_command_accepts_one_run_id(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-run-audit-report-0.1.0",
+            "status": "clean",
+            "summary": {
+                "run_count": 1,
+                "checked_runs": 1,
+                "attention_runs": 0,
+                "missing_events": 0,
+                "duplicate_events": 0,
+                "unexpected_events": 0,
+                "truncated": False,
+            },
+            "runs": [],
+        }
+        with patch(
+            "skill2workflow.cli.fetch_audit_consistency",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-audit-consistency",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                        "--run-id",
+                        "run_remote_1",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example", token_file, "run_remote_1")
+
     def test_service_support_bundle_writes_private_output(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

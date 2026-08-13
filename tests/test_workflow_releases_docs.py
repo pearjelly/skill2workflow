@@ -35,6 +35,13 @@ class WorkflowReleaseDocumentationTests(TestCase):
         remote_audit_guide = (ROOT / "docs" / "remote-audit-consistency.md").read_text(
             encoding="utf-8"
         )
+        targeted_audit_plan = (
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-08-13-targeted-remote-audit.md"
+        ).read_text(encoding="utf-8")
         run_audit_schema = json.loads(
             (ROOT / "schemas" / "run-audit-report-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -89,6 +96,10 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("Loop 76: Remote Run Audit Consistency", roadmap)
         self.assertIn("GET /api/v1/audit-consistency", remote_audit_guide)
         self.assertIn("service-audit-consistency", remote_audit_guide)
+        self.assertIn("--run-id", remote_audit_guide)
+        self.assertIn("one known run", targeted_audit_plan)
+        self.assertIn("pre-network rejection", targeted_audit_plan)
+        self.assertIn("Loop 77", roadmap)
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",

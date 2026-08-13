@@ -710,7 +710,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-76 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-77 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -819,6 +819,13 @@ the authenticated self-hosted service exposes the same bounded diagnostic at
 printing it. The read-only path works before readiness, performs no scheduler
 or audit mutation, rejects redirects and oversized responses, and keeps the
 two-database boundary diagnostic-only.
+
+Loop 77 adds targeted remote audit inspection: the same authenticated endpoint
+accepts `/api/v1/audit-consistency/{run_id}`, and
+`service-audit-consistency --run-id` lets an operator inspect a specific run
+even when the bounded global report is truncated. The target path uses the
+existing safe run-identifier grammar and preserves the fixed redacted report
+contract.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

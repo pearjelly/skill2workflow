@@ -85,7 +85,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli service \
 | `GET /readyz` | Returns `200` only while the service accepts work, its providers and SQLite control state are usable, and this process owns the scheduler lease. |
 | `GET /metrics` | Requires Bearer authentication and exports aggregate Prometheus text metrics, including while the process is not ready. |
 | `GET /api/v1/control-snapshot` | Requires Bearer authentication and returns a read-only, 100-item-per-collection, 1 MiB Operator snapshot without appending persisted audit state. |
-| `GET /api/v1/audit-consistency` | Requires Bearer authentication and returns the bounded, value-free run/audit consistency report with a 64 KiB response cap and no persisted-state mutation. |
+| `GET /api/v1/audit-consistency` or `GET /api/v1/audit-consistency/{run_id}` | Requires Bearer authentication and returns the bounded, value-free run/audit consistency report with a 64 KiB response cap and no persisted-state mutation. The targeted form bypasses the global 256-run window for one safe run identifier. |
 | `GET /runs/{run_id}` | Requires Bearer authentication and returns one redacted, read-only run detail projection with at most 50 allowlisted events and a 64 KiB response cap. |
 | `GET /runs` | Requires Bearer authentication and returns at most 100 redacted run summaries for operator discovery, with fixed status counts and a 64 KiB response cap. |
 | `GET /api/v1/support-bundle` | Requires Bearer authentication and returns fixed lifecycle, aggregate observability, and nested redacted run-list data with a 128 KiB response cap. |

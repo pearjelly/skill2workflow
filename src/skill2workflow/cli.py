@@ -350,6 +350,11 @@ def main(argv=None) -> int:
     )
     service_audit_cmd.add_argument("--service-url", required=True)
     service_audit_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_audit_cmd.add_argument(
+        "--run-id",
+        default="",
+        help="Inspect one run when the global bounded report is truncated",
+    )
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -743,6 +748,14 @@ def main(argv=None) -> int:
             return 1
 
     if args.command == "service-audit-consistency":
+        if args.run_id:
+            return _service_action(
+                lambda: fetch_audit_consistency(
+                    args.service_url,
+                    args.auth_token_file,
+                    args.run_id,
+                )
+            )
         return _service_action(
             lambda: fetch_audit_consistency(
                 args.service_url,
