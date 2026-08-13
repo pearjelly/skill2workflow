@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-58
+- Completed delivery loops: 1-59
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 58 is complete with protected remote operator action clients
+- Active loop: None; Loop 59 is complete with authenticated redacted run detail
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the protected operator client drill
+- Next decision: select the next Production Baseline loop after reviewing the redacted run-detail drill
 
 ## Production Readiness Path
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-58 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-59 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, and protected remote operator action clients became Loop 58 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, and authenticated redacted run detail became Loop 59 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, and protected remote operator action clients are achieved by Loops 44-58. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, and bounded redacted run detail are achieved by Loops 44-59. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -122,9 +122,33 @@ PYTHONPATH=src python3 -m unittest tests.test_service_client tests.test_cli.CliT
 
 Loop 58 closes the operator ergonomics gap without changing the service protocol or workflow execution authority. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
 
+### Loop 59: Authenticated Redacted Run Detail
+
+**Status:** Complete.
+
+**Prior basis:** Loop 58 made remote approval and cancellation safe from an installed CLI, but an operator still had to fetch a broad snapshot and locally search it before deciding which run to act on. The broad snapshot also mixed registry, audit, connector, and run collections, which was unnecessary for a single-run handoff.
+
+**Outcome:** `GET /runs/{run_id}` serves one authenticated, read-only `skill2workflow-run-detail-0.1.0` projection. It includes fixed run status fields, compact node overlays, and at most the latest 50 allowlisted events. The installed `service-show` client validates the origin, protected token file, response headers, byte bound, and schema before printing the projection.
+
+**Evidence:** [`docs/run-detail.md`](docs/run-detail.md) defines the schema, redaction and availability boundaries. Dashboard, service, client, CLI, telemetry, schema, documentation, and full-suite tests prove that workflow DSL, trigger input, node-result payloads, connector responses, credential values, and raw errors do not cross the boundary.
+
+**Safety boundary:** This is a single-tenant diagnostic read surface. It does not expose full run state, append audit events, mutate execution, add pagination cursors, accept arbitrary filters, or provide hosted RBAC, browser sessions, or remote audit storage.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_dashboard.DashboardTests.test_run_detail_is_bounded_and_redacts_context_results_and_errors \
+  tests.test_service.RuntimeServiceTests.test_run_detail_is_authenticated_redacted_bounded_and_read_only \
+  tests.test_service_client.ServiceClientTests.test_run_detail_uses_authenticated_get_and_validates_redacted_contract \
+  -v
+```
+
+Loop 59 closes the single-run operator diagnosis gap while preserving the existing execution authority and single-tenant network boundary. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 58 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the protected operator client drill.
+This rolling queue is ordered. Loop 59 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the redacted run-detail drill.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -148,6 +172,7 @@ This rolling queue is ordered. Loop 58 is complete and there is no active delive
 | Loop 56: Linux systemd Supervision | Complete | Generate one least-privilege manually enabled Linux systemd unit for a secure self-hosted workspace | Non-overwrite CLI, fixed systemd sandbox, state-only write path, SIGTERM-only shutdown, target-host verification contract, and portable generator evidence |
 | Loop 57: Authenticated Human-Gate Decisions | Complete | Provide one authenticated service decision route for a waiting human gate without bypassing the durable executor | Exact boolean body, waiting-only conflict, success/failure branch audit, fixed route telemetry, and real threaded-service evidence |
 | Loop 58: Protected Remote Operator Action Clients | Complete | Make the existing service actions safe and ergonomic from an installed CLI | Token-file auth, origin/redirect/proxy/response bounds, exact request contracts, compact errors, and wheel help evidence |
+| Loop 59: Authenticated Redacted Run Detail | Complete | Let an operator inspect one run safely before remote action | Fixed redacted schema, 50-event window, 64 KiB response bound, authenticated `service-show`, and leakage/read-only evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -189,6 +214,8 @@ Loop 57 covers only one authenticated decision for one waiting human gate. It ex
 
 Loop 58 covers only the CLI client for the existing resume and cancel routes. It excludes browser sessions, token issuance or rotation, retries, queued actions, RBAC, bulk operations, and changes to service-side authorization.
 
+Loop 59 covers only one authenticated `GET /runs/{run_id}` projection and its protected CLI client. It excludes full run-state export, workflow/input/result payloads, raw errors, arbitrary filtering, pagination cursors, mutation, browser sessions, RBAC, and remote audit storage.
+
 Selection rules:
 
 - Merge or explicitly defer the current loop before starting the next one.
@@ -206,7 +233,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, human gates, retry/recovery policy, run context, and connector events |
-| Control plane | Publish immutable workflow versions, trigger runs from CLI/webhook/schedules, query audit evidence, and export read-only operator snapshots |
+| Control plane | Publish immutable workflow versions, trigger runs from CLI/webhook/schedules, query audit evidence, export read-only operator snapshots, and inspect one redacted run detail |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:
@@ -281,6 +308,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 56: Linux systemd Supervision | Complete | Non-overwriting CLI unit generation, fixed Linux sandboxing, state-only write access, SIGTERM-only shutdown, target-host verification steps, and portable real-CLI evidence |
 | Loop 57: Authenticated Human-Gate Decisions | Complete | Exact authenticated resume body, durable success/failure branch, waiting-only conflict, compact audit evidence, and real threaded-service verification |
 | Loop 58: Protected Remote Operator Action Clients | Complete | Token-file authenticated resume/cancel CLI, fixed origin and response safety, compact errors, and installed-wheel command evidence |
+| Loop 59: Authenticated Redacted Run Detail | Complete | Fixed redacted run-detail schema, authenticated service route, protected `service-show` client, and bounded leakage/read-only evidence |
 
 ## Release Direction
 

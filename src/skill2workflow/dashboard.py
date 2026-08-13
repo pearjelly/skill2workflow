@@ -10,8 +10,10 @@ from .visualizer import run_overlay_for_nodes
 
 
 SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
+RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
+MAX_RUN_DETAIL_EVENTS = 50
 
 
 def build_control_snapshot(
@@ -99,6 +101,162 @@ def build_control_snapshot_from_control(
             ),
         }
     return snapshot
+
+
+def build_run_detail(
+    state_dir: Path,
+    run_id: str,
+    storage: str = "json",
+    max_events: int = MAX_RUN_DETAIL_EVENTS,
+) -> Dict[str, object]:
+    """Build one bounded, operator-safe detail view without exposing run state."""
+
+    control = LocalControlPlane(Path(state_dir), storage=storage)
+    return build_run_detail_from_control(control, run_id, max_events=max_events)
+
+
+def build_run_detail_from_control(
+    control: LocalControlPlane,
+    run_id: str,
+    max_events: int = MAX_RUN_DETAIL_EVENTS,
+) -> Dict[str, object]:
+    """Project one run into a fixed safe contract for authenticated operators.
+
+    The complete run contains workflow DSL, trigger context, node results, and
+    connector metadata.  None of those structures cross this boundary.  Only
+    bounded status evidence and an allowlisted event tail are returned.
+    """
+
+    if (
+        isinstance(max_events, bool)
+        or not isinstance(max_events, int)
+        or max_events <= 0
+        or max_events > MAX_RUN_DETAIL_EVENTS
+    ):
+        raise ValueError("max_events must be a positive bounded integer")
+    state = control.get_run(str(run_id))
+    events = state.get("events", [])
+    if not isinstance(events, list):
+        events = []
+    audit_events = control.list_audit_events(run_id=str(run_id))
+    workflow = state.get("workflow", {})
+    node_ids = [
+        node.get("id")
+        for node in _items(workflow, "nodes")
+        if isinstance(node, dict) and isinstance(node.get("id"), str) and node.get("id")
+    ]
+    current_node = _safe_string(state.get("current_node", ""))
+    if current_node and current_node not in node_ids:
+        node_ids.append(current_node)
+    overlays = run_overlay_for_nodes(node_ids, state, audit_events)
+    safe_overlays = {
+        node_id: _safe_run_overlay(overlay)
+        for node_id, overlay in overlays.items()
+    }
+    returned_events = events[-max_events:]
+    start_index = len(events) - len(returned_events)
+    safe_events = [
+        _safe_run_event(event, sequence=start_index + index + 1)
+        for index, event in enumerate(returned_events)
+        if isinstance(event, dict)
+    ]
+    return {
+        "schema_version": RUN_DETAIL_SCHEMA_VERSION,
+        "run": {
+            "run_id": _safe_string(state.get("run_id", "")),
+            "workflow_id": _safe_string(state.get("workflow_id", "")),
+            "workflow_version": _safe_string(state.get("workflow_version", "")),
+            "status": _safe_string(state.get("status", "")),
+            "current_node": current_node,
+            "event_count": len(events),
+            "node_result_count": _safe_non_negative_int(
+                len(state.get("node_results", {}))
+                if isinstance(state.get("node_results", {}), dict)
+                else 0
+            ),
+            "node_overlays": safe_overlays,
+            "created_at": _safe_string(state.get("created_at", "")),
+            "updated_at": _safe_string(state.get("updated_at", "")),
+        },
+        "events": safe_events,
+        "window": {
+            "max_events": max_events,
+            "total": len(events),
+            "returned": len(safe_events),
+            "truncated": len(safe_events) < len(events),
+        },
+    }
+
+
+_RUN_OVERLAY_FIELDS = (
+    "node_id",
+    "status",
+    "current",
+    "event_count",
+    "latest_event_type",
+    "result_status",
+    "attempts",
+    "max_attempts",
+    "retry_count",
+    "recovered",
+    "connector_id",
+    "connector_kind",
+    "connector_status",
+    "audit_event_count",
+)
+_RUN_EVENT_FIELDS = (
+    "sequence",
+    "type",
+    "node_id",
+    "timestamp",
+    "approved",
+    "attempt",
+    "max_attempts",
+    "connector_id",
+    "connector_kind",
+    "connector_status",
+    "has_error",
+)
+
+
+def _safe_run_overlay(overlay: Dict[str, object]) -> Dict[str, object]:
+    """Keep operational overlay fields while replacing raw errors with a flag."""
+
+    safe = {field: overlay.get(field) for field in _RUN_OVERLAY_FIELDS}
+    safe["has_error"] = bool(overlay.get("error"))
+    return safe
+
+
+def _safe_run_event(event: Dict[str, object], sequence: int) -> Dict[str, object]:
+    """Project one event using a fixed allowlist; never copy arbitrary payloads."""
+
+    safe: Dict[str, object] = {"sequence": _safe_non_negative_int(sequence)}
+    for field in _RUN_EVENT_FIELDS[1:]:
+        if field == "has_error":
+            safe[field] = bool(event.get("error") or event.get("last_error"))
+        elif field in event:
+            value = event.get(field)
+            if field in {"approved"}:
+                if isinstance(value, bool):
+                    safe[field] = value
+            elif field in {"attempt", "max_attempts"}:
+                if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+                    safe[field] = value
+            else:
+                safe[field] = _safe_string(value)
+    return safe
+
+
+def _safe_string(value: object, limit: int = 256) -> str:
+    """Return only bounded primitive text; never stringify nested provider data."""
+
+    if not isinstance(value, str):
+        return ""
+    return value[:limit]
+
+
+def _safe_non_negative_int(value: object) -> int:
+    return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
 
 
 def _tail(items: List[object], max_items: Optional[int]) -> List[object]:

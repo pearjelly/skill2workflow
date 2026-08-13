@@ -6,9 +6,10 @@ import json
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 from urllib.parse import urlsplit, urlunsplit
 
+from .dashboard import RUN_DETAIL_SCHEMA_VERSION
 from .service import read_service_bearer_token
 
 
@@ -84,6 +85,24 @@ def post_run_cancel(
     return payload
 
 
+def fetch_run_detail(
+    service_url: str,
+    token_file: Path,
+    run_id: str,
+) -> Dict[str, object]:
+    """Fetch one authenticated, redacted operator detail projection."""
+
+    normalized_run_id = _validate_run_id(run_id)
+    payload = _get_json(
+        service_url,
+        token_file,
+        f"/runs/{normalized_run_id}",
+        conflict_message="run detail unavailable",
+    )
+    _validate_run_detail(payload, normalized_run_id)
+    return payload
+
+
 def service_endpoint(service_url: str, path: str) -> str:
     """Build one path under an unambiguous service origin."""
 
@@ -120,19 +139,60 @@ def _post_json(
     payload: Dict[str, object],
     conflict_message: str,
 ) -> Dict[str, object]:
+    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return _request_json(
+        service_url,
+        token_file,
+        path,
+        method="POST",
+        body=body,
+        conflict_message=conflict_message,
+    )
+
+
+def _get_json(
+    service_url: str,
+    token_file: Path,
+    path: str,
+    conflict_message: str,
+) -> Dict[str, object]:
+    return _request_json(
+        service_url,
+        token_file,
+        path,
+        method="GET",
+        body=None,
+        conflict_message=conflict_message,
+    )
+
+
+def _request_json(
+    service_url: str,
+    token_file: Path,
+    path: str,
+    *,
+    method: str,
+    body: Optional[bytes],
+    conflict_message: str,
+) -> Dict[str, object]:
     endpoint = service_endpoint(service_url, path)
     token = read_service_bearer_token(token_file)
-    body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
+    if body is not None:
+        headers.update(
+            {
+                "Content-Type": "application/json",
+                "Content-Length": str(len(body)),
+            }
+        )
     request = urllib.request.Request(
         endpoint,
         data=body,
-        headers={
-            "Accept": "application/json",
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-            "Content-Length": str(len(body)),
-        },
-        method="POST",
+        headers=headers,
+        method=method,
     )
     opener = urllib.request.build_opener(
         urllib.request.ProxyHandler({}),
@@ -156,6 +216,163 @@ def _post_json(
         raise
     except (OSError, urllib.error.URLError, TimeoutError) as error:
         raise ServiceActionError() from error
+
+
+def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
+    """Reject responses outside the reviewed redacted detail contract."""
+
+    if set(payload) != {"schema_version", "run", "events", "window"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RUN_DETAIL_SCHEMA_VERSION:
+        raise ServiceActionError()
+    run = payload.get("run")
+    if not isinstance(run, dict) or set(run) != {
+        "run_id",
+        "workflow_id",
+        "workflow_version",
+        "status",
+        "current_node",
+        "event_count",
+        "node_result_count",
+        "node_overlays",
+        "created_at",
+        "updated_at",
+    }:
+        raise ServiceActionError()
+    if run.get("run_id") != run_id or any(
+        not isinstance(run.get(field), str)
+        for field in (
+            "run_id",
+            "workflow_id",
+            "workflow_version",
+            "status",
+            "current_node",
+            "created_at",
+            "updated_at",
+        )
+    ):
+        raise ServiceActionError()
+    if any(
+        isinstance(run.get(field), bool)
+        or not isinstance(run.get(field), int)
+        or run.get(field) < 0
+        for field in ("event_count", "node_result_count")
+    ):
+        raise ServiceActionError()
+    overlays = run.get("node_overlays")
+    if not isinstance(overlays, dict) or any(
+        not isinstance(node_id, str) or not isinstance(overlay, dict)
+        or set(overlay) != {
+            "node_id",
+            "status",
+            "current",
+            "event_count",
+            "latest_event_type",
+            "result_status",
+            "attempts",
+            "max_attempts",
+            "retry_count",
+            "recovered",
+            "connector_id",
+            "connector_kind",
+            "connector_status",
+            "audit_event_count",
+            "has_error",
+        }
+        or overlay.get("node_id") != node_id
+        or any(
+            not isinstance(overlay.get(field), str)
+            for field in (
+                "node_id",
+                "status",
+                "latest_event_type",
+                "result_status",
+                "connector_id",
+                "connector_kind",
+                "connector_status",
+            )
+        )
+        or any(
+            isinstance(overlay.get(field), bool)
+            or not isinstance(overlay.get(field), int)
+            or overlay.get(field) < 0
+            for field in (
+                "event_count",
+                "attempts",
+                "max_attempts",
+                "retry_count",
+                "audit_event_count",
+            )
+        )
+        or any(
+            not isinstance(overlay.get(field), bool)
+            for field in ("current", "recovered", "has_error")
+        )
+        for node_id, overlay in overlays.items()
+    ):
+        raise ServiceActionError()
+    events = payload.get("events")
+    if not isinstance(events, list) or any(
+        not isinstance(event, dict)
+        or set(event) - {
+            "sequence",
+            "type",
+            "node_id",
+            "timestamp",
+            "approved",
+            "attempt",
+            "max_attempts",
+            "connector_id",
+            "connector_kind",
+            "connector_status",
+            "has_error",
+        }
+        or not isinstance(event.get("sequence"), int)
+        or isinstance(event.get("sequence"), bool)
+        or not isinstance(event.get("type"), str)
+        or not isinstance(event.get("has_error"), bool)
+        or any(
+            field in event and not isinstance(event.get(field), str)
+            for field in (
+                "node_id",
+                "timestamp",
+                "connector_id",
+                "connector_kind",
+                "connector_status",
+            )
+        )
+        or any(
+            field in event
+            and (
+                isinstance(event.get(field), bool)
+                or not isinstance(event.get(field), int)
+                or event.get(field) < 0
+            )
+            for field in ("attempt", "max_attempts")
+        )
+        or ("approved" in event and not isinstance(event.get("approved"), bool))
+        for event in events
+    ):
+        raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_events", "total", "returned", "truncated"}
+        or any(
+            isinstance(window.get(field), bool)
+            or not isinstance(window.get(field), int)
+            or window.get(field) < 0
+            for field in ("max_events", "total", "returned")
+        )
+        or window.get("max_events") < 1
+        or window.get("max_events") > 50
+        or window.get("returned") > window.get("max_events")
+        or not isinstance(window.get("truncated"), bool)
+        or window.get("returned") != len(events)
+        or window.get("returned") > window.get("total")
+        or window.get("truncated") != (window.get("returned") < window.get("total"))
+    ):
+        raise ServiceActionError()
 
 
 def _safe_json_response_headers(response) -> bool:

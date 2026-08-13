@@ -23,7 +23,7 @@ from .schedules import LocalScheduleRunner
 from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace
 from .service_doctor import diagnose_service
-from .service_client import post_run_cancel, post_run_resume
+from .service_client import fetch_run_detail, post_run_cancel, post_run_resume
 from .systemd_service import write_systemd_service_unit
 from .telemetry import OperationalEventLogger
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
@@ -279,6 +279,14 @@ def main(argv=None) -> int:
     service_cancel_cmd.add_argument("run_id")
     service_cancel_cmd.add_argument("--service-url", required=True)
     service_cancel_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_show_cmd = subparsers.add_parser(
+        "service-show",
+        help="Show one redacted run detail through the authenticated service",
+    )
+    service_show_cmd.add_argument("run_id")
+    service_show_cmd.add_argument("--service-url", required=True)
+    service_show_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -591,6 +599,15 @@ def main(argv=None) -> int:
     if args.command == "service-cancel":
         return _service_action(
             lambda: post_run_cancel(
+                args.service_url,
+                args.auth_token_file,
+                args.run_id,
+            )
+        )
+
+    if args.command == "service-show":
+        return _service_action(
+            lambda: fetch_run_detail(
                 args.service_url,
                 args.auth_token_file,
                 args.run_id,

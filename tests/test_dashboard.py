@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -6,8 +7,10 @@ from skill2workflow.control_plane import LocalControlPlane
 from unittest.mock import patch
 
 from skill2workflow.dashboard import (
+    RUN_DETAIL_SCHEMA_VERSION,
     build_control_snapshot,
     build_control_snapshot_from_control,
+    build_run_detail,
 )
 
 
@@ -196,6 +199,69 @@ class DashboardTests(TestCase):
                 for item in insights["attention_items"]
             },
         )
+
+    def test_run_detail_is_bounded_and_redacts_context_results_and_errors(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            run = control.run_published_workflow("workflow_dashboard", "1.0.0")
+            detail = control.get_run(run["run_id"])
+            detail["context"] = {
+                "trigger": {
+                    "input": "private-trigger-value",
+                    "authorization": "private-auth-value",
+                }
+            }
+            detail["node_results"]["start"]["output"] = "private-output-value"
+            detail["events"].append(
+                {
+                    "type": "connector_failed",
+                    "node_id": "start",
+                    "timestamp": "2026-08-13T00:00:00+00:00",
+                    "error": "private-provider-error",
+                    "response": "private-provider-response",
+                    "connector_id": {"secret": "nested-provider-secret"},
+                }
+            )
+            for index in range(60):
+                detail["events"].append(
+                    {
+                        "type": "private-event-type",
+                        "node_id": "start",
+                        "timestamp": f"2026-08-13T00:01:{index:02d}+00:00",
+                        "secret": "private-event-value",
+                    }
+                )
+            control.executor.store.save(detail)
+
+            projected = build_run_detail(state_dir, run["run_id"], storage="sqlite")
+
+        self.assertEqual(projected["schema_version"], RUN_DETAIL_SCHEMA_VERSION)
+        self.assertEqual(projected["run"]["run_id"], run["run_id"])
+        self.assertEqual(projected["window"], {
+            "max_events": 50,
+            "total": 64,
+            "returned": 50,
+            "truncated": True,
+        })
+        self.assertEqual(len(projected["events"]), 50)
+        self.assertTrue(all("secret" not in event for event in projected["events"]))
+        self.assertTrue(all("error" not in event for event in projected["events"]))
+        self.assertNotIn("context", projected["run"])
+        self.assertNotIn("output", json.dumps(projected, ensure_ascii=False))
+        serialized = json.dumps(projected, ensure_ascii=False)
+        for private_value in (
+            "private-trigger-value",
+            "private-auth-value",
+            "private-output-value",
+            "private-provider-error",
+            "private-provider-response",
+            "private-event-value",
+            "nested-provider-secret",
+        ):
+            self.assertNotIn(private_value, serialized)
+        self.assertIn("has_error", projected["run"]["node_overlays"]["start"])
 
 
 def _workflow(version: str, node_title: str):

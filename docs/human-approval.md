@@ -97,6 +97,15 @@ The client refuses remote plain HTTP, embedded URL credentials, query strings,
 redirects, oversized or non-JSON responses, and unsafe run identifiers. It
 does not retry a decision or cancellation automatically.
 
+Before choosing a run, use the authenticated, redacted [`service-show`](run-detail.md)
+client to inspect one run without fetching the full control snapshot:
+
+```bash
+skill2workflow service-show run_example \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+```
+
 ## Verification
 
 The real threaded-service regression covers the full route, exact body

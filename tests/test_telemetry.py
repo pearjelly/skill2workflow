@@ -55,6 +55,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry = RuntimeTelemetry(state_dir, monotonic=lambda: 15.25)
             telemetry.observe_http("workflow_trigger", 200)
             telemetry.observe_http("control_snapshot", 200)
+            telemetry.observe_http("run_detail", 200)
             telemetry.observe_http("run_resume", 409)
             telemetry.observe_http("unknown-private-route", 418)
 
@@ -73,6 +74,7 @@ class RuntimeTelemetryTests(TestCase):
             "skill2workflow_recurring_schedules 1",
             'skill2workflow_http_requests_total{route="workflow_trigger",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="control_snapshot",status_class="2xx"} 1',
+            'skill2workflow_http_requests_total{route="run_detail",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="run_resume",status_class="4xx"} 1',
             'skill2workflow_http_requests_total{route="unknown",status_class="4xx"} 1',
         ):

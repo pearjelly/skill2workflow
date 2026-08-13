@@ -100,7 +100,7 @@ def run_overlay_for_nodes(
             "status": _run_status(node_id, run_state),
             "current": bool(isinstance(run_state, dict) and run_state.get("current_node") == node_id),
             "event_count": len(node_events),
-            "latest_event_type": str(latest_event.get("type", "")) if isinstance(latest_event, dict) else "",
+            "latest_event_type": _overlay_string(latest_event.get("type", "")) if isinstance(latest_event, dict) else "",
             "result_status": str(result.get("status", "")) if result else "",
             "attempts": _overlay_int(result.get("attempts") if result else None, node_events, "attempt"),
             "max_attempts": _overlay_int(result.get("max_attempts") if result else None, node_events, "max_attempts"),
@@ -159,21 +159,27 @@ def _overlay_text(result: Dict[str, object], events: List[Dict[str, object]], ke
     if key in {"connector_id", "connector_kind"}:
         connector = result.get("connector", {})
         if isinstance(connector, dict) and connector.get(key.replace("connector_", "")):
-            return str(connector.get(key.replace("connector_", "")))
+            return _overlay_string(connector.get(key.replace("connector_", "")))
     for event in reversed(events):
         if event.get(key) not in (None, ""):
-            return str(event.get(key))
+            return _overlay_string(event.get(key))
     return ""
 
 
 def _overlay_error(result: Dict[str, object], events: List[Dict[str, object]]) -> str:
     for key in ("last_error", "error"):
-        if result.get(key):
-            return str(result.get(key))
+        if isinstance(result.get(key), str) and result.get(key):
+            return result[key]
     for event in reversed(events):
-        if event.get("error"):
-            return str(event.get("error"))
+        if isinstance(event.get("error"), str) and event.get("error"):
+            return event["error"]
     return ""
+
+
+def _overlay_string(value: object, limit: int = 256) -> str:
+    if not isinstance(value, str):
+        return ""
+    return value[:limit]
 
 
 def _run_overlay_summary(
@@ -522,10 +528,10 @@ def _run_status(node_id: str, run_state: Optional[RunState]) -> str:
     if isinstance(node_results, dict):
         result = node_results.get(node_id)
         if isinstance(result, dict) and result.get("status"):
-            return str(result["status"])
+            return _overlay_string(result["status"])
 
     if run_state.get("current_node") == node_id:
-        return str(run_state.get("status") or "active")
+        return _overlay_string(run_state.get("status")) or "active"
 
     return "not_started"
 

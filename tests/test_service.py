@@ -220,6 +220,116 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("private-value", json.dumps(payload))
         self.assertFalse(thread.is_alive())
 
+    def test_run_detail_is_authenticated_redacted_bounded_and_read_only(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            run = control.run_published_workflow("workflow_service", "0.1.0")
+            state = control.get_run(run["run_id"])
+            state["context"] = {"private_input": "private-input-value"}
+            state["node_results"]["start"]["output"] = "private-output-value"
+            state["events"].append(
+                {
+                    "type": "connector_failed",
+                    "node_id": "start",
+                    "timestamp": "2026-08-13T00:00:00+00:00",
+                    "error": "private-error-value",
+                    "response": "private-response-value",
+                }
+            )
+            control.executor.store.save(state)
+            audit_count_before = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/runs/{run['run_id']}"
+
+            denied_status, denied = _get_json(url)
+            accepted_status, detail = _get_json(url, token=AUTH_TOKEN)
+            missing_status, missing = _get_json(
+                f"http://{host}:{port}/runs/run_missing_detail"
+                , token=AUTH_TOKEN,
+            )
+            body_connection = http.client.HTTPConnection(host, port, timeout=2)
+            body_connection.request(
+                "GET",
+                f"/runs/{run['run_id']}",
+                body=b"{}",
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            )
+            body_response = body_connection.getresponse()
+            body_payload = json.loads(body_response.read().decode("utf-8"))
+            body_status = body_response.status
+            body_connection.close()
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+            audit_count_after = len(
+                LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+            )
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(detail["run"]["run_id"], run["run_id"])
+        self.assertEqual(detail["schema_version"], "skill2workflow-run-detail-0.1.0")
+        serialized = json.dumps(detail, ensure_ascii=False)
+        for private_value in (
+            "private-input-value",
+            "private-output-value",
+            "private-error-value",
+            "private-response-value",
+        ):
+            self.assertNotIn(private_value, serialized)
+        self.assertNotIn("context", serialized)
+        self.assertNotIn("error", detail["events"][-1])
+        self.assertIn("has_error", detail["events"][-1])
+        self.assertEqual(missing_status, 404)
+        self.assertEqual(missing, {"error": "run not found"})
+        self.assertEqual(body_status, 400)
+        self.assertEqual(body_payload, {"error": "run detail request must not include a body"})
+        self.assertEqual(audit_count_after, audit_count_before)
+        self.assertFalse(thread.is_alive())
+
+    def test_run_detail_rejects_oversized_projection_without_disclosure(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            host, port = service.server_address
+            thread = threading.Thread(target=service._server.handle_request, daemon=True)
+            private_value = "private-run-detail-value-" + ("x" * 70000)
+            with patch(
+                "skill2workflow.service.build_run_detail_from_control",
+                return_value={"private": private_value},
+            ):
+                thread.start()
+                status, payload = _get_json(
+                    f"http://{host}:{port}/runs/run_oversized_detail",
+                    token=AUTH_TOKEN,
+                )
+                thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 503)
+        self.assertEqual(payload, {"error": "run detail unavailable"})
+        self.assertNotIn("private-run-detail-value", json.dumps(payload))
+        self.assertFalse(thread.is_alive())
+
     def test_auth_token_read_is_descriptor_bound_against_path_replacement(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

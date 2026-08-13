@@ -21,7 +21,12 @@ from urllib.parse import urlsplit
 from .backup import inspect_state_backup_readiness
 from .control_plane import LocalControlPlane
 from .credentials import DirectoryCredentialProvider
-from .dashboard import MAX_LIVE_SNAPSHOT_BYTES, build_control_snapshot_from_control
+from .dashboard import (
+    MAX_LIVE_SNAPSHOT_BYTES,
+    MAX_RUN_DETAIL_EVENTS,
+    build_control_snapshot_from_control,
+    build_run_detail_from_control,
+)
 from .schedules import RecurringScheduleDispatcher, SchedulerLeaseError
 from .state_layout import ensure_service_state_layout, mark_service_state_initialized
 from .state_layout import (
@@ -39,6 +44,7 @@ _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 MAX_AUTH_TOKEN_BYTES = 16 * 1024
 LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
 MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
+MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -496,6 +502,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_metrics()
                 elif self.command == "GET" and path == "/api/v1/control-snapshot":
                     self._handle_control_snapshot()
+                elif self.command == "GET" and _run_detail_id(path):
+                    self._handle_run_detail(_run_detail_id(path))
                 elif self.command == "POST" and _resume_run_id(path):
                     self._handle_resume(_resume_run_id(path))
                 elif self.command == "POST" and _cancel_run_id(path):
@@ -587,6 +595,54 @@ def _handler_for(service: RuntimeService):
                 self._send_json(503, {"error": "control snapshot unavailable"})
                 return
             self._send_json(200, snapshot)
+
+        def _handle_run_detail(self, run_id: str):
+            """Serve a bounded status projection for one authenticated run."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "run detail request must not include a body"},
+                )
+                return
+            try:
+                detail = build_run_detail_from_control(
+                    service.control_plane,
+                    run_id,
+                    max_events=MAX_RUN_DETAIL_EVENTS,
+                )
+                encoded = json.dumps(detail, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_RUN_DETAIL_RESPONSE_BYTES:
+                    raise ValueError("run detail exceeds response limit")
+            except FileNotFoundError:
+                self._send_json(404, {"error": "run not found"})
+                return
+            except (ValueError, OSError, sqlite3.Error):
+                self._send_json(503, {"error": "run detail unavailable"})
+                return
+            self._send_json(200, detail)
 
         def _handle_webhook(self):
             readiness_status, _ = service.readiness()
@@ -809,6 +865,8 @@ def _request_route(method: str, path: str) -> str:
         return "metrics"
     if method == "GET" and path == "/api/v1/control-snapshot":
         return "control_snapshot"
+    if method == "GET" and _run_detail_id(path):
+        return "run_detail"
     if path.startswith("/webhooks/"):
         return "workflow_trigger"
     if method == "POST" and _resume_run_id(path):
@@ -837,6 +895,20 @@ def _cancel_run_id(path: str) -> str:
 
 def _resume_run_id(path: str) -> str:
     return _run_action_id(path, "resume")
+
+
+def _run_detail_id(path: str) -> str:
+    parts = path.split("/")
+    if len(parts) != 3 or parts[0] or parts[1] != "runs":
+        return ""
+    run_id = parts[2]
+    if (
+        not run_id.startswith("run_")
+        or len(run_id) > 128
+        or any(not (char.isalnum() or char in {"_", "-"}) for char in run_id)
+    ):
+        return ""
+    return run_id
 
 
 def _run_action_id(path: str, action: str) -> str:

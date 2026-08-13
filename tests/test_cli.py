@@ -141,6 +141,35 @@ class CliTests(TestCase):
         )
         cancel.assert_called_once_with("https://service.example", token_file, "run_remote_1")
 
+    def test_service_show_command_prints_redacted_run_detail(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-run-detail-0.1.0",
+            "run": {"run_id": "run_remote_1", "status": "waiting"},
+            "events": [],
+            "window": {"max_events": 50, "total": 0, "returned": 0, "truncated": False},
+        }
+        with patch(
+            "skill2workflow.cli.fetch_run_detail",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-show",
+                        "run_remote_1",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example", token_file, "run_remote_1")
+
     def test_state_retention_plan_and_apply_commands_publish_new_copy(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

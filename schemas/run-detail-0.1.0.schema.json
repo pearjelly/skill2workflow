@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/run-detail-0.1.0.schema.json",
+  "title": "skill2workflow authenticated run detail",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "run", "events", "window"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-run-detail-0.1.0"
+    },
+    "run": {
+      "$ref": "#/$defs/run"
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      },
+      "maxItems": 50
+    },
+    "window": {
+      "$ref": "#/$defs/window"
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_id", "status", "current", "event_count", "latest_event_type",
+        "result_status", "attempts", "max_attempts", "retry_count", "recovered",
+        "connector_id", "connector_kind", "connector_status", "audit_event_count",
+        "has_error"
+      ],
+      "properties": {
+        "node_id": {"type": "string"},
+        "status": {"type": "string"},
+        "current": {"type": "boolean"},
+        "event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "latest_event_type": {"type": "string"},
+        "result_status": {"type": "string"},
+        "attempts": {"$ref": "#/$defs/nonNegativeInteger"},
+        "max_attempts": {"$ref": "#/$defs/nonNegativeInteger"},
+        "retry_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "recovered": {"type": "boolean"},
+        "connector_id": {"type": "string"},
+        "connector_kind": {"type": "string"},
+        "connector_status": {"type": "string"},
+        "audit_event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "has_error": {"type": "boolean"}
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id", "workflow_id", "workflow_version", "status", "current_node",
+        "event_count", "node_result_count", "node_overlays", "created_at", "updated_at"
+      ],
+      "properties": {
+        "run_id": {"type": "string", "pattern": "^run_[A-Za-z0-9_-]{1,123}$"},
+        "workflow_id": {"type": "string"},
+        "workflow_version": {"type": "string"},
+        "status": {"type": "string"},
+        "current_node": {"type": "string"},
+        "event_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "node_result_count": {"$ref": "#/$defs/nonNegativeInteger"},
+        "node_overlays": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/overlay"}
+        },
+        "created_at": {"type": "string"},
+        "updated_at": {"type": "string"}
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "type", "has_error"],
+      "properties": {
+        "sequence": {"$ref": "#/$defs/nonNegativeInteger"},
+        "type": {"type": "string"},
+        "node_id": {"type": "string"},
+        "timestamp": {"type": "string"},
+        "approved": {"type": "boolean"},
+        "attempt": {"$ref": "#/$defs/nonNegativeInteger"},
+        "max_attempts": {"$ref": "#/$defs/nonNegativeInteger"},
+        "connector_id": {"type": "string"},
+        "connector_kind": {"type": "string"},
+        "connector_status": {"type": "string"},
+        "has_error": {"type": "boolean"}
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_events", "total", "returned", "truncated"],
+      "properties": {
+        "max_events": {"type": "integer", "minimum": 1, "maximum": 50},
+        "total": {"$ref": "#/$defs/nonNegativeInteger"},
+        "returned": {"$ref": "#/$defs/nonNegativeInteger"},
+        "truncated": {"type": "boolean"}
+      }
+    }
+  }
+}

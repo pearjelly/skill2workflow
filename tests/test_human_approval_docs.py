@@ -23,6 +23,7 @@ class HumanApprovalDocumentationTests(TestCase):
             "does not implement multi-user RBAC",
             "skill2workflow service-resume",
             "skill2workflow service-cancel",
+            "skill2workflow service-show",
             "disables proxy and redirect handling",
         ):
             self.assertIn(fragment, guide)

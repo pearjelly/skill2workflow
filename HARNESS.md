@@ -113,6 +113,9 @@ skill2workflow service-resume <run_id> \
 skill2workflow service-cancel <run_id> \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
+skill2workflow service-show <run_id> \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
 ```
 
 Run the interrupted-run crash recovery evidence:

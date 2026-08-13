@@ -34,7 +34,7 @@ be non-symlink directories inaccessible to group or others. Run the read-only
 [`service-doctor`](service-doctor.md) preflight before startup or cutover; it
 uses the same filesystem and state guards without printing configured values.
 
-`GET /healthz` and `GET /readyz` remain anonymous and expose only process and readiness status. Every other route, including `GET /metrics`, requires `Authorization: Bearer <token>`. Metrics remain scrapeable when readiness is false so operators can diagnose standby or failure state, but they export only the aggregate fixed-label contract in [`observability.md`](observability.md). Authenticated request bodies are capped at 1 MiB before they are read; ambiguous multiple content lengths and transfer-encoded bodies are rejected at this origin boundary.
+`GET /healthz` and `GET /readyz` remain anonymous and expose only process and readiness status. Every other route, including `GET /metrics`, `GET /runs/{run_id}`, and the live snapshot, requires `Authorization: Bearer <token>`. Metrics remain scrapeable when readiness is false so operators can diagnose standby or failure state, but they export only the aggregate fixed-label contract in [`observability.md`](observability.md). Authenticated request bodies are capped at 1 MiB before they are read; ambiguous multiple content lengths and transfer-encoded bodies are rejected at this origin boundary.
 
 ## Execution-time Connector Credentials
 
@@ -54,7 +54,7 @@ SQLite audit records contain only:
 
 - `ingress_authenticated` or `ingress_authentication_denied`;
 - HTTP method;
-- normalized route class (`workflow_trigger`, `run_resume`, `run_cancel`, or `unknown`);
+- normalized route class (`workflow_trigger`, `run_resume`, `run_cancel`, `run_detail`, or `unknown`);
 - timestamp;
 - a compact denial reason.
 

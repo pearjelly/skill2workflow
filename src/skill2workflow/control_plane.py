@@ -305,7 +305,13 @@ class LocalControlPlane:
         if normalized_method not in {"GET", "POST", "PUT", "DELETE"}:
             normalized_method = "OTHER"
         normalized_route = str(route)
-        if normalized_route not in {"workflow_trigger", "run_cancel", "run_resume", "unknown"}:
+        if normalized_route not in {
+            "workflow_trigger",
+            "run_cancel",
+            "run_resume",
+            "run_detail",
+            "unknown",
+        }:
             normalized_route = "unknown"
         normalized_reason = str(reason)
         if normalized_reason not in {"missing_or_malformed", "invalid", "provider_unavailable"}:
