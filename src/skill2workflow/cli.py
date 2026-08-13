@@ -37,6 +37,7 @@ from .service_client import (
     post_recurring_schedule_state,
     post_run_cancel,
     post_run_resume,
+    post_workflow_release,
     post_workflow_trigger,
 )
 from .systemd_service import write_systemd_service_unit
@@ -386,6 +387,14 @@ def main(argv=None) -> int:
     )
     service_runtime_cmd.add_argument("--service-url", required=True)
     service_runtime_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_release_cmd = subparsers.add_parser(
+        "service-workflow-publish",
+        help="Publish one Workflow DSL document through the authenticated service",
+    )
+    service_release_cmd.add_argument("workflow", type=Path)
+    service_release_cmd.add_argument("--service-url", required=True)
+    service_release_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_trigger_cmd = subparsers.add_parser(
         "service-trigger",
@@ -855,6 +864,15 @@ def main(argv=None) -> int:
             lambda: fetch_runtime_info(
                 args.service_url,
                 args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-workflow-publish":
+        return _service_action(
+            lambda: post_workflow_release(
+                args.service_url,
+                args.auth_token_file,
+                _load_json(args.workflow),
             )
         )
 

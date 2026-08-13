@@ -111,7 +111,7 @@ class LiveConnectorReadinessTests(TestCase):
         self.assertIn("Never paste the token into the command or shell history", connectors)
 
         self.assertIn("| Loop 38: Live Connector Readiness Review | Complete |", roadmap)
-        self.assertIn("Active loop: None; Loop 85 is complete with protected remote workflow triggering", roadmap)
+        self.assertIn("Active loop: None; Loop 86 is complete with protected remote Workflow publication", roadmap)
         self.assertIn("| Loop 39: Scoped Live Lark Task Connector | Complete |", roadmap)
         self.assertIn("| Loop 40: Controlled Live Connector Pilot | Complete |", roadmap)
         self.assertIn("docs/lark-live-connector-validation.md", roadmap)

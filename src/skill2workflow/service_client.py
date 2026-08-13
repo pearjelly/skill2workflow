@@ -31,6 +31,7 @@ from .control_plane import (
 from .service import (
     RUNTIME_INFO_SCHEMA_VERSION,
     SERVICE_SCHEMA_VERSION,
+    WORKFLOW_RELEASE_SCHEMA_VERSION,
     WORKFLOW_DSL_SCHEMA_VERSION,
     read_service_bearer_token,
 )
@@ -49,6 +50,8 @@ MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_TRIGGER_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_REMOTE_WORKFLOW_RELEASE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -296,6 +299,28 @@ def post_workflow_trigger(
     return payload
 
 
+def post_workflow_release(
+    service_url: str,
+    token_file: Path,
+    workflow: Dict[str, object],
+) -> Dict[str, object]:
+    """Publish one immutable Workflow DSL document through the service."""
+
+    if not isinstance(workflow, dict):
+        raise ValueError("workflow release must be a JSON object")
+    payload = _post_json(
+        service_url,
+        token_file,
+        "/api/v1/workflow-releases",
+        {"workflow": workflow},
+        conflict_message="workflow version is immutable",
+        max_request_bytes=MAX_REMOTE_WORKFLOW_RELEASE_REQUEST_BYTES,
+        max_response_bytes=MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTES,
+    )
+    _validate_workflow_release_response(payload)
+    return payload
+
+
 def post_recurring_schedule_state(
     service_url: str,
     token_file: Path,
@@ -418,6 +443,7 @@ def _post_json(
     conflict_message: str,
     not_found_message: str = "run not found",
     max_request_bytes: int = 0,
+    max_response_bytes: int = MAX_SERVICE_ACTION_RESPONSE_BYTES,
 ) -> Dict[str, object]:
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     if max_request_bytes and len(body) > max_request_bytes:
@@ -430,6 +456,7 @@ def _post_json(
         body=body,
         conflict_message=conflict_message,
         not_found_message=not_found_message,
+        max_response_bytes=max_response_bytes,
     )
 
 
@@ -1252,6 +1279,33 @@ def _validate_trigger_response(
         or response_input_keys != list(input_keys)
     ):
         raise ServiceActionError()
+
+
+def _validate_workflow_release_response(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed redacted release contract."""
+
+    if set(payload) != {
+        "schema_version",
+        "workflow_id",
+        "version",
+        "status",
+        "checksum",
+    }:
+        raise ServiceActionError()
+    if payload.get("schema_version") != WORKFLOW_RELEASE_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if any(
+        not isinstance(payload.get(field), str) or not payload.get(field)
+        for field in ("workflow_id", "version", "status", "checksum")
+    ):
+        raise ServiceActionError()
+    if payload["status"] != "published" or not _is_hex_digest(payload["checksum"]):
+        raise ServiceActionError()
+    try:
+        _validate_workflow_ref(payload["workflow_id"], "workflow_id")
+        _validate_workflow_ref(payload["version"], "version")
+    except ValueError as error:
+        raise ServiceActionError() from error
 
 
 def _validate_schedule_id(schedule_id: str) -> str:

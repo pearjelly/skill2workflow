@@ -478,6 +478,40 @@ class CliTests(TestCase):
             trigger_input={"customer_id": "customer_123"},
         )
 
+    def test_service_workflow_publish_command_loads_workflow(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        workflow = _approval_workflow()
+        expected = {
+            "schema_version": "skill2workflow-workflow-release-0.1.0",
+            "workflow_id": "workflow_demo",
+            "version": "0.1.0",
+            "status": "published",
+            "checksum": "a" * 64,
+        }
+        with TemporaryDirectory() as tmp:
+            workflow_file = Path(tmp) / "workflow.json"
+            workflow_file.write_text(json.dumps(workflow), encoding="utf-8")
+            with patch(
+                "skill2workflow.cli.post_workflow_release",
+                return_value=expected,
+            ) as publish:
+                with redirect_stdout(stdout):
+                    exit_code = main(
+                        [
+                            "service-workflow-publish",
+                            str(workflow_file),
+                            "--service-url",
+                            "https://service.example",
+                            "--auth-token-file",
+                            str(token_file),
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        publish.assert_called_once_with("https://service.example", token_file, workflow)
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

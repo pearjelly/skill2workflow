@@ -33,7 +33,11 @@ from skill2workflow.service import (
     serve_runtime_service,
 )
 from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringScheduleStore
-from skill2workflow.service_client import ServiceActionError, post_workflow_trigger
+from skill2workflow.service_client import (
+    ServiceActionError,
+    post_workflow_release,
+    post_workflow_trigger,
+)
 
 
 AUTH_TOKEN = "loop42-test-bearer-token-0123456789abcdef"
@@ -1644,6 +1648,77 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(raised.exception.status_code, 409)
         self.assertEqual(len(runs), 1)
         self.assertFalse(thread.is_alive())
+
+    def test_remote_workflow_publication_is_authenticated_immutable_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/api/v1/workflow-releases"
+            workflow = _workflow()
+            try:
+                denied_status, denied = _post_json(
+                    url,
+                    {"workflow": workflow},
+                )
+                malformed_status, malformed = _post_json(
+                    url,
+                    {"workflow": []},
+                    token=AUTH_TOKEN,
+                )
+                published = post_workflow_release(
+                    f"http://{host}:{port}",
+                    config.auth_token_file,
+                    workflow,
+                )
+                replay = post_workflow_release(
+                    f"http://{host}:{port}",
+                    config.auth_token_file,
+                    workflow,
+                )
+                changed = json.loads(json.dumps(workflow))
+                changed["description"] = "changed after publication"
+                with self.assertRaises(ServiceActionError) as raised:
+                    post_workflow_release(
+                        f"http://{host}:{port}",
+                        config.auth_token_file,
+                        changed,
+                    )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            records = LocalControlPlane(state_dir, storage="sqlite").list_workflows()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "workflow publication rejected"})
+        self.assertEqual(published, replay)
+        self.assertEqual(
+            set(published),
+            {"schema_version", "workflow_id", "version", "status", "checksum"},
+        )
+        self.assertEqual(published["status"], "published")
+        self.assertEqual(len(published["checksum"]), 64)
+        self.assertNotIn("artifact", published)
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(len(records), 1)
         self.assertFalse(thread.is_alive())
 
     def test_business_routes_require_rotatable_bearer_auth_and_write_compact_audit(self):

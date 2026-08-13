@@ -48,6 +48,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added the protected `service-trigger` CLI for remote published-workflow
   triggering, requiring a stable idempotency key, reusing shared input/body
   bounds, and validating the compact response before output.
+- Added protected `POST /api/v1/workflow-releases` and the
+  `service-workflow-publish` CLI, reusing immutable SQLite publication with a
+  1 MiB request bound and a fixed path-free checksum response.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

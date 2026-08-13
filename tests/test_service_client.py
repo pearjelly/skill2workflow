@@ -16,6 +16,7 @@ from skill2workflow.service_client import (
     MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     MAX_RUNTIME_INFO_RESPONSE_BYTES,
     MAX_REMOTE_TRIGGER_REQUEST_BYTES,
+    MAX_REMOTE_WORKFLOW_RELEASE_REQUEST_BYTES,
     ServiceActionError,
     post_recurring_schedule_state,
     post_run_cancel,
@@ -31,6 +32,7 @@ from skill2workflow.service_client import (
     fetch_support_bundle,
     fetch_audit_consistency,
     post_workflow_trigger,
+    post_workflow_release,
 )
 
 
@@ -39,6 +41,62 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_service_workflow_publish_uses_fixed_contract(self):
+        observed = {}
+        payload = {
+            "schema_version": "skill2workflow-workflow-release-0.1.0",
+            "workflow_id": "workflow_remote_release",
+            "version": "1.2.3",
+            "status": "published",
+            "checksum": "a" * 64,
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        workflow = _workflow_document()
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = post_workflow_release(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                workflow,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed["path"], "/api/v1/workflow-releases")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(observed["body"], {"workflow": workflow})
+        self.assertFalse(thread.is_alive())
+
+    def test_service_workflow_publish_rejects_oversized_request_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            workflow = _workflow_document()
+            workflow["description"] = "x" * MAX_REMOTE_WORKFLOW_RELEASE_REQUEST_BYTES
+            with self.assertRaises(ServiceActionError) as raised:
+                post_workflow_release("https://service.example", token_file, workflow)
+
+        self.assertEqual(raised.exception.status_code, 413)
+
     def test_service_trigger_posts_bounded_idempotent_envelope(self):
         observed = {}
         payload = {
@@ -1470,6 +1528,26 @@ def _runtime_info_payload():
         "service_status": "ready",
         "service_ready": True,
         "scheduler_lease_owned": True,
+    }
+
+
+def _workflow_document():
+    return {
+        "schema_version": "0.1.0",
+        "workflow": {
+            "id": "workflow_remote_release",
+            "name": "Remote release",
+            "version": "1.2.3",
+            "status": "draft",
+        },
+        "entry": "start",
+        "nodes": [
+            {"id": "start", "type": "start", "title": "Start", "on_success": "end"},
+            {"id": "end", "type": "end", "title": "End"},
+        ],
+        "edges": [
+            {"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}
+        ],
     }
 
 
