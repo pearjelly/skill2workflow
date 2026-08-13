@@ -31,6 +31,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Stale recurring-dispatch claim recovery now streams eligible SQLite rows in
   the existing recovery transaction, avoiding full dispatch-ledger
   materialization while preserving `uncertain` and no-automatic-retry semantics.
+- Interrupted-run takeover now streams foreign active-execution rows in the
+  existing SQLite recovery transaction, avoiding full execution-ledger
+  materialization while preserving fencing and no-replay semantics.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.

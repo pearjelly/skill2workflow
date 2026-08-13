@@ -379,15 +379,7 @@ class SqliteRunStore:
         recovered: List[RunState] = []
         with self._connection() as connection:
             connection.execute("begin immediate")
-            rows = connection.execute(
-                """
-                select e.run_id, r.state_json
-                from run_executions e join runs r on r.run_id = e.run_id
-                where e.status = 'active' and e.owner_id != ?
-                order by e.run_id
-                """,
-                (owner,),
-            ).fetchall()
+            rows = _iter_foreign_active_execution_rows(connection, owner)
             for run_id, raw_state in rows:
                 state = json.loads(str(raw_state))
                 if str(state.get("status", "")) not in {"created", "running"}:
@@ -1911,6 +1903,20 @@ def _interrupt_state(state: RunState) -> RunState:
     updated["events"] = events
     updated["status"] = "interrupted"
     return updated
+
+
+def _iter_foreign_active_execution_rows(connection, current_owner: str):
+    """Return a cursor for active executions owned by another process."""
+
+    return connection.execute(
+        """
+        select e.run_id, r.state_json
+        from run_executions e join runs r on r.run_id = e.run_id
+        where e.status = 'active' and e.owner_id != ?
+        order by e.run_id
+        """,
+        (str(current_owner),),
+    )
 
 
 def _required_execution_value(value: str, field: str) -> str:

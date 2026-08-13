@@ -32,6 +32,11 @@ and cannot replace `interrupted` with a stale success or failure snapshot. Owner
 identities and ticket values are not copied into run JSON, audit events, metrics,
 or the control snapshot.
 
+Foreign active-execution rows are read through the SQLite cursor inside that same
+transaction and converted one at a time. Recovery therefore avoids materializing
+the full execution ledger before fencing runs; the returned recovered-state list
+and takeover semantics remain compatible.
+
 The executor rechecks the ticket before every node and connector attempt and
 persists `connector_started` before transport. If takeover occurs between two
 nodes, the old owner cannot start the successor. A tiny check-to-send interval

@@ -1,13 +1,45 @@
 import os
+import sqlite3
 import threading
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.storage import JsonControlStore, JsonRunStore, SqliteControlStore, SqliteRunStore
+from skill2workflow.storage import (
+    JsonControlStore,
+    JsonRunStore,
+    SqliteControlStore,
+    SqliteRunStore,
+    _iter_foreign_active_execution_rows,
+)
 
 
 class StorageTests(TestCase):
+    def test_interrupted_execution_rows_stream_without_fetchall(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteRunStore(Path(tmp) / "sqlite")
+            store.start_execution(
+                {
+                    "run_id": "run_stream_interrupted",
+                    "workflow_id": "workflow_storage",
+                    "workflow_version": "0.1.0",
+                    "status": "running",
+                    "current_node": "node",
+                    "events": [],
+                },
+                owner_id="owner-a",
+                execution_id="execution-a",
+            )
+
+            with closing(sqlite3.connect(store.db_path)) as raw:
+                connection = _NoInterruptedFetchAllConnection(raw)
+                with raw:
+                    rows = list(_iter_foreign_active_execution_rows(connection, "owner-b"))
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][0], "run_stream_interrupted")
+
     def test_run_count_does_not_load_all_states(self):
         with TemporaryDirectory() as tmp:
             stores = [JsonRunStore(Path(tmp) / "json"), SqliteRunStore(Path(tmp) / "sqlite")]
@@ -267,6 +299,32 @@ class StorageTests(TestCase):
             after = len(os.listdir(fd_dir))
 
         self.assertLessEqual(after - baseline, 2)
+
+
+class _NoInterruptedFetchAllCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+    def fetchall(self):
+        raise AssertionError("interrupted execution rows must be streamed")
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _NoInterruptedFetchAllConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query, parameters=()):
+        cursor = self._connection.execute(query, parameters)
+        normalized = " ".join(str(query).lower().split())
+        if "select e.run_id, r.state_json from run_executions" in normalized:
+            return _NoInterruptedFetchAllCursor(cursor)
+        return cursor
 
 
 def _fd_dir():
