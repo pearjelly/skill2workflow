@@ -17,6 +17,9 @@ release; Roadmap loop completion alone does not publish a new version.
   workflow content while preserving complete-list compatibility.
 - Bounded workflow artifact diagnostics now retain only the fixed issue window
   while preserving full issue counts and truncation status.
+- Added an optional `schedule-run-due --max-items` side-effect batch budget;
+  bounded invocations process at most 100 schedule records and leave the rest
+  eligible for a later run.
 - Added bounded read-only backup expiration planning through
   `backup-retention-plan`. An explicit cutoff and minimum-valid-backup floor
   produce candidates only from a complete inventory; truncation, invalid sets,

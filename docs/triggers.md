@@ -334,6 +334,20 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due \
 ```
 
 `schedule-run-due` does not sleep, poll, or manage cron. It selects enabled schedules whose `run_at` is less than or equal to `--now`, triggers each due workflow through `LocalControlPlane.trigger_workflow`, and marks each successful one-shot schedule as `completed`.
+For a controlled operator batch, add `--max-items 1` through `--max-items 100`:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due \
+  --state-dir /tmp/skill2workflow-control \
+  --now 2026-07-06T00:00:00Z \
+  --max-items 25
+```
+
+The bounded form processes at most that many one-shot or recurring schedule
+records in one invocation and returns a `window` with `max_items`,
+`processed`, and `budget_exhausted`. Unclaimed due schedules remain eligible
+for the next invocation. Omitting `--max-items` preserves the historical
+complete due-run behavior.
 
 The scheduled trigger response uses the same compact trigger response shape plus `schedule_id`. The `run_started` audit event records the schedule identity through `trigger_source`, for example `local-schedule:schedule_approval_flow_daily`.
 

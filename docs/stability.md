@@ -105,6 +105,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Local `schedules --limit` and `schedule-dispatches --limit` contracts `skill2workflow-local-schedule-list-0.1.0` and `skill2workflow-local-schedule-dispatch-list-0.1.0` provide 1-1000 compact newest windows, omit trigger inputs and lease ownership, and preserve the complete-list path when the flag is omitted
 - Local `workflows --limit` reuses `skill2workflow-workflow-inventory-0.1.0` for a read-only 1-100 newest published-version window with workflow-content redaction; the complete-list path remains unchanged when the flag is omitted
 - Local `workflow-artifacts` retains a fixed 1-256 value-free issue window while preserving complete issue counts and truncation status; it never repairs or deletes artifacts
+- Local `schedule-run-due --max-items` accepts a 1-100 side-effect batch budget and leaves unclaimed due schedules for later invocations; omission preserves complete-batch compatibility
 - State layout marker `skill2workflow-state-layout-marker-0.1.0`, fail-closed compatibility preflight, and legacy-to-current copy-on-write migration documented in `docs/upgrade-migration.md`
 - Body-only HTTP connector input mapping documented in `docs/connectors.md`
 - Minimum connector manifest contract documented in `docs/connectors.md`

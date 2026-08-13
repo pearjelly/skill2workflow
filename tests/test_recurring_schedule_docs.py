@@ -42,6 +42,8 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("capped at 1 MiB", guide)
         self.assertIn("recurring_scheduler_smoke.py", guide)
         self.assertIn("--limit 100", guide)
+        self.assertIn("--max-items", guide)
+        self.assertIn("1` through `100", guide)
         self.assertIn("skill2workflow-local-schedule-list-0.1.0", guide)
         self.assertIn("skill2workflow-local-schedule-dispatch-list-0.1.0", guide)
         self.assertIn("trigger inputs", guide)
@@ -89,7 +91,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-128 are complete", readme)
+        self.assertIn("Delivery Loops 1-129 are complete", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete |", roadmap)

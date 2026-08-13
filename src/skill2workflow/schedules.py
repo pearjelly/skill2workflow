@@ -26,6 +26,7 @@ LOCAL_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-local-schedule-list-0.1.0"
 LOCAL_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-local-schedule-dispatch-list-0.1.0"
 MAX_LOCAL_SCHEDULE_LIST_ITEMS = 1000
 MAX_LOCAL_SCHEDULE_DISPATCH_LIST_ITEMS = 1000
+MAX_SCHEDULE_RUN_DUE_ITEMS = 100
 
 Schedule = Dict[str, object]
 ScheduleRunResult = Dict[str, object]
@@ -209,12 +210,31 @@ class LocalScheduleRunner:
             raise ValueError("recurring schedules requires sqlite storage")
         return self.recurring_store.set_enabled(schedule_id, enabled)
 
-    def list_due_schedules(self, now: str) -> List[Schedule]:
+    def list_due_schedules(self, now: str, max_items: int = None) -> List[Schedule]:
         now_at = _normalize_timestamp(now, "now")
-        return [schedule for schedule in self.store.list_schedules() if _is_due(schedule, now_at)]
+        if max_items is not None:
+            _validate_dispatch_limit(max_items)
+        due = []
+        for path in sorted(self.store.schedules_dir.glob("*.json")):
+            schedule = normalize_schedule_definition(
+                json.loads(path.read_text(encoding="utf-8"))
+            )
+            if not _is_due(schedule, now_at):
+                continue
+            due.append(schedule)
+            if max_items is not None and len(due) >= max_items:
+                break
+        return due
 
-    def run_due(self, now: str, lease_now_epoch: float = None) -> ScheduleRunResult:
+    def run_due(
+        self,
+        now: str,
+        lease_now_epoch: float = None,
+        max_items: int = None,
+    ) -> ScheduleRunResult:
         now_at = _normalize_timestamp(now, "now")
+        if max_items is not None:
+            _validate_dispatch_limit(max_items)
         dispatcher = None
         lease_now = time.time() if lease_now_epoch is None else float(lease_now_epoch)
         if self.recurring_store is not None:
@@ -229,8 +249,9 @@ class LocalScheduleRunner:
         runs = []
         skipped = 0
         failures = 0
+        processed = 0
         try:
-            for schedule in self.list_due_schedules(now_at):
+            for schedule in self.list_due_schedules(now_at, max_items=max_items):
                 trigger = _trigger_request(schedule)
                 response = self.control_plane.trigger_workflow(trigger)
                 updated = copy.deepcopy(schedule)
@@ -244,26 +265,37 @@ class LocalScheduleRunner:
                 run = dict(response)
                 run["schedule_id"] = str(schedule["schedule"]["id"])
                 runs.append(run)
+                processed += 1
 
-            if dispatcher is not None:
+            remaining = None if max_items is None else max_items - processed
+            if dispatcher is not None and (remaining is None or remaining > 0):
                 recurring_result = dispatcher.dispatch_due(
                     now_at,
                     now_epoch=time.time() if lease_now_epoch is None else lease_now,
+                    max_items=remaining,
                 )
                 runs.extend(recurring_result["runs"])
                 skipped = int(recurring_result["skipped"])
                 failures = int(recurring_result["failures"])
+                processed += int(recurring_result.get("processed", len(recurring_result["runs"])))
         finally:
             if dispatcher is not None:
                 dispatcher.release()
 
-        return {
+        result = {
             "now": now_at,
             "count": len(runs),
             "skipped": skipped,
             "failures": failures,
             "runs": runs,
         }
+        if max_items is not None:
+            result["window"] = {
+                "max_items": max_items,
+                "processed": processed,
+                "budget_exhausted": processed >= max_items,
+            }
+        return result
 
 
 def normalize_schedule_definition(definition: object) -> Schedule:
@@ -334,6 +366,18 @@ def _validate_local_window(value: object, label: str) -> None:
     ):
         raise ValueError(
             f"{label} must be an integer from 1 through {MAX_LOCAL_SCHEDULE_LIST_ITEMS}"
+        )
+
+
+def _validate_dispatch_limit(value: object) -> None:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= MAX_SCHEDULE_RUN_DUE_ITEMS
+    ):
+        raise ValueError(
+            "schedule run limit must be an integer from 1 through "
+            f"{MAX_SCHEDULE_RUN_DUE_ITEMS}"
         )
 
 
@@ -788,16 +832,20 @@ class RecurringScheduleDispatcher:
                 (self.LEASE_NAME, self.owner_id),
             )
 
-    def claim_due(self, now: str, now_epoch: float) -> List[Dict[str, object]]:
+    def claim_due(
+        self, now: str, now_epoch: float, max_items: int = None
+    ) -> List[Dict[str, object]]:
         now_at = _normalize_timestamp(now, "now")
         now_value = float(now_epoch)
+        if max_items is not None:
+            _validate_dispatch_limit(max_items)
         with self.store._connection() as connection:
             connection.execute("begin immediate")
             if not self._owns_lease(connection, now_value):
                 raise SchedulerLeaseError("scheduler lease is not held by this dispatcher")
             rows = connection.execute(
                 "select schedule_id, definition_json from recurring_schedules order by schedule_id"
-            ).fetchall()
+            )
             claimed = []
             for schedule_id, raw_definition in rows:
                 definition = _load_recurring_definition(raw_definition)
@@ -857,10 +905,16 @@ class RecurringScheduleDispatcher:
                     (_json_text(definition), _utc_now(), str(schedule_id)),
                 )
                 claimed.append(record)
+                if max_items is not None and len(claimed) >= max_items:
+                    break
         return claimed
 
-    def dispatch_due(self, now: str, now_epoch: float) -> ScheduleRunResult:
-        claims = self.claim_due(now, now_epoch)
+    def dispatch_due(
+        self, now: str, now_epoch: float, max_items: int = None
+    ) -> ScheduleRunResult:
+        if max_items is not None:
+            _validate_dispatch_limit(max_items)
+        claims = self.claim_due(now, now_epoch, max_items=max_items)
         runs = []
         skipped = 0
         failures = 0
@@ -892,13 +946,16 @@ class RecurringScheduleDispatcher:
                 }
             )
             runs.append(result)
-        return {
+        result = {
             "now": _normalize_timestamp(now, "now"),
             "count": len(runs),
             "skipped": skipped,
             "failures": failures,
             "runs": runs,
         }
+        if max_items is not None:
+            result["processed"] = len(claims)
+        return result
 
     def recover_stale_claims(self, now_epoch: float) -> int:
         now_value = float(now_epoch)

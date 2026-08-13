@@ -1844,6 +1844,63 @@ class CliTests(TestCase):
         self.assertEqual(inventory["schedules"][0]["schedule_id"], "schedule_new")
         self.assertNotIn("not-in-bounded-output", stdout.getvalue())
 
+    def test_schedule_run_due_command_supports_bounded_batch_budget(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            workflow_path = root / "workflow.json"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["publish", str(workflow_path), "--state-dir", str(state_dir)]),
+                    0,
+                )
+                for schedule_id in ("schedule_a", "schedule_b"):
+                    schedule_path = root / f"{schedule_id}.json"
+                    schedule_path.write_text(
+                        json.dumps(
+                            {
+                                "schema_version": "skill2workflow-schedule-0.1.0",
+                                "schedule": {
+                                    "id": schedule_id,
+                                    "workflow_id": "workflow_demo",
+                                    "version": "0.1.0",
+                                    "run_at": "2026-07-06T00:00:00Z",
+                                },
+                                "trigger": {"input": {"private": schedule_id}},
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        main(["schedule-add", str(schedule_path), "--state-dir", str(state_dir)]),
+                        0,
+                    )
+
+            output = StringIO()
+            with redirect_stdout(output):
+                exit_code = main(
+                    [
+                        "schedule-run-due",
+                        "--state-dir",
+                        str(state_dir),
+                        "--now",
+                        "2026-07-06T00:00:00Z",
+                        "--max-items",
+                        "1",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        result = json.loads(output.getvalue())
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["window"], {
+            "max_items": 1,
+            "processed": 1,
+            "budget_exhausted": True,
+        })
+        self.assertEqual(result["runs"][0]["schedule_id"], "schedule_a")
+
     def test_schedule_commands_support_sqlite_recurring_definitions_and_dispatch_records(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

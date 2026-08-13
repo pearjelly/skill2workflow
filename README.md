@@ -161,6 +161,7 @@ explicit connector boundaries. It currently supports:
 - Produce a bounded, read-only backup expiration plan with a minimum-valid-backup floor
 - Inspect compact, bounded local schedules and dispatch history without trigger inputs or lease identities
 - Inspect compact, bounded published-workflow inventory without workflow content
+- Drain due schedule work in explicitly bounded side-effect batches
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Validate and inspect the minimum connector manifest contract for future extensions
@@ -596,6 +597,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli backup-retention-plan /etc/skill2wo
 PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /var/lib/skill2workflow --storage sqlite --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli schedules --state-dir /var/lib/skill2workflow --storage sqlite --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches --state-dir /var/lib/skill2workflow --storage sqlite --limit 100
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due --state-dir /var/lib/skill2workflow --storage sqlite --now 2026-08-14T00:00:00Z --max-items 25
 PYTHONPATH=src python3 -m skill2workflow.cli restore --backup-dir /var/backups/skill2workflow/2026-08-11 --state-dir /var/lib/skill2workflow-restored
 ```
 
@@ -739,7 +741,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-128 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-129 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1115,6 +1117,10 @@ Loop 128 bounds [workflow artifact diagnostics](docs/workflow-artifacts.md)
 internally: the scan keeps complete issue counts but retains only the fixed
 value-free issue window, so damaged state cannot make the diagnostic result
 grow with every failure.
+
+Loop 129 adds bounded due-run batches. `schedule-run-due --max-items` limits
+one invocation to at most 100 schedule records and leaves unclaimed due work
+eligible for a later invocation; omitting it preserves complete-batch behavior.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

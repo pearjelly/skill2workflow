@@ -114,6 +114,30 @@ class RecurringSchedulePersistenceTests(TestCase):
         self.assertEqual(listed[0]["schedule"]["next_run_at"], "2026-08-11T00:01:00+00:00")
         self.assertEqual(dispatches[0]["status"], "completed")
 
+    def test_recurring_dispatch_budget_claims_only_requested_batch(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            LocalControlPlane(state_dir, storage="sqlite").publish_workflow(_workflow())
+            runner = LocalScheduleRunner(state_dir, storage="sqlite")
+            runner.add_schedule(_recurring_definition())
+            runner.add_schedule(
+                _recurring_definition(extra_schedule={"id": "schedule_second"})
+            )
+
+            result = runner.run_due("2026-08-11T00:00:00Z", max_items=1)
+            remaining = runner.list_schedules()
+
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["window"], {
+            "max_items": 1,
+            "processed": 1,
+            "budget_exhausted": True,
+        })
+        self.assertEqual(
+            [item["schedule"]["id"] for item in remaining if item["schedule"]["next_run_at"] == "2026-08-11T00:00:00+00:00"],
+            ["schedule_second"],
+        )
+
     def test_cli_due_run_honors_service_lease_before_any_sqlite_dispatch(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

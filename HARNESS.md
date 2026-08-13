@@ -399,6 +399,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli backup-retention-plan /etc/skill2wo
 PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control --storage sqlite --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli schedules --state-dir /tmp/skill2workflow-control --storage sqlite --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches --state-dir /tmp/skill2workflow-control --storage sqlite --limit 100
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due --state-dir /tmp/skill2workflow-control --storage sqlite --now 2026-08-14T00:00:00Z --max-items 25
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
 PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --service-url http://127.0.0.1:8080 --auth-token-file /tmp/skill2workflow-ingress.token -o /tmp/skill2workflow-live-snapshot.json

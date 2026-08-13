@@ -221,6 +221,11 @@ def main(argv=None) -> int:
     schedule_run_due_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     schedule_run_due_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
     schedule_run_due_cmd.add_argument("--now", required=True, help="ISO-8601 timestamp used for deterministic due checks")
+    schedule_run_due_cmd.add_argument(
+        "--max-items",
+        type=int,
+        help="Process at most this many due schedules (1-100)",
+    )
     schedule_run_due_cmd.add_argument("--credential-file", type=Path)
 
     webhook_server_cmd = subparsers.add_parser(
@@ -858,7 +863,7 @@ def main(argv=None) -> int:
                 args.state_dir,
                 storage=args.storage,
                 credential_provider=_credential_provider(args),
-            ).run_due(args.now)
+            ).run_due(args.now, max_items=args.max_items)
         )
 
     if args.command == "webhook-server":

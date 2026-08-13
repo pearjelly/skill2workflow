@@ -186,6 +186,30 @@ class ScheduleTests(TestCase):
         self.assertEqual(stored_schedule["schedule"]["last_run_id"], result["runs"][0]["run_id"])
         self.assertEqual(stored_schedule["schedule"]["last_trigger_id"], result["runs"][0]["trigger_id"])
 
+    def test_runner_can_bound_one_shot_due_batch_without_consuming_remaining_schedules(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            runner = LocalScheduleRunner(state_dir, storage="sqlite")
+            runner.add_schedule(_schedule_definition(schedule_id="schedule_a"))
+            runner.add_schedule(_schedule_definition(schedule_id="schedule_b"))
+
+            result = runner.run_due("2026-07-06T00:00:00Z", max_items=1)
+            remaining = runner.list_due_schedules("2026-07-06T00:00:00Z")
+
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["window"], {
+            "max_items": 1,
+            "processed": 1,
+            "budget_exhausted": True,
+        })
+        self.assertEqual([item["schedule"]["id"] for item in remaining], ["schedule_b"])
+
+        for invalid in (0, -1, 101, True, "1"):
+            with self.assertRaisesRegex(ValueError, "schedule run limit"):
+                runner.run_due("2026-07-06T00:00:00Z", max_items=invalid)
+
     def test_runner_resolves_a_promoted_version_alias(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)
