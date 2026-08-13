@@ -125,6 +125,23 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_readiness_checks_sqlite_registry_without_materializing_records(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+            service._status = "ready"
+            with patch.object(service.authenticator, "is_ready", return_value=True), patch.object(
+                service.credential_provider, "is_ready", return_value=True
+            ), patch.object(service.scheduler, "is_ready", return_value=True), patch.object(
+                service.control_plane,
+                "list_workflows",
+                side_effect=AssertionError("readiness loaded the full workflow registry"),
+            ):
+                status, payload = service.readiness()
+            service._server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["status"], "ready")
+
     def test_shutdown_requested_during_scheduler_start_does_not_restore_ready(self):
         with TemporaryDirectory() as tmp:
             service = RuntimeService(_service_config(Path(tmp)))

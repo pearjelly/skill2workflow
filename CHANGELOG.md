@@ -40,6 +40,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Interrupted-run audit reconciliation now streams interrupted states and
   checks one `(run_id,event_type)` projection at a time, avoiding complete
   run-table and audit-history materialization during startup recovery.
+- Live readiness now checks SQLite workflow-registry readability with a count
+  query instead of loading every published record; complete list APIs remain
+  compatible.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.

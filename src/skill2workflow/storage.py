@@ -766,6 +766,11 @@ class JsonControlStore:
     def save_index(self, index: Dict[str, WorkflowRecord]) -> None:
         self.index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    def count_workflow_records(self) -> int:
+        """Count JSON registry records while preserving the complete-list API."""
+
+        return len(self.load_index())
+
     def snapshot_window(self, limit: int) -> Dict[str, object]:
         """Read a bounded JSON control window with aggregate totals."""
 

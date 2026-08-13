@@ -18,6 +18,19 @@ from skill2workflow.triggers import TriggerIdempotencyError
 
 
 class ControlPlaneTests(TestCase):
+    def test_sqlite_registry_readiness_check_does_not_load_records(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            with patch.object(
+                control,
+                "list_workflows",
+                side_effect=AssertionError("readiness loaded the full workflow registry"),
+            ):
+                count = control.check_workflow_registry()
+
+        self.assertEqual(count, 1)
+
     def test_timeout_terminal_audit_contains_fixed_error_code(self):
         clock = _TestClock()
         workflow = _connector_workflow("8.0.0", "https://unused.invalid")

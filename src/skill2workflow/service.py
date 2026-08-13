@@ -349,7 +349,7 @@ class RuntimeService:
                 raise ValueError("security provider unavailable")
             if not self.scheduler.is_ready():
                 raise ValueError("scheduler lease unavailable")
-            self.control_plane.list_workflows()
+            self.control_plane.check_workflow_registry()
         except (OSError, sqlite3.Error, ValueError):
             return 503, {"service": "skill2workflow", "status": "not_ready"}
         return 200, {

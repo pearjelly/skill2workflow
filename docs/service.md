@@ -240,7 +240,7 @@ connection. This bounds slow, half-open, and truncated body reads during
 overload and graceful drain. It is a per-request read deadline, not a total
 workflow or connector execution timeout.
 
-The webhook request and response contract remains documented in [`triggers.md`](triggers.md). Health does not imply readiness: during shutdown, readiness is withdrawn before the HTTP server closes.
+The webhook request and response contract remains documented in [`triggers.md`](triggers.md). Health does not imply readiness: during shutdown, readiness is withdrawn before the HTTP server closes. The readiness probe checks SQLite workflow-registry readability with a count query and does not materialize the complete published-version registry; the complete local workflow-list API remains available for explicit inspection.
 
 Unexpected exceptions from a business handler are converted to the fixed
 `503` `service unavailable` response. Connection-abort errors close the socket

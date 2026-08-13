@@ -286,6 +286,14 @@ class LocalControlPlane:
         records = list(self._load_index().values())
         return sorted(records, key=lambda record: (str(record["workflow_id"]), str(record["version"])))
 
+    def check_workflow_registry(self) -> int:
+        """Check registry readability without materializing SQLite records."""
+
+        counter = getattr(self.store, "count_workflow_records", None)
+        if callable(counter):
+            return int(counter())
+        return len(self.list_workflows())
+
     def inspect_workflow_artifacts(
         self, max_issues: int = MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES
     ) -> Dict[str, object]:
