@@ -14,6 +14,7 @@ from skill2workflow.service_client import (
     MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
     MAX_BACKUP_READINESS_RESPONSE_BYTES,
     MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
+    MAX_RUNTIME_INFO_RESPONSE_BYTES,
     ServiceActionError,
     post_recurring_schedule_state,
     post_run_cancel,
@@ -25,6 +26,7 @@ from skill2workflow.service_client import (
     fetch_workflow_artifact_report,
     fetch_backup_readiness,
     fetch_audit_integrity,
+    fetch_runtime_info,
     fetch_support_bundle,
     fetch_audit_consistency,
 )
@@ -603,6 +605,80 @@ class ServiceClientTests(TestCase):
             thread.start()
             with self.assertRaises(ServiceActionError):
                 fetch_audit_integrity(
+                    f"http://127.0.0.1:{server.server_port}", token_file
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
+    def test_runtime_info_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+        payload = _runtime_info_payload()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_runtime_info(
+                f"http://127.0.0.1:{server.server_port}", token_file
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(
+            observed,
+            [{
+                "path": "/api/v1/runtime-info",
+                "authorization": f"Bearer {AUTH_TOKEN}",
+            }],
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_runtime_info_rejects_oversized_response(self):
+        body = b"x" * (MAX_RUNTIME_INFO_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_runtime_info(
                     f"http://127.0.0.1:{server.server_port}", token_file
                 )
             thread.join(timeout=2)
@@ -1278,6 +1354,21 @@ def _audit_integrity_payload():
         "head_digest": "a" * 64,
         "first_invalid_sequence": 0,
         "reason": "",
+    }
+
+
+def _runtime_info_payload():
+    return {
+        "schema_version": "skill2workflow-runtime-info-0.1.0",
+        "package_version": "0.1.0",
+        "compatibility_line": "0.1.x",
+        "service_schema_version": "skill2workflow-service-0.2.0",
+        "workflow_dsl_schema_version": "0.1.0",
+        "storage": "sqlite",
+        "state_layout_version": "skill2workflow-sqlite-layout-0.1.0",
+        "service_status": "ready",
+        "service_ready": True,
+        "scheduler_lease_owned": True,
     }
 
 

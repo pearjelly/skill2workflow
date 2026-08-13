@@ -125,6 +125,21 @@ class WorkflowReleaseDocumentationTests(TestCase):
             / "plans"
             / "2026-08-13-remote-audit-integrity.md"
         ).read_text(encoding="utf-8")
+        runtime_info_guide = (ROOT / "docs" / "remote-runtime-info.md").read_text(
+            encoding="utf-8"
+        )
+        runtime_info_plan = (
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-08-13-remote-runtime-info.md"
+        ).read_text(encoding="utf-8")
+        runtime_info_schema = json.loads(
+            (ROOT / "schemas" / "runtime-info-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
@@ -243,6 +258,19 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("16 KiB", audit_integrity_remote_guide)
         self.assertIn("event payload", audit_integrity_remote_plan)
         self.assertIn("Loop 83: Remote Audit Integrity", roadmap)
+        self.assertIn("GET /api/v1/runtime-info", runtime_info_guide)
+        self.assertIn("service-runtime-info", runtime_info_guide)
+        self.assertIn("16 KiB", runtime_info_guide)
+        self.assertIn("readiness-independent", runtime_info_plan)
+        self.assertEqual(
+            runtime_info_schema["$id"],
+            "https://skill2workflow.dev/schemas/runtime-info-0.1.0.json",
+        )
+        self.assertEqual(
+            runtime_info_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-runtime-info-0.1.0",
+        )
+        self.assertIn("Loop 84: Remote Runtime Info", roadmap)
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",
@@ -268,6 +296,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-workflow-artifacts"', cli)
         self.assertIn('"service-backup-readiness"', cli)
         self.assertIn('"service-audit-integrity"', cli)
+        self.assertIn('"service-runtime-info"', cli)
         self.assertIn('"service-schedule-enable"', cli)
         self.assertIn('"service-schedule-disable"', cli)
         self.assertIn("--expected-current-version", cli)
@@ -280,5 +309,6 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-workflow-artifacts"', package_smoke)
         self.assertIn('"service-backup-readiness"', package_smoke)
         self.assertIn('"service-audit-integrity"', package_smoke)
+        self.assertIn('"service-runtime-info"', package_smoke)
         self.assertIn('"service-schedule-enable"', package_smoke)
         self.assertIn('"service-schedule-disable"', package_smoke)

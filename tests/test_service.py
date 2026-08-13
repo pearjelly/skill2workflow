@@ -25,6 +25,7 @@ from skill2workflow.service import (
     MAX_LIVE_CONTROL_SNAPSHOT_BYTES,
     MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
     MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
+    MAX_RUNTIME_INFO_RESPONSE_BYTES,
     RuntimeService,
     ServiceScheduleLoop,
     ServiceConfig,
@@ -619,6 +620,73 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(status, 503)
         self.assertEqual(payload, {"error": "audit integrity unavailable"})
         self.assertNotIn("private-audit-integrity-value", json.dumps(payload))
+        self.assertFalse(thread.is_alive())
+
+    def test_runtime_info_is_authenticated_bounded_and_reports_compatibility(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = _service_config(root)
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            denied_status, denied = _get_json(
+                f"http://{host}:{port}/api/v1/runtime-info"
+            )
+            accepted_status, accepted = _get_json(
+                f"http://{host}:{port}/api/v1/runtime-info",
+                token=AUTH_TOKEN,
+            )
+            body_connection = http.client.HTTPConnection(host, port, timeout=2)
+            body_connection.request(
+                "GET",
+                "/api/v1/runtime-info",
+                body=b"{}",
+                headers={"Authorization": f"Bearer {AUTH_TOKEN}"},
+            )
+            body_response = body_connection.getresponse()
+            body_payload = json.loads(body_response.read().decode("utf-8"))
+            body_status = body_response.status
+            body_connection.close()
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted["schema_version"],
+            "skill2workflow-runtime-info-0.1.0",
+        )
+        self.assertEqual(accepted["package_version"], "0.1.0")
+        self.assertEqual(accepted["compatibility_line"], "0.1.x")
+        self.assertEqual(accepted["service_schema_version"], SERVICE_SCHEMA_VERSION)
+        self.assertEqual(accepted["workflow_dsl_schema_version"], "0.1.0")
+        self.assertEqual(accepted["storage"], "sqlite")
+        self.assertEqual(
+            accepted["state_layout_version"],
+            "skill2workflow-sqlite-layout-0.1.0",
+        )
+        self.assertEqual(accepted["service_status"], "ready")
+        self.assertTrue(accepted["service_ready"])
+        self.assertTrue(accepted["scheduler_lease_owned"])
+        self.assertEqual(body_status, 400)
+        self.assertEqual(
+            body_payload,
+            {"error": "runtime info request must not include a body"},
+        )
+        self.assertLess(len(json.dumps(accepted).encode("utf-8")), MAX_RUNTIME_INFO_RESPONSE_BYTES)
         self.assertFalse(thread.is_alive())
 
     def test_audit_consistency_can_target_one_run_beyond_the_global_window(self):

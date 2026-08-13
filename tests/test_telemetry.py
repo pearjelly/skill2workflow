@@ -60,6 +60,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry.observe_http("workflow_artifact_report", 200)
             telemetry.observe_http("backup_readiness", 200)
             telemetry.observe_http("audit_integrity", 200)
+            telemetry.observe_http("runtime_info", 200)
             telemetry.observe_http("support_bundle", 200)
             telemetry.observe_http("run_list", 200)
             telemetry.observe_http("run_detail", 200)
@@ -87,6 +88,7 @@ class RuntimeTelemetryTests(TestCase):
             'skill2workflow_http_requests_total{route="workflow_artifact_report",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="backup_readiness",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="audit_integrity",status_class="2xx"} 1',
+            'skill2workflow_http_requests_total{route="runtime_info",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="support_bundle",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="run_list",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="run_detail",status_class="2xx"} 1',
@@ -142,6 +144,7 @@ class RuntimeTelemetryTests(TestCase):
                 "workflow_artifact_report",
                 "backup_readiness",
                 "audit_integrity",
+                "runtime_info",
                 "audit_consistency",
                 "support_bundle", "run_list", "run_detail", "workflow_trigger", "run_cancel",
                 "run_resume", "unknown",

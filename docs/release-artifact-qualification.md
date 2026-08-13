@@ -27,7 +27,7 @@ The installed command set also includes the protected `service-resume`,
 `service-cancel`, redacted `service-show`, bounded `service-runs`, bounded
 `service-recurring-schedules`, bounded `service-recurring-dispatches`, bounded
 `service-workflow-artifacts`, bounded `service-backup-readiness`, bounded
-`service-audit-integrity`, protected
+`service-audit-integrity`, bounded `service-runtime-info`, protected
 `service-schedule-enable` and
 `service-schedule-disable`, and owner-only `service-support-bundle` operator
 clients.

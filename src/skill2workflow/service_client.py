@@ -28,7 +28,12 @@ from .control_plane import (
     RUN_AUDIT_REPORT_SCHEMA_VERSION,
     WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
 )
-from .service import read_service_bearer_token
+from .service import (
+    RUNTIME_INFO_SCHEMA_VERSION,
+    SERVICE_SCHEMA_VERSION,
+    WORKFLOW_DSL_SCHEMA_VERSION,
+    read_service_bearer_token,
+)
 from .storage import AUDIT_INTEGRITY_ALGORITHM, AUDIT_INTEGRITY_SCHEMA_VERSION
 
 
@@ -40,6 +45,7 @@ MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
+MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -210,6 +216,23 @@ def fetch_audit_integrity(
         max_response_bytes=MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     )
     _validate_audit_integrity(payload)
+    return payload
+
+
+def fetch_runtime_info(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch fixed runtime identity and compatibility metadata."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/runtime-info",
+        conflict_message="runtime info unavailable",
+        max_response_bytes=MAX_RUNTIME_INFO_RESPONSE_BYTES,
+    )
+    _validate_runtime_info(payload)
     return payload
 
 
@@ -768,6 +791,38 @@ def _validate_audit_integrity(payload: Dict[str, object]) -> None:
         algorithm != AUDIT_INTEGRITY_ALGORITHM
         or reason == ""
         or head_digest != ""
+    ):
+        raise ServiceActionError()
+
+
+def _validate_runtime_info(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed runtime-info contract."""
+
+    fields = {
+        "schema_version", "package_version", "compatibility_line",
+        "service_schema_version", "workflow_dsl_schema_version", "storage",
+        "state_layout_version", "service_status", "service_ready",
+        "scheduler_lease_owned",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    package_version = payload.get("package_version")
+    service_status = payload.get("service_status")
+    if (
+        payload.get("schema_version") != RUNTIME_INFO_SCHEMA_VERSION
+        or not isinstance(package_version, str)
+        or not package_version
+        or len(package_version) > 64
+        or any(character.isspace() for character in package_version)
+        or payload.get("compatibility_line") != "0.1.x"
+        or payload.get("service_schema_version") != SERVICE_SCHEMA_VERSION
+        or payload.get("workflow_dsl_schema_version") != WORKFLOW_DSL_SCHEMA_VERSION
+        or payload.get("storage") != "sqlite"
+        or payload.get("state_layout_version") != "skill2workflow-sqlite-layout-0.1.0"
+        or service_status not in {"starting", "ready", "draining", "stopped"}
+        or not isinstance(payload.get("service_ready"), bool)
+        or not isinstance(payload.get("scheduler_lease_owned"), bool)
+        or (payload.get("service_ready") and service_status != "ready")
     ):
         raise ServiceActionError()
 

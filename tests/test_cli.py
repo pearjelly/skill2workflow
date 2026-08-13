@@ -392,6 +392,40 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_runtime_info_command_prints_report(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-runtime-info-0.1.0",
+            "package_version": "0.1.0",
+            "compatibility_line": "0.1.x",
+            "service_schema_version": "skill2workflow-service-0.2.0",
+            "workflow_dsl_schema_version": "0.1.0",
+            "storage": "sqlite",
+            "state_layout_version": "skill2workflow-sqlite-layout-0.1.0",
+            "service_status": "ready",
+            "service_ready": True,
+            "scheduler_lease_owned": True,
+        }
+        with patch(
+            "skill2workflow.cli.fetch_runtime_info",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-runtime-info",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example", token_file)
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

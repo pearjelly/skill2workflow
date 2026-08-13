@@ -41,6 +41,10 @@ release; Roadmap loop completion alone does not publish a new version.
   `GET /api/v1/audit-integrity` and the protected `service-audit-integrity` CLI,
   reusing the fixed payload-free integrity result with a 16 KiB bound and no
   repair mutation.
+- Added authenticated remote runtime identity at `GET /api/v1/runtime-info` and
+  the protected `service-runtime-info` CLI, exposing fixed package,
+  compatibility-line, state-layout, lifecycle, readiness, and lease metadata
+  with a 16 KiB bound and no configuration disclosure.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/runtime-info-0.1.0.json",
+  "title": "skill2workflow remote runtime identity and compatibility report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "package_version",
+    "compatibility_line",
+    "service_schema_version",
+    "workflow_dsl_schema_version",
+    "storage",
+    "state_layout_version",
+    "service_status",
+    "service_ready",
+    "scheduler_lease_owned"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-runtime-info-0.1.0"
+    },
+    "package_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^\\S+$"
+    },
+    "compatibility_line": {
+      "const": "0.1.x"
+    },
+    "service_schema_version": {
+      "const": "skill2workflow-service-0.2.0"
+    },
+    "workflow_dsl_schema_version": {
+      "const": "0.1.0"
+    },
+    "storage": {
+      "const": "sqlite"
+    },
+    "state_layout_version": {
+      "const": "skill2workflow-sqlite-layout-0.1.0"
+    },
+    "service_status": {
+      "enum": ["starting", "ready", "draining", "stopped"]
+    },
+    "service_ready": {
+      "type": "boolean"
+    },
+    "scheduler_lease_owned": {
+      "type": "boolean"
+    }
+  }
+}

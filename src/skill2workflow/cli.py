@@ -30,6 +30,7 @@ from .service_client import (
     fetch_workflow_artifact_report,
     fetch_backup_readiness,
     fetch_audit_integrity,
+    fetch_runtime_info,
     fetch_run_detail,
     fetch_run_list,
     fetch_support_bundle,
@@ -377,6 +378,13 @@ def main(argv=None) -> int:
     )
     service_integrity_cmd.add_argument("--service-url", required=True)
     service_integrity_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_runtime_cmd = subparsers.add_parser(
+        "service-runtime-info",
+        help="Show runtime version and compatibility metadata through the authenticated service",
+    )
+    service_runtime_cmd.add_argument("--service-url", required=True)
+    service_runtime_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     for command, help_text in (
         ("service-schedule-enable", "Enable one recurring schedule through the authenticated service"),
@@ -816,6 +824,14 @@ def main(argv=None) -> int:
     if args.command == "service-audit-integrity":
         return _service_action(
             lambda: fetch_audit_integrity(
+                args.service_url,
+                args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-runtime-info":
+        return _service_action(
+            lambda: fetch_runtime_info(
                 args.service_url,
                 args.auth_token_file,
             )

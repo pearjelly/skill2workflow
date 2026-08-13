@@ -386,6 +386,7 @@ def build_support_bundle_from_control(
     http_requests.pop("workflow_artifact_report", None)
     http_requests.pop("backup_readiness", None)
     http_requests.pop("audit_integrity", None)
+    http_requests.pop("runtime_info", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests
     return {
