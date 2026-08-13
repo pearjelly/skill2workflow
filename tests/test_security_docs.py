@@ -41,6 +41,7 @@ class SecurityBoundaryDocumentationTests(TestCase):
         self.assertIn("loopback", guide)
         self.assertIn("must not contain secret values", guide)
         self.assertIn("security_boundary_smoke.py", guide)
+        self.assertIn("service unavailable", guide)
         self.assertIn("unsafe_credential_file_blocked", guide)
         self.assertIn("not multi-tenant RBAC", guide)
 
@@ -56,7 +57,7 @@ class SecurityBoundaryDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-96 are complete", readme)
+        self.assertIn("Delivery Loops 1-97 are complete", readme)
         self.assertIn("docs/security-boundary.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("| Loop 42: Authenticated Ingress And Production Credentials | Complete |", roadmap)

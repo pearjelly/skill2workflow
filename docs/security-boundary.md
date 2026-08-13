@@ -40,6 +40,13 @@ uses the same filesystem and state guards without printing configured values.
 
 `GET /healthz` and `GET /readyz` remain anonymous and expose only process and readiness status. Every other route, including `GET /metrics`, `GET /runs`, `GET /runs/{run_id}`, and the live snapshot, requires `Authorization: Bearer <token>`. Metrics remain scrapeable when readiness is false so operators can diagnose standby or failure state, but they export only the aggregate fixed-label contract in [`observability.md`](observability.md). Authenticated request bodies are capped at 1 MiB before they are read; ambiguous multiple content lengths and transfer-encoded bodies are rejected at this origin boundary.
 
+The service dispatch boundary also fails closed for unexpected handler errors:
+it returns only `503 {"error":"service unavailable"}` and never serializes an
+exception message, traceback, request value, or credential. A client that has
+already closed the connection is not given a second write attempt. Telemetry
+and operational event logging are best-effort and cannot turn a request error
+into a secret-bearing response.
+
 ## Execution-time Connector Credentials
 
 The production service uses credentials provider: `directory`. Each valid Workflow DSL credential handle maps to one file with the same name beneath the configured directory:

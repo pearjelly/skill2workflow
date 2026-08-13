@@ -553,88 +553,111 @@ def _handler_for(service: RuntimeService):
             path = urlsplit(self.path).path
             route = _request_route(self.command, path)
             self._response_status = 500
+            self._response_started = False
             admitted = route in {"health", "readiness"} or self._try_admit_request()
             try:
-                if not admitted:
-                    self._send_json(
-                        429,
-                        {"error": "service concurrency limit reached"},
-                        headers={"Retry-After": "1"},
-                    )
-                elif self.command == "GET" and path == "/healthz":
-                    self._send_json(200, {"service": "skill2workflow", "status": "ok"})
-                elif self.command == "GET" and path == "/readyz":
-                    status_code, payload = service.readiness()
-                    self._send_json(status_code, payload)
-                elif self.command == "GET" and path == "/metrics":
-                    self._handle_metrics()
-                elif self.command == "GET" and path == "/api/v1/control-snapshot":
-                    self._handle_control_snapshot()
-                elif self.command == "GET" and path == "/api/v1/workflow-artifacts":
-                    self._handle_workflow_artifact_report()
-                elif self.command == "GET" and path == "/api/v1/backup-readiness":
-                    self._handle_backup_readiness()
-                elif self.command == "POST" and path == "/api/v1/retention-readiness":
-                    self._handle_retention_readiness()
-                elif self.command == "GET" and path == "/api/v1/operational-readiness":
-                    self._handle_operational_readiness()
-                elif self.command == "GET" and path == "/api/v1/audit-integrity":
-                    self._handle_audit_integrity()
-                elif self.command == "GET" and path == "/api/v1/runtime-info":
-                    self._handle_runtime_info()
-                elif self.command == "GET" and path == "/api/v1/workflows":
-                    self._handle_workflow_inventory()
-                elif self.command == "POST" and path == "/api/v1/workflow-releases":
-                    self._handle_workflow_release()
-                elif self.command == "POST" and path == "/api/v1/workflow-promotions":
-                    self._handle_workflow_promotion()
-                elif self.command == "POST" and path == "/api/v1/workflow-deprecations":
-                    self._handle_workflow_deprecation()
-                elif self.command == "GET" and _workflow_diff_parts(path) is not None:
-                    self._handle_workflow_diff(_workflow_diff_parts(path))
-                elif self.command == "GET" and path == "/api/v1/recurring-schedules":
-                    self._handle_recurring_schedule_list()
-                elif self.command == "POST" and _recurring_schedule_action(path):
-                    schedule_id, action = _recurring_schedule_action(path)
-                    self._handle_recurring_schedule_action(
-                        schedule_id,
-                        enabled=action == "enable",
-                    )
-                elif self.command == "GET" and _recurring_schedule_dispatch_list(path) is not None:
-                    self._handle_recurring_schedule_dispatch_list(
-                        _recurring_schedule_dispatch_list(path)
-                    )
-                elif self.command == "GET" and (
-                    path == "/api/v1/audit-consistency"
-                    or _audit_consistency_run_id(path)
-                ):
-                    self._handle_audit_consistency(_audit_consistency_run_id(path))
-                elif self.command == "GET" and path == "/api/v1/support-bundle":
-                    self._handle_support_bundle()
-                elif self.command == "GET" and path == "/runs":
-                    self._handle_run_list()
-                elif self.command == "GET" and _run_detail_id(path):
-                    self._handle_run_detail(_run_detail_id(path))
-                elif self.command == "POST" and _resume_run_id(path):
-                    self._handle_resume(_resume_run_id(path))
-                elif self.command == "POST" and _cancel_run_id(path):
-                    self._handle_cancel(_cancel_run_id(path))
-                else:
-                    self._handle_webhook()
+                try:
+                    if not admitted:
+                        self._send_json(
+                            429,
+                            {"error": "service concurrency limit reached"},
+                            headers={"Retry-After": "1"},
+                        )
+                    elif self.command == "GET" and path == "/healthz":
+                        self._send_json(200, {"service": "skill2workflow", "status": "ok"})
+                    elif self.command == "GET" and path == "/readyz":
+                        status_code, payload = service.readiness()
+                        self._send_json(status_code, payload)
+                    elif self.command == "GET" and path == "/metrics":
+                        self._handle_metrics()
+                    elif self.command == "GET" and path == "/api/v1/control-snapshot":
+                        self._handle_control_snapshot()
+                    elif self.command == "GET" and path == "/api/v1/workflow-artifacts":
+                        self._handle_workflow_artifact_report()
+                    elif self.command == "GET" and path == "/api/v1/backup-readiness":
+                        self._handle_backup_readiness()
+                    elif self.command == "POST" and path == "/api/v1/retention-readiness":
+                        self._handle_retention_readiness()
+                    elif self.command == "GET" and path == "/api/v1/operational-readiness":
+                        self._handle_operational_readiness()
+                    elif self.command == "GET" and path == "/api/v1/audit-integrity":
+                        self._handle_audit_integrity()
+                    elif self.command == "GET" and path == "/api/v1/runtime-info":
+                        self._handle_runtime_info()
+                    elif self.command == "GET" and path == "/api/v1/workflows":
+                        self._handle_workflow_inventory()
+                    elif self.command == "POST" and path == "/api/v1/workflow-releases":
+                        self._handle_workflow_release()
+                    elif self.command == "POST" and path == "/api/v1/workflow-promotions":
+                        self._handle_workflow_promotion()
+                    elif self.command == "POST" and path == "/api/v1/workflow-deprecations":
+                        self._handle_workflow_deprecation()
+                    elif self.command == "GET" and _workflow_diff_parts(path) is not None:
+                        self._handle_workflow_diff(_workflow_diff_parts(path))
+                    elif self.command == "GET" and path == "/api/v1/recurring-schedules":
+                        self._handle_recurring_schedule_list()
+                    elif self.command == "POST" and _recurring_schedule_action(path):
+                        schedule_id, action = _recurring_schedule_action(path)
+                        self._handle_recurring_schedule_action(
+                            schedule_id,
+                            enabled=action == "enable",
+                        )
+                    elif self.command == "GET" and _recurring_schedule_dispatch_list(path) is not None:
+                        self._handle_recurring_schedule_dispatch_list(
+                            _recurring_schedule_dispatch_list(path)
+                        )
+                    elif self.command == "GET" and (
+                        path == "/api/v1/audit-consistency"
+                        or _audit_consistency_run_id(path)
+                    ):
+                        self._handle_audit_consistency(_audit_consistency_run_id(path))
+                    elif self.command == "GET" and path == "/api/v1/support-bundle":
+                        self._handle_support_bundle()
+                    elif self.command == "GET" and path == "/runs":
+                        self._handle_run_list()
+                    elif self.command == "GET" and _run_detail_id(path):
+                        self._handle_run_detail(_run_detail_id(path))
+                    elif self.command == "POST" and _resume_run_id(path):
+                        self._handle_resume(_resume_run_id(path))
+                    elif self.command == "POST" and _cancel_run_id(path):
+                        self._handle_cancel(_cancel_run_id(path))
+                    else:
+                        self._handle_webhook()
+                except (BrokenPipeError, ConnectionResetError, TimeoutError):
+                    self.close_connection = True
+                except Exception:
+                    self._send_internal_error()
             finally:
                 if admitted and route not in {"health", "readiness"}:
                     service._request_admission.release()
-                service.telemetry.observe_http(route, self._response_status)
+                try:
+                    service.telemetry.observe_http(route, self._response_status)
+                except Exception:
+                    pass
                 if service.event_logger is not None:
-                    service.event_logger.request_completed(
-                        method=self.command,
-                        route=route,
-                        status_code=self._response_status,
-                        duration_ms=(time.monotonic() - started_at) * 1000,
-                    )
+                    try:
+                        service.event_logger.request_completed(
+                            method=self.command,
+                            route=route,
+                            status_code=self._response_status,
+                            duration_ms=(time.monotonic() - started_at) * 1000,
+                        )
+                    except Exception:
+                        pass
 
         def _try_admit_request(self) -> bool:
             return service._request_admission.acquire(blocking=False)
+
+        def _send_internal_error(self) -> None:
+            """Return one fixed error without exposing unexpected exception details."""
+
+            self.close_connection = True
+            if self._response_started:
+                return
+            try:
+                self._send_json(503, {"error": "service unavailable"})
+            except (OSError, ValueError):
+                self.close_connection = True
 
         def _handle_metrics(self):
             authenticated, reason = service.authenticator.authenticate(
@@ -1872,6 +1895,7 @@ def _handler_for(service: RuntimeService):
         def _send_json(self, status_code: int, payload: Dict[str, object], headers=None) -> None:
             data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
             self._response_status = status_code
+            self._response_started = True
             self.send_response(status_code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Cache-Control", "no-store")
@@ -1884,6 +1908,7 @@ def _handler_for(service: RuntimeService):
         def _send_text(self, status_code: int, payload: str) -> None:
             data = payload.encode("utf-8")
             self._response_status = status_code
+            self._response_started = True
             self.send_response(status_code)
             self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
             self.send_header("Cache-Control", "no-store")

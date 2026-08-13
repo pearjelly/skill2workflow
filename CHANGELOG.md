@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a fail-closed service exception boundary: unexpected handler failures
+  return a fixed `503 service unavailable` response without exception details,
+  while connection aborts and telemetry failures cannot cause a second write or
+  leak a traceback through the service response.
 - Added exact-length request-body reads: early EOF now returns the fixed
   `request body incomplete` error and cannot be parsed or trigger a workflow.
 - Added the bounded `service-probe` deployment gate, with a fixed health and

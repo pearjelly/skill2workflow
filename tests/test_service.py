@@ -124,6 +124,67 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_event_logger_failure_cannot_change_success_response(self):
+        class FailingEventLogger:
+            def lifecycle(self, _status):
+                return
+
+            def request_completed(self, **_kwargs):
+                raise RuntimeError("event logger failed")
+
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(
+                _service_config(Path(tmp)),
+                event_logger=FailingEventLogger(),
+            )
+            thread = threading.Thread(
+                target=service._server.handle_request,
+                daemon=True,
+            )
+            thread.start()
+            status, payload = _get_json(
+                f"http://{service.server_address[0]}:{service.server_address[1]}/healthz"
+            )
+            thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload, {"service": "skill2workflow", "status": "ok"})
+        self.assertFalse(thread.is_alive())
+
+    def test_unexpected_request_failure_returns_fixed_503_without_error_details(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            service._status = "ready"
+            with patch.object(
+                service,
+                "readiness",
+                return_value=(200, {"service": "skill2workflow", "status": "ready"}),
+            ), patch.object(
+                service.control_plane,
+                "trigger_workflow",
+                side_effect=RuntimeError("private internal failure"),
+            ):
+                thread = threading.Thread(
+                    target=service._server.handle_request,
+                    daemon=True,
+                )
+                thread.start()
+                status, payload = _post_json(
+                    f"http://{service.server_address[0]}:{service.server_address[1]}"
+                    "/webhooks/workflow_service/0.1.0",
+                    {},
+                    token=AUTH_TOKEN,
+                )
+                thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 503)
+        self.assertEqual(payload, {"error": "service unavailable"})
+        self.assertNotIn("private internal failure", json.dumps(payload))
+        self.assertFalse(thread.is_alive())
+
     def test_early_eof_rejects_partial_body_with_bounded_error(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

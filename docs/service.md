@@ -20,6 +20,9 @@ client for deployment cutovers; it composes the existing `/healthz` and
 `/readyz` endpoints without adding a route or exposing response bodies.
 Loop 96 makes all authenticated service request bodies exact-length reads, so
 early EOF cannot be parsed as a complete request.
+Loop 97 adds a fail-closed exception boundary around request dispatch: an
+unexpected handler failure returns only `503 {"error":"service unavailable"}`
+and never exposes the exception text.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
@@ -163,6 +166,12 @@ overload and graceful drain. It is a per-request read deadline, not a total
 workflow or connector execution timeout.
 
 The webhook request and response contract remains documented in [`triggers.md`](triggers.md). Health does not imply readiness: during shutdown, readiness is withdrawn before the HTTP server closes.
+
+Unexpected exceptions from a business handler are converted to the fixed
+`503` `service unavailable` response. Connection-abort errors close the socket
+without attempting a second write. Request telemetry and operational event
+logging are best-effort after the response path and cannot replace or corrupt
+the fixed response contract.
 
 The live snapshot remains available before readiness when authentication and
 control state are readable. Its CLI client, response bounds, zero-write polling
