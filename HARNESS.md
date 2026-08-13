@@ -92,6 +92,17 @@ python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellatio
 python3 -m json.tool /tmp/skill2workflow-cancellation-loop48/cancellation-smoke.json >/tmp/skill2workflow-cancellation-check.json
 ```
 
+Verify the authenticated human-gate decision route:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_service.RuntimeServiceTests.test_authenticated_resume_endpoint_requires_exact_decision_and_reuses_audit_path \
+  -v
+```
+
+The route contract, exact decision body, fixed errors, and external TLS
+boundary are documented in [`docs/human-approval.md`](docs/human-approval.md).
+
 Run the interrupted-run crash recovery evidence:
 
 ```bash

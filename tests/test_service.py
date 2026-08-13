@@ -758,6 +758,92 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(transfer_response.status, 400)
         self.assertEqual(transfer_payload, {"error": "transfer encoding is not supported"})
 
+    def test_authenticated_resume_endpoint_requires_exact_decision_and_reuses_audit_path(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_approval_workflow())
+            waiting = control.run_published_workflow("workflow_service_approval", "0.1.0")
+            rejected = control.run_published_workflow("workflow_service_approval", "0.1.0")
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/runs/{waiting['run_id']}/resume"
+            rejected_url = f"http://{host}:{port}/runs/{rejected['run_id']}/resume"
+
+            denied_status, denied = _post_json(url, {"approved": True})
+            extra_status, extra = _post_json(
+                url,
+                {"approved": True, "reason": "must-not-be-accepted"},
+                token=AUTH_TOKEN,
+            )
+            accepted_status, accepted = _post_json(
+                url,
+                {"approved": True},
+                token=AUTH_TOKEN,
+            )
+            rejected_status, rejected_payload = _post_json(
+                rejected_url,
+                {"approved": False},
+                token=AUTH_TOKEN,
+            )
+            repeated_status, repeated = _post_json(
+                url,
+                {"approved": True},
+                token=AUTH_TOKEN,
+            )
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+            audit = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(extra_status, 400)
+        self.assertEqual(extra, {"error": "run resume body must contain approved boolean"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted,
+            {"run_id": waiting["run_id"], "status": "completed", "approved": True},
+        )
+        self.assertEqual(rejected_status, 200)
+        self.assertEqual(
+            rejected_payload,
+            {"run_id": rejected["run_id"], "status": "failed", "approved": False},
+        )
+        self.assertEqual(repeated_status, 409)
+        self.assertEqual(repeated, {"error": "run is not waiting"})
+        resume_auth_events = [
+            event for event in audit if event.get("route") == "run_resume"
+        ]
+        self.assertEqual(
+            [event["type"] for event in resume_auth_events],
+            [
+                "ingress_authentication_denied",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+            ],
+        )
+        self.assertEqual([event["type"] for event in audit].count("run_resumed"), 2)
+        serialized = json.dumps(audit)
+        self.assertNotIn("must-not-be-accepted", serialized)
+
     def test_real_process_smoke_proves_sigterm_and_restart_continuity(self):
         with TemporaryDirectory() as tmp:
             result = subprocess.run(
@@ -1046,6 +1132,29 @@ def _workflow():
         ],
         "edges": [{"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}],
     }
+
+
+def _approval_workflow():
+    workflow = _workflow()
+    workflow["workflow"]["id"] = "workflow_service_approval"
+    workflow["nodes"] = [
+        {"id": "start", "type": "start", "title": "Start", "on_success": "review"},
+        {
+            "id": "review",
+            "type": "human_gate",
+            "title": "Review",
+            "on_success": "end",
+            "on_failure": "failure",
+        },
+        {"id": "failure", "type": "failure", "title": "Failure"},
+        {"id": "end", "type": "end", "title": "End"},
+    ]
+    workflow["edges"] = [
+        {"id": "edge_start_review", "from": "start", "to": "review", "label": "next"},
+        {"id": "edge_review_end", "from": "review", "to": "end", "label": "next"},
+        {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "failure"},
+    ]
+    return workflow
 
 
 def _credential_workflow(url: str):

@@ -1,6 +1,6 @@
 # Self-hosted Runtime Service
 
-The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, published-workflow triggers, and durable cooperative run cancellation. Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md).
+The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, published-workflow triggers, authenticated human-gate decisions, and durable cooperative run cancellation. Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md).
 
 The HTTP control plane and recurring dispatcher share the scheduler lease owner.
 Graceful drain waits for in-flight HTTP handlers before releasing that lease. After
@@ -8,7 +8,7 @@ an ungraceful process loss, a replacement becomes ready only after lease expiry 
 marks foreign active execution tickets `interrupted`; it never automatically
 replays an external request with an unknown outcome.
 
-This boundary is intentionally loopback-only and uses SQLite. Loop 42 adds mandatory single-team Bearer authentication and execution-time directory credentials. Loop 43 adds durable recurring dispatch and an active/standby lease for processes sharing one state directory. Loop 46 adds low-cardinality metrics and allowlisted operational NDJSON. Loop 48 adds authenticated, idempotent, cooperative cancellation. The complete security and external TLS termination contract is documented in [`security-boundary.md`](security-boundary.md), scheduler semantics in [`recurring-scheduling.md`](recurring-scheduling.md), telemetry semantics in [`observability.md`](observability.md), and cancellation semantics in [`cancellation.md`](cancellation.md).
+This boundary is intentionally loopback-only and uses SQLite. Loop 42 adds mandatory single-team Bearer authentication and execution-time directory credentials. Loop 43 adds durable recurring dispatch and an active/standby lease for processes sharing one state directory. Loop 46 adds low-cardinality metrics and allowlisted operational NDJSON. Loop 48 adds authenticated, idempotent, cooperative cancellation. Loop 57 adds the authenticated human-gate decision route documented in [`human-approval.md`](human-approval.md). The complete security and external TLS termination contract is documented in [`security-boundary.md`](security-boundary.md), scheduler semantics in [`recurring-scheduling.md`](recurring-scheduling.md), telemetry semantics in [`observability.md`](observability.md), and cancellation semantics in [`cancellation.md`](cancellation.md).
 
 ## Configuration
 
@@ -86,6 +86,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli service \
 | `GET /metrics` | Requires Bearer authentication and exports aggregate Prometheus text metrics, including while the process is not ready. |
 | `GET /api/v1/control-snapshot` | Requires Bearer authentication and returns a read-only, 100-item-per-collection, 1 MiB Operator snapshot without appending persisted audit state. |
 | `POST /webhooks/<workflow_id>/<version>` | Requires Bearer authentication, then uses the existing trigger contract to start a published workflow. |
+| `POST /runs/{run_id}/resume` | Requires Bearer authentication and exactly `{"approved": true|false}`, then resumes one waiting human gate through the existing control-plane executor. |
 | `POST /runs/{run_id}/cancel` | Requires Bearer authentication and an empty JSON object, then durably requests idempotent cooperative cancellation. |
 
 The webhook request and response contract remains documented in [`triggers.md`](triggers.md). Health does not imply readiness: during shutdown, readiness is withdrawn before the HTTP server closes.

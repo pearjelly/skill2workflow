@@ -24,6 +24,7 @@ _ROUTES = (
     "control_snapshot",
     "workflow_trigger",
     "run_cancel",
+    "run_resume",
     "unknown",
 )
 _STATUS_CLASSES = ("2xx", "4xx", "5xx")

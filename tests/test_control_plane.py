@@ -37,6 +37,16 @@ class ControlPlaneTests(TestCase):
             },
         )
 
+    def test_human_gate_resume_is_a_persisted_ingress_route_class(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.record_ingress_authentication(True, "POST", "run_resume")
+            event = control.list_audit_events()[0]
+
+        self.assertEqual(event["type"], "ingress_authenticated")
+        self.assertEqual(event["method"], "POST")
+        self.assertEqual(event["route"], "run_resume")
+
     def test_publish_workflow_persists_immutable_version_and_audit(self):
         workflow = _workflow(version="1.0.0")
 

@@ -496,6 +496,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_metrics()
                 elif self.command == "GET" and path == "/api/v1/control-snapshot":
                     self._handle_control_snapshot()
+                elif self.command == "POST" and _resume_run_id(path):
+                    self._handle_resume(_resume_run_id(path))
                 elif self.command == "POST" and _cancel_run_id(path):
                     self._handle_cancel(_cancel_run_id(path))
                 else:
@@ -680,6 +682,8 @@ def _handler_for(service: RuntimeService):
                 )
             except FileNotFoundError:
                 self._send_json(404, {"error": "run not found"})
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
             except (UnicodeDecodeError, json.JSONDecodeError):
                 self._send_json(400, {"error": "run cancellation body must be valid JSON"})
             except ValueError as error:
@@ -696,6 +700,77 @@ def _handler_for(service: RuntimeService):
                     else 400
                 )
                 self._send_json(status_code, {"error": str(error)})
+
+        def _handle_resume(self, run_id: str):
+            readiness_status, _ = service.readiness()
+            if readiness_status != 200:
+                self._send_json(503, {"error": "service is not ready"})
+                return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                service.control_plane.record_ingress_authentication(
+                    False,
+                    self.command,
+                    "run_resume",
+                    reason=reason,
+                )
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            service.control_plane.record_ingress_authentication(
+                True,
+                self.command,
+                "run_resume",
+            )
+            try:
+                body = self.rfile.read(_content_length(self))
+                if not body:
+                    raise ValueError("run resume body must contain approved boolean")
+                payload = json.loads(body.decode("utf-8"))
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != {"approved"}
+                    or not isinstance(payload["approved"], bool)
+                ):
+                    raise ValueError("run resume body must contain approved boolean")
+                state = service.control_plane.resume_published_run(
+                    run_id,
+                    approved=payload["approved"],
+                )
+                self._send_json(
+                    200,
+                    {
+                        "run_id": run_id,
+                        "status": str(state["status"]),
+                        "approved": payload["approved"],
+                    },
+                )
+            except FileNotFoundError:
+                self._send_json(404, {"error": "run not found"})
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._send_json(
+                    400,
+                    {"error": "run resume body must contain approved boolean"},
+                )
+            except ValueError as error:
+                if str(error).startswith(f"run {run_id} "):
+                    self._send_json(409, {"error": "run is not waiting"})
+                else:
+                    self._send_json(400, {"error": str(error)})
 
         def _send_json(self, status_code: int, payload: Dict[str, object], headers=None) -> None:
             data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
@@ -736,6 +811,8 @@ def _request_route(method: str, path: str) -> str:
         return "control_snapshot"
     if path.startswith("/webhooks/"):
         return "workflow_trigger"
+    if method == "POST" and _resume_run_id(path):
+        return "run_resume"
     if method == "POST" and _cancel_run_id(path):
         return "run_cancel"
     return "unknown"
@@ -755,8 +832,16 @@ def _http_server(host: str, port: int, handler):
 
 
 def _cancel_run_id(path: str) -> str:
+    return _run_action_id(path, "cancel")
+
+
+def _resume_run_id(path: str) -> str:
+    return _run_action_id(path, "resume")
+
+
+def _run_action_id(path: str, action: str) -> str:
     parts = path.split("/")
-    if len(parts) != 4 or parts[0] or parts[1] != "runs" or parts[3] != "cancel":
+    if len(parts) != 4 or parts[0] or parts[1] != "runs" or parts[3] != action:
         return ""
     run_id = parts[2]
     if (

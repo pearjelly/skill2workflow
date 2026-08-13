@@ -131,7 +131,7 @@ explicit connector boundaries. It currently supports:
 - Persist trigger input values in durable run context without logging full input values to audit by default
 - Map non-secret trigger input fields into HTTP connector request bodies through `connector.request.input_mapping`
 - Trigger published workflow versions from local HTTP webhook POST requests
-- Run a validated loopback-only long-running service with health/readiness probes, graceful signal shutdown, and SQLite restart continuity
+- Run a validated loopback-only long-running service with health/readiness probes, authenticated human-gate decisions, graceful signal shutdown, and SQLite restart continuity
 - Create a non-overwriting owner-only service workspace with a generated ingress secret and absolute configuration
 - Run an installed-wheel quickstart that compiles and publishes a bundled Skill, pauses at one human gate, and completes after explicit approval
 - Diagnose configuration, authentication, credential-directory, SQLite-state, and loopback-bind readiness without starting or modifying the service
@@ -670,7 +670,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-56 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-57 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -706,6 +706,8 @@ Loop 55 adds an [authenticated live Operator snapshot](docs/live-control-snapsho
 
 Loop 56 adds [Linux systemd supervision](docs/systemd-service.md): the CLI generates one non-overwriting, least-privilege service unit for a secure workspace, with state-only write access, hardened process isolation, restart backoff, and SIGTERM-only shutdown. Operators still review the target-host unit with `systemd-analyze verify` and explicitly enable it; no account, TLS, proxy, or host change is automated.
 
+Loop 57 adds [authenticated human-gate decisions](docs/human-approval.md): the service accepts one exact boolean decision for one waiting run, records the authenticated ingress and durable resume evidence, follows the declared success/failure branch, and returns a fixed conflict for repeated or non-waiting decisions. It does not add hosted RBAC, multi-tenancy, or provider-side exactly-once claims.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -719,6 +721,7 @@ See:
 - `docs/authoring.md`
 - `docs/backup-restore.md`
 - `docs/cancellation.md`
+- `docs/human-approval.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`
 - `docs/controlled-pilot-deferral-review.md`

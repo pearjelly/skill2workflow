@@ -19,6 +19,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added authenticated live Operator snapshots with a machine-readable schema, consistent collection windows, fixed byte bounds, a safe no-redirect CLI client, zero-write polling, and owner-only atomic output.
 - Added a manually reviewed Linux systemd unit generator with non-overwriting output, state-only write access, fixed hardening directives, restart backoff, and SIGTERM-only shutdown.
 - Added a Linux CI gate that runs `systemd-analyze verify` against a generated unit without installing or starting a service.
+- Added an authenticated human-gate decision endpoint with an exact boolean body, durable success/failure branching, and waiting-only conflict semantics.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed
@@ -35,6 +36,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added repository-wide pre-commit hygiene scanning that rejects private paths, runtime state, key material, misplaced binary media, and symbolic links without reading rejected artifacts or echoing suspected secret values.
 - Hardened explicit JSON hygiene scans to reject symbolic links, non-regular or unavailable files, invalid UTF-8, invalid JSON, and inputs above 2 MiB with fixed redacted findings instead of tracebacks.
 - Hardened the local webhook adapter with the same bounded request-body and strict `Content-Length` contract as the authenticated service boundary.
+- Hardened authenticated run-action bodies so malformed, oversized, transfer-encoded, or ambiguous requests return fixed JSON errors instead of terminating the handler.
 - Restricted the unauthenticated local webhook adapter to loopback hosts so a local test command cannot be accidentally exposed on a public interface.
 - Bound state-layout marker validation to one owner-only regular-file descriptor, rejected path-replacement races, and capped marker input at 16 KiB before decoding.
 - Generated systemd units carry no secret values or `Environment=` entries and require a private regular service configuration plus a non-symlink executable.

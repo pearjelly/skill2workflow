@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-56
+- Completed delivery loops: 1-57
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 56 is complete with a manually reviewed Linux systemd supervisor unit
+- Active loop: None; Loop 57 is complete with an authenticated human-gate decision endpoint
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the systemd supervisor drill
+- Next decision: select the next Production Baseline loop after reviewing the human-gate decision drill
 
 ## Production Readiness Path
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-56 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-57 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, and a manually reviewed Linux systemd unit became Loop 56 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, and an authenticated human-gate decision endpoint became Loop 57 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, and a manually reviewed least-privilege Linux service unit are achieved by Loops 44-56. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, and an authenticated human-gate decision route are achieved by Loops 44-57. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -80,9 +80,31 @@ python3 scripts/systemd_service_smoke.py --work-dir /tmp/skill2workflow-systemd-
 
 Loop 56 closes the single-host supervisor-definition gap without altering host state or expanding the network boundary. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
 
+### Loop 57: Authenticated Human-Gate Decisions
+
+**Status:** Complete.
+
+**Prior basis:** The service could trigger, inspect, and cooperatively cancel durable runs, but an operator still needed local CLI access to approve or reject a waiting human gate. That made the self-hosted service boundary incomplete for a controlled remote review handoff.
+
+**Outcome:** `POST /runs/{run_id}/resume` accepts one exact `{"approved": true|false}` body behind the existing Bearer boundary. It reuses the control-plane executor, follows the declared success/failure branch, persists compact ingress and `run_resumed` evidence, and returns a fixed conflict for repeated or non-waiting decisions.
+
+**Evidence:** [`docs/human-approval.md`](docs/human-approval.md) defines the stable endpoint, exact body, error contract, external TLS boundary, and operator verification. Service, control-plane, telemetry, documentation, and full-suite tests cover authentication, strict input, durable branch behavior, bounded bodies, route labels, and audit redaction.
+
+**Safety boundary:** This is one single-tenant Bearer-authenticated decision route. It excludes hosted RBAC, multi-user identity, arbitrary reason text, bulk decisions, hosted callbacks, remote audit storage, and exactly-once provider effects.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_service.RuntimeServiceTests.test_authenticated_resume_endpoint_requires_exact_decision_and_reuses_audit_path \
+  -v
+```
+
+Loop 57 closes the remote human-gate handoff gap without expanding the workflow DSL or network bind boundary. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 56 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the systemd supervisor drill.
+This rolling queue is ordered. Loop 57 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the human-gate decision drill.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -104,6 +126,7 @@ This rolling queue is ordered. Loop 56 is complete and there is no active delive
 | Loop 54: Descriptor-bound Connector Credentials | Complete | Bind every execution-time connector credential read to one private regular file without losing atomic rotation | `0700`/`0600` enforcement, no-follow identity checks, 64 KiB bound, generic failures, and outbound suppression evidence |
 | Loop 55: Authenticated Live Operator Snapshot | Complete | Expose the existing Operator artifact through a bounded authenticated service read without poll-driven state mutation | Fixed-window and byte bounds, safe token-file CLI, owner-only output, fixed telemetry, and real-process evidence |
 | Loop 56: Linux systemd Supervision | Complete | Generate one least-privilege manually enabled Linux systemd unit for a secure self-hosted workspace | Non-overwrite CLI, fixed systemd sandbox, state-only write path, SIGTERM-only shutdown, target-host verification contract, and portable generator evidence |
+| Loop 57: Authenticated Human-Gate Decisions | Complete | Provide one authenticated service decision route for a waiting human gate without bypassing the durable executor | Exact boolean body, waiting-only conflict, success/failure branch audit, fixed route telemetry, and real threaded-service evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -140,6 +163,8 @@ Loop 54 covers only directory-backed connector credential reads. It excludes enc
 Loop 55 covers only authenticated bounded reads of the current control snapshot. It excludes browser credential storage, CORS, live UI polling, remote mutations, pagination cursors, RBAC, hosted TLS, multi-tenant filtering, and remote audit storage.
 
 Loop 56 covers only generation of one manually enabled Linux systemd unit. It excludes account provisioning, automatic unit installation or enabling, service-manager alternatives, containers, log shipping, TLS/proxy automation, hosted monitoring, secret rotation, distributed coordination, and forceful provider-request abort.
+
+Loop 57 covers only one authenticated decision for one waiting human gate. It excludes hosted RBAC, multi-user identity, arbitrary reason text, bulk approval, callbacks, remote audit storage, provider reconciliation, and exactly-once execution.
 
 Selection rules:
 
@@ -231,6 +256,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 54: Descriptor-bound Connector Credentials | Complete | Private descriptor-bound value reads, bounded UTF-8 input, atomic rotation, fixed errors, and real transport-suppression evidence |
 | Loop 55: Authenticated Live Operator Snapshot | Complete | Zero-write authenticated service snapshot, fixed collection and byte bounds, safe CLI retrieval, private atomic output, and real-process observability evidence |
 | Loop 56: Linux systemd Supervision | Complete | Non-overwriting CLI unit generation, fixed Linux sandboxing, state-only write access, SIGTERM-only shutdown, target-host verification steps, and portable real-CLI evidence |
+| Loop 57: Authenticated Human-Gate Decisions | Complete | Exact authenticated resume body, durable success/failure branch, waiting-only conflict, compact audit evidence, and real threaded-service verification |
 
 ## Release Direction
 

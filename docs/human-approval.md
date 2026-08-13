@@ -1,0 +1,88 @@
+# Authenticated Human-Gate Decisions
+
+The self-hosted service can expose a waiting `human_gate` as one narrow,
+authenticated decision boundary. An operator may approve or reject exactly one
+waiting run; the existing durable executor then follows the workflow's
+declared `on_success` or `on_failure` transition.
+
+This is a single-tenant control-plane capability. It is not a hosted approval
+product, a multi-tenant identity layer, or a replacement for the external TLS
+and access-control boundary described in [`security-boundary.md`](security-boundary.md).
+
+## Endpoint
+
+```http
+POST /runs/{run_id}/resume
+Authorization: Bearer <service-ingress-token>
+Content-Type: application/json
+```
+
+The request body must be exactly one JSON object with one boolean field:
+
+```json
+{"approved": true}
+```
+
+`false` rejects the gate. Extra fields, missing fields, non-boolean values,
+empty bodies, malformed JSON, and oversized or ambiguous HTTP bodies are
+rejected. The body intentionally does not accept a free-form reason or an
+operator-supplied identity: the service's authenticated ingress audit records
+the request class, while the durable run audit records the boolean decision.
+
+On success the service returns a compact result:
+
+```json
+{"run_id": "run_example", "status": "completed", "approved": true}
+```
+
+The status is the resulting run status and may be `completed`, `failed`, or
+another non-terminal status when the resumed workflow continues to a later
+node.
+
+## Failure contract
+
+- `401` means the Bearer token is missing or invalid. `503` means the token
+  provider is unavailable or the service is not ready.
+- `400` means the decision body is invalid.
+- `404` means the run does not exist in the published control plane.
+- `409` means the run is no longer waiting at a human gate. Repeating a
+  decision never replays a completed run.
+
+The endpoint delegates to the same `LocalControlPlane.resume_published_run`
+and executor path used by the CLI. It therefore preserves waiting-only checks,
+durable `run_resumed` audit evidence, the declared success/failure branch, and
+connector retry policy. It does not claim exactly-once effects for a provider
+request that was already sent before a process failure.
+
+## Example
+
+Keep the token outside source files and avoid putting real secrets in shell
+history. Replace the placeholders below through your deployment's secret
+manager or an owner-only environment:
+
+```bash
+curl -sS -X POST \
+  "https://service.example/runs/run_example/resume" \
+  -H "Authorization: Bearer ${SKILL2WORKFLOW_INGRESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  --data '{"approved":true}'
+```
+
+Terminate TLS and apply team authentication, authorization, rate limiting, and
+audit retention at the deployment boundary. The built-in service authenticates
+one mounted Bearer secret and deliberately does not implement multi-user RBAC.
+
+## Verification
+
+The real threaded-service regression covers the full route, exact body
+contract, auth audit classification, durable resume audit, rejection branch,
+and repeat-decision conflict:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_service.RuntimeServiceTests.test_authenticated_resume_endpoint_requires_exact_decision_and_reuses_audit_path \
+  -v
+```
+
+For the complete repository gate, run the test and smoke commands in
+[`CONTRIBUTING.md`](../CONTRIBUTING.md).
