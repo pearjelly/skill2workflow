@@ -4,10 +4,64 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.storage import JsonControlStore, SqliteControlStore, SqliteRunStore
+from skill2workflow.storage import JsonControlStore, JsonRunStore, SqliteControlStore, SqliteRunStore
 
 
 class StorageTests(TestCase):
+    def test_run_windows_are_bounded_and_ordered_by_latest_state_timestamp(self):
+        states = [
+            {
+                "run_id": "run_zeta",
+                "status": "completed",
+                "events": [{"type": "run_completed", "timestamp": "2026-08-14T00:00:02Z"}],
+            },
+            {
+                "run_id": "run_alpha",
+                "status": "failed",
+                "events": [{"type": "run_failed", "timestamp": "2026-08-14T00:00:03Z"}],
+            },
+            {
+                "run_id": "run_middle",
+                "status": "waiting",
+                "events": [{"type": "run_waiting", "timestamp": "2026-08-14T00:00:01Z"}],
+            },
+        ]
+
+        with TemporaryDirectory() as tmp:
+            json_store = JsonRunStore(Path(tmp) / "json")
+            sqlite_store = SqliteRunStore(Path(tmp) / "sqlite")
+            for state in states:
+                json_store.save(state)
+                sqlite_store.save(state)
+            with sqlite_store._connection() as connection:
+                for state in states:
+                    timestamp = next(iter(state["events"]))["timestamp"]
+                    connection.execute(
+                        "update runs set updated_at = ? where run_id = ?",
+                        (timestamp, state["run_id"]),
+                    )
+
+            json_window = json_store.snapshot_window(2)
+            json_list = json_store.list_bounded(2)
+            sqlite_window = sqlite_store.snapshot_window(2)
+            sqlite_list = sqlite_store.list_bounded(2)
+
+        expected = ["run_zeta", "run_alpha"]
+        self.assertEqual([item["run_id"] for item in json_window["items"]], expected)
+        self.assertEqual([item["run_id"] for item in json_list], expected)
+        self.assertEqual([item["run_id"] for item in sqlite_window["items"]], expected)
+        self.assertEqual([item["run_id"] for item in sqlite_list], expected)
+        self.assertEqual(json_window["total"], 3)
+        self.assertEqual(sqlite_window["total"], 3)
+
+    def test_run_list_window_rejects_invalid_limits(self):
+        with TemporaryDirectory() as tmp:
+            stores = [JsonRunStore(Path(tmp) / "json"), SqliteRunStore(Path(tmp) / "sqlite")]
+            for store in stores:
+                for limit in (0, -1, 1001, True, "2"):
+                    with self.assertRaisesRegex(ValueError, "run list limit"):
+                        store.list_bounded(limit)
+
     def test_audit_tail_limit_filters_before_bounding_for_json_and_sqlite(self):
         events = [
             {

@@ -1,5 +1,36 @@
 # Authenticated Run List
 
+## Local run summaries
+
+The local CLI keeps its existing complete-list behavior when no limit is given:
+
+```bash
+skill2workflow runs --state-dir /var/lib/skill2workflow --storage sqlite
+skill2workflow control-runs --state-dir /var/lib/skill2workflow --storage sqlite
+```
+
+For routine inspection of a long-running instance, request only the newest
+window:
+
+```bash
+skill2workflow runs \
+  --state-dir /var/lib/skill2workflow \
+  --storage sqlite \
+  --limit 100
+```
+
+`--limit` accepts `1` through `1000` and returns the same compact run-summary
+array as the unbounded command. SQLite orders the window by durable update time
+and run ID; JSON uses the newest durable event timestamp (with a filesystem fallback
+for legacy states without timestamps). The read is storage-bounded and
+does not mutate runs, append audit events, or change retention. The complete
+path remains available when the flag is omitted.
+
+The equivalent `control-runs --limit N` form uses the same bound for published
+workflow runs.
+
+## Authenticated service discovery
+
 Operators can discover run identifiers through the bounded read-only service
 route:
 

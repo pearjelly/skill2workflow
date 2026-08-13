@@ -157,8 +157,9 @@ class LocalExecutor:
 
         return self.store.request_cancellation(run_id)
 
-    def list_runs(self) -> List[RunState]:
-        return [_summarize_run(state) for state in self.store.list()]
+    def list_runs(self, limit: int = None) -> List[RunState]:
+        states = self.store.list() if limit is None else self.store.list_bounded(limit)
+        return [_summarize_run(state) for state in states]
 
     def snapshot_window(self, limit: int) -> Dict[str, object]:
         """Return a bounded SQLite run window and aggregate status counts."""

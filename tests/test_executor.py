@@ -7,12 +7,26 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.credentials import StaticCredentialProvider
 from skill2workflow.executor import LocalExecutor
 
 
 class ExecutorTests(TestCase):
+    def test_bounded_run_listing_does_not_call_unbounded_store_list(self):
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp), storage="json")
+            executor.run(_approval_workflow())
+            with patch.object(
+                executor.store,
+                "list",
+                side_effect=AssertionError("unbounded run read"),
+            ):
+                summaries = executor.list_runs(limit=1)
+
+        self.assertEqual(len(summaries), 1)
+
     def test_workflow_timeout_includes_human_gate_wait_and_fails_on_resume(self):
         clock = _TestClock()
         workflow = _approval_workflow()

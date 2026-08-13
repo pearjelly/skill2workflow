@@ -86,6 +86,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - SQLite audit integrity result contract `skill2workflow-audit-integrity-0.1.0` and the payload-free `audit-verify` CLI; this does not claim signatures or JSON/JSONL chain guarantees
 - Local `audit --limit` accepts a bounded 1-1000 tail after storage-level filters and preserves chronological output; omitting it retains the complete-list compatibility path
 - Offline `control-snapshot --max-items` accepts a bounded 1-1000 window for JSON and SQLite state, preserves aggregate totals, and leaves live snapshots at their fixed 100-item bound
+- Local `runs --limit` and `control-runs --limit` accept a bounded 1-1000 newest-summary window for JSON and SQLite state; omitting the flag retains the complete-list compatibility path
 - Authenticated Prometheus text metric names, fixed label vocabularies, live HTTP/scheduler pressure gauges, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`
 - The operator-managed `examples/observability/prometheus-alerts.yml` starter pack and its fixed-metric safety checks are documented in `docs/prometheus-alerts.md`; it adds no runtime route, dependency, or automatic remediation
 - The operator-managed `examples/observability/grafana-dashboard.json` read-only dashboard and its fixed-metric safety checks are documented in `docs/grafana-dashboard.md`; it adds no runtime route, dependency, or mutation

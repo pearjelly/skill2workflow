@@ -342,10 +342,16 @@ List summaries and inspect full run logs:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-state
+PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-state --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli show <run_id> --state-dir /tmp/skill2workflow-state
 PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli show <run_id> --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite
 ```
+
+The optional `--limit` keeps local run inspection to the newest 1-1000 compact
+summaries; omit it to preserve the complete-list path. See
+[`docs/run-list.md`](docs/run-list.md) for ordering and storage-boundary details.
 
 Open the LiteGraph editor:
 

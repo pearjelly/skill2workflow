@@ -111,7 +111,7 @@ explicit connector boundaries. It currently supports:
 - Pause at `human_gate`
 - Resume waiting runs
 - Persist run state as JSON or opt-in SQLite
-- List run summaries and inspect full run logs
+- List run summaries with an optional bounded `runs --limit` / `control-runs --limit` window and inspect full run logs
 - Inspect a bounded tail of filtered local audit events with `audit --limit`
 - Store queryable run event rows when SQLite storage is enabled
 - Bind `human_gate` nodes to the built-in manual connector
@@ -434,7 +434,12 @@ List local run summaries:
 
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-state
+PYTHONPATH=src python3 -m skill2workflow.cli runs --state-dir /tmp/skill2workflow-state --limit 100
 ```
+
+The optional `--limit` returns only the newest 1-1000 compact summaries while
+the omitted form remains a complete local list. See [`docs/run-list.md`](docs/run-list.md)
+for the JSON/SQLite ordering and compatibility boundary.
 
 Inspect a full run log:
 
@@ -725,7 +730,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-122 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-123 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1072,6 +1077,10 @@ Loop 122 adds [bounded offline control snapshots](docs/live-control-snapshot.md)
 `control-snapshot --max-items` exposes the existing window contract for local
 JSON and SQLite state, retaining only the newest selected collections while
 preserving aggregate totals. Live snapshots keep their fixed 100-item bound.
+
+Loop 123 adds [bounded local run discovery](docs/run-list.md).
+`runs --limit` and `control-runs --limit` retain only the newest compact
+summaries up to 1,000 while the omitted flag preserves the complete-list path.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

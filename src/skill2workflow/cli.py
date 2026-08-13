@@ -96,6 +96,7 @@ def main(argv=None) -> int:
     runs_cmd = subparsers.add_parser("runs", help="List local runs")
     runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    runs_cmd.add_argument("--limit", type=int, help="Return the newest bounded run window (1-1000)")
 
     show_cmd = subparsers.add_parser("show", help="Show a local run detail")
     show_cmd.add_argument("run_id")
@@ -554,6 +555,7 @@ def main(argv=None) -> int:
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     control_runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_runs_cmd.add_argument("--limit", type=int, help="Return the newest bounded run window (1-1000)")
 
     control_run_cmd = subparsers.add_parser("control-run", help="Show a control-plane run detail")
     control_run_cmd.add_argument("run_id")
@@ -695,8 +697,11 @@ def main(argv=None) -> int:
         return 0
 
     if args.command == "runs":
-        _print_json(LocalExecutor(args.state_dir, storage=args.storage).list_runs())
-        return 0
+        return _control_action(
+            lambda: LocalExecutor(args.state_dir, storage=args.storage).list_runs(
+                limit=args.limit
+            )
+        )
 
     if args.command == "show":
         _print_json(LocalExecutor(args.state_dir, storage=args.storage).get_run(args.run_id))
@@ -1137,8 +1142,11 @@ def main(argv=None) -> int:
         )
 
     if args.command == "control-runs":
-        _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_runs())
-        return 0
+        return _control_action(
+            lambda: LocalControlPlane(
+                args.state_dir, storage=args.storage
+            ).list_runs(limit=args.limit)
+        )
 
     if args.command == "control-run":
         return _control_action(

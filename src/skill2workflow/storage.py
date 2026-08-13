@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import heapq
 import json
 import sqlite3
 import stat
@@ -23,6 +24,7 @@ AuditEvent = Dict[str, object]
 AUDIT_INTEGRITY_SCHEMA_VERSION = "skill2workflow-audit-integrity-0.1.0"
 AUDIT_INTEGRITY_ALGORITHM = "sha256-chain-v1"
 MAX_AUDIT_LIST_ITEMS = 1000
+MAX_RUN_LIST_ITEMS = 1000
 _AUDIT_GENESIS_DIGEST = ""
 _LEGACY_AUDIT_COLUMNS = {
     "sequence",
@@ -94,23 +96,39 @@ class JsonRunStore:
     def list(self) -> List[RunState]:
         return [json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.runs_dir.glob("*.json"))]
 
+    def list_bounded(self, limit: int) -> List[RunState]:
+        """Read only the newest bounded run summaries' source states."""
+
+        _validate_run_list_limit(limit)
+        return self._bounded_items(limit)[0]
+
     def snapshot_window(self, limit: int) -> Dict[str, object]:
         """Read a bounded run tail while retaining aggregate status counts."""
 
         _validate_snapshot_limit(limit)
-        selected = deque(maxlen=limit)
         status_counts = Counter()
-        total = 0
-        for path in sorted(self.runs_dir.glob("*.json")):
-            state = json.loads(path.read_text(encoding="utf-8"))
-            total += 1
-            status_counts[str(state.get("status", "other"))] += 1
-            selected.append(state)
+        items, total = self._bounded_items(limit, status_counts=status_counts)
         return {
             "total": total,
             "status_counts": dict(status_counts),
-            "items": list(selected),
+            "items": items,
         }
+
+    def _bounded_items(self, limit: int, status_counts=None):
+        selected = []
+        total = 0
+        for path in self.runs_dir.glob("*.json"):
+            state = json.loads(path.read_text(encoding="utf-8"))
+            total += 1
+            if status_counts is not None:
+                status_counts[str(state.get("status", "other"))] += 1
+            key = _json_run_sort_key(state, path)
+            item = (key, state)
+            if len(selected) < limit:
+                heapq.heappush(selected, item)
+            elif key > selected[0][0]:
+                heapq.heapreplace(selected, item)
+        return [state for _, state in sorted(selected, key=lambda item: item[0])], total
 
     def start_execution(self, state: RunState, owner_id: str, execution_id: str) -> None:
         self.save(state)
@@ -404,9 +422,25 @@ class SqliteRunStore:
             rows = connection.execute("select state_json from runs order by run_id").fetchall()
         return [json.loads(str(row[0])) for row in rows]
 
+    def list_bounded(self, limit: int) -> List[RunState]:
+        """Read only the newest bounded run states without loading the full table."""
+
+        _validate_run_list_limit(limit)
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                select state_json from runs
+                order by updated_at desc, run_id desc
+                limit ?
+                """,
+                (limit,),
+            ).fetchall()
+        return [json.loads(str(row[0])) for row in reversed(rows)]
+
     def snapshot_window(self, limit: int) -> Dict[str, object]:
         """Read recent run state plus aggregate counts without loading all rows."""
 
+        _validate_snapshot_limit(limit)
         with self._connection() as connection:
             total = int(connection.execute("select count(*) from runs").fetchone()[0])
             status_rows = connection.execute(
@@ -1838,6 +1872,29 @@ def _validate_page_limit(limit: int) -> None:
 def _validate_snapshot_limit(limit: int) -> None:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
         raise ValueError("control snapshot limit must be an integer from 1 through 1000")
+
+
+def _validate_run_list_limit(limit: int) -> None:
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_RUN_LIST_ITEMS:
+        raise ValueError(f"run list limit must be an integer from 1 through {MAX_RUN_LIST_ITEMS}")
+
+
+def _json_run_sort_key(state: RunState, path: Path):
+    updated_at = state.get("updated_at")
+    if not updated_at:
+        events = state.get("events")
+        if isinstance(events, list):
+            for event in reversed(events):
+                if isinstance(event, dict) and event.get("timestamp"):
+                    updated_at = event["timestamp"]
+                    break
+    if updated_at:
+        return (1, str(updated_at), str(state.get("run_id", path.stem)), path.name)
+    try:
+        fallback = f"{path.stat().st_mtime_ns:020d}"
+    except OSError:
+        fallback = ""
+    return (0, fallback, str(state.get("run_id", path.stem)), path.name)
 
 
 def _expire_waiting_workflow_state(state: RunState, now: str):

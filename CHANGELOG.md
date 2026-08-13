@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added bounded local run discovery through `runs --limit` and
+  `control-runs --limit`. JSON and SQLite retain only the newest 1-1000
+  summaries in durable timestamp order while the omitted flag preserves the complete
+  list path.
 - Added `control-snapshot --max-items` for bounded offline operator exports.
   JSON and SQLite snapshots retain newest collection windows up to 1,000 while
   preserving aggregate totals; live snapshots keep their fixed 100-item bound.

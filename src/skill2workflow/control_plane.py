@@ -756,8 +756,8 @@ class LocalControlPlane:
         self._append_missing_audit_event_types(run_id, events)
         return state
 
-    def list_runs(self) -> List[RunState]:
-        return self.executor.list_runs()
+    def list_runs(self, limit: int = None) -> List[RunState]:
+        return self.executor.list_runs(limit=limit)
 
     def get_run(self, run_id: str) -> RunState:
         return self.executor.get_run(run_id)

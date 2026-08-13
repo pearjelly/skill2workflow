@@ -2169,6 +2169,90 @@ class CliTests(TestCase):
         self.assertEqual([event["type"] for event in audit_events], ["run_completed"])
         self.assertEqual(audit_events[0]["run_id"], run_state["run_id"])
 
+    def test_local_run_commands_support_bounded_windows_for_json_and_sqlite(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+
+            for storage in ("json", "sqlite"):
+                state_dir = root / storage
+                with redirect_stdout(StringIO()):
+                    self.assertEqual(
+                        main(
+                            [
+                                "run",
+                                str(workflow_path),
+                                "--state-dir",
+                                str(state_dir),
+                                "--storage",
+                                storage,
+                            ]
+                        ),
+                        0,
+                    )
+                    self.assertEqual(
+                        main(
+                            [
+                                "run",
+                                str(workflow_path),
+                                "--state-dir",
+                                str(state_dir),
+                                "--storage",
+                                storage,
+                            ]
+                        ),
+                        0,
+                    )
+                runs_stdout = StringIO()
+                control_runs_stdout = StringIO()
+                with redirect_stdout(runs_stdout):
+                    runs_exit = main(
+                        [
+                            "runs",
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            storage,
+                            "--limit",
+                            "1",
+                        ]
+                    )
+                with redirect_stdout(control_runs_stdout):
+                    control_runs_exit = main(
+                        [
+                            "control-runs",
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            storage,
+                            "--limit",
+                            "1",
+                        ]
+                    )
+
+                self.assertEqual(runs_exit, 0)
+                self.assertEqual(control_runs_exit, 0)
+                self.assertEqual(len(json.loads(runs_stdout.getvalue())), 1)
+                self.assertEqual(len(json.loads(control_runs_stdout.getvalue())), 1)
+
+    def test_local_run_commands_reject_invalid_limit_without_traceback(self):
+        with TemporaryDirectory() as tmp:
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "runs",
+                        "--state-dir",
+                        str(Path(tmp) / "state"),
+                        "--limit",
+                        "0",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "run list limit must be an integer from 1 through 1000\n")
+
     def test_audit_command_supports_bounded_tail_after_filters(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"

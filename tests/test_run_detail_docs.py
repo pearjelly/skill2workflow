@@ -79,6 +79,13 @@ class RunDetailDocumentationTests(TestCase):
         )
         self.assertEqual(schema["properties"]["runs"]["maxItems"], 100)
         for phrase in (
+            "## Local run summaries",
+            "runs --state-dir",
+            "control-runs --state-dir",
+            "--limit 100",
+            "1` through `1000",
+            "durable update time",
+            "filesystem fallback",
             "GET /runs",
             "latest 100",
             "fixed status counts",
