@@ -41,6 +41,8 @@ REQUIRED_CONSOLE_COMMANDS = (
     "state-upgrade",
     "state-retention-apply",
     "cancel-run",
+    "service-resume",
+    "service-cancel",
     "control-snapshot",
 )
 

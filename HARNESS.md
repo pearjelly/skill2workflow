@@ -103,6 +103,18 @@ PYTHONPATH=src python3 -m unittest \
 The route contract, exact decision body, fixed errors, and external TLS
 boundary are documented in [`docs/human-approval.md`](docs/human-approval.md).
 
+The installed CLI can perform the same actions without exposing a token in
+argv:
+
+```bash
+skill2workflow service-resume <run_id> \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+skill2workflow service-cancel <run_id> \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+```
+
 Run the interrupted-run crash recovery evidence:
 
 ```bash

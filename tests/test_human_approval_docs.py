@@ -21,6 +21,9 @@ class HumanApprovalDocumentationTests(TestCase):
             "LocalControlPlane.resume_published_run",
             "run_resumed",
             "does not implement multi-user RBAC",
+            "skill2workflow service-resume",
+            "skill2workflow service-cancel",
+            "disables proxy and redirect handling",
         ):
             self.assertIn(fragment, guide)
 

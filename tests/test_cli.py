@@ -93,6 +93,54 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(stderr.getvalue(), "run not found\n")
 
+    def test_service_action_commands_keep_remote_operator_contract_compact(self):
+        resume_stdout = StringIO()
+        cancel_stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        with patch(
+            "skill2workflow.cli.post_run_resume",
+            return_value={"run_id": "run_remote_1", "status": "failed", "approved": False},
+        ) as resume:
+            with redirect_stdout(resume_stdout):
+                resume_exit = main(
+                    [
+                        "service-resume",
+                        "run_remote_1",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                        "--reject",
+                    ]
+                )
+        with patch(
+            "skill2workflow.cli.post_run_cancel",
+            return_value={"run_id": "run_remote_1", "status": "cancelled"},
+        ) as cancel:
+            with redirect_stdout(cancel_stdout):
+                cancel_exit = main(
+                    [
+                        "service-cancel",
+                        "run_remote_1",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(resume_exit, 0)
+        self.assertEqual(cancel_exit, 0)
+        self.assertEqual(json.loads(resume_stdout.getvalue())["approved"], False)
+        self.assertEqual(json.loads(cancel_stdout.getvalue())["status"], "cancelled")
+        resume.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            "run_remote_1",
+            approved=False,
+        )
+        cancel.assert_called_once_with("https://service.example", token_file, "run_remote_1")
+
     def test_state_retention_plan_and_apply_commands_publish_new_copy(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

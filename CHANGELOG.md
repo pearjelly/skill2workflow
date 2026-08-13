@@ -20,6 +20,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added a manually reviewed Linux systemd unit generator with non-overwriting output, state-only write access, fixed hardening directives, restart backoff, and SIGTERM-only shutdown.
 - Added a Linux CI gate that runs `systemd-analyze verify` against a generated unit without installing or starting a service.
 - Added an authenticated human-gate decision endpoint with an exact boolean body, durable success/failure branching, and waiting-only conflict semantics.
+- Added protected `service-resume` and `service-cancel` CLI clients that read Bearer tokens from owner-only files and reject unsafe origins, redirects, and unbounded responses.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

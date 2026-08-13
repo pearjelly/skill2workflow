@@ -23,6 +23,8 @@ They run from `isolated/`, not from the checkout, and verify package metadata,
 workflow validation, production-module imports, and help for the minimum
 release command set: publish/run, service, recurring dispatch, backup/restore,
 state upgrade, retention, cancellation, and operator snapshot export.
+The installed command set also includes the protected `service-resume` and
+`service-cancel` operator clients.
 
 The qualification also starts a strict loopback fixture and makes the installed
 `control-snapshot` command perform one authenticated live fetch. It verifies the

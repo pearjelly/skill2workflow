@@ -23,6 +23,7 @@ from .schedules import LocalScheduleRunner
 from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace
 from .service_doctor import diagnose_service
+from .service_client import post_run_cancel, post_run_resume
 from .systemd_service import write_systemd_service_unit
 from .telemetry import OperationalEventLogger
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
@@ -261,6 +262,23 @@ def main(argv=None) -> int:
     cancel_run_cmd.add_argument("run_id")
     cancel_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     cancel_run_cmd.add_argument("--storage", choices=["sqlite"], default="sqlite")
+
+    service_resume_cmd = subparsers.add_parser(
+        "service-resume",
+        help="Approve or reject one waiting run through the authenticated service",
+    )
+    service_resume_cmd.add_argument("run_id")
+    service_resume_cmd.add_argument("--service-url", required=True)
+    service_resume_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_resume_cmd.add_argument("--reject", action="store_true")
+
+    service_cancel_cmd = subparsers.add_parser(
+        "service-cancel",
+        help="Request cooperative cancellation through the authenticated service",
+    )
+    service_cancel_cmd.add_argument("run_id")
+    service_cancel_cmd.add_argument("--service-url", required=True)
+    service_cancel_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -560,6 +578,25 @@ def main(argv=None) -> int:
     if args.command == "cancel-run":
         return _control_action(lambda: _cancel_run(args))
 
+    if args.command == "service-resume":
+        return _service_action(
+            lambda: post_run_resume(
+                args.service_url,
+                args.auth_token_file,
+                args.run_id,
+                approved=not args.reject,
+            )
+        )
+
+    if args.command == "service-cancel":
+        return _service_action(
+            lambda: post_run_cancel(
+                args.service_url,
+                args.auth_token_file,
+                args.run_id,
+            )
+        )
+
     if args.command == "control-runs":
         _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_runs())
         return 0
@@ -634,6 +671,18 @@ def _control_action(callback) -> int:
         return 1
     except FileNotFoundError:
         print("run not found", file=sys.stderr)
+        return 1
+
+
+def _service_action(callback) -> int:
+    try:
+        _print_json(callback())
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except OSError:
+        print("service action failed", file=sys.stderr)
         return 1
 
 

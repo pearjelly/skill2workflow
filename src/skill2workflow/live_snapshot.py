@@ -9,14 +9,13 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Dict
-from urllib.parse import urlsplit, urlunsplit
 
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES, SNAPSHOT_SCHEMA_VERSION
 from .service import read_service_bearer_token
+from .service_client import service_endpoint
 
 
 _SNAPSHOT_PATH = "/api/v1/control-snapshot"
-_LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -106,28 +105,7 @@ def write_private_snapshot(path: Path, snapshot: Dict[str, object]) -> None:
 
 
 def _snapshot_endpoint(service_url: str) -> str:
-    try:
-        parsed = urlsplit(str(service_url))
-        port = parsed.port
-    except ValueError as error:
-        raise ValueError("service URL must be an unambiguous HTTPS or loopback HTTP origin") from error
-    if (
-        parsed.scheme not in {"http", "https"}
-        or not parsed.hostname
-        or parsed.username is not None
-        or parsed.password is not None
-        or parsed.path not in {"", "/"}
-        or parsed.query
-        or parsed.fragment
-        or (parsed.scheme == "http" and parsed.hostname not in _LOOPBACK_HOSTS)
-    ):
-        raise ValueError("service URL must be an unambiguous HTTPS or loopback HTTP origin")
-    netloc = parsed.hostname
-    if ":" in netloc and not netloc.startswith("["):
-        netloc = f"[{netloc}]"
-    if port is not None:
-        netloc = f"{netloc}:{port}"
-    return urlunsplit((parsed.scheme, netloc, _SNAPSHOT_PATH, "", ""))
+    return service_endpoint(service_url, _SNAPSHOT_PATH)
 
 
 def _validate_snapshot(snapshot) -> None:

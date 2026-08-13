@@ -72,6 +72,31 @@ Terminate TLS and apply team authentication, authorization, rate limiting, and
 audit retention at the deployment boundary. The built-in service authenticates
 one mounted Bearer secret and deliberately does not implement multi-user RBAC.
 
+## Protected CLI client
+
+An installed operator can use the same boundary without placing the token in
+the command line or writing request JSON by hand. The CLI reads the token from
+the owner-only file, disables proxy and redirect handling, validates the
+service origin, and prints only the compact response:
+
+```bash
+skill2workflow service-resume run_example \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
+skill2workflow service-resume run_example --reject \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
+skill2workflow service-cancel run_example \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+```
+
+The client refuses remote plain HTTP, embedded URL credentials, query strings,
+redirects, oversized or non-JSON responses, and unsafe run identifiers. It
+does not retry a decision or cancellation automatically.
+
 ## Verification
 
 The real threaded-service regression covers the full route, exact body
