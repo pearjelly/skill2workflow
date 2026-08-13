@@ -240,8 +240,10 @@ HTTP `413`; malformed length metadata receives HTTP `400`.
 After valid length parsing, body reads use a fixed five-second socket deadline.
 A client that stalls before sending the advertised bytes receives HTTP `408`
 with the fixed error `request timed out`; the adapter does not trigger a
-workflow from a partial body. The authenticated service uses the same deadline
-and error contract.
+workflow from a partial body. An early EOF before the advertised length
+receives HTTP `400` with the fixed error `request body incomplete`; short reads
+are never parsed as a complete request. The authenticated service uses the
+same exact-length and error contract.
 
 The response shape matches the CLI trigger response:
 

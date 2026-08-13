@@ -1,3 +1,4 @@
+import io
 import json
 import socket
 import threading
@@ -16,6 +17,7 @@ from skill2workflow.webhooks import (
     MAX_REQUEST_BODY_BYTES,
     WebhookError,
     handle_webhook_request,
+    read_request_body,
     parse_webhook_request,
     serve_webhook_requests,
     _content_length,
@@ -23,6 +25,17 @@ from skill2workflow.webhooks import (
 
 
 class WebhookTests(TestCase):
+    def test_read_request_body_rejects_early_eof_without_returning_partial_bytes(self):
+        headers = Message()
+        headers["Content-Length"] = "5"
+        handler = SimpleNamespace(headers=headers, rfile=io.BytesIO(b"{}"))
+
+        with self.assertRaises(WebhookError) as raised:
+            read_request_body(handler)
+
+        self.assertEqual(raised.exception.status_code, 400)
+        self.assertEqual(str(raised.exception), "request body incomplete")
+
     def test_serve_webhook_requests_times_out_incomplete_body_without_triggering(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp))

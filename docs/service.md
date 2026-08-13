@@ -18,6 +18,8 @@ report and its installed `service-operational-readiness` client.
 Loop 95 adds the unauthenticated, read-only [`service-probe.md`](service-probe.md)
 client for deployment cutovers; it composes the existing `/healthz` and
 `/readyz` endpoints without adding a route or exposing response bodies.
+Loop 96 makes all authenticated service request bodies exact-length reads, so
+early EOF cannot be parsed as a complete request.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
@@ -150,12 +152,15 @@ proxy can observe liveness and remove a draining instance. The budget is
 process-local and protects one single-tenant service; it is not a distributed
 queue or a guarantee of exactly-once execution.
 
-Request bodies are read with a fixed five-second socket deadline
-(`REQUEST_SOCKET_TIMEOUT_SECONDS`). A client that advertises a body but stalls
-before delivering it receives HTTP `408` with `{"error":"request timed out"}`;
-the handler releases its admission slot and closes the connection. This bounds
-slow or half-open body reads during overload and graceful drain. It is a
-per-request read deadline, not a total workflow or connector execution timeout.
+Request bodies are read to the exact advertised `Content-Length` with a fixed
+five-second socket deadline (`REQUEST_SOCKET_TIMEOUT_SECONDS`). A client that
+advertises a body but stalls before delivering it receives HTTP `408` with
+`{"error":"request timed out"}`; a client that closes early receives HTTP `400`
+with `{"error":"request body incomplete"}`. Neither path can reach a workflow
+trigger, and the handler releases its admission slot and closes the
+connection. This bounds slow, half-open, and truncated body reads during
+overload and graceful drain. It is a per-request read deadline, not a total
+workflow or connector execution timeout.
 
 The webhook request and response contract remains documented in [`triggers.md`](triggers.md). Health does not imply readiness: during shutdown, readiness is withdrawn before the HTTP server closes.
 

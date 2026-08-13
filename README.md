@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-95 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-96 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -920,6 +920,11 @@ Loop 95 adds the fixed [deployment service probe](docs/service-probe.md):
 supervisors and cutover automation can distinguish a ready service, a live but
 not-ready service, and an unavailable service through the existing `/healthz`
 and `/readyz` endpoints, with stable exit codes and no response-body disclosure.
+
+Loop 96 hardens the [service and webhook body boundary](docs/triggers.md):
+requests must deliver exactly their advertised `Content-Length`; early EOF is
+rejected with a fixed `400` error and never reaches workflow parsing or
+execution, while the existing bounded timeout contract remains unchanged.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

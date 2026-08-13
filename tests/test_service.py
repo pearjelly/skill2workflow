@@ -124,6 +124,43 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_early_eof_rejects_partial_body_with_bounded_error(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            host, port = service.server_address
+            thread = threading.Thread(
+                target=service._server.handle_request,
+                daemon=True,
+            )
+            thread.start()
+            with socket.create_connection((host, port), timeout=2) as connection:
+                connection.sendall(
+                    (
+                        "POST /api/v1/retention-readiness HTTP/1.1\r\n"
+                        f"Host: {host}\r\n"
+                        f"Authorization: Bearer {AUTH_TOKEN}\r\n"
+                        "Content-Length: 4\r\n"
+                        "Connection: close\r\n"
+                        "\r\n"
+                        "{}"
+                    ).encode("ascii")
+                )
+                connection.shutdown(socket.SHUT_WR)
+                connection.settimeout(2)
+                response = b""
+                while True:
+                    chunk = connection.recv(4096)
+                    if not chunk:
+                        break
+                    response += chunk
+            thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertIn(b"400 Bad Request", response)
+        self.assertIn(b'"error": "request body incomplete"', response)
+        self.assertFalse(thread.is_alive())
+
     def test_incomplete_request_body_times_out_with_bounded_error(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

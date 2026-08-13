@@ -30,6 +30,7 @@ class TriggerDocumentationTests(TestCase):
             "five-second socket deadline",
             "HTTP `408`",
             "request timed out",
+            "request body incomplete",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("Loop 62: Durable SQLite Trigger Idempotency", roadmap)

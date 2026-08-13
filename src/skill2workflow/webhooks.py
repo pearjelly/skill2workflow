@@ -179,9 +179,16 @@ def _content_length(handler: BaseHTTPRequestHandler) -> int:
 
 
 def read_request_body(handler: BaseHTTPRequestHandler) -> bytes:
-    """Read one bounded request body and convert socket stalls to HTTP 408."""
+    """Read one complete bounded body and classify stalls or early EOFs."""
 
     try:
-        return handler.rfile.read(_content_length(handler))
+        content_length = _content_length(handler)
+        body = bytearray()
+        while len(body) < content_length:
+            chunk = handler.rfile.read(content_length - len(body))
+            if not chunk:
+                raise WebhookError("request body incomplete", status_code=400)
+            body.extend(chunk)
+        return bytes(body)
     except socket.timeout as error:
         raise WebhookError("request timed out", status_code=408) from error
