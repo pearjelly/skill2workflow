@@ -249,6 +249,7 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
                     ["nodes", index, "on_fallback"],
                 )
             )
+        _validate_retry_policy(node.get("retry"), ["nodes", index, "retry"], errors)
         _validate_connector_binding(node, index, errors)
         for key in _TRANSITION_KEYS:
             target = node.get(key)
@@ -410,20 +411,57 @@ def _validate_policies(policies: object, errors: List[ValidationError]) -> None:
             )
         )
         return
-    if "default_timeout_ms" not in policies:
+    _validate_retry_policy(policies.get("default_retry"), ["policies", "default_retry"], errors)
+    if "default_timeout_ms" in policies:
+        value = policies.get("default_timeout_ms")
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 0
+            or value > 86_400_000
+        ):
+            errors.append(
+                _validation_error(
+                    "policy_timeout_invalid",
+                    "policies.default_timeout_ms must be an integer between 0 and 86400000",
+                    ["policies", "default_timeout_ms"],
+                )
+            )
+
+
+def _validate_retry_policy(
+    retry: object,
+    path: List[object],
+    errors: List[ValidationError],
+) -> None:
+    if retry is None:
         return
-    value = policies.get("default_timeout_ms")
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or value < 0
-        or value > 86_400_000
+    if not isinstance(retry, dict):
+        errors.append(_validation_error("retry_invalid", "retry policy must be an object", path))
+        return
+    max_attempts = retry.get("max_attempts")
+    if max_attempts is not None and (
+        isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or max_attempts < 0
     ):
         errors.append(
             _validation_error(
-                "policy_timeout_invalid",
-                "policies.default_timeout_ms must be an integer between 0 and 86400000",
-                ["policies", "default_timeout_ms"],
+                "retry_max_attempts_invalid",
+                "retry.max_attempts must be a non-negative integer",
+                path + ["max_attempts"],
+            )
+        )
+    backoff_ms = retry.get("backoff_ms")
+    if backoff_ms is not None and (
+        isinstance(backoff_ms, bool)
+        or not isinstance(backoff_ms, int)
+        or backoff_ms < 0
+        or backoff_ms > 60000
+    ):
+        errors.append(
+            _validation_error(
+                "retry_backoff_invalid",
+                "retry.backoff_ms must be an integer between 0 and 60000",
+                path + ["backoff_ms"],
             )
         )
 

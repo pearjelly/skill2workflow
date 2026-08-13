@@ -84,7 +84,9 @@ python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-release-retent
 
 Release notes must call out any retention policy compatibility change and preserve the stopped-service, protected-state, residual-source, and operator-controlled destruction boundaries.
 
-When a release changes run cancellation, executor safe points, retry behavior, service concurrency, or the cancellation ledger, also include:
+When a release changes run cancellation, executor safe points, retry behavior
+(including retry delay/backoff), service concurrency, or the cancellation ledger,
+also include:
 
 ```bash
 PYTHONPATH=src python3 -m unittest tests.test_cancellation tests.test_cancellation_docs -v

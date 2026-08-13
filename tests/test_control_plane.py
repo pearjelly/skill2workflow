@@ -1326,7 +1326,7 @@ class ControlPlaneTests(TestCase):
             with TemporaryDirectory() as tmp:
                 control = LocalControlPlane(Path(tmp), storage="sqlite")
                 workflow = _connector_workflow("9.0.0", server.url)
-                workflow["nodes"][1]["retry"] = {"max_attempts": 1}
+                workflow["nodes"][1]["retry"] = {"max_attempts": 1, "backoff_ms": 1}
                 control.publish_workflow(workflow)
 
                 run_state = control.run_published_workflow("workflow_connector", "9.0.0")
@@ -1345,6 +1345,7 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(retry_events[0]["node_id"], "call_api")
         self.assertEqual(retry_events[0]["attempt"], 1)
         self.assertEqual(retry_events[0]["max_attempts"], 1)
+        self.assertEqual(retry_events[0]["backoff_ms"], 1)
         self.assertIn("HTTP 503", retry_events[0]["error"])
         self.assertEqual(recovered_events[0]["node_id"], "call_api")
         self.assertEqual(recovered_events[0]["attempt"], 2)

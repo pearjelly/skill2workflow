@@ -354,6 +354,52 @@ class ExecutorTests(TestCase):
         self.assertIn("node_retrying", event_types)
         self.assertIn("node_recovered", event_types)
 
+    def test_retry_policy_applies_bounded_backoff_and_records_delay(self):
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["nodes"][1]["retry"] = {"max_attempts": 1, "backoff_ms": 250}
+        runtime = _SequenceConnectorRuntime(
+            [
+                {"status": "failed", "error": "temporary", "output": {}},
+                {"status": "completed", "output": {"ok": True}},
+            ]
+        )
+        sleeps = []
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(
+                Path(tmp),
+                connector_runtime=runtime,
+                sleeper=sleeps.append,
+            ).run(workflow)
+
+        retry_event = next(event for event in state["events"] if event["type"] == "node_retrying")
+        result = state["node_results"]["call_api"]
+        self.assertEqual(sleeps, [0.25])
+        self.assertEqual(retry_event["backoff_ms"], 250)
+        self.assertEqual(result["backoff_ms"], 250)
+        self.assertEqual(state["status"], "completed")
+
+    def test_retry_backoff_is_resolved_from_default_and_clamped(self):
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["policies"] = {"default_retry": {"max_attempts": 1, "backoff_ms": 999999}}
+        runtime = _SequenceConnectorRuntime(
+            [
+                {"status": "failed", "error": "temporary", "output": {}},
+                {"status": "completed", "output": {"ok": True}},
+            ]
+        )
+        sleeps = []
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(
+                Path(tmp),
+                connector_runtime=runtime,
+                sleeper=sleeps.append,
+            ).run(workflow)
+
+        self.assertEqual(sleeps, [60.0])
+        self.assertEqual(state["node_results"]["call_api"]["backoff_ms"], 60000)
+
     def test_connector_receives_ephemeral_execution_identity_without_persisting_it(self):
         runtime = _CapturingConnectorRuntime()
         original_context = {
@@ -419,6 +465,18 @@ class _CapturingConnectorRuntime:
             "connector": {"id": "http", "kind": "http"},
             "output": {},
         }
+
+
+class _SequenceConnectorRuntime:
+    def __init__(self, results):
+        self.results = list(results)
+        self.calls = 0
+
+    def execute_connector(self, node, credential_provider=None, context=None):
+        self.calls += 1
+        result = dict(self.results.pop(0))
+        result.setdefault("connector", {"id": "http", "kind": "http"})
+        return result
 
 
 class _FailingConnectorRuntime:

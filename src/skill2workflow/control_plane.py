@@ -1002,6 +1002,7 @@ class LocalControlPlane:
                 "attempt",
                 "next_attempt",
                 "max_attempts",
+                "backoff_ms",
                 "target",
                 "fallback_target",
                 "error",

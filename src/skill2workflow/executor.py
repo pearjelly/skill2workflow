@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -14,6 +15,7 @@ from .storage import create_run_store
 
 RunState = Dict[str, object]
 MAX_ACTIVE_TIMEOUT_MS = 86_400_000
+MAX_RETRY_BACKOFF_MS = 60_000
 
 
 class LocalExecutor:
@@ -27,6 +29,7 @@ class LocalExecutor:
         connector_runtime=None,
         execution_owner: str = "",
         clock: Callable[[], str] = None,
+        sleeper: Callable[[float], None] = None,
     ):
         self.state_dir = Path(state_dir)
         self.store = create_run_store(self.state_dir, storage)
@@ -34,6 +37,7 @@ class LocalExecutor:
         self.connector_runtime = connector_runtime or ConnectorRuntime()
         self.execution_owner = str(execution_owner or "")
         self._clock = clock or _now
+        self._sleep = sleeper or time.sleep
         self._execution_ids: Dict[str, str] = {}
 
     def run(self, workflow: Dict[str, object], context: Dict[str, object] = None) -> RunState:
@@ -273,7 +277,13 @@ class LocalExecutor:
             return state
 
         max_attempts = _retry_max_attempts(node, state.get("workflow", {}))
-        self._event(state, "node_started", current_id, {"max_attempts": max_attempts})
+        backoff_ms = _retry_backoff_ms(node, state.get("workflow", {}))
+        self._event(
+            state,
+            "node_started",
+            current_id,
+            {"max_attempts": max_attempts, "backoff_ms": backoff_ms},
+        )
         last_error = ""
         connector_result = {}
         attempts = 0
@@ -360,12 +370,32 @@ class LocalExecutor:
                         "attempt": attempt,
                         "next_attempt": attempt + 1,
                         "max_attempts": max_attempts,
+                        "backoff_ms": backoff_ms,
                         "error": last_error,
                     },
                 )
             self._save(state)
             if state.get("status") == "cancelled":
                 return state
+            if attempt <= max_attempts and backoff_ms:
+                self._sleep(backoff_ms / 1000.0)
+                cancelled = self._cancel_if_requested(state)
+                if cancelled is not None:
+                    return cancelled
+                timed_out = self._timeout_if_exceeded(state)
+                if timed_out is not None:
+                    timed_out["node_results"][current_id] = {
+                        "status": "failed",
+                        "title": node.get("title", current_id),
+                        "connector": ref,
+                        "attempts": attempts,
+                        "max_attempts": max_attempts,
+                        "backoff_ms": backoff_ms,
+                        "error_code": "execution_timeout",
+                        "timestamp": self._now(),
+                    }
+                    self._save(timed_out)
+                    return timed_out
 
         result_status = str(connector_result.get("status", "failed"))
         node_result = {
@@ -375,6 +405,7 @@ class LocalExecutor:
             "output": connector_result.get("output", {}),
             "attempts": attempts,
             "max_attempts": max_attempts,
+            "backoff_ms": backoff_ms,
             "timestamp": self._now(),
         }
         mapping_summary = connector_result.get("input_mapping")
@@ -643,12 +674,34 @@ def _retry_max_attempts(node: Dict[str, object], workflow: object) -> int:
     return 0
 
 
+def _retry_backoff_ms(node: Dict[str, object], workflow: object) -> int:
+    retry = node.get("retry")
+    if isinstance(retry, dict) and retry.get("backoff_ms") is not None:
+        return _bounded_non_negative_int(retry.get("backoff_ms"), MAX_RETRY_BACKOFF_MS)
+
+    if isinstance(workflow, dict):
+        policies = workflow.get("policies")
+        if isinstance(policies, dict):
+            default_retry = policies.get("default_retry")
+            if isinstance(default_retry, dict):
+                return _bounded_non_negative_int(
+                    default_retry.get("backoff_ms"), MAX_RETRY_BACKOFF_MS
+                )
+    return 0
+
+
 def _non_negative_int(value: object) -> int:
     if isinstance(value, bool):
         return 0
     if isinstance(value, int) and value > 0:
         return value
     return 0
+
+
+def _bounded_non_negative_int(value: object, maximum: int) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return 0
+    return min(value, maximum)
 
 
 def _input_mapping_event_fields(summary: object) -> Dict[str, object]:

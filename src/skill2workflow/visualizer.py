@@ -104,6 +104,7 @@ def run_overlay_for_nodes(
             "result_status": str(result.get("status", "")) if result else "",
             "attempts": _overlay_int(result.get("attempts") if result else None, node_events, "attempt"),
             "max_attempts": _overlay_int(result.get("max_attempts") if result else None, node_events, "max_attempts"),
+            "backoff_ms": _overlay_int(result.get("backoff_ms") if result else None, node_events, "backoff_ms"),
             "retry_count": sum(1 for event in node_events if event.get("type") == "node_retrying"),
             "recovered": any(event.get("type") == "node_recovered" for event in node_events),
             "connector_id": _overlay_text(result, node_events, "connector_id"),
@@ -281,6 +282,11 @@ def _apply_retry_edits(node: Dict[str, object], graph_retry: object) -> None:
         raise ValueError(f"{node['id']} retry must remain an object")
     if "max_attempts" in graph_retry:
         retry["max_attempts"] = _non_negative_int(graph_retry["max_attempts"], f"{node['id']} retry.max_attempts")
+    if "backoff_ms" in graph_retry:
+        backoff_ms = _non_negative_int(graph_retry["backoff_ms"], f"{node['id']} retry.backoff_ms")
+        if backoff_ms > 60000:
+            raise ValueError(f"{node['id']} retry.backoff_ms must be at most 60000")
+        retry["backoff_ms"] = backoff_ms
 
 
 def _apply_connector_edits(node: Dict[str, object], graph_connector: object) -> None:

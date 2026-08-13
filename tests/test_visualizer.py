@@ -89,6 +89,7 @@ class VisualizerTests(TestCase):
                 "result_status": "completed",
                 "attempts": 2,
                 "max_attempts": 1,
+                "backoff_ms": 0,
                 "retry_count": 1,
                 "recovered": True,
                 "connector_id": "http",
@@ -224,6 +225,7 @@ class VisualizerTests(TestCase):
 
         review["properties"]["action"]["prompt"] = "Escalate to finance reviewer."
         review["properties"]["retry"]["max_attempts"] = 2
+        review["properties"]["retry"]["backoff_ms"] = 250
         api["properties"]["action"]["instruction"] = "Send the normalized approval payload."
         api["properties"]["connector"]["request"]["method"] = "PUT"
         api["properties"]["connector"]["request"]["url"] = "https://example.test/approval"
@@ -237,6 +239,7 @@ class VisualizerTests(TestCase):
 
         self.assertEqual(updated_review["action"]["prompt"], "Escalate to finance reviewer.")
         self.assertEqual(updated_review["retry"]["max_attempts"], 2)
+        self.assertEqual(updated_review["retry"]["backoff_ms"], 250)
         self.assertEqual(updated_api["action"]["instruction"], "Send the normalized approval payload.")
         self.assertEqual(
             updated_api["connector"],

@@ -29,6 +29,12 @@ class DslContractTests(TestCase):
         self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["from"]["pattern"], "^/input/.+")
         self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["to"]["pattern"], "^/body/.+")
         self.assertIn("on_fallback", schema["$defs"]["node"]["properties"])
+        retry_policy = schema["$defs"]["retry_policy"]
+        self.assertEqual(retry_policy["properties"]["backoff_ms"]["maximum"], 60000)
+        self.assertEqual(
+            schema["$defs"]["policies"]["properties"]["default_retry"]["$ref"],
+            "#/$defs/retry_policy",
+        )
 
     def test_input_schema_contract_is_additive_and_bounded_in_schema(self):
         schema = json.loads((ROOT / "schemas" / "workflow.schema.json").read_text(encoding="utf-8"))
@@ -103,3 +109,12 @@ class DslContractTests(TestCase):
             },
             errors,
         )
+
+    def test_retry_backoff_policy_is_validated_and_bounded(self):
+        workflow = json.loads(
+            (ROOT / "examples" / "workflows" / "approval-flow.workflow.json").read_text(encoding="utf-8")
+        )
+        workflow["nodes"][1]["retry"] = {"max_attempts": 1, "backoff_ms": 60001}
+        errors = validate_workflow_structured(workflow)
+        self.assertIn("retry.backoff_ms must be an integer between 0 and 60000", validate_workflow(workflow))
+        self.assertTrue(any(error["code"] == "retry_backoff_invalid" for error in errors))

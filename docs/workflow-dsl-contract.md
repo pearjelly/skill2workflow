@@ -33,7 +33,11 @@ The schema documents the stable top-level shape:
 - `checkpoints`
 - `policies`
 
-It also documents the initial node and edge shapes. The current schema intentionally allows additional properties so the compiler, executor, visual editor, and connector runtime can add metadata without breaking old readers.
+It also documents the initial node and edge shapes. Connector retry policy
+supports `max_attempts` plus an optional fixed `backoff_ms` from `0` to
+`60000`. The current schema intentionally allows additional properties so the
+compiler, executor, visual editor, and connector runtime can add metadata
+without breaking old readers.
 
 ## Declarative Trigger Input Contracts
 

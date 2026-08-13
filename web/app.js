@@ -99,6 +99,7 @@
     els.nodeDescription = document.getElementById("node-description");
     els.nodeAction = document.getElementById("node-action");
     els.nodeRetryMax = document.getElementById("node-retry-max");
+    els.nodeRetryBackoff = document.getElementById("node-retry-backoff");
     els.connectorSection = document.getElementById("connector-section");
     els.nodeConnectorId = document.getElementById("node-connector-id");
     els.nodeConnectorKind = document.getElementById("node-connector-kind");
@@ -594,6 +595,7 @@
     els.nodeDescription.value = hasNode ? props.description || "" : "";
     els.nodeAction.value = action ? action.prompt || action.instruction || "" : "";
     els.nodeRetryMax.value = retry && retry.max_attempts !== undefined ? retry.max_attempts : "";
+    els.nodeRetryBackoff.value = retry && retry.backoff_ms !== undefined ? retry.backoff_ms : "";
     els.nodeConnectorId.value = connector ? connector.id || "" : "";
     els.nodeConnectorKind.value = connector ? connector.kind || "" : "";
     els.nodeHttpMethod.value = request.method || "";
@@ -608,6 +610,7 @@
     els.nodeDescription.disabled = !hasNode;
     els.nodeAction.disabled = !hasNode || !action;
     els.nodeRetryMax.disabled = !hasNode || !retry;
+    els.nodeRetryBackoff.disabled = !hasNode || !retry;
     els.nodeHttpMethod.disabled = !hasNode || !connector || connector.id !== "http";
     els.nodeHttpUrl.disabled = !hasNode || !connector || connector.id !== "http";
     els.nodeHttpHeaders.disabled = !hasNode || !connector || connector.id !== "http";
@@ -650,6 +653,13 @@
         return { ok: false, error: "Retry attempts must be a non-negative integer." };
       }
       props.retry.max_attempts = maxAttempts;
+    }
+    if (props.retry && typeof props.retry === "object" && els.nodeRetryBackoff.value !== "") {
+      const backoffMs = Number(els.nodeRetryBackoff.value);
+      if (!Number.isInteger(backoffMs) || backoffMs < 0 || backoffMs > 60000) {
+        return { ok: false, error: "Retry backoff must be an integer between 0 and 60000 ms." };
+      }
+      props.retry.backoff_ms = backoffMs;
     }
     const connector = props.connector;
     if (!connector || typeof connector !== "object" || connector.id !== "http") {
@@ -810,14 +820,23 @@
   }
 
   function applyRetryProperties(node, graphRetry) {
-    if (!node.retry || !graphRetry || graphRetry.max_attempts === undefined) {
+    if (!node.retry || !graphRetry) {
       return;
     }
-    const maxAttempts = Number(graphRetry.max_attempts);
-    if (!Number.isInteger(maxAttempts) || maxAttempts < 0) {
-      throw new Error(node.id + " retry.max_attempts must be a non-negative integer.");
+    if (graphRetry.max_attempts !== undefined) {
+      const maxAttempts = Number(graphRetry.max_attempts);
+      if (!Number.isInteger(maxAttempts) || maxAttempts < 0) {
+        throw new Error(node.id + " retry.max_attempts must be a non-negative integer.");
+      }
+      node.retry.max_attempts = maxAttempts;
     }
-    node.retry.max_attempts = maxAttempts;
+    if (graphRetry.backoff_ms !== undefined) {
+      const backoffMs = Number(graphRetry.backoff_ms);
+      if (!Number.isInteger(backoffMs) || backoffMs < 0 || backoffMs > 60000) {
+        throw new Error(node.id + " retry.backoff_ms must be an integer between 0 and 60000.");
+      }
+      node.retry.backoff_ms = backoffMs;
+    }
   }
 
   function applyConnectorProperties(node, graphConnector) {
@@ -890,6 +909,12 @@
         const maxAttempts = Number(node.retry.max_attempts);
         if (!Number.isInteger(maxAttempts) || maxAttempts < 0) {
           errors.push(node.id + " retry.max_attempts must be a non-negative integer.");
+        }
+      }
+      if (node.retry && node.retry.backoff_ms !== undefined) {
+        const backoffMs = Number(node.retry.backoff_ms);
+        if (!Number.isInteger(backoffMs) || backoffMs < 0 || backoffMs > 60000) {
+          errors.push(node.id + " retry.backoff_ms must be an integer between 0 and 60000.");
         }
       }
       if (node.connector && node.connector.id === "http" && node.connector.request) {

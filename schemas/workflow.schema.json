@@ -124,7 +124,14 @@
           "type": ["object", "null"]
         },
         "retry": {
-          "type": ["object", "null"]
+          "anyOf": [
+            {
+              "$ref": "#/$defs/retry_policy"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "connector": {
           "$ref": "#/$defs/connector_binding"
@@ -332,12 +339,29 @@
         }
       }
     },
+    "retry_policy": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Connector retry policy. max_attempts counts retries after the first attempt; backoff_ms is a fixed, bounded delay before each retry.",
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backoff_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "Fixed delay before each retry, in milliseconds. The executor clamps values above 60000 to 60000 for legacy documents."
+        }
+      }
+    },
     "policies": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
         "default_retry": {
-          "type": "object"
+          "$ref": "#/$defs/retry_policy"
         },
         "default_timeout_ms": {
           "type": "integer",

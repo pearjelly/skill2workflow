@@ -13,12 +13,18 @@ Connector nodes can declare retry policy:
   "id": "call_api",
   "type": "tool_call",
   "retry": {
-    "max_attempts": 1
+    "max_attempts": 1,
+    "backoff_ms": 250
   }
 }
 ```
 
 `retry.max_attempts` means retries after the first attempt. A value of `1` allows at most two total connector executions: the first attempt and one retry.
+`retry.backoff_ms` is an optional fixed delay before each retry. It is bounded
+to 60,000 milliseconds; values above the bound are clamped for legacy
+documents. The default is `0`, preserving immediate retries when no delay is
+declared. This bounded connector retry backoff is intentionally fixed rather
+than exponential. Node policy takes precedence over `policies.default_retry`.
 
 If a node does not declare `retry.max_attempts`, the executor falls back to:
 
@@ -32,7 +38,8 @@ If a node does not declare `retry.max_attempts`, the executor falls back to:
 }
 ```
 
-Missing, invalid, negative, and boolean retry values are treated as `0`.
+Missing, invalid, negative, and boolean retry values are treated as `0`;
+legacy `backoff_ms` values above the bound are clamped to `60000`.
 
 ## Timeout Boundary
 
@@ -43,10 +50,13 @@ executor checks it before each node and after connector returns. A timeout
 fails the run with fixed `error_code: "execution_timeout"` evidence; it never
 interrupts an outbound request already in flight. The budget is persisted with
 the run and is cleared while a human gate is waiting, so operator review time
-does not consume execution budget. It does not cover queueing, retry backoff,
-downstream systems after a returned connector call, or local process scheduling.
+does not consume execution budget. It does not cover queueing, downstream
+systems after a returned connector call, or local process scheduling.
 
-The local executor does not yet implement global workflow deadlines, node-level wall-clock deadlines, delayed retry backoff, or scheduled recovery. Those remain future runtime policy work.
+The local executor does not yet implement global workflow deadlines, node-level
+wall-clock deadlines, or scheduled recovery. Those remain future runtime policy
+work. A configured retry backoff is part of the active execution segment and is
+checked against `default_timeout_ms` after the delay.
 
 ## Fallback Transitions
 
@@ -71,7 +81,7 @@ The executor records policy and recovery visibility in run state:
 | --- | --- |
 | `connector_started` | A connector attempt started. Includes `attempt` and `max_attempts`. |
 | `connector_failed` | A connector attempt failed. Includes connector metadata, `attempt`, `max_attempts`, and `error`. |
-| `node_retrying` | A failed connector node will be retried. Includes `attempt`, `next_attempt`, `max_attempts`, and `error`. |
+| `node_retrying` | A failed connector node will be retried. Includes `attempt`, `next_attempt`, `max_attempts`, `backoff_ms`, and `error`. |
 | `node_recovered` | A connector node succeeded after at least one failed attempt. Includes final `attempt`, `max_attempts`, and last error. |
 | `node_failed` | A connector node failed after exhausting available retry attempts; it may still route through `on_fallback`. |
 | `node_fallback` | A failed connector node routed to its explicit `on_fallback` target after retries were exhausted. |
@@ -84,6 +94,7 @@ Node results for connector nodes include:
   "status": "completed",
   "attempts": 2,
   "max_attempts": 1,
+  "backoff_ms": 250,
   "last_error": "HTTP 503"
 }
 ```
@@ -110,7 +121,6 @@ The local runtime intentionally does not yet provide:
 
 - background workers
 - distributed scheduling
-- delayed retry backoff
 - automatic idempotency enforcement for JSON/local evaluation (SQLite service enforcement is documented in `docs/triggers.md`)
 - compensation or rollback handlers
 - global workflow deadlines

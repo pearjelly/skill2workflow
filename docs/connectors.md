@@ -407,7 +407,13 @@ Invalid request metadata, unsupported URL schemes, JSON body serialization failu
 
 `connector.request.timeout_ms` is the per-request timeout for the built-in HTTP connector. It is not a whole-node deadline and does not include queueing, human approval, or downstream workflow execution time. The separate top-level `policies.default_timeout_ms` budget bounds active workflow execution segments; see [`runtime-policy.md`](runtime-policy.md).
 
-`retry.max_attempts` and `policies.default_retry.max_attempts` are Workflow DSL policy fields. The local executor honors them for connector nodes. `max_attempts` means retries after the first attempt; `1` allows two total connector attempts.
+`retry.max_attempts`, `retry.backoff_ms`, and their `policies.default_retry.*`
+counterparts are Workflow DSL policy fields. The local executor honors them for
+connector nodes. `max_attempts` means retries after the first attempt; `1`
+allows two total connector attempts. `backoff_ms` is a fixed delay before each
+retry, defaults to `0`, and is bounded to 60,000 milliseconds. The executor
+records the effective delay in the node result and retry event; a configured
+delay is still subject to the active `default_timeout_ms` execution budget.
 
 Retry and recovery events are recorded in run state and published-run audit logs:
 

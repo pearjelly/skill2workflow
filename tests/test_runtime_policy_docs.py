@@ -16,6 +16,9 @@ class RuntimePolicyDocumentationTests(TestCase):
             (ROOT / "schemas" / "workflow.schema.json").read_text(encoding="utf-8")
         )
         for phrase in (
+            "retry.backoff_ms",
+            "60,000 milliseconds",
+            "bounded connector retry backoff",
             "policies.default_timeout_ms",
             "active-execution segment",
             "execution_timeout",
@@ -29,4 +32,8 @@ class RuntimePolicyDocumentationTests(TestCase):
         self.assertEqual(
             schema["$defs"]["policies"]["properties"]["default_timeout_ms"]["maximum"],
             86400000,
+        )
+        self.assertEqual(
+            schema["$defs"]["retry_policy"]["properties"]["backoff_ms"]["maximum"],
+            60000,
         )

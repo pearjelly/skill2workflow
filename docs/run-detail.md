@@ -28,6 +28,11 @@ an internal or oversized projection returns the fixed `503` response
 `{"error":"run detail unavailable"}`. Responses carry `Cache-Control:
 no-store` and are capped at 64 KiB.
 
+The stable remote projection intentionally omits retry-delay values; operators
+can inspect the effective bounded `backoff_ms` in the local run state, control-
+plane audit events, or LiteGraph overlay without changing this 0.1.0 response
+shape.
+
 ## Protected CLI client
 
 The installed CLI reads the Bearer token from an owner-only file and applies

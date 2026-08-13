@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added bounded connector retry backoff: `retry.backoff_ms` and
+  `policies.default_retry.backoff_ms` now provide a fixed, capped delay before
+  connector retries, with timeout/cancellation safe points and run-state,
+  control-plane audit, and local visual evidence. The default remains zero for
+  compatibility.
 - Added a dependency-free release artifact manifest for wheels, recording the
   archive and member SHA-256 hashes plus fixed package metadata without source
   paths or workflow values.
