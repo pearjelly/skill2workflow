@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added the installed `service-wait` command for bounded startup and cutover
+  readiness polling using the existing unauthenticated probe contract; it
+  prints only the final fixed probe payload and preserves stable exit codes.
 - Added the label-free `skill2workflow_scheduler_dispatch_inflight` gauge to
   authenticated `/metrics`, exposing an already-admitted recurring dispatch
   during graceful drain without changing the support-bundle 0.1.0 contract.

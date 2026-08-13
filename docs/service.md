@@ -56,6 +56,9 @@ contract.
 Loop 109 adds the matching label-free
 `skill2workflow_scheduler_dispatch_inflight` gauge, so an already-admitted
 background recurring dispatch is visible while graceful drain waits for it.
+Loop 110 adds the installed `service-wait` client command, which polls the
+existing public probes with bounded timeout and interval values for safe
+startup/cutover automation; it adds no route or authentication bypass.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
@@ -144,6 +147,16 @@ skill2workflow service-probe --service-url https://service.example
 Require exit code `0` (`status: "ready"`) before routing application traffic.
 See [`service-probe.md`](service-probe.md) for the contract and the distinct
 `not_ready` versus `unavailable` exit states.
+
+For a bounded restart or rollout wait, use the same contract without writing a
+custom polling loop:
+
+```bash
+skill2workflow service-wait \
+  --service-url https://service.example \
+  --timeout-seconds 60 \
+  --poll-interval-seconds 1
+```
 
 From a source checkout, the equivalent command is:
 

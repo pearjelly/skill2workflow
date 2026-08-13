@@ -452,6 +452,53 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(json.loads(stdout.getvalue()), expected)
 
+    def test_service_wait_command_prints_ready_contract_and_options(self):
+        stdout = StringIO()
+        expected = {
+            "schema_version": "skill2workflow-service-probe-0.1.0",
+            "status": "ready",
+            "health": {"status": "ok", "http_status": 200},
+            "readiness": {"status": "ready", "http_status": 200},
+        }
+        with patch("skill2workflow.cli.wait_for_service_ready", return_value=expected) as wait:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-wait",
+                        "--service-url",
+                        "https://service.example",
+                        "--timeout-seconds",
+                        "12",
+                        "--poll-interval-seconds",
+                        "0.25",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        wait.assert_called_once_with(
+            "https://service.example",
+            timeout_seconds=12.0,
+            poll_interval_seconds=0.25,
+        )
+
+    def test_service_wait_command_maps_unavailable_exit_code(self):
+        stdout = StringIO()
+        expected = {
+            "schema_version": "skill2workflow-service-probe-0.1.0",
+            "status": "unavailable",
+            "health": {"status": "unavailable", "http_status": 0},
+            "readiness": {"status": "unavailable", "http_status": 0},
+        }
+        with patch("skill2workflow.cli.wait_for_service_ready", return_value=expected):
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    ["service-wait", "--service-url", "https://service.example"]
+                )
+
+        self.assertEqual(exit_code, 2)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+
     def test_service_audit_integrity_command_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

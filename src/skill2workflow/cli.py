@@ -33,6 +33,7 @@ from .service_client import (
     fetch_retention_readiness,
     fetch_operational_readiness,
     fetch_service_probe,
+    wait_for_service_ready,
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_workflow_diff,
@@ -407,6 +408,24 @@ def main(argv=None) -> int:
         help="Probe service health and readiness for deployment automation",
     )
     service_probe_cmd.add_argument("--service-url", required=True)
+
+    service_wait_cmd = subparsers.add_parser(
+        "service-wait",
+        help="Wait for service readiness for deployment cutover",
+    )
+    service_wait_cmd.add_argument("--service-url", required=True)
+    service_wait_cmd.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=60.0,
+        help="Maximum wait time (0 through 300 seconds; default: 60)",
+    )
+    service_wait_cmd.add_argument(
+        "--poll-interval-seconds",
+        type=float,
+        default=1.0,
+        help="Delay between probes (greater than 0 through 10 seconds; default: 1)",
+    )
 
     service_integrity_cmd = subparsers.add_parser(
         "service-audit-integrity",
@@ -951,6 +970,13 @@ def main(argv=None) -> int:
     if args.command == "service-probe":
         return _service_probe_action(args.service_url)
 
+    if args.command == "service-wait":
+        return _service_wait_action(
+            args.service_url,
+            args.timeout_seconds,
+            args.poll_interval_seconds,
+        )
+
     if args.command == "service-audit-integrity":
         return _service_action(
             lambda: fetch_audit_integrity(
@@ -1178,6 +1204,24 @@ def _service_action(callback) -> int:
 def _service_probe_action(service_url: str) -> int:
     try:
         result = fetch_service_probe(service_url)
+        _print_json(result)
+        return {"ready": 0, "not_ready": 1, "unavailable": 2}[result["status"]]
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+
+
+def _service_wait_action(
+    service_url: str,
+    timeout_seconds: float,
+    poll_interval_seconds: float,
+) -> int:
+    try:
+        result = wait_for_service_ready(
+            service_url,
+            timeout_seconds=timeout_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+        )
         _print_json(result)
         return {"ready": 0, "not_ready": 1, "unavailable": 2}[result["status"]]
     except ValueError as error:

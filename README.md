@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-109 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-110 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -987,6 +987,11 @@ Loop 109 adds the matching live gauge for an already-admitted recurring
 scheduler dispatch, making graceful-drain progress visible for background work
 without changing dispatch or support-bundle semantics.
 
+Loop 110 adds [`service-wait`](docs/service-probe.md), a bounded readiness
+poller for startup and cutover automation. It reuses the existing public probe
+contract, prints only the final fixed payload, and never adds a new service
+route or credential requirement.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1038,7 +1043,7 @@ See:
 - `docs/runtime-policy.md`
 - `docs/security-boundary.md`
 - `docs/service.md`
-- `docs/service-probe.md`
+- [`docs/service-probe.md`](docs/service-probe.md) (including `service-wait` for bounded readiness polling)
 - `docs/service-doctor.md`
 - `docs/service-bootstrap.md`
 - `docs/systemd-service.md`

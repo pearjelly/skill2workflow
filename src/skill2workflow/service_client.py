@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -61,6 +62,10 @@ MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
 SERVICE_PROBE_SCHEMA_VERSION = "skill2workflow-service-probe-0.1.0"
 MAX_SERVICE_PROBE_RESPONSE_BYTES = 8 * 1024
 SERVICE_PROBE_TIMEOUT_SECONDS = 5
+SERVICE_WAIT_DEFAULT_TIMEOUT_SECONDS = 60.0
+SERVICE_WAIT_MAX_TIMEOUT_SECONDS = 300.0
+SERVICE_WAIT_DEFAULT_POLL_INTERVAL_SECONDS = 1.0
+SERVICE_WAIT_MAX_POLL_INTERVAL_SECONDS = 10.0
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_TRIGGER_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
@@ -125,6 +130,58 @@ def fetch_service_probe(service_url: str) -> Dict[str, object]:
     }
     _validate_service_probe(payload)
     return payload
+
+
+def wait_for_service_ready(
+    service_url: str,
+    *,
+    timeout_seconds: float = SERVICE_WAIT_DEFAULT_TIMEOUT_SECONDS,
+    poll_interval_seconds: float = SERVICE_WAIT_DEFAULT_POLL_INTERVAL_SECONDS,
+    monotonic=time.monotonic,
+    sleep=time.sleep,
+) -> Dict[str, object]:
+    """Poll the fixed deployment probe until ready or a bounded deadline."""
+
+    timeout = _bounded_wait_number(
+        timeout_seconds,
+        "timeout_seconds",
+        maximum=SERVICE_WAIT_MAX_TIMEOUT_SECONDS,
+        allow_zero=True,
+    )
+    interval = _bounded_wait_number(
+        poll_interval_seconds,
+        "poll_interval_seconds",
+        maximum=SERVICE_WAIT_MAX_POLL_INTERVAL_SECONDS,
+        allow_zero=False,
+    )
+    deadline = float(monotonic()) + timeout
+    while True:
+        result = fetch_service_probe(service_url)
+        if result["status"] == "ready":
+            return result
+        remaining = deadline - float(monotonic())
+        if remaining <= 0:
+            return result
+        sleep(min(interval, remaining))
+
+
+def _bounded_wait_number(
+    value: object,
+    name: str,
+    *,
+    maximum: float,
+    allow_zero: bool,
+) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        or float(value) < (0 if allow_zero else 0.000001)
+        or float(value) > maximum
+    ):
+        lower = "0" if allow_zero else "greater than 0"
+        raise ValueError(f"{name} must be {lower} and at most {maximum:g} seconds")
+    return float(value)
 
 
 def _fetch_probe_endpoint(

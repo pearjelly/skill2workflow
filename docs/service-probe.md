@@ -11,6 +11,23 @@ does not add an HTTP route, require an ingress token, or mutate runtime state.
 skill2workflow service-probe --service-url https://service.example
 ```
 
+For a bounded startup or cutover wait, use the same fixed probe contract with
+the installed `service-wait` command:
+
+```bash
+skill2workflow service-wait \
+  --service-url https://service.example \
+  --timeout-seconds 60 \
+  --poll-interval-seconds 1
+```
+
+`service-wait` performs an immediate probe, then polls only while the bounded
+deadline remains. It prints the last safe probe payload and uses the same exit
+codes as `service-probe`: `0` when ready, `1` when the deadline ends in
+`not_ready`, and `2` when the final result is unavailable. The timeout is
+limited to 300 seconds and the poll interval to 10 seconds, preventing an
+accidental unbounded deployment wait or a tight request loop.
+
 The URL must be an HTTPS origin without credentials, query, fragment, or path.
 Plain HTTP is accepted only for loopback origins, which keeps local smoke tests
 possible without weakening the external TLS boundary. The client disables
@@ -55,6 +72,7 @@ network policy.
 
 1. Run `service-doctor` against the generated configuration before startup.
 2. Use `service-probe` for the live cutover gate and require exit code `0`.
+   Use `service-wait` when a restart or rollout needs a bounded readiness wait.
 3. Use the authenticated `service-operational-readiness` report for deeper
    artifact, audit, and backup checks; this probe does not replace it.
 

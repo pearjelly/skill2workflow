@@ -20,6 +20,9 @@ class ServiceProbeDocumentationTests(TestCase):
         self.assertIn("/readyz", guide)
         self.assertIn("8 KiB", guide)
         self.assertIn("five-second timeout", guide)
+        self.assertIn("skill2workflow service-wait", guide)
+        self.assertIn("bounded", guide)
+        self.assertIn("polls", guide)
         self.assertIn("does not add an HTTP route", guide)
         self.assertEqual(
             schema["properties"]["schema_version"]["const"],
@@ -37,6 +40,7 @@ class ServiceProbeDocumentationTests(TestCase):
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         self.assertIn("docs/service-probe.md", readme)
+        self.assertIn("service-wait", readme)
         self.assertIn("service-probe", service)
         self.assertIn("Loop 95: Deployment Service Probe", roadmap)
-        self.assertIn("Loops 44-109 complete", roadmap)
+        self.assertIn("Loops 44-110 complete", roadmap)

@@ -76,6 +76,7 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("Loop 107 closes the matching scheduler boundary", guide)
         self.assertIn("Loop 108 exposes the live, label-free", guide)
         self.assertIn("Loop 109 adds the matching label-free", guide)
+        self.assertIn("Loop 110 adds the installed `service-wait`", guide)
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         self.assertIn("five-second socket deadline", stability)
         self.assertIn("GET /metrics` zero-body request validation", stability)
@@ -85,6 +86,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-109 are complete", readme)
+        self.assertIn("Delivery Loops 1-110 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

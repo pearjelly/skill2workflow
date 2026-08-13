@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
@@ -16,6 +17,8 @@ from skill2workflow.service_client import (
     MAX_RETENTION_READINESS_RESPONSE_BYTES,
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
     SERVICE_PROBE_SCHEMA_VERSION,
+    SERVICE_WAIT_MAX_POLL_INTERVAL_SECONDS,
+    SERVICE_WAIT_MAX_TIMEOUT_SECONDS,
     MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     MAX_RUNTIME_INFO_RESPONSE_BYTES,
     MAX_REMOTE_TRIGGER_REQUEST_BYTES,
@@ -34,6 +37,7 @@ from skill2workflow.service_client import (
     fetch_retention_readiness,
     fetch_operational_readiness,
     fetch_service_probe,
+    wait_for_service_ready,
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_support_bundle,
@@ -153,6 +157,88 @@ class ServiceClientTests(TestCase):
     def test_service_probe_rejects_unsafe_origin_before_network(self):
         with self.assertRaisesRegex(ValueError, "unambiguous HTTPS"):
             fetch_service_probe("http://service.example")
+
+    def test_service_wait_polls_until_ready_with_bounded_sleep(self):
+        not_ready = {
+            "schema_version": SERVICE_PROBE_SCHEMA_VERSION,
+            "status": "not_ready",
+            "health": {"status": "ok", "http_status": 200},
+            "readiness": {"status": "not_ready", "http_status": 503},
+        }
+        ready = {
+            "schema_version": SERVICE_PROBE_SCHEMA_VERSION,
+            "status": "ready",
+            "health": {"status": "ok", "http_status": 200},
+            "readiness": {"status": "ready", "http_status": 200},
+        }
+        now = [0.0]
+        sleeps = []
+
+        def monotonic():
+            return now[0]
+
+        def sleep(seconds):
+            sleeps.append(seconds)
+            now[0] += seconds
+
+        with patch(
+            "skill2workflow.service_client.fetch_service_probe",
+            side_effect=[not_ready, ready],
+        ) as probe:
+            result = wait_for_service_ready(
+                "http://127.0.0.1:8080",
+                timeout_seconds=5,
+                poll_interval_seconds=2,
+                monotonic=monotonic,
+                sleep=sleep,
+            )
+
+        self.assertEqual(result, ready)
+        self.assertEqual(probe.call_count, 2)
+        self.assertEqual(sleeps, [2.0])
+
+    def test_service_wait_returns_last_not_ready_probe_at_deadline(self):
+        not_ready = {
+            "schema_version": SERVICE_PROBE_SCHEMA_VERSION,
+            "status": "not_ready",
+            "health": {"status": "ok", "http_status": 200},
+            "readiness": {"status": "not_ready", "http_status": 503},
+        }
+        now = [0.0]
+        sleeps = []
+
+        with patch(
+            "skill2workflow.service_client.fetch_service_probe",
+            side_effect=[not_ready, not_ready, not_ready],
+        ) as probe:
+            result = wait_for_service_ready(
+                "http://127.0.0.1:8080",
+                timeout_seconds=3,
+                poll_interval_seconds=2,
+                monotonic=lambda: now[0],
+                sleep=lambda seconds: (sleeps.append(seconds), now.__setitem__(0, now[0] + seconds)),
+            )
+
+        self.assertEqual(result, not_ready)
+        self.assertEqual(probe.call_count, 3)
+        self.assertEqual(sleeps, [2.0, 1.0])
+
+    def test_service_wait_rejects_unbounded_timing_options(self):
+        with self.assertRaisesRegex(ValueError, "timeout_seconds"):
+            wait_for_service_ready(
+                "http://127.0.0.1:8080",
+                timeout_seconds=SERVICE_WAIT_MAX_TIMEOUT_SECONDS + 1,
+            )
+        with self.assertRaisesRegex(ValueError, "poll_interval_seconds"):
+            wait_for_service_ready(
+                "http://127.0.0.1:8080",
+                poll_interval_seconds=SERVICE_WAIT_MAX_POLL_INTERVAL_SECONDS + 1,
+            )
+        with self.assertRaisesRegex(ValueError, "greater than 0"):
+            wait_for_service_ready(
+                "http://127.0.0.1:8080",
+                poll_interval_seconds=0,
+            )
 
     def test_service_workflow_inventory_uses_fixed_redacted_contract(self):
         observed = {}
