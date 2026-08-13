@@ -24,6 +24,7 @@ if str(SRC) not in sys.path:
 
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.service import SERVICE_SCHEMA_VERSION
+from skill2workflow.service_bootstrap import rotate_service_token
 
 
 FIRST_INGRESS_TOKEN = "security-smoke-ingress-token-0123456789abcdef"
@@ -38,6 +39,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     work_dir = args.work_dir.resolve()
     work_dir.mkdir(parents=True, exist_ok=True)
+    work_dir.chmod(0o700)
     state_dir = work_dir / "state"
     credential_dir = work_dir / "credentials"
     credential_dir.mkdir(exist_ok=True)
@@ -86,7 +88,10 @@ def main(argv=None) -> int:
         )
         connector_file.chmod(0o600)
         connector_file.write_text(SECOND_CONNECTOR_TOKEN, encoding="utf-8")
-        ingress_file.write_text(SECOND_INGRESS_TOKEN, encoding="utf-8")
+        rotate_service_token(
+            ingress_file,
+            token_factory=lambda: SECOND_INGRESS_TOKEN,
+        )
         old_status, _ = _request(port, token=FIRST_INGRESS_TOKEN, idempotency_key="old")
         second_status, _ = _request(port, token=SECOND_INGRESS_TOKEN, idempotency_key="second")
     finally:

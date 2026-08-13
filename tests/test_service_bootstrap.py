@@ -12,8 +12,12 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 from skill2workflow.cli import main
-from skill2workflow.service import load_service_config
-from skill2workflow.service_bootstrap import initialize_service_workspace
+from skill2workflow.service import FileBearerTokenAuthenticator, load_service_config
+from skill2workflow.service_bootstrap import (
+    SERVICE_TOKEN_ROTATION_RESULT_SCHEMA_VERSION,
+    initialize_service_workspace,
+    rotate_service_token,
+)
 
 
 class ServiceBootstrapTests(TestCase):
@@ -96,6 +100,102 @@ class ServiceBootstrapTests(TestCase):
                 initialize_service_workspace(root, token_factory=lambda: "short")
 
             self.assertFalse(root.exists())
+
+    def test_rotate_replaces_valid_token_atomically_without_returning_secret(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            old_token = "old-rotation-token-0123456789abcdef012345"
+            new_token = "new-rotation-token-0123456789abcdef012345"
+            initialize_service_workspace(root, token_factory=lambda: old_token)
+            token_path = root / "secrets" / "ingress-token"
+
+            result = rotate_service_token(token_path, token_factory=lambda: new_token)
+
+            self.assertEqual(
+                result,
+                {
+                    "schema_version": SERVICE_TOKEN_ROTATION_RESULT_SCHEMA_VERSION,
+                    "status": "rotated",
+                    "token_file": str(token_path),
+                },
+            )
+            self.assertNotIn(old_token, json.dumps(result))
+            self.assertNotIn(new_token, json.dumps(result))
+            self.assertEqual(token_path.read_text(encoding="utf-8"), new_token + "\n")
+            self.assertEqual(FileBearerTokenAuthenticator(token_path).authenticate("Bearer " + old_token), (False, "invalid"))
+            self.assertEqual(FileBearerTokenAuthenticator(token_path).authenticate("Bearer " + new_token), (True, ""))
+            if os.name != "nt":
+                self.assertEqual(_mode(token_path), 0o600)
+
+    def test_rotate_rejects_unsafe_or_invalid_inputs_without_mutating_old_token(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            old_token = "old-rotation-token-0123456789abcdef012345"
+            initialize_service_workspace(root, token_factory=lambda: old_token)
+            token_path = root / "secrets" / "ingress-token"
+
+            with self.assertRaisesRegex(ValueError, "at least 32"):
+                rotate_service_token(token_path, token_factory=lambda: "short")
+            self.assertEqual(token_path.read_text(encoding="utf-8"), old_token + "\n")
+
+            token_path.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "group or others"):
+                rotate_service_token(token_path, token_factory=lambda: "n" * 48)
+            token_path.chmod(0o600)
+
+            outside = root / "outside.token"
+            outside.write_text(old_token, encoding="utf-8")
+            outside.chmod(0o600)
+            token_path.unlink()
+            token_path.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "regular non-symlink"):
+                rotate_service_token(token_path, token_factory=lambda: "n" * 48)
+
+    def test_rotate_fails_closed_when_token_path_changes_during_generation(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            old_token = "old-race-token-0123456789abcdef0123456789"
+            initialize_service_workspace(root, token_factory=lambda: old_token)
+            token_path = root / "secrets" / "ingress-token"
+
+            def race_token_factory():
+                replacement = token_path.parent / "replacement.token"
+                replacement.write_text(old_token, encoding="utf-8")
+                replacement.chmod(0o600)
+                os.rename(replacement, token_path)
+                return "new-race-token-0123456789abcdef0123456789"
+
+            with self.assertRaisesRegex(ValueError, "changed while being rotated"):
+                rotate_service_token(token_path, token_factory=race_token_factory)
+
+    def test_service_token_rotate_cli_prints_redacted_result(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            old_token = "old-cli-rotation-token-0123456789abcdef"
+            new_token = "new-cli-rotation-token-0123456789abcdef"
+            initialize_service_workspace(root, token_factory=lambda: old_token)
+            config_path = root / "config" / "service.json"
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "service-token-rotate",
+                        "--config",
+                        str(config_path),
+                    ]
+                )
+
+            result = json.loads(stdout.getvalue())
+            rotated = (root / "secrets" / "ingress-token").read_text(encoding="utf-8").strip()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(result["status"], "rotated")
+        self.assertNotIn(old_token, stdout.getvalue())
+        self.assertNotIn(new_token, stdout.getvalue())
+        self.assertGreaterEqual(len(rotated.encode("utf-8")), 32)
 
     def test_initialize_cleans_partial_workspace_when_config_publication_fails(self):
         with TemporaryDirectory() as temporary:

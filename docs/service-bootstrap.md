@@ -53,6 +53,10 @@ All five fixed checks must pass. See [`service-doctor.md`](service-doctor.md)
 for stable failure codes and the distinction between preflight and live
 readiness.
 
+After installation, use [`service-token-rotation.md`](service-token-rotation.md)
+to rotate the generated ingress credential atomically; do not edit the token
+file in place.
+
 Start the generated configuration directly:
 
 ```bash

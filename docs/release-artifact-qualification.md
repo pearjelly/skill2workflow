@@ -36,6 +36,11 @@ The installed command set also includes the protected `service-resume`,
 `service-schedule-disable`, and owner-only `service-support-bundle` operator
 clients.
 
+The installed command set also includes local `service-token-rotate`; package
+qualification runs it against the generated bootstrap workspace and verifies
+that the new token is usable while neither token value appears in command
+output.
+
 The qualification also starts a strict loopback fixture and makes the installed
 `control-snapshot` command perform one authenticated live fetch. It verifies the
 fixed endpoint, protected token-file path, bounded schema, empty standard output,

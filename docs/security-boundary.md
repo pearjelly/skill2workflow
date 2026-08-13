@@ -29,6 +29,10 @@ chmod 600 /run/secrets/skill2workflow-ingress-token
 
 The process refuses a short token, a symbolic-link or non-regular token path, a token above 16 KiB, or a token file accessible by group or others. Each read is bound to one no-follow regular-file descriptor and rejects path replacement between inspection and open. It rereads the file for every business request, so an atomic replacement rotates the token without restarting the service. Missing, malformed, and incorrect Bearer credentials receive HTTP 401 with the same compact response. If the token provider becomes unavailable, readiness changes to `503 not_ready` and business requests fail closed.
 
+Use the local [`service-token-rotate`](service-token-rotation.md) command for
+that replacement. It rechecks the existing file identity, publishes a new
+owner-only token atomically, and never prints the new or old value.
+
 Service startup also requires the state and connector credential directories to
 be non-symlink directories inaccessible to group or others. Run the read-only
 [`service-doctor`](service-doctor.md) preflight before startup or cutover; it

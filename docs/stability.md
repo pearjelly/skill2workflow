@@ -47,6 +47,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Fixed process-local business-request admission of 16 active handlers, `429`/`Retry-After` rejection, and probe availability documented in `docs/service.md`
 - Local webhook route and response shape documented in `docs/triggers.md`
 - Self-hosted service configuration `skill2workflow-service-0.2.0` and its published JSON Schema
+- Local `service-token-rotate` and `skill2workflow-service-token-rotation-result-0.1.0` preserve owner-only atomic ingress-token replacement without returning the secret
 - Loopback service health/readiness paths and authenticated workflow-trigger boundary documented in `docs/service.md`
 - Authenticated `POST /runs/{run_id}/cancel`, CLI `cancel-run`, terminal `cancelled`, and cooperative safe-point semantics documented in `docs/cancellation.md`
 - Authenticated `POST /runs/{run_id}/resume`, exact boolean decision body, waiting-only conflict behavior, and durable human-gate branch semantics documented in `docs/human-approval.md`

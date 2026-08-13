@@ -21,7 +21,7 @@ from .quickstart import initialize_quickstart_workspace
 from .retention import apply_state_retention, inspect_state_retention
 from .schedules import LocalScheduleRunner
 from .service import load_service_config, serve_runtime_service
-from .service_bootstrap import initialize_service_workspace
+from .service_bootstrap import initialize_service_workspace, rotate_service_token
 from .service_doctor import diagnose_service
 from .service_client import (
     fetch_audit_consistency,
@@ -232,6 +232,12 @@ def main(argv=None) -> int:
     service_init_cmd.add_argument("--root", type=Path, required=True)
     service_init_cmd.add_argument("--host", default="127.0.0.1")
     service_init_cmd.add_argument("--port", type=int, default=8080)
+
+    service_token_rotate_cmd = subparsers.add_parser(
+        "service-token-rotate",
+        help="Atomically rotate the local self-hosted service ingress token",
+    )
+    service_token_rotate_cmd.add_argument("--config", type=Path, required=True)
 
     systemd_unit_cmd = subparsers.add_parser(
         "systemd-unit",
@@ -731,6 +737,11 @@ def main(argv=None) -> int:
                 host=args.host,
                 port=args.port,
             )
+        )
+
+    if args.command == "service-token-rotate":
+        return _service_bootstrap_action(
+            lambda: rotate_service_token(load_service_config(args.config).auth_token_file)
         )
 
     if args.command == "systemd-unit":

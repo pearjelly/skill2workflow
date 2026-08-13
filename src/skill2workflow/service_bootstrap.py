@@ -6,14 +6,18 @@ import json
 import os
 import secrets
 import shutil
+import stat
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
-from .service import SERVICE_SCHEMA_VERSION
+from .service import SERVICE_SCHEMA_VERSION, read_service_bearer_token
 
 
 SERVICE_BOOTSTRAP_RESULT_SCHEMA_VERSION = (
     "skill2workflow-service-bootstrap-result-0.1.0"
+)
+SERVICE_TOKEN_ROTATION_RESULT_SCHEMA_VERSION = (
+    "skill2workflow-service-token-rotation-result-0.1.0"
 )
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
@@ -99,6 +103,59 @@ def initialize_service_workspace(
     }
 
 
+def rotate_service_token(
+    token_file: Path,
+    *,
+    token_factory: Optional[Callable[[], str]] = None,
+) -> Dict[str, object]:
+    """Atomically replace one valid owner-only service ingress token.
+
+    Rotation is intentionally a local filesystem operation.  The running
+    service rereads this file for every request, so a successful replacement
+    invalidates the previous token without requiring a restart.  The new
+    token is never returned by this function or the CLI result.
+    """
+
+    path = Path(token_file)
+    if not path.is_absolute():
+        raise ValueError("service auth token file must be an absolute path")
+    parent = path.parent
+    _require_private_directory(parent, "service auth token directory")
+    original = _require_private_token_file(path)
+    # Read and validate the current value before replacing it.  This keeps a
+    # broken or operator-replaced file fail-closed instead of silently
+    # recovering from an unknown credential state.
+    read_service_bearer_token(path)
+
+    token = (token_factory or _new_ingress_token)()
+    _validate_token(token)
+    temporary = parent / f".{path.name}.rotate-{secrets.token_hex(8)}"
+    try:
+        _write_private_file(temporary, token + "\n")
+        current = path.lstat()
+        if (
+            stat.S_ISLNK(current.st_mode)
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_dev != original.st_dev
+            or current.st_ino != original.st_ino
+        ):
+            raise ValueError("service auth token file changed while being rotated")
+        os.replace(temporary, path)
+        os.chmod(path, 0o600)
+        _fsync_directory(parent)
+    finally:
+        try:
+            temporary.unlink()
+        except FileNotFoundError:
+            pass
+
+    return {
+        "schema_version": SERVICE_TOKEN_ROTATION_RESULT_SCHEMA_VERSION,
+        "status": "rotated",
+        "token_file": str(path),
+    }
+
+
 def _new_ingress_token() -> str:
     return secrets.token_urlsafe(32)
 
@@ -120,6 +177,40 @@ def _private_directory(path: Path) -> Path:
 
 def _owner_only_directory(path: Path) -> None:
     os.chmod(path, 0o700)
+
+
+def _require_private_directory(path: Path, label: str) -> None:
+    try:
+        details = Path(path).lstat()
+    except OSError as error:
+        raise ValueError(f"{label} must exist") from error
+    if stat.S_ISLNK(details.st_mode) or not stat.S_ISDIR(details.st_mode):
+        raise ValueError(f"{label} must be a non-symlink directory")
+    if stat.S_IMODE(details.st_mode) & 0o077:
+        raise ValueError(f"{label} must not be accessible by group or others")
+
+
+def _require_private_token_file(path: Path):
+    try:
+        details = path.lstat()
+    except OSError as error:
+        raise ValueError("service auth token file is unavailable") from error
+    if stat.S_ISLNK(details.st_mode) or not stat.S_ISREG(details.st_mode):
+        raise ValueError("service auth token file must be a regular non-symlink file")
+    if stat.S_IMODE(details.st_mode) & 0o077:
+        raise ValueError("service auth token file must not be accessible by group or others")
+    return details
+
+
+def _fsync_directory(path: Path) -> None:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    descriptor = os.open(path, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _write_private_file(path: Path, value: str) -> None:

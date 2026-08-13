@@ -42,10 +42,12 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("GET /api/v1/workflow-diffs", guide)
         self.assertIn("remote-workflow-diff.md", guide)
         self.assertIn("service-workflow-diff", guide)
+        self.assertIn("service-token-rotation.md", guide)
+        self.assertIn("service-token-rotate", guide)
 
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-88 are complete", readme)
+        self.assertIn("Delivery Loops 1-89 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

@@ -8,6 +8,7 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added local `service-token-rotate` for atomic owner-only ingress-token replacement without secret output or service restart.
 - Added atomic lifecycle/runtime audit batches and a bounded `audit-consistency`
   report for missing, duplicate, or unexpected projections between durable run
   state and the control-plane audit store.

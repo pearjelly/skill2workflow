@@ -121,6 +121,18 @@ class PackageSmokeTests(TestCase):
                             ],
                         }
                     )
+                if "service-token-rotate" in command and "--help" not in command:
+                    config_path = Path(command[command.index("--config") + 1])
+                    config = json.loads(config_path.read_text(encoding="utf-8"))
+                    secret_path = Path(config["auth"]["token_file"])
+                    secret_path.write_text("r" * 48 + "\n", encoding="utf-8")
+                    return json.dumps(
+                        {
+                            "schema_version": "skill2workflow-service-token-rotation-result-0.1.0",
+                            "status": "rotated",
+                            "token_file": str(secret_path),
+                        }
+                    )
                 if "systemd-unit" in command:
                     output_path = Path(command[command.index("--output") + 1])
                     config_path = Path(command[command.index("--config") + 1])
@@ -151,6 +163,7 @@ class PackageSmokeTests(TestCase):
         self.assertEqual(result["install_mode"], "wheel")
         self.assertTrue(result["isolated_from_source"])
         self.assertTrue(result["service_bootstrap_status"])
+        self.assertTrue(result["service_token_rotation_status"])
         self.assertTrue(result["service_doctor_status"])
         self.assertTrue(result["systemd_unit_status"])
         self.assertTrue(result["live_snapshot_status"])

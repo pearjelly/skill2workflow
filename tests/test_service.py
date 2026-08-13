@@ -40,6 +40,7 @@ from skill2workflow.service_client import (
     fetch_workflow_diff,
     post_workflow_trigger,
 )
+from skill2workflow.service_bootstrap import rotate_service_token
 
 
 AUTH_TOKEN = "loop42-test-bearer-token-0123456789abcdef"
@@ -1917,7 +1918,10 @@ class RuntimeServiceTests(TestCase):
             invalid_status, _ = _post_json(url, {}, token="wrong-token-value-that-is-long-enough")
             accepted_status, accepted = _post_json(url, {}, token=AUTH_TOKEN)
             rotated_token = "rotated-loop42-bearer-token-0123456789abcdef"
-            config.auth_token_file.write_text(rotated_token, encoding="utf-8")
+            rotate_service_token(
+                config.auth_token_file,
+                token_factory=lambda: rotated_token,
+            )
             old_status, _ = _post_json(url, {}, token=AUTH_TOKEN)
             new_status, _ = _post_json(
                 url,

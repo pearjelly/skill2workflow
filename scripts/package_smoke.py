@@ -35,6 +35,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "run-published",
     "quickstart",
     "service-init",
+    "service-token-rotate",
     "service-doctor",
     "systemd-unit",
     "service",
@@ -197,6 +198,25 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or bootstrap_secret in bootstrap_output
     ):
         raise RuntimeError("installed service-init did not preserve secret redaction")
+    rotate_output = _run(
+        [
+            str(console_script),
+            "service-token-rotate",
+            "--config",
+            str(bootstrap_config),
+        ],
+        cwd=isolated_dir,
+    )
+    rotate_result = json.loads(rotate_output)
+    rotated_secret = bootstrap_secret_path.read_text(encoding="utf-8").strip()
+    if (
+        rotate_result.get("status") != "rotated"
+        or rotated_secret == bootstrap_secret
+        or len(rotated_secret.encode("utf-8")) < 32
+        or rotated_secret in rotate_output
+    ):
+        raise RuntimeError("installed service-token-rotate did not preserve secret redaction")
+    bootstrap_secret = rotated_secret
     doctor_output = _run(
         [
             str(console_script),
@@ -276,6 +296,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "isolated_from_source": True,
         "required_console_commands": list(REQUIRED_CONSOLE_COMMANDS),
         "service_bootstrap_status": True,
+        "service_token_rotation_status": True,
         "service_doctor_status": True,
         "systemd_unit_status": systemd_unit_status,
         "live_snapshot_status": live_snapshot_status,

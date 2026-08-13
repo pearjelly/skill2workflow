@@ -198,6 +198,9 @@ skill2workflow service-workflow-diff workflow_approval_flow \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-token-rotate \
+  --config /srv/skill2workflow/config/service.json
+
 skill2workflow service-trigger workflow_approval_flow \
   --version production \
   --service-url https://service.example \
@@ -221,6 +224,11 @@ skill2workflow service-support-bundle \
   --auth-token-file /run/secrets/skill2workflow-ingress-token \
   --output /var/lib/skill2workflow/support-bundle.json
 ```
+
+The local `service-token-rotate` command replaces the owner-only ingress token
+atomically without printing it or restarting the service. See
+[`docs/service-token-rotation.md`](docs/service-token-rotation.md) for the
+secret-handling boundary.
 
 Run the interrupted-run crash recovery evidence:
 
