@@ -356,6 +356,27 @@ class RecurringSchedulePersistenceTests(TestCase):
 
         self.assertEqual(len(rows), 1)
 
+    def test_stale_claim_recovery_accepts_a_bounded_batch(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = RecurringScheduleStore(state_dir)
+            store.add(_recurring_definition())
+            store.add(_recurring_definition(extra_schedule={"id": "schedule_second"}))
+            first = RecurringScheduleDispatcher(state_dir, owner_id="owner-a", lease_seconds=5)
+            self.assertTrue(first.try_acquire(now_epoch=1000))
+            claimed = first.claim_due("2026-08-11T00:00:00Z", now_epoch=1001)
+            second = RecurringScheduleDispatcher(state_dir, owner_id="owner-b", lease_seconds=5)
+            self.assertTrue(second.try_acquire(now_epoch=1007))
+
+            first_batch = second.recover_stale_claims(now_epoch=1007, max_items=1)
+            second_batch = second.recover_stale_claims(now_epoch=1007, max_items=1)
+            records = RecurringScheduleStore(state_dir).list_dispatches()
+
+        self.assertEqual(len(claimed), 2)
+        self.assertEqual(first_batch, 1)
+        self.assertEqual(second_batch, 1)
+        self.assertEqual([record["status"] for record in records], ["uncertain", "uncertain"])
+
 
 class _NoStaleClaimFetchAllCursor:
     def __init__(self, cursor):

@@ -105,7 +105,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - File-backed single-team Bearer and execution-time directory credential contracts documented in `docs/security-boundary.md`
 - Durable recurring schedule input contract `skill2workflow-schedule-0.2.0` and its published JSON Schema
 - Recurring dispatch states, missed-run policies, and single-SQLite lease semantics documented in `docs/recurring-scheduling.md`
-- Stale recurring-dispatch claim recovery streams eligible SQLite rows inside the existing recovery transaction; `uncertain` semantics, no-automatic-retry behavior, and the recovery count remain unchanged
+- Long-running SQLite service takeover recovery marks stale recurring-dispatch claims `uncertain` in fixed 100-row transactions and renews the lease between full batches; direct dispatcher and CLI complete-batch compatibility, no-automatic-retry behavior, and recovery counts remain unchanged
 - State backup manifest `skill2workflow-state-backup-0.1.0`, current `skill2workflow-sqlite-layout-0.1.0`, and verified offline restore contract documented in `docs/backup-restore.md`
 - Local `backup-list` contract `skill2workflow-state-backup-list-0.1.0` provides a read-only 1-1000 newest-set inventory with fixed integrity, size, and layout metadata; it does not delete or upload backups
 - Local `backup-retention-plan` contracts `skill2workflow-backup-retention-policy-0.1.0` and `skill2workflow-backup-retention-plan-0.1.0` provide a read-only, complete-inventory-only expiration plan with an explicit cutoff and minimum-valid-backup floor; truncation blocks candidates and no backup is mutated

@@ -957,8 +957,10 @@ class RecurringScheduleDispatcher:
             result["processed"] = len(claims)
         return result
 
-    def recover_stale_claims(self, now_epoch: float) -> int:
+    def recover_stale_claims(self, now_epoch: float, max_items: int = None) -> int:
         now_value = float(now_epoch)
+        if max_items is not None:
+            _validate_dispatch_limit(max_items)
         with self.store._connection() as connection:
             connection.execute("begin immediate")
             if not self._owns_lease(connection, now_value):
@@ -974,6 +976,8 @@ class RecurringScheduleDispatcher:
                     (_json_text(record), str(dispatch_id)),
                 )
                 recovered += 1
+                if max_items is not None and recovered >= max_items:
+                    break
         return recovered
 
     def _finish_claim(

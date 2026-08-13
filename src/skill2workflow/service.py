@@ -102,7 +102,7 @@ MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 REQUEST_SOCKET_TIMEOUT_SECONDS = 5.0
 WORKFLOW_DEADLINE_SWEEP_INTERVAL_SECONDS = 1.0
-MAX_SERVICE_DISPATCH_BATCH = 100
+MAX_SERVICE_SCHEDULER_BATCH = 100
 _MUTATING_REQUEST_ROUTES = frozenset(
     {
         "workflow_trigger",
@@ -577,7 +577,7 @@ class ServiceScheduleLoop:
                         self.dispatcher.dispatch_due(
                             datetime.now(timezone.utc).isoformat(),
                             now_epoch=now_epoch,
-                            max_items=MAX_SERVICE_DISPATCH_BATCH,
+                            max_items=MAX_SERVICE_SCHEDULER_BATCH,
                         )
                     finally:
                         if self.telemetry is not None:
@@ -615,7 +615,15 @@ class ServiceScheduleLoop:
         )
 
     def _recover_after_acquire(self, now_epoch: float) -> None:
-        self.dispatcher.recover_stale_claims(now_epoch=now_epoch)
+        while True:
+            recovered = self.dispatcher.recover_stale_claims(
+                now_epoch=now_epoch,
+                max_items=MAX_SERVICE_SCHEDULER_BATCH,
+            )
+            if recovered < MAX_SERVICE_SCHEDULER_BATCH:
+                break
+            if not self.dispatcher.renew(now_epoch=time.time()):
+                raise SchedulerLeaseError("scheduler lease was lost during stale-claim recovery")
         self.dispatcher.control_plane.recover_interrupted_runs()
         self._sweep_workflow_deadlines(now_epoch, force=True)
 

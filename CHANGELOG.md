@@ -49,6 +49,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Long-running service scheduler passes now claim at most 100 recurring
   dispatches, keeping backlog processing batch-bounded while preserving the
   existing lease and claim-before-execute semantics.
+- Long-running service takeover now marks stale recurring claims uncertain in
+  fixed 100-row transactions and renews the lease between full batches,
+  preserving no-automatic-retry semantics while bounding recovery writes.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.

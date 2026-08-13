@@ -344,16 +344,39 @@ class RuntimeServiceTests(TestCase):
     def test_scheduler_lease_recovery_runs_workflow_deadline_sweep(self):
         with TemporaryDirectory() as tmp:
             scheduler = ServiceScheduleLoop(Path(tmp))
-            with patch.object(scheduler.dispatcher, "recover_stale_claims") as recover, patch.object(
+            with patch.object(scheduler.dispatcher, "recover_stale_claims", return_value=2) as recover, patch.object(
                 scheduler.dispatcher.control_plane, "recover_interrupted_runs"
             ) as interrupted, patch.object(
                 scheduler.dispatcher.control_plane, "expire_workflow_deadlines"
             ) as expire:
                 scheduler._recover_after_acquire(123.0)
 
-        recover.assert_called_once_with(now_epoch=123.0)
+        recover.assert_called_once_with(now_epoch=123.0, max_items=100)
         interrupted.assert_called_once_with()
         expire.assert_called_once()
+
+    def test_scheduler_lease_recovery_renews_between_full_stale_claim_batches(self):
+        with TemporaryDirectory() as tmp:
+            scheduler = ServiceScheduleLoop(Path(tmp))
+            with patch.object(
+                scheduler.dispatcher,
+                "recover_stale_claims",
+                side_effect=[100, 2],
+            ) as recover, patch.object(
+                scheduler.dispatcher, "renew", return_value=True
+            ) as renew, patch.object(
+                scheduler.dispatcher.control_plane, "recover_interrupted_runs"
+            ), patch.object(
+                scheduler.dispatcher.control_plane, "expire_workflow_deadlines"
+            ):
+                scheduler._recover_after_acquire(123.0)
+
+        self.assertEqual(recover.call_count, 2)
+        self.assertEqual(
+            [call.kwargs["max_items"] for call in recover.call_args_list],
+            [100, 100],
+        )
+        renew.assert_called_once()
 
     def test_running_scheduler_expires_waiting_workflow_deadline(self):
         with TemporaryDirectory() as tmp:
