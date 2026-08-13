@@ -38,6 +38,7 @@ from skill2workflow.service_client import (
     post_workflow_release,
     post_workflow_promotion,
     post_workflow_deprecation,
+    fetch_workflow_inventory,
     fetch_workflow_diff,
     post_workflow_trigger,
 )
@@ -1966,6 +1967,81 @@ class RuntimeServiceTests(TestCase):
             sum(event.get("type") == "workflow_deprecated" for event in audit),
             1,
         )
+        self.assertFalse(thread.is_alive())
+
+    def test_remote_workflow_inventory_is_authenticated_bounded_and_read_only(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            first = _workflow()
+            second = json.loads(json.dumps(first))
+            second["workflow"]["version"] = "0.2.0"
+            control.publish_workflow(first)
+            control.publish_workflow(second)
+            control.promote_workflow("workflow_service", "0.1.0")
+            control.deprecate_workflow("workflow_service", "0.1.0")
+            audit_count = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            url = f"{base_url}/api/v1/workflows"
+            try:
+                denied_status, denied = _get_json(url)
+                malformed_status, malformed = _get_raw_get(
+                    url,
+                    token=AUTH_TOKEN,
+                    body=b"{}",
+                )
+                inventory = fetch_workflow_inventory(
+                    base_url,
+                    config.auth_token_file,
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            audit_after = len(LocalControlPlane(state_dir, storage="sqlite").list_audit_events())
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "workflow inventory request must not include a body"})
+        self.assertEqual(
+            set(inventory),
+            {"schema_version", "summary", "versions", "window"},
+        )
+        self.assertEqual(inventory["summary"]["total"], 2)
+        self.assertEqual(
+            inventory["summary"]["status_counts"],
+            {"published": 1, "deprecated": 1, "other": 0},
+        )
+        self.assertEqual(inventory["window"]["returned"], 2)
+        self.assertEqual(
+            {version["version"] for version in inventory["versions"]},
+            {"0.1.0", "0.2.0"},
+        )
+        deprecated = next(version for version in inventory["versions"] if version["version"] == "0.1.0")
+        self.assertEqual(deprecated["status"], "deprecated")
+        self.assertEqual(deprecated["aliases"], [])
+        for version in inventory["versions"]:
+            self.assertNotIn("artifact", version)
+            self.assertNotIn("name", version)
+        self.assertEqual(audit_after, audit_count)
         self.assertFalse(thread.is_alive())
 
     def test_business_routes_require_rotatable_bearer_auth_and_write_compact_audit(self):

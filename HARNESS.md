@@ -198,6 +198,10 @@ skill2workflow service-workflow-deprecate workflow_approval_flow \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-workflows \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
 skill2workflow service-workflow-diff workflow_approval_flow \
   --from-version 0.1.0 --to-version 0.2.0 \
   --service-url https://service.example \

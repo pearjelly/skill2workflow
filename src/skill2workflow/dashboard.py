@@ -16,6 +16,7 @@ SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
 RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
 RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
 SUPPORT_BUNDLE_SCHEMA_VERSION = "skill2workflow-support-bundle-0.1.0"
+WORKFLOW_INVENTORY_SCHEMA_VERSION = "skill2workflow-workflow-inventory-0.1.0"
 RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list-0.1.0"
 RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION = "skill2workflow-recurring-schedule-action-0.1.0"
 RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
@@ -27,6 +28,7 @@ MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
 MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES = 64
+MAX_WORKFLOW_INVENTORY_ITEMS = 100
 
 
 def build_control_snapshot(
@@ -355,6 +357,114 @@ def build_workflow_artifact_report_from_control(
     }
 
 
+def build_workflow_inventory_from_control(
+    control: LocalControlPlane,
+    max_items: int = MAX_WORKFLOW_INVENTORY_ITEMS,
+) -> Dict[str, object]:
+    """Project bounded published-version metadata without workflow content."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or max_items <= 0
+        or max_items > MAX_WORKFLOW_INVENTORY_ITEMS
+    ):
+        raise ValueError("max_items must be a positive bounded integer")
+
+    bounded_sqlite = hasattr(control.store, "snapshot_window")
+    if bounded_sqlite:
+        window = control.store.snapshot_window(max_items)
+        total = int(window.get("workflow_total", 0))
+        selected = list(window.get("workflows", []))
+        raw_counts = window.get("workflow_status_counts", {})
+    else:
+        all_workflows = control.list_workflows()
+        ordered = sorted(
+            all_workflows,
+            key=lambda record: (
+                str(record.get("published_at", "")),
+                str(record.get("workflow_id", "")),
+                str(record.get("version", "")),
+            ),
+        )
+        total = len(ordered)
+        selected = _tail(ordered, max_items)
+        raw_counts = _status_counts(ordered)
+
+    status_counts = {"published": 0, "deprecated": 0, "other": 0}
+    for status, count in (raw_counts.items() if isinstance(raw_counts, dict) else ()):
+        normalized = status if status in {"published", "deprecated"} else "other"
+        status_counts[normalized] += _safe_non_negative_int(count)
+
+    versions = []
+    for record in selected:
+        if not isinstance(record, dict):
+            raise ValueError("workflow inventory record is invalid")
+        workflow_id = _inventory_reference(record.get("workflow_id"), "workflow_id")
+        version = _inventory_reference(record.get("version"), "version")
+        checksum = record.get("checksum")
+        if (
+            not isinstance(checksum, str)
+            or len(checksum) != 64
+            or any(char not in "0123456789abcdef" for char in checksum)
+        ):
+            raise ValueError("workflow inventory checksum is invalid")
+        status = record.get("status")
+        status = status if status in {"published", "deprecated"} else "other"
+        aliases = record.get("aliases", [])
+        if not isinstance(aliases, list) or len(aliases) > 16:
+            raise ValueError("workflow inventory aliases are invalid")
+        normalized_aliases = []
+        for alias in aliases:
+            if not isinstance(alias, str) or not alias or len(alias) > 64:
+                raise ValueError("workflow inventory alias is invalid")
+            if any(
+                ord(char) < 0x20
+                or ord(char) == 0x7F
+                or char not in "abcdefghijklmnopqrstuvwxyz0123456789._-"
+                for char in alias
+            ):
+                raise ValueError("workflow inventory alias is invalid")
+            normalized_aliases.append(alias)
+        versions.append(
+            {
+                "workflow_id": workflow_id,
+                "version": version,
+                "status": status,
+                "aliases": sorted(set(normalized_aliases)),
+                "checksum": checksum,
+            }
+        )
+
+    return {
+        "schema_version": WORKFLOW_INVENTORY_SCHEMA_VERSION,
+        "summary": {
+            "total": total,
+            "status_counts": status_counts,
+        },
+        "versions": versions,
+        "window": {
+            "max_items": max_items,
+            "total": total,
+            "returned": len(versions),
+            "truncated": len(versions) < total,
+        },
+    }
+
+
+def _inventory_reference(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value or len(value) > 128:
+        raise ValueError(f"workflow inventory {field} is invalid")
+    if any(
+        ord(char) < 0x20
+        or ord(char) == 0x7F
+        or char in {"/", "?", "#"}
+        for char in value
+    ):
+        raise ValueError(f"workflow inventory {field} is invalid")
+    return value
+
+
 def build_support_bundle_from_control(
     control: LocalControlPlane,
     telemetry,
@@ -390,6 +500,7 @@ def build_support_bundle_from_control(
     http_requests.pop("workflow_release", None)
     http_requests.pop("workflow_promotion", None)
     http_requests.pop("workflow_deprecation", None)
+    http_requests.pop("workflow_inventory", None)
     http_requests.pop("workflow_diff", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests

@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-90 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-91 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -894,6 +894,11 @@ the installed `service-workflow-deprecate` command retires one published version
 through the authenticated service, removes its stable aliases, preserves the
 immutable artifact, and returns a fixed redacted summary with idempotent replay.
 
+Loop 91 adds [remote Workflow inventory](docs/remote-workflow-inventory.md):
+the installed `service-workflows` command discovers bounded published-version
+metadata, lifecycle status, aliases, and checksums without exporting Workflow
+content, artifact paths, or audit data.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -924,6 +929,7 @@ See:
 - `docs/remote-workflow-promotion.md`
 - `docs/remote-workflow-diff.md`
 - `docs/remote-workflow-deprecation.md`
+- `docs/remote-workflow-inventory.md`
 - `docs/service-token-rotation.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`

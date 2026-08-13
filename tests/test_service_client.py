@@ -26,6 +26,7 @@ from skill2workflow.service_client import (
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
     fetch_workflow_artifact_report,
+    fetch_workflow_inventory,
     fetch_backup_readiness,
     fetch_audit_integrity,
     fetch_runtime_info,
@@ -44,6 +45,55 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_service_workflow_inventory_uses_fixed_redacted_contract(self):
+        observed = {}
+        payload = {
+            "schema_version": "skill2workflow-workflow-inventory-0.1.0",
+            "summary": {
+                "total": 1,
+                "status_counts": {"published": 1, "deprecated": 0, "other": 0},
+            },
+            "versions": [
+                {
+                    "workflow_id": "workflow_remote_release",
+                    "version": "1.2.3",
+                    "status": "published",
+                    "aliases": ["production"],
+                    "checksum": "a" * 64,
+                }
+            ],
+            "window": {"max_items": 100, "total": 1, "returned": 1, "truncated": False},
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["content_length"] = self.headers.get("Content-Length")
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_workflow_inventory(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed["path"], "/api/v1/workflows")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertFalse(thread.is_alive())
+
     def test_service_workflow_diff_uses_fixed_redacted_contract(self):
         observed = {}
         payload = {

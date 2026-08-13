@@ -16,6 +16,8 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
+    MAX_WORKFLOW_INVENTORY_ITEMS,
+    WORKFLOW_INVENTORY_SCHEMA_VERSION,
     RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION,
     RUN_DETAIL_SCHEMA_VERSION,
     RUN_LIST_SCHEMA_VERSION,
@@ -61,6 +63,7 @@ MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
+MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES = 64 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 
@@ -198,6 +201,23 @@ def fetch_workflow_artifact_report(
         max_response_bytes=MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
     )
     _validate_workflow_artifact_report(payload)
+    return payload
+
+
+def fetch_workflow_inventory(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch bounded published-version metadata without workflow content."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/workflows",
+        conflict_message="workflow inventory unavailable",
+        max_response_bytes=MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
+    )
+    _validate_workflow_inventory(payload)
     return payload
 
 
@@ -908,6 +928,70 @@ def _validate_workflow_artifact_report(payload: Dict[str, object]) -> None:
     if payload["status"] != ("clean" if summary["issue_count"] == 0 else "attention"):
         raise ServiceActionError()
     if summary["truncated"] != (len(issues) < summary["issue_count"]):
+        raise ServiceActionError()
+
+
+def _validate_workflow_inventory(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed redacted workflow inventory contract."""
+
+    if set(payload) != {"schema_version", "summary", "versions", "window"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != WORKFLOW_INVENTORY_SCHEMA_VERSION:
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != {"total", "status_counts"}
+        or not _is_non_negative_integer(summary.get("total"))
+    ):
+        raise ServiceActionError()
+    status_counts = summary.get("status_counts")
+    if (
+        not isinstance(status_counts, dict)
+        or set(status_counts) != {"published", "deprecated", "other"}
+        or any(not _is_non_negative_integer(status_counts.get(key)) for key in status_counts)
+    ):
+        raise ServiceActionError()
+    versions = payload.get("versions")
+    version_fields = {"workflow_id", "version", "status", "aliases", "checksum"}
+    if not isinstance(versions, list) or len(versions) > MAX_WORKFLOW_INVENTORY_ITEMS:
+        raise ServiceActionError()
+    for version in versions:
+        if (
+            not isinstance(version, dict)
+            or set(version) != version_fields
+            or not isinstance(version.get("workflow_id"), str)
+            or not version.get("workflow_id")
+            or not isinstance(version.get("version"), str)
+            or not version.get("version")
+            or version.get("status") not in {"published", "deprecated", "other"}
+            or not isinstance(version.get("aliases"), list)
+            or len(version.get("aliases")) > 16
+            or any(
+                not isinstance(alias, str) or not alias
+                for alias in version.get("aliases")
+            )
+            or not _is_hex_digest(version.get("checksum"))
+        ):
+            raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_items", "total", "returned", "truncated"}
+        or not _is_non_negative_integer(window.get("max_items"))
+        or window.get("max_items") < 1
+        or window.get("max_items") > MAX_WORKFLOW_INVENTORY_ITEMS
+        or not _is_non_negative_integer(window.get("total"))
+        or not _is_non_negative_integer(window.get("returned"))
+        or window.get("returned") != len(versions)
+        or window.get("returned") > window.get("total")
+        or window.get("returned") > window.get("max_items")
+        or not isinstance(window.get("truncated"), bool)
+        or window.get("truncated") != (window.get("returned") < window.get("total"))
+        or window.get("total") != summary.get("total")
+    ):
+        raise ServiceActionError()
+    if sum(status_counts.values()) != summary["total"]:
         raise ServiceActionError()
 
 

@@ -30,6 +30,7 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
+    MAX_WORKFLOW_INVENTORY_ITEMS,
     MAX_RUN_DETAIL_EVENTS,
     MAX_RUN_LIST_ITEMS,
     MAX_SUPPORT_BUNDLE_BYTES,
@@ -37,6 +38,7 @@ from .dashboard import (
     build_recurring_schedule_list_from_store,
     build_recurring_schedule_dispatch_list_from_store,
     build_workflow_artifact_report_from_control,
+    build_workflow_inventory_from_control,
     build_run_detail_from_control,
     build_run_list_from_control,
     build_support_bundle_from_control,
@@ -78,6 +80,7 @@ MAX_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
+MAX_WORKFLOW_INVENTORY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
@@ -555,6 +558,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_audit_integrity()
                 elif self.command == "GET" and path == "/api/v1/runtime-info":
                     self._handle_runtime_info()
+                elif self.command == "GET" and path == "/api/v1/workflows":
+                    self._handle_workflow_inventory()
                 elif self.command == "POST" and path == "/api/v1/workflow-releases":
                     self._handle_workflow_release()
                 elif self.command == "POST" and path == "/api/v1/workflow-promotions":
@@ -987,6 +992,50 @@ def _handler_for(service: RuntimeService):
                     raise ValueError("workflow artifact report exceeds response limit")
             except (ValueError, OSError, sqlite3.Error):
                 self._send_json(503, {"error": "workflow artifact report unavailable"})
+                return
+            self._send_json(200, payload)
+
+        def _handle_workflow_inventory(self):
+            """Serve bounded published-version metadata without workflow content."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "workflow inventory request must not include a body"},
+                )
+                return
+            try:
+                payload = build_workflow_inventory_from_control(
+                    service.control_plane,
+                    max_items=MAX_WORKFLOW_INVENTORY_ITEMS,
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_WORKFLOW_INVENTORY_RESPONSE_BYTES:
+                    raise ValueError("workflow inventory exceeds response limit")
+            except (ValueError, OSError, sqlite3.Error):
+                self._send_json(503, {"error": "workflow inventory unavailable"})
                 return
             self._send_json(200, payload)
 
@@ -1740,6 +1789,8 @@ def _request_route(method: str, path: str) -> str:
         return "audit_integrity"
     if method == "GET" and path == "/api/v1/runtime-info":
         return "runtime_info"
+    if method == "GET" and path == "/api/v1/workflows":
+        return "workflow_inventory"
     if method == "POST" and path == "/api/v1/workflow-releases":
         return "workflow_release"
     if method == "POST" and path == "/api/v1/workflow-promotions":

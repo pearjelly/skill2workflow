@@ -14,6 +14,9 @@ release; Roadmap loop completion alone does not publish a new version.
   `service-workflow-deprecate` client, with idempotent SQLite status/alias
   retirement, one audit event, immutable artifact preservation, and a fixed
   redacted response.
+- Added authenticated remote Workflow inventory at `GET /api/v1/workflows`
+  and the installed `service-workflows` client, with fixed redacted version
+  metadata, lifecycle counts, 100-item/64 KiB bounds, and no-write semantics.
 - Added atomic lifecycle/runtime audit batches and a bounded `audit-consistency`
   report for missing, duplicate, or unexpected projections between durable run
   state and the control-plane audit store.

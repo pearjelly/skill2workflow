@@ -30,6 +30,7 @@ The installed command set also includes the protected `service-resume`,
 `service-audit-integrity`, bounded `service-runtime-info`, protected
 `service-workflow-publish`, protected
 `service-workflow-promote`, protected
+`service-workflows`, protected
 `service-workflow-diff`, protected
 `service-workflow-deprecate`, protected
 `service-trigger`, protected

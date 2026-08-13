@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/workflow-inventory-0.1.0.json",
+  "title": "skill2workflow redacted published Workflow inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "summary", "versions", "window"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-workflow-inventory-0.1.0"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "status_counts"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "status_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["published", "deprecated", "other"],
+          "properties": {
+            "published": {"type": "integer", "minimum": 0},
+            "deprecated": {"type": "integer", "minimum": 0},
+            "other": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "versions": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workflow_id", "version", "status", "aliases", "checksum"],
+        "properties": {
+          "workflow_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "version": {"type": "string", "minLength": 1, "maxLength": 128},
+          "status": {"type": "string", "enum": ["published", "deprecated", "other"]},
+          "aliases": {
+            "type": "array",
+            "maxItems": 16,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1, "maxLength": 64}
+          },
+          "checksum": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_items", "total", "returned", "truncated"],
+      "properties": {
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 100},
+        "total": {"type": "integer", "minimum": 0},
+        "returned": {"type": "integer", "minimum": 0, "maximum": 100},
+        "truncated": {"type": "boolean"}
+      }
+    }
+  }
+}

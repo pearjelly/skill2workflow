@@ -606,6 +606,45 @@ class CliTests(TestCase):
             "0.2.0",
         )
 
+    def test_service_workflows_command_prints_inventory(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-workflow-inventory-0.1.0",
+            "summary": {
+                "total": 1,
+                "status_counts": {"published": 1, "deprecated": 0, "other": 0},
+            },
+            "versions": [
+                {
+                    "workflow_id": "workflow_demo",
+                    "version": "0.1.0",
+                    "status": "published",
+                    "aliases": ["production"],
+                    "checksum": "a" * 64,
+                }
+            ],
+            "window": {"max_items": 100, "total": 1, "returned": 1, "truncated": False},
+        }
+        with patch(
+            "skill2workflow.cli.fetch_workflow_inventory",
+            return_value=expected,
+        ) as inventory:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-workflows",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        inventory.assert_called_once_with("https://service.example", token_file)
+
     def test_service_workflow_deprecate_command_uses_version_options(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

@@ -28,6 +28,7 @@ from .service_client import (
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
     fetch_workflow_artifact_report,
+    fetch_workflow_inventory,
     fetch_backup_readiness,
     fetch_audit_integrity,
     fetch_runtime_info,
@@ -396,6 +397,13 @@ def main(argv=None) -> int:
     )
     service_runtime_cmd.add_argument("--service-url", required=True)
     service_runtime_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_workflows_cmd = subparsers.add_parser(
+        "service-workflows",
+        help="List bounded published Workflow DSL versions through the authenticated service",
+    )
+    service_workflows_cmd.add_argument("--service-url", required=True)
+    service_workflows_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_diff_cmd = subparsers.add_parser(
         "service-workflow-diff",
@@ -910,6 +918,14 @@ def main(argv=None) -> int:
     if args.command == "service-runtime-info":
         return _service_action(
             lambda: fetch_runtime_info(
+                args.service_url,
+                args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-workflows":
+        return _service_action(
+            lambda: fetch_workflow_inventory(
                 args.service_url,
                 args.auth_token_file,
             )
