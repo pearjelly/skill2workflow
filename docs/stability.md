@@ -15,6 +15,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - CLI command names documented in `README.md` and `HARNESS.md`
 - Example workflow fixture validity under `examples/workflows/`
 - Published workflow artifact immutability
+- Control-plane workflow version aliases and the `promote`/trigger resolution contract documented in `docs/triggers.md`
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`

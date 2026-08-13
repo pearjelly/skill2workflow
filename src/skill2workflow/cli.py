@@ -94,6 +94,15 @@ def main(argv=None) -> int:
     deprecate_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     deprecate_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
+    promote_cmd = subparsers.add_parser(
+        "promote", help="Point a stable alias at a published workflow version"
+    )
+    promote_cmd.add_argument("workflow_id")
+    promote_cmd.add_argument("--version", required=True)
+    promote_cmd.add_argument("--alias", default="production")
+    promote_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    promote_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
     workflows_cmd = subparsers.add_parser("workflows", help="List published workflow versions")
     workflows_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     workflows_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
@@ -451,6 +460,13 @@ def main(argv=None) -> int:
         return _control_action(
             lambda: LocalControlPlane(args.state_dir, storage=args.storage).deprecate_workflow(
                 args.workflow_id, args.version
+            )
+        )
+
+    if args.command == "promote":
+        return _control_action(
+            lambda: LocalControlPlane(args.state_dir, storage=args.storage).promote_workflow(
+                args.workflow_id, args.version, alias=args.alias
             )
         )
 

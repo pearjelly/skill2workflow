@@ -334,15 +334,16 @@ Implemented:
   - marks invalid graph connections in the UI
 - Minimal local control plane
   - publishes immutable workflow artifacts
+  - promotes published versions behind bounded control-plane aliases such as `production`
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions
-  - triggers published workflow versions through a compact local API envelope
+  - triggers published workflow versions or stable aliases through a compact local API envelope
   - serves local webhook POST requests through the same published trigger boundary
   - runs deterministic one-shot local schedules through the same published trigger boundary
   - resumes waiting published runs
   - lists and shows run state through control-plane commands
   - keeps run state bound to workflow id and version
-  - records workflow publish, deprecate, and run events in JSONL or SQLite audit storage
+  - records workflow publish, promote, deprecate, and run events in JSONL or SQLite audit storage
   - adds trigger metadata to `run_started` audit events for triggered runs
   - filters audit events by workflow id, version, run id, and event type
   - verifies the current SQLite audit chain with the payload-free `audit-verify` command

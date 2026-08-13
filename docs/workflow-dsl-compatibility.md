@@ -40,6 +40,11 @@ Within the `0.1.x` release line:
   them may retain the historical open-object behavior, while current
   publishers and trigger boundaries validate the documented bounded subset.
 
+Workflow version aliases are control-plane registry metadata, not Workflow DSL
+fields. They may point a trigger or schedule at one published immutable
+artifact, but promotion never mutates the artifact or changes the DSL schema;
+an exact version remains a valid and deterministic target.
+
 ## Breaking Changes
 
 A change is breaking if it:

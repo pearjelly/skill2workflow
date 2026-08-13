@@ -161,6 +161,23 @@ class ScheduleTests(TestCase):
         self.assertEqual(stored_schedule["schedule"]["last_run_id"], result["runs"][0]["run_id"])
         self.assertEqual(stored_schedule["schedule"]["last_trigger_id"], result["runs"][0]["trigger_id"])
 
+    def test_runner_resolves_a_promoted_version_alias(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            control.publish_workflow(_workflow(version="2.0.0"))
+            control.promote_workflow("workflow_control", "2.0.0", alias="production")
+            definition = _schedule_definition()
+            definition["schedule"]["version"] = "production"
+            runner = LocalScheduleRunner(state_dir, storage="sqlite")
+            runner.add_schedule(definition)
+
+            result = runner.run_due("2026-07-06T00:00:00Z")
+
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(result["runs"][0]["workflow_version"], "2.0.0")
+
     def test_runner_maps_schedule_input_into_connector_body(self):
         server = _ConnectorTestServer()
 

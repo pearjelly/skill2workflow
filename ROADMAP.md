@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-68
+- Completed delivery loops: 1-69
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 68 is complete with bounded service request admission
+- Active loop: None; Loop 69 is complete with stable workflow version promotion aliases
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the service-admission drill
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-68 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-69 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, and bounded service request admission became Loop 68 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, and stable workflow version promotion aliases became Loop 69 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, and bounded service request admission are achieved by Loops 44-68. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, and stable workflow version promotion aliases are achieved by Loops 44-69. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -451,9 +451,51 @@ Workflow DSL version, or single-tenant network boundary. Current maturity
 remains Self-hosted Beta until the remaining Production Baseline evidence is
 explicitly completed and reviewed.
 
+### Loop 69: Stable Workflow Version Promotion Aliases
+
+**Status:** Complete.
+
+**Prior basis:** Published versions were immutable and safely triggerable, but
+every schedule, webhook integration, and operator command had to name an exact
+version. Releasing a replacement therefore required a coordinated configuration
+edit, and an alias-based retry could not yet define safe behavior across a
+promotion.
+
+**Outcome:** The control plane now stores optional bounded aliases on existing
+workflow registry records and exposes `promote <workflow_id> --version <version>
+--alias <alias>`. Promotion moves an alias only between published versions and
+records compact `workflow_promoted` evidence. Trigger, webhook, and schedule
+paths resolve aliases before validation and return the resolved immutable
+version; exact versions take precedence and deprecation clears aliases.
+
+**Evidence:** [`docs/triggers.md`](docs/triggers.md) defines the alias grammar,
+CLI contract, persistence behavior, and operator boundaries. Control-plane,
+trigger, SQLite, CLI, and documentation tests cover alias movement, exact
+precedence, deprecation cleanup, JSON/SQLite compatibility, new-version
+execution, and replay of the original result after a later promotion.
+
+**Safety boundary:** This is explicit single-tenant control-plane metadata. It
+does not add health-based rollout, traffic splitting, automatic rollback,
+hosted release orchestration, or exactly-once provider effects.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_control_plane.ControlPlaneTests.test_workflow_alias_promotion_resolves_triggers_and_pins_replays \
+  tests.test_cli.CliTests.test_promote_command_assigns_alias_and_trigger_resolves_it \
+  tests.test_trigger_docs \
+  -v
+```
+
+Loop 69 makes version rollout practical without mutating Workflow DSL
+artifacts or expanding the single-tenant service boundary. Current maturity
+remains Self-hosted Beta until the remaining Production Baseline evidence is
+explicitly completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 68 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the service-admission drill.
+This rolling queue is ordered. Loop 69 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the version-promotion evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -487,6 +529,7 @@ This rolling queue is ordered. Loop 68 is complete and there is no active delive
 | Loop 66: Bounded Trigger Inputs | Complete | Bound durable trigger context and idempotency fingerprint work consistently across all trigger entry paths | Shared 1 MiB canonical input limit, fixed oversize errors, and CLI/schedule/recurring/webhook contract tests |
 | Loop 67: Declarative Trigger Input Contracts | Complete | Make published workflow business inputs explicit without breaking open-object legacy workflows | Bounded `input_schema`, publication/runtime validation, pre-idempotency rejection, fixed errors, and contract/SQLite compatibility tests |
 | Loop 68: Bounded Service Request Admission | Complete | Prevent unbounded active HTTP business work while keeping liveness and readiness probes available | Fixed 16-slot process-local admission, fixed `429`/`Retry-After`, slot release, and service regression evidence |
+| Loop 69: Stable Workflow Version Promotion Aliases | Complete | Let operators roll an immutable workflow release forward without editing every trigger target | Bounded alias metadata, `promote` CLI, exact-version precedence, deprecation cleanup, alias-scoped idempotency replay, and JSON/SQLite evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -554,6 +597,11 @@ service routes. It excludes distributed coordination, per-client quotas,
 token-bucket rate limiting, queue persistence, admission of scheduler work,
 provider cancellation, and exactly-once execution.
 
+Loop 69 covers only explicit aliases scoped to one workflow and one local
+control plane. It excludes health-based canaries, traffic splitting, automatic
+rollback, alias garbage collection, hosted release orchestration, multi-tenant
+routing, and exactly-once provider effects.
+
 Selection rules:
 
 - Merge or explicitly defer the current loop before starting the next one.
@@ -571,7 +619,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, bounded active timeout policy, human gates, retry/recovery policy, run context, connector events, and verifiable SQLite audit evidence |
-| Control plane | Publish immutable workflow versions, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, and write a redacted support bundle |
+| Control plane | Publish immutable workflow versions, promote stable aliases, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, and write a redacted support bundle |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:
@@ -656,6 +704,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 66: Bounded Trigger Inputs | Complete | Shared canonical input limit and fixed oversize failure contract across CLI, schedules, recurring schedules, and webhooks |
 | Loop 67: Declarative Trigger Input Contracts | Complete | Optional bounded `input_schema`, publication/runtime validation, fixed path-only errors, and legacy open-object compatibility |
 | Loop 68: Bounded Service Request Admission | Complete | Fixed 16-slot process-local business-handler budget, retryable `429`, probe availability, and slot-release regression evidence |
+| Loop 69: Stable Workflow Version Promotion Aliases | Complete | Bounded workflow aliases, explicit promotion, exact-version precedence, deprecation cleanup, and alias-scoped replay-safe trigger resolution |
 
 ## Release Direction
 

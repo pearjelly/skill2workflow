@@ -127,8 +127,9 @@ explicit connector boundaries. It currently supports:
 - Write safe action, retry, and HTTP connector request edits back to Workflow DSL
 - Load example workflows from the editor gallery
 - Publish immutable workflow versions into a local control plane
+- Promote a published version behind a stable control-plane alias such as `production`
 - Run published workflow versions and write audit events
-- Trigger published workflow versions through a compact local API envelope
+- Trigger published workflow versions or stable aliases through a compact local API envelope
 - Persist trigger input values in durable run context without logging full input values to audit by default
 - Map non-secret trigger input fields into HTTP connector request bodies through `connector.request.input_mapping`
 - Trigger published workflow versions from local HTTP webhook POST requests
@@ -446,6 +447,20 @@ PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2wo
 PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 ```
 
+Promote one immutable version behind a stable trigger alias:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli promote workflow_approval_flow \
+  --version 0.1.0 --alias production \
+  --state-dir /tmp/skill2workflow-control --storage sqlite
+```
+
+Use `--version production` with `trigger`, webhook paths, or schedule
+definitions. The response reports the resolved immutable version; SQLite
+idempotency retries keep the original alias scope across later promotions.
+See [`docs/triggers.md`](docs/triggers.md#stable-workflow-version-aliases) for
+the promotion and deprecation boundary.
+
 Run a published version and inspect audit events:
 
 ```bash
@@ -678,7 +693,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-68 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-69 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -745,6 +760,8 @@ single-tenant process permits at most 16 active non-probe HTTP handlers and
 returns a fixed retryable `429` when that budget is exhausted. Health and
 readiness probes remain available for safe traffic removal during overload or
 graceful drain.
+
+Loop 69 adds [stable workflow version promotion aliases](docs/triggers.md#stable-workflow-version-aliases): operators can move a bounded `production`-style alias between immutable published versions, trigger and schedule through the alias, and retain safe SQLite idempotency replay semantics across a later promotion. It does not add health-based rollout, automatic rollback, or exactly-once provider effects.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

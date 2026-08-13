@@ -31,6 +31,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added a shared 1 MiB canonical UTF-8 trigger-input limit across CLI, webhook, one-shot schedule, and recurring schedule entry paths, with fixed oversize errors and no Workflow DSL compatibility change.
 - Added optional bounded declarative `input_schema` contracts for published workflows, with publication validation and pre-idempotency trigger rejection for missing, mistyped, out-of-range, and undeclared input values.
 - Added a fixed process-local service admission budget of 16 active business handlers, with a fixed retryable `429` response and probe availability under overload.
+- Added stable workflow version promotion aliases with a `promote` CLI command, exact-version precedence, deprecation cleanup, and alias-scoped SQLite idempotency replay across later promotions.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

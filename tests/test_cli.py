@@ -1040,6 +1040,83 @@ class CliTests(TestCase):
         self.assertEqual([event["type"] for event in audit_events], ["workflow_published", "workflow_deprecated"])
         self.assertTrue(control_db_exists)
 
+    def test_promote_command_assigns_alias_and_trigger_resolves_it(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            first_path = root / "workflow-v1.json"
+            second_path = root / "workflow-v2.json"
+            first_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            second = _workflow()
+            second["workflow"]["version"] = "0.2.0"
+            second_path.write_text(json.dumps(second), encoding="utf-8")
+
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(first_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(second_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+
+            promote_stdout = StringIO()
+            with redirect_stdout(promote_stdout):
+                promote_exit = main(
+                    [
+                        "promote",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--alias",
+                        "production",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            trigger_stdout = StringIO()
+            with redirect_stdout(trigger_stdout):
+                trigger_exit = main(
+                    [
+                        "trigger",
+                        "workflow_demo",
+                        "--version",
+                        "production",
+                        "--idempotency-key",
+                        "cli-production-001",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        self.assertEqual(promote_exit, 0)
+        self.assertEqual(json.loads(promote_stdout.getvalue())["aliases"], ["production"])
+        self.assertEqual(trigger_exit, 0)
+        self.assertEqual(json.loads(trigger_stdout.getvalue())["workflow_version"], "0.1.0")
+
     def test_published_run_resume_detail_and_audit_filters(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

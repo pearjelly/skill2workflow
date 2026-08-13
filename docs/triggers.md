@@ -2,7 +2,7 @@
 
 This document describes the current local trigger boundary for published workflow runs.
 
-Workflow DSL remains the execution truth source. The trigger API does not execute draft workflows and does not mutate published workflow artifacts. It accepts a small request envelope, delegates to the existing published-run control-plane path, and returns compact trigger/run identity.
+Workflow DSL remains the execution truth source. The trigger API does not execute draft workflows and does not mutate published workflow artifacts. It accepts a small request envelope, delegates to the existing published-run control-plane path, and returns compact trigger/run identity. The `version` may be an exact immutable version or a control-plane alias such as `production`; the response always reports the resolved immutable version.
 
 When the control plane uses SQLite (the self-hosted service production path), a
 non-empty `idempotency_key` is durable and enforced before execution. JSON/local
@@ -11,7 +11,7 @@ backward-compatible.
 
 ## Trigger Request Envelope
 
-A trigger request targets one immutable published workflow version:
+A trigger request targets one immutable published workflow version or a stable alias:
 
 ```json
 {
@@ -30,7 +30,7 @@ Supported fields:
 | Field | Required | Behavior |
 | --- | --- | --- |
 | `workflow_id` | Yes | Published workflow id to run. |
-| `version` | Yes | Published workflow version to run. |
+| `version` | Yes | Exact published workflow version or a published control-plane alias to resolve. |
 | `source` | No | Local trigger source label. Defaults to `local`; the CLI uses `local-cli`. |
 | `idempotency_key` | No | In SQLite, a safe non-empty key is durably enforced per workflow version; JSON/local evaluation records it as metadata only. |
 | `input` | No | JSON object accepted as trigger input. Values are persisted in run context; audit and trigger responses expose only keys. |
@@ -96,6 +96,43 @@ different source or input is rejected with a fixed conflict. A request whose
 first execution outcome is unresolved remains fail-closed; choose a new key
 only after investigating the original run.
 
+## Stable Workflow Version Aliases
+
+The control plane can assign a bounded, human-readable alias to one published
+version without changing that version's immutable artifact. Aliases are scoped
+to one `workflow_id`; the default CLI alias is `production`, and safe names
+start with a lowercase letter and contain only lowercase letters, numbers,
+`.`, `_`, or `-` (at most 64 UTF-8 bytes).
+
+Promote a version and then trigger through the alias:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli promote workflow_approval_flow \
+  --version 0.2.0 \
+  --alias production \
+  --state-dir /tmp/skill2workflow-control \
+  --storage sqlite
+
+PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow \
+  --version production \
+  --state-dir /tmp/skill2workflow-control \
+  --storage sqlite \
+  --idempotency-key production-example-001
+```
+
+Promotion moves an alias to the selected published version and records a
+`workflow_promoted` audit event. An exact version always wins if its text also
+matches an alias. Deprecating a version clears its aliases; an alias never
+silently falls back to another version. JSON and SQLite registry metadata both
+retain aliases, while the published Workflow DSL artifact remains untouched.
+
+Alias resolution happens before input validation and execution. For SQLite
+idempotency, the requested alias is the durable scope: retrying the same key
+after a later promotion replays the original compact response (and does not
+run the new version), while a new key resolves and runs the newly promoted
+version. Webhooks and both schedule formats use the same trigger boundary, so
+their version field can use an alias as well.
+
 Inspect the run context:
 
 ```bash
@@ -157,7 +194,7 @@ Webhook route:
 
 | Method | Path | Behavior |
 | --- | --- | --- |
-| `POST` | `/webhooks/<workflow_id>/<version>` | Triggers the published workflow version through `LocalControlPlane.trigger_workflow`. |
+| `POST` | `/webhooks/<workflow_id>/<version-or-alias>` | Triggers the exact published workflow version or control-plane alias through `LocalControlPlane.trigger_workflow`. |
 
 Request body:
 
@@ -232,7 +269,7 @@ Supported schedule fields:
 | `schema_version` | No | Defaults to `skill2workflow-schedule-0.1.0` when omitted. |
 | `schedule.id` | Yes | Local schedule id. It is used in the schedule file name and trigger source. |
 | `schedule.workflow_id` | Yes | Published workflow id to trigger. |
-| `schedule.version` | Yes | Published workflow version to trigger. |
+| `schedule.version` | Yes | Exact published workflow version or a published control-plane alias to trigger. |
 | `schedule.run_at` | Yes | ISO-8601 timestamp used by deterministic due checks. |
 | `schedule.enabled` | No | Boolean flag. Defaults to `true`. |
 | `trigger.source` | No | Optional source suffix. The runtime prefixes it with `local-schedule:<schedule.id>`. |
@@ -282,13 +319,13 @@ The service performs claim-before-execute and marks an expired in-flight claim `
 
 The authenticated SQLite service and any `LocalControlPlane(storage="sqlite")`
 trigger share one durable ledger in `control.sqlite3`. The ledger stores only
-the workflow/version scope, the safe key, a SHA-256 request fingerprint, a
+the workflow/requested-version scope, the safe key, a SHA-256 request fingerprint, a
 small lifecycle status, timestamps, and the compact trigger response. It never
 stores trigger input values, credentials, headers, or provider payloads.
 
 Keys are at most 128 UTF-8 bytes and use only letters, numbers, `_`, `.`, `:`,
-`+`, or `-`. The fingerprint covers workflow id, version, source, key, and the
-canonical JSON input; the generated `trigger_id` is intentionally excluded so
+`+`, or `-`. The fingerprint covers workflow id, requested version (exact
+version or alias), source, key, and the canonical JSON input; the generated `trigger_id` is intentionally excluded so
 a client can retry after rebuilding its request envelope.
 
 The fixed behavior is:
@@ -355,6 +392,7 @@ The trigger API intentionally does not provide:
 - cron/calendar expressions, queues, or distributed scheduling
 - authentication, RBAC, or IAM
 - secret injection
+- automatic alias promotion, rollback, or health-based version selection
 - automatic idempotency enforcement for JSON/local evaluation (SQLite service enforcement is documented above)
 - automatic retry of uncertain recurring effects across process restarts
 - arbitrary input templating or connector request interpolation

@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
@@ -114,11 +115,17 @@ class LocalControlPlane:
             raise ValueError(f"workflow version not found: {workflow_id}@{version}")
 
         record = dict(index[key])
-        if record.get("status") != "deprecated":
+        was_deprecated = record.get("status") == "deprecated"
+        aliases_removed = bool(_record_aliases(record))
+        if aliases_removed:
+            record.pop("aliases", None)
+        if not was_deprecated:
             record["status"] = "deprecated"
             record["deprecated_at"] = _now()
+        if aliases_removed or not was_deprecated:
             index[key] = record
             self._save_index(index)
+        if not was_deprecated:
             self._append_audit(
                 {
                     "type": "workflow_deprecated",
@@ -128,6 +135,57 @@ class LocalControlPlane:
                 }
             )
         return record
+
+    def promote_workflow(
+        self, workflow_id: str, version: str, alias: str = "production"
+    ) -> WorkflowRecord:
+        """Point a stable control-plane alias at one published immutable version."""
+
+        normalized_alias = _normalize_workflow_alias(alias)
+        index = self._load_index()
+        target_key = _record_key(workflow_id, version)
+        if target_key not in index:
+            raise ValueError(f"workflow version not found: {workflow_id}@{version}")
+        target = dict(index[target_key])
+        if target.get("status") != "published":
+            raise ValueError(f"workflow version is not published: {workflow_id}@{version}")
+
+        changed = False
+        for key, existing in list(index.items()):
+            if str(existing.get("workflow_id", "")) != str(workflow_id):
+                continue
+            existing_aliases = _record_aliases(existing)
+            if normalized_alias not in existing_aliases:
+                continue
+            updated = dict(existing)
+            existing_aliases.remove(normalized_alias)
+            if existing_aliases:
+                updated["aliases"] = existing_aliases
+            else:
+                updated.pop("aliases", None)
+            index[key] = updated
+            changed = True
+
+        target = dict(index[target_key])
+        target_aliases = _record_aliases(target)
+        if normalized_alias not in target_aliases:
+            target_aliases.append(normalized_alias)
+            target["aliases"] = sorted(set(target_aliases))
+            index[target_key] = target
+            changed = True
+
+        if changed:
+            self._save_index(index)
+            self._append_audit(
+                {
+                    "type": "workflow_promoted",
+                    "workflow_id": workflow_id,
+                    "workflow_version": version,
+                    "alias": normalized_alias,
+                    "timestamp": _now(),
+                }
+            )
+        return target
 
     def list_workflows(self) -> List[WorkflowRecord]:
         records = list(self._load_index().values())
@@ -180,7 +238,10 @@ class LocalControlPlane:
 
         trigger = normalize_trigger_request(request)
         workflow_id = str(trigger["workflow_id"])
-        workflow_version = str(trigger["version"])
+        requested_version = str(trigger["version"])
+        workflow_version = self.resolve_workflow_version(workflow_id, requested_version)
+        trigger["idempotency_version"] = requested_version
+        trigger["version"] = workflow_version
         idempotency_key = str(trigger.get("idempotency_key", ""))
         self._validate_trigger_input(workflow_id, workflow_version, trigger.get("input", {}))
         if self.storage != "sqlite" or not idempotency_key:
@@ -192,9 +253,10 @@ class LocalControlPlane:
                 f"workflow version is not published: {workflow_id}@{workflow_version}"
             )
         request_fingerprint = trigger_request_fingerprint(trigger)
+        idempotency_version = str(trigger.get("idempotency_version", workflow_version))
         claim = self.store.claim_trigger_idempotency(
             workflow_id,
-            workflow_version,
+            idempotency_version,
             idempotency_key,
             request_fingerprint,
         )
@@ -216,7 +278,7 @@ class LocalControlPlane:
             response = self._execute_trigger(trigger)
             self.store.complete_trigger_idempotency(
                 workflow_id,
-                workflow_version,
+                idempotency_version,
                 idempotency_key,
                 request_fingerprint,
                 response,
@@ -225,11 +287,29 @@ class LocalControlPlane:
         except BaseException:
             self.store.mark_trigger_idempotency_unresolved(
                 workflow_id,
-                workflow_version,
+                idempotency_version,
                 idempotency_key,
                 request_fingerprint,
             )
             raise
+
+    def resolve_workflow_version(self, workflow_id: str, version: str) -> str:
+        """Resolve an exact version or a published stable alias to its version."""
+
+        requested = str(version)
+        index = self._load_index()
+        if _record_key(workflow_id, requested) in index:
+            return requested
+        matches = [
+            str(record.get("version", ""))
+            for record in index.values()
+            if str(record.get("workflow_id", "")) == str(workflow_id)
+            and record.get("status") == "published"
+            and requested in _record_aliases(record)
+        ]
+        if len(matches) > 1:
+            raise ValueError(f"workflow alias is ambiguous: {workflow_id}@{requested}")
+        return matches[0] if matches else requested
 
     def _execute_trigger(self, trigger: Dict[str, object]) -> Dict[str, object]:
         state = self.run_published_workflow(
@@ -503,6 +583,37 @@ def _workflow_identity(workflow: Workflow) -> tuple:
 
 def _record_key(workflow_id: str, version: str) -> str:
     return f"{workflow_id}@{version}"
+
+
+_WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
+MAX_WORKFLOW_ALIAS_BYTES = 64
+
+
+def _normalize_workflow_alias(alias: str) -> str:
+    value = str(alias).strip()
+    if (
+        len(value.encode("utf-8")) > MAX_WORKFLOW_ALIAS_BYTES
+        or not _WORKFLOW_ALIAS_PATTERN.fullmatch(value)
+    ):
+        raise ValueError(
+            "workflow alias must start with a lowercase letter and contain only "
+            "lowercase letters, numbers, ., _, or - (at most 64 UTF-8 bytes)"
+        )
+    return value
+
+
+def _record_aliases(record: WorkflowRecord) -> List[str]:
+    value = record.get("aliases", [])
+    if not isinstance(value, list):
+        return []
+    aliases = []
+    seen = set()
+    for alias in value:
+        text = str(alias)
+        if text and text not in seen:
+            aliases.append(text)
+            seen.add(text)
+    return aliases
 
 
 def _checksum(value: object) -> str:

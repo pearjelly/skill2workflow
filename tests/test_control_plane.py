@@ -137,6 +137,107 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(stored["workflow"]["status"], "published")
         self.assertEqual(audit_types, ["workflow_published", "workflow_deprecated"])
 
+    def test_workflow_alias_promotion_resolves_triggers_and_pins_replays(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            control.publish_workflow(_workflow(version="2.0.0"))
+
+            promoted = control.promote_workflow(
+                "workflow_control", "1.0.0", alias="production"
+            )
+            first_request = {
+                "workflow_id": "workflow_control",
+                "version": "production",
+                "source": "partner",
+                "idempotency_key": "production-event-001",
+                "input": {"customer_id": "customer_123"},
+            }
+            first = control.trigger_workflow(first_request)
+
+            control.promote_workflow("workflow_control", "2.0.0", alias="production")
+            replay = control.trigger_workflow({**first_request, "trigger_id": "retry"})
+            second = control.trigger_workflow(
+                {**first_request, "idempotency_key": "production-event-002"}
+            )
+            run_count = len(control.list_runs())
+            records = {record["version"]: record for record in control.list_workflows()}
+            audit_types = [event["type"] for event in control.list_audit_events()]
+
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection:
+                idempotency_versions = [
+                    row[0]
+                    for row in connection.execute(
+                        "select workflow_version from trigger_idempotency order by idempotency_key"
+                    ).fetchall()
+                ]
+
+        self.assertEqual(promoted["aliases"], ["production"])
+        self.assertEqual(first["workflow_version"], "1.0.0")
+        self.assertEqual(replay, first)
+        self.assertEqual(second["workflow_version"], "2.0.0")
+        self.assertEqual(run_count, 2)
+        self.assertNotIn("aliases", records["1.0.0"])
+        self.assertEqual(records["2.0.0"]["aliases"], ["production"])
+        self.assertEqual(idempotency_versions, ["production", "production"])
+        self.assertEqual(
+            audit_types,
+            [
+                "workflow_published",
+                "workflow_published",
+                "workflow_promoted",
+                "run_started",
+                "run_completed",
+                "workflow_promoted",
+                "run_started",
+                "run_completed",
+            ],
+        )
+
+    def test_workflow_alias_validation_and_deprecation_fail_closed(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp))
+            control.publish_workflow(_workflow(version="1.0.0"))
+
+            for alias in ("", "1production", "prod/unsafe", "x" * 65):
+                with self.subTest(alias=alias), self.assertRaisesRegex(
+                    ValueError, "workflow alias"
+                ):
+                    control.promote_workflow("workflow_control", "1.0.0", alias=alias)
+
+            with self.assertRaisesRegex(ValueError, "workflow version not found"):
+                control.promote_workflow("workflow_control", "missing", alias="production")
+
+            control.promote_workflow("workflow_control", "1.0.0", alias="production")
+            deprecated = control.deprecate_workflow("workflow_control", "1.0.0")
+            with self.assertRaisesRegex(ValueError, "workflow version not found"):
+                control.trigger_workflow(
+                    {
+                        "workflow_id": "workflow_control",
+                        "version": "production",
+                    }
+                )
+
+        self.assertNotIn("aliases", deprecated)
+
+    def test_exact_version_takes_precedence_over_same_named_alias(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="production"))
+            control.publish_workflow(_workflow(version="1.0.0"))
+            control.promote_workflow("workflow_control", "1.0.0", alias="production")
+
+            result = control.trigger_workflow(
+                {
+                    "workflow_id": "workflow_control",
+                    "version": "production",
+                    "idempotency_key": "exact-version-001",
+                }
+            )
+
+        self.assertEqual(result["workflow_version"], "production")
+
     def test_run_published_workflow_binds_run_to_immutable_version_and_audit(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp))

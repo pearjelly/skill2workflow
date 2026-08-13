@@ -82,7 +82,9 @@ def trigger_request_fingerprint(trigger: Trigger) -> str:
 
     payload = {
         "workflow_id": str(trigger.get("workflow_id", "")),
-        "version": str(trigger.get("version", "")),
+        "version": str(
+            trigger.get("idempotency_version", trigger.get("version", ""))
+        ),
         "source": str(trigger.get("source", "")),
         "idempotency_key": str(trigger.get("idempotency_key", "")),
         "input": copy.deepcopy(trigger.get("input", {}))

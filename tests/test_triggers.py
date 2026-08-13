@@ -130,6 +130,22 @@ class TriggerTests(TestCase):
         changed["input"] = {"customer_id": "customer_456", "priority": "high"}
         self.assertNotEqual(trigger_request_fingerprint(first), trigger_request_fingerprint(changed))
 
+    def test_trigger_request_fingerprint_can_pin_an_alias_idempotency_scope(self):
+        first = normalize_trigger_request(
+            {
+                "workflow_id": "workflow_control",
+                "version": "1.0.0",
+                "source": "partner",
+                "idempotency_key": "event-001",
+            }
+        )
+        second = dict(first)
+        second["version"] = "2.0.0"
+        first["idempotency_version"] = "production"
+        second["idempotency_version"] = "production"
+
+        self.assertEqual(trigger_request_fingerprint(first), trigger_request_fingerprint(second))
+
     def test_trigger_audit_fields_and_response_keep_compact_metadata(self):
         trigger = normalize_trigger_request(
             {
