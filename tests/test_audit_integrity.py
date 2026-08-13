@@ -9,6 +9,10 @@ from skill2workflow.backup import create_state_backup, restore_state_backup
 from skill2workflow.cli import main
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.schedules import RecurringScheduleStore
+from skill2workflow.storage import (
+    _rebuild_audit_integrity_connection,
+    _verify_audit_integrity_connection,
+)
 
 
 class AuditIntegrityTests(TestCase):
@@ -157,6 +161,47 @@ class AuditIntegrityTests(TestCase):
 
         self.assertEqual(result["status"], "invalid")
         self.assertEqual(result["reason"], "column_mismatch")
+
+    def test_audit_chain_verification_and_rebuild_stream_event_rows(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as raw:
+                connection = _NoAuditFetchAllConnection(raw)
+                with raw:
+                    _rebuild_audit_integrity_connection(connection)
+                    result = _verify_audit_integrity_connection(connection)
+
+        self.assertEqual(result["status"], "valid")
+        self.assertEqual(result["event_count"], 1)
+
+
+class _NoAuditFetchAllCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+    def fetchall(self):
+        raise AssertionError("audit event rows must be streamed")
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _NoAuditFetchAllConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query, parameters=()):
+        cursor = self._connection.execute(query, parameters)
+        normalized = " ".join(str(query).lower().split())
+        if "from audit_events order by sequence" in normalized:
+            return _NoAuditFetchAllCursor(cursor)
+        return cursor
 
 
 def _workflow():

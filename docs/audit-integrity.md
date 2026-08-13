@@ -81,6 +81,11 @@ does not load unrelated SQLite audit rows or emit a partial event. Omitting
 form for routine operator inspection and incident triage. This is an output
 and memory boundary, not retention or deletion policy.
 
+SQLite chain verification itself also streams the ordered audit rows after a
+count-only query, so `audit-verify`, backup validation, and remote audit
+diagnostics do not materialize the complete history in memory. Opening a legacy
+audit table rebuilds its integrity columns through the same cursor path.
+
 ## Boundary
 
 This loop covers one local audit database and bounded, secret-free inspection

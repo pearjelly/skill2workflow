@@ -1698,7 +1698,7 @@ def _rebuild_audit_integrity_connection(connection) -> None:
     previous_digest = _AUDIT_GENESIS_DIGEST
     rows = connection.execute(
         "select sequence, payload_json from audit_events order by sequence"
-    ).fetchall()
+    )
     for sequence, payload_json in rows:
         try:
             payload = json.loads(str(payload_json))
@@ -1729,13 +1729,16 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
     if columns != _CURRENT_AUDIT_COLUMNS:
         return _audit_integrity_result(status="invalid", reason="schema_mismatch")
 
+    event_count = int(
+        connection.execute("select count(*) from audit_events").fetchone()[0]
+    )
     rows = connection.execute(
         """
         select sequence, event_type, workflow_id, workflow_version, run_id,
                timestamp, payload_json, prev_digest, digest
         from audit_events order by sequence
         """
-    ).fetchall()
+    )
     previous_sequence = 0
     previous_digest = _AUDIT_GENESIS_DIGEST
     for (
@@ -1754,13 +1757,13 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
         except (TypeError, ValueError):
             return _audit_integrity_result(
                 status="invalid",
-                event_count=len(rows),
+                event_count=event_count,
                 reason="sequence_invalid",
             )
         if sequence <= previous_sequence:
             return _audit_integrity_result(
                 status="invalid",
-                event_count=len(rows),
+                event_count=event_count,
                 head_digest=previous_digest,
                 first_invalid_sequence=sequence,
                 reason="sequence_out_of_order",
@@ -1770,7 +1773,7 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
         except (TypeError, ValueError, json.JSONDecodeError):
             return _audit_integrity_result(
                 status="invalid",
-                event_count=len(rows),
+                event_count=event_count,
                 head_digest=previous_digest,
                 first_invalid_sequence=sequence,
                 reason="payload_invalid",
@@ -1778,7 +1781,7 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
         if not isinstance(payload, dict):
             return _audit_integrity_result(
                 status="invalid",
-                event_count=len(rows),
+                event_count=event_count,
                 head_digest=previous_digest,
                 first_invalid_sequence=sequence,
                 reason="payload_invalid",
@@ -1796,7 +1799,7 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
         ):
             return _audit_integrity_result(
                 status="invalid",
-                event_count=len(rows),
+                event_count=event_count,
                 head_digest=previous_digest,
                 first_invalid_sequence=sequence,
                 reason="column_mismatch",
@@ -1804,7 +1807,7 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
         if str(stored_previous or "") != previous_digest:
             return _audit_integrity_result(
                 status="invalid",
-                event_count=len(rows),
+                event_count=event_count,
                 head_digest=previous_digest,
                 first_invalid_sequence=sequence,
                 reason="prev_digest_mismatch",
@@ -1813,7 +1816,7 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
         if str(stored_digest or "") != expected_digest:
             return _audit_integrity_result(
                 status="invalid",
-                event_count=len(rows),
+                event_count=event_count,
                 head_digest=previous_digest,
                 first_invalid_sequence=sequence,
                 reason="digest_mismatch",
@@ -1822,7 +1825,7 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
         previous_digest = expected_digest
     return _audit_integrity_result(
         status="valid",
-        event_count=len(rows),
+        event_count=event_count,
         head_digest=previous_digest,
     )
 

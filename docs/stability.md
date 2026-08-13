@@ -107,6 +107,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Local `workflows --limit` reuses `skill2workflow-workflow-inventory-0.1.0` for a read-only 1-100 newest published-version window with workflow-content redaction; the complete-list path remains unchanged when the flag is omitted
 - Local `workflow-artifacts` retains a fixed 1-256 value-free issue window while preserving complete issue counts and truncation status; it never repairs or deletes artifacts
 - SQLite `workflow-artifacts` streams registry rows and checks filesystem artifacts by exact reference instead of materializing the full registry/path set; JSON keeps its dependency-light compatibility path
+- SQLite audit-chain verification counts events and streams the ordered rows; legacy-chain rebuilds use the same cursor path without changing the fixed result contract
 - Local `schedule-run-due --max-items` accepts a 1-100 side-effect batch budget and leaves unclaimed due schedules for later invocations; omission preserves complete-batch compatibility
 - State layout marker `skill2workflow-state-layout-marker-0.1.0`, fail-closed compatibility preflight, and legacy-to-current copy-on-write migration documented in `docs/upgrade-migration.md`
 - Body-only HTTP connector input mapping documented in `docs/connectors.md`

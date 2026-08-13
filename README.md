@@ -741,7 +741,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-131 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-132 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1132,6 +1132,12 @@ for SQLite production state: registry rows stream in stable order and orphan
 checks query exact references one artifact at a time, avoiding a full registry
 or filesystem-path set in memory. The report contract and JSON evaluation path
 remain compatible.
+
+Loop 132 hardens [SQLite audit integrity](docs/audit-integrity.md): chain
+verification and legacy-chain rebuilds count events and stream ordered rows
+instead of materializing the complete audit history. The fixed result contract,
+backup validation, remote diagnostics, and JSON evaluation path remain
+compatible.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

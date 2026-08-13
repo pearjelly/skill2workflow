@@ -24,6 +24,8 @@ release; Roadmap loop completion alone does not publish a new version.
 - SQLite workflow artifact diagnostics now stream registry rows and check
   filesystem artifacts by exact reference, avoiding a full registry/path-set
   materialization on long-running production instances.
+- SQLite audit-chain verification and legacy-chain rebuilds now stream ordered
+  event rows after count-only reads, avoiding full audit-history materialization.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.
