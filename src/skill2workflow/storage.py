@@ -955,6 +955,32 @@ class SqliteControlStore:
             raise ValueError(f"workflow version not found: {workflow_id}@{version}")
         return json.loads(str(row[0]))
 
+    def resolve_workflow_version(self, workflow_id: str, requested: str) -> str:
+        """Resolve one SQLite workflow alias without loading the global registry."""
+
+        workflow_id = str(workflow_id)
+        requested = str(requested)
+        with self._connection() as connection:
+            exact = connection.execute(
+                "select 1 from workflow_versions where record_key = ? limit 1",
+                (_workflow_record_key(workflow_id, requested),),
+            ).fetchone()
+            if exact is not None:
+                return requested
+            matches = []
+            rows = _iter_workflow_records_for_id(connection, workflow_id)
+            for _record_key, raw_record in rows:
+                record = json.loads(str(raw_record))
+                if (
+                    record.get("status") == "published"
+                    and requested in _sqlite_record_aliases(record)
+                ):
+                    matches.append(str(record.get("version", "")))
+        matches = sorted(version for version in matches if version)
+        if len(matches) > 1:
+            raise ValueError(f"workflow alias is ambiguous: {workflow_id}@{requested}")
+        return matches[0] if matches else requested
+
     def count_workflow_records(self) -> int:
         """Count published registry rows without loading their JSON records."""
 

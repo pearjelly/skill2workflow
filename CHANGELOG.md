@@ -43,6 +43,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Live readiness now checks SQLite workflow-registry readability with a count
   query instead of loading every published record; complete list APIs remain
   compatible.
+- Stable-alias trigger resolution now performs a direct exact-version lookup
+  and scans only the selected workflow's registry rows, avoiding global
+  registry materialization while preserving alias and replay semantics.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.

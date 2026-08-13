@@ -142,10 +142,10 @@ class BackupDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-138 are complete", readme)
+        self.assertIn("Delivery Loops 1-139 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("docs/backup-restore.md", readme)
-        self.assertIn("- Completed delivery loops: 1-138", roadmap)
+        self.assertIn("- Completed delivery loops: 1-139", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 44: Verified Backup And Restore | Complete |", roadmap)
         self.assertIn("Production Baseline remains directional", roadmap)

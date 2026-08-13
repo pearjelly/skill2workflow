@@ -631,6 +631,9 @@ class LocalControlPlane:
         """Resolve an exact version or a published stable alias to its version."""
 
         requested = str(version)
+        resolver = getattr(self.store, "resolve_workflow_version", None)
+        if callable(resolver):
+            return str(resolver(workflow_id, requested))
         index = self._load_index()
         if _record_key(workflow_id, requested) in index:
             return requested
