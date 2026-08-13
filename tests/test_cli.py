@@ -1014,6 +1014,50 @@ class CliTests(TestCase):
         self.assertEqual(written_snapshot, snapshot)
         self.assertEqual(written_mode, 0o600)
 
+    def test_systemd_unit_command_writes_a_redacted_hardened_unit(self):
+        from skill2workflow.service_bootstrap import initialize_service_workspace
+
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            initialized = initialize_service_workspace(
+                root / "workspace",
+                token_factory=lambda: "t" * 48,
+            )
+            executable = root / "bin" / "skill2workflow"
+            executable.parent.mkdir()
+            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o700)
+            output = root / "skill2workflow.service"
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "systemd-unit",
+                        "--config",
+                        str(initialized["config_file"]),
+                        "--output",
+                        str(output),
+                        "--service-user",
+                        "workflow",
+                        "--executable",
+                        str(executable),
+                    ]
+                )
+
+            result = json.loads(stdout.getvalue())
+            content = output.read_text(encoding="utf-8")
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(result["status"], "written")
+        self.assertEqual(result["unit_name"], "skill2workflow.service")
+        self.assertIn("ExecStart=", content)
+        self.assertIn("ProtectSystem=strict", content)
+        self.assertNotIn("t" * 48, stdout.getvalue())
+        self.assertNotIn("t" * 48, content)
+
     def test_run_and_list_runs_can_use_sqlite_storage(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

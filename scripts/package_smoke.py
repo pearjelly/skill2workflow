@@ -32,6 +32,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "quickstart",
     "service-init",
     "service-doctor",
+    "systemd-unit",
     "service",
     "schedule-run-due",
     "backup",
@@ -192,6 +193,12 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or bootstrap_secret in doctor_output
     ):
         raise RuntimeError("installed service-doctor did not validate its generated workspace")
+    systemd_unit_status = _qualify_systemd_unit(
+        console_script,
+        isolated_dir,
+        bootstrap_config,
+        console_script,
+    )
     live_snapshot_status = _qualify_live_snapshot(
         console_script,
         isolated_dir,
@@ -247,6 +254,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "required_console_commands": list(REQUIRED_CONSOLE_COMMANDS),
         "service_bootstrap_status": True,
         "service_doctor_status": True,
+        "systemd_unit_status": systemd_unit_status,
         "live_snapshot_status": live_snapshot_status,
         **wheel_contents,
         "tooling_command": tooling.splitlines()[-1] if tooling.splitlines() else "",
@@ -379,6 +387,58 @@ def _qualify_live_snapshot(
         or output.stat().st_mode & 0o777 != 0o600
     ):
         raise RuntimeError("installed live snapshot client did not preserve its contract")
+    return True
+
+
+def _qualify_systemd_unit(
+    console_script: Path,
+    isolated_dir: Path,
+    config_file: Path,
+    executable: Path,
+) -> bool:
+    """Prove the installed CLI can generate one redacted fixed-port unit."""
+
+    config = json.loads(config_file.read_text(encoding="utf-8"))
+    config["service"]["port"] = 8080
+    systemd_config = isolated_dir / "systemd-service.json"
+    systemd_config.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    systemd_config.chmod(0o600)
+    output = isolated_dir / "skill2workflow-wheel.service"
+    result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "systemd-unit",
+                "--config",
+                str(systemd_config),
+                "--output",
+                str(output),
+                "--service-user",
+                "skill2workflow",
+                "--service-group",
+                "skill2workflow",
+                "--executable",
+                str(executable),
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    content = output.read_text(encoding="utf-8")
+    token_value = Path(config["auth"]["token_file"]).read_text(encoding="utf-8").strip()
+    if (
+        result.get("status") != "written"
+        or result.get("unit_name") != output.name
+        or output.stat().st_mode & 0o777 != 0o644
+        or token_value in content
+        or "Environment=" in content
+        or "StandardOutput=journal" not in content
+        or "ProtectSystem=strict" not in content
+        or "ReadWritePaths=" + config["runtime"]["state_dir"] not in content
+    ):
+        raise RuntimeError("installed systemd unit generator did not preserve its contract")
     return True
 
 

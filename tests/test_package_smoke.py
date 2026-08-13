@@ -67,15 +67,41 @@ class PackageSmokeTests(TestCase):
                     bootstrap_root = Path(command[command.index("--root") + 1])
                     secret_path = bootstrap_root / "secrets" / "ingress-token"
                     config_path = bootstrap_root / "config" / "service.json"
+                    state_path = bootstrap_root / "state"
+                    credential_path = bootstrap_root / "secrets" / "connectors"
                     secret_path.parent.mkdir(parents=True)
                     config_path.parent.mkdir(parents=True)
+                    state_path.mkdir(parents=True)
+                    credential_path.mkdir(parents=True)
                     secret_path.write_text("s" * 48 + "\n", encoding="utf-8")
-                    config_path.write_text("{}", encoding="utf-8")
+                    config_path.write_text(
+                        json.dumps(
+                            {
+                                "schema_version": "skill2workflow-service-0.2.0",
+                                "service": {"host": "127.0.0.1", "port": 0},
+                                "runtime": {
+                                    "state_dir": str(state_path),
+                                    "storage": "sqlite",
+                                },
+                                "auth": {
+                                    "provider": "bearer_token_file",
+                                    "token_file": str(secret_path),
+                                },
+                                "credentials": {
+                                    "provider": "directory",
+                                    "directory": str(credential_path),
+                                },
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
                     return json.dumps(
                         {
                             "status": "initialized",
                             "config_file": str(config_path),
                             "token_file": str(secret_path),
+                            "state_dir": str(state_path),
+                            "credential_directory": str(credential_path),
                         }
                     )
                 if "service-doctor" in command:
@@ -94,6 +120,18 @@ class PackageSmokeTests(TestCase):
                                 )
                             ],
                         }
+                    )
+                if "systemd-unit" in command:
+                    output_path = Path(command[command.index("--output") + 1])
+                    config_path = Path(command[command.index("--config") + 1])
+                    config = json.loads(config_path.read_text(encoding="utf-8"))
+                    output_path.write_text(
+                        "StandardOutput=journal\nProtectSystem=strict\n"
+                        f"ReadWritePaths={config['runtime']['state_dir']}\n",
+                        encoding="utf-8",
+                    )
+                    return json.dumps(
+                        {"status": "written", "unit_name": output_path.name}
                     )
                 if "validate" in command:
                     return '{"valid": true}\n'
@@ -114,7 +152,16 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["isolated_from_source"])
         self.assertTrue(result["service_bootstrap_status"])
         self.assertTrue(result["service_doctor_status"])
+        self.assertTrue(result["systemd_unit_status"])
         self.assertTrue(result["live_snapshot_status"])
+        systemd_commands = [
+            command
+            for command, _cwd in commands
+            if "systemd-unit" in command and "--output" in command
+        ]
+        self.assertEqual(len(systemd_commands), 1)
+        executable_index = systemd_commands[0].index("--executable") + 1
+        self.assertTrue(systemd_commands[0][executable_index].endswith("skill2workflow"))
         qualify_live_snapshot.assert_called_once()
         self.assertTrue(result["license_included"])
         self.assertTrue(result["private_artifacts_excluded"])

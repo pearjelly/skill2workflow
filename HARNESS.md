@@ -318,6 +318,10 @@ Implemented:
   - creates a complete non-overwriting owner-only service workspace through `skill2workflow service-init`
   - generates the ingress secret without printing it and wires absolute config, state, and connector paths
   - proves unchanged startup, readiness, authentication, no-overwrite behavior, graceful exit, and durable state through `scripts/service_bootstrap_smoke.py`
+- Linux systemd supervision
+  - generates one non-overwriting, manually reviewed Linux service unit through `skill2workflow systemd-unit`
+  - fixes least-privilege state-only write access, process sandboxing, restart behavior, and SIGTERM-only shutdown without embedding credential values
+  - proves CLI generation, Doctor compatibility, static hardening directives, redaction, permissions, and no-overwrite behavior through `scripts/systemd_service_smoke.py`
 - Installed controlled quickstart
   - compiles a bundled standard Skill and publishes it immutably through the installed `quickstart` command
   - creates a durable waiting run that completes after one explicit approval

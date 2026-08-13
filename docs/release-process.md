@@ -36,6 +36,11 @@ The command checks:
 - Python module compilation
 - an isolated wheel build, install, console-script, service-help, and validation smoke
 
+The isolated wheel smoke also executes the installed `systemd-unit` command
+against a fixed-port secure workspace and checks its redacted least-privilege
+unit output. This proves the deployment command is present in the distributed
+artifact; it does not claim that the release host runs Linux systemd.
+
 The command fails before any GitHub operation when the changelog, release
 notes, package version, module version, or tag inputs disagree.
 

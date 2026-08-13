@@ -24,6 +24,7 @@ This repository is the `skill2workflow` open-source harness.
 - Secure service bootstrap: `docs/service-bootstrap.md`.
 - Installed controlled quickstart: `docs/quickstart.md`.
 - Operational readiness Doctor: `docs/service-doctor.md`.
+- Linux systemd supervision: `docs/systemd-service.md`.
 
 ## Local Commands
 
@@ -42,6 +43,7 @@ This repository is the `skill2workflow` open-source harness.
 - Secure service bootstrap: `PYTHONPATH=src python3 -m skill2workflow.cli service-init --root /tmp/skill2workflow-service --port 8080`
 - Installed controlled quickstart: `PYTHONPATH=src python3 -m skill2workflow.cli quickstart --root /tmp/skill2workflow-quickstart --port 8080`
 - Service Doctor: `PYTHONPATH=src python3 -m skill2workflow.cli service-doctor --config /tmp/skill2workflow-runtime/config/service.json`
+- systemd unit: `PYTHONPATH=src python3 -m skill2workflow.cli systemd-unit --config /tmp/skill2workflow-runtime/config/service.json --output /tmp/skill2workflow.service --service-user skill2workflow --executable /usr/local/bin/skill2workflow`
 - Run with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite`
 - Run with local credential file: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state --credential-file /tmp/skill2workflow-credentials.json`
 - Publish: `PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control`
@@ -78,6 +80,7 @@ This repository is the `skill2workflow` open-source harness.
 - Schedule smoke: `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
 - Package smoke: `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
 - Service Doctor smoke: `python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-doctor`
+- systemd supervision smoke: `python3 scripts/systemd_service_smoke.py --work-dir /tmp/skill2workflow-systemd-service`
 - Secret hygiene: `python3 scripts/secret_hygiene.py examples/workflows`
 - Editable install: `python3 -m venv /tmp/skill2workflow-venv && /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68" && /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .`
 - Installed CLI smoke: `/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json`

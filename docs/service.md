@@ -19,6 +19,11 @@ the non-overwriting `service-init` command that generates this configuration,
 an owner-only ingress token, the connector credential directory, and the state
 directory together.
 
+For one manually reviewed Linux systemd supervisor definition, use
+[`systemd-service.md`](systemd-service.md) only after the generated workspace
+passes the Doctor. The runtime does not start, install, or enable a supervisor
+itself.
+
 The manual configuration shape is:
 
 The machine-readable shape is published at [`schemas/service-config-0.2.0.schema.json`](../schemas/service-config-0.2.0.schema.json); runtime validation additionally enforces absolute paths and usable security providers.

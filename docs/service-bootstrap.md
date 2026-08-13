@@ -79,8 +79,10 @@ at execution time.
 The generated listener remains loopback-only. Public or cross-host traffic still
 requires the external TLS reverse-proxy boundary described in
 [`security-boundary.md`](security-boundary.md). The initializer does not create
-certificates, proxy rules, firewall policy, a service account, or an operating
-system supervisor.
+certificates, proxy rules, firewall policy, or a service account. For a
+manually reviewed Linux systemd unit after bootstrap, see
+[`systemd-service.md`](systemd-service.md); initialization itself never writes,
+installs, or enables a supervisor.
 
 Only `state/` belongs to the runtime backup and migration commands. The ingress
 secret and connector files are not included in state backups; protect, rotate,

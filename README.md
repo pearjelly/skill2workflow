@@ -670,7 +670,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-55 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-56 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -704,6 +704,8 @@ Loop 54 hardens the [connector credential boundary](docs/credential-boundary.md)
 
 Loop 55 adds an [authenticated live Operator snapshot](docs/live-control-snapshot.md): the running service exposes a zero-write, fixed-window control view; the CLI reads its Bearer token from a protected file, refuses insecure remote HTTP and redirects, enforces a 1 MiB response cap, and atomically writes owner-only evidence. Fixed metrics and NDJSON expose request outcomes without identifiers or payloads.
 
+Loop 56 adds [Linux systemd supervision](docs/systemd-service.md): the CLI generates one non-overwriting, least-privilege service unit for a secure workspace, with state-only write access, hardened process isolation, restart backoff, and SIGTERM-only shutdown. Operators still review the target-host unit with `systemd-analyze verify` and explicitly enable it; no account, TLS, proxy, or host change is automated.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -736,6 +738,7 @@ See:
 - `docs/service.md`
 - `docs/service-doctor.md`
 - `docs/service-bootstrap.md`
+- `docs/systemd-service.md`
 - `docs/stability.md`
 - `docs/triggers.md`
 - `docs/upgrade-migration.md`

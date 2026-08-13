@@ -23,6 +23,7 @@ from .schedules import LocalScheduleRunner
 from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace
 from .service_doctor import diagnose_service
+from .systemd_service import write_systemd_service_unit
 from .telemetry import OperationalEventLogger
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 from .webhooks import serve_webhook_requests
@@ -178,6 +179,16 @@ def main(argv=None) -> int:
     service_init_cmd.add_argument("--root", type=Path, required=True)
     service_init_cmd.add_argument("--host", default="127.0.0.1")
     service_init_cmd.add_argument("--port", type=int, default=8080)
+
+    systemd_unit_cmd = subparsers.add_parser(
+        "systemd-unit",
+        help="Write a hardened non-overwriting Linux systemd service unit",
+    )
+    systemd_unit_cmd.add_argument("--config", type=Path, required=True)
+    systemd_unit_cmd.add_argument("--output", type=Path, required=True)
+    systemd_unit_cmd.add_argument("--service-user", required=True)
+    systemd_unit_cmd.add_argument("--service-group")
+    systemd_unit_cmd.add_argument("--executable", type=Path, required=True)
 
     quickstart_cmd = subparsers.add_parser(
         "quickstart",
@@ -473,6 +484,17 @@ def main(argv=None) -> int:
             )
         )
 
+    if args.command == "systemd-unit":
+        return _systemd_unit_action(
+            lambda: write_systemd_service_unit(
+                args.config,
+                args.output,
+                service_user=args.service_user,
+                service_group=args.service_group,
+                executable=args.executable,
+            )
+        )
+
     if args.command == "quickstart":
         return _quickstart_action(
             lambda: initialize_quickstart_workspace(
@@ -735,6 +757,15 @@ def _serve_runtime_service(args) -> int:
         return 1
     except KeyboardInterrupt:
         return 130
+
+
+def _systemd_unit_action(action) -> int:
+    try:
+        _print_json(action())
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
 
 
 def _credential_provider(args):

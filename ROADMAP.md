@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-55
+- Completed delivery loops: 1-56
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 55 is complete with authenticated live Operator snapshot evidence
+- Active loop: None; Loop 56 is complete with a manually reviewed Linux systemd supervisor unit
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the live Operator snapshot drill
+- Next decision: select the next Production Baseline loop after reviewing the systemd supervisor drill
 
 ## Production Readiness Path
 
@@ -52,37 +52,37 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-55 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-56 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, and the authenticated live Operator snapshot became Loop 55 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, and a manually reviewed Linux systemd unit became Loop 56 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, and a bounded live Operator read surface are achieved by Loops 44-55. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, and a manually reviewed least-privilege Linux service unit are achieved by Loops 44-56. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
-### Loop 55: Authenticated Live Operator Snapshot
+### Loop 56: Linux systemd Supervision
 
 **Status:** Complete.
 
-**Prior basis:** The Operator inspector consumed only manually exported files. A running service exposed aggregate metrics but no authenticated control snapshot, so operators could not inspect bounded workflow, run, audit, connector, and attention state through the supported service boundary.
+**Prior basis:** The secure bootstrap can create a ready workspace and the Doctor can diagnose it, but operators still had to hand-author a supervisor definition. That left restart semantics, least-privilege filesystem access, signal handling, and the service command line vulnerable to deployment-specific drift.
 
-**Outcome:** The service exposes one authenticated, zero-write `GET /api/v1/control-snapshot` route with a fixed 100-item window and 1 MiB response cap. The CLI fetches it without putting the Bearer token in argv, accepts only HTTPS or loopback HTTP, rejects redirects and ambiguous responses, and atomically publishes `0600` output.
+**Outcome:** `systemd-unit` validates one secure service configuration and writes one non-overwriting Linux `.service` file. It fixes the service account, command, restart/backoff, SIGTERM-only shutdown, `0700` process umask, systemd sandboxing, and a least-privilege split: only SQLite state is writable while configuration, ingress-token, and connector paths are explicitly read-only.
 
-**Evidence:** [`docs/live-control-snapshot.md`](docs/live-control-snapshot.md) defines the server, client, window, caching, and output contracts. Unit tests cover authentication, pre-readiness access, zero persisted writes, output size, URL restrictions, redirects, schema validation, and private atomic output. `scripts/live_control_snapshot_smoke.py` proves the complete CLI-to-service path and fixed observability in real processes.
+**Evidence:** [`docs/systemd-service.md`](docs/systemd-service.md) defines the manual account, generation, target-host verification, enabling, shutdown, and boundary contracts. Unit and CLI tests cover path and account injection, private input, output permissions, no-overwrite, fixed sandbox directives, no environment or secret output, and port stability. `scripts/systemd_service_smoke.py` proves the real CLI generator and Doctor path without requiring systemd on the development machine.
 
-**Safety boundary:** This is a single-team read surface, not a browser session, UI polling channel, pagination API, RBAC layer, hosted control plane, or remote audit store. Snapshots contain authorized workflow and run metadata; operators must protect output and terminate external TLS before loopback forwarding.
+**Safety boundary:** This is one manually enabled Linux systemd unit, not account provisioning, automatic `systemctl` execution, Launchd, Windows services, containers, Kubernetes, remote monitoring, log shipping, hosted TLS, or forceful provider-request abort. Each target host must run `systemd-analyze verify` and explicitly review/enable the output before treating it as a deployment unit.
 
 The repeatable evidence command is:
 
 ```bash
-python3 scripts/live_control_snapshot_smoke.py --work-dir /tmp/skill2workflow-live-snapshot-loop55
+python3 scripts/systemd_service_smoke.py --work-dir /tmp/skill2workflow-systemd-service-loop56
 ```
 
-Loop 55 closes the live Operator read gap without adding remote mutations or poll-driven audit growth. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
+Loop 56 closes the single-host supervisor-definition gap without altering host state or expanding the network boundary. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 55 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the live snapshot drill.
+This rolling queue is ordered. Loop 56 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the systemd supervisor drill.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -103,6 +103,7 @@ This rolling queue is ordered. Loop 55 is complete and there is no active delive
 | Loop 53: Operational Readiness Doctor | Complete | Diagnose whether one self-hosted service configuration can safely start without mutating its workspace | Fixed secret-free checks, shared startup guards, stable exit codes, permission and bind failure evidence, and a real CLI drill |
 | Loop 54: Descriptor-bound Connector Credentials | Complete | Bind every execution-time connector credential read to one private regular file without losing atomic rotation | `0700`/`0600` enforcement, no-follow identity checks, 64 KiB bound, generic failures, and outbound suppression evidence |
 | Loop 55: Authenticated Live Operator Snapshot | Complete | Expose the existing Operator artifact through a bounded authenticated service read without poll-driven state mutation | Fixed-window and byte bounds, safe token-file CLI, owner-only output, fixed telemetry, and real-process evidence |
+| Loop 56: Linux systemd Supervision | Complete | Generate one least-privilege manually enabled Linux systemd unit for a secure self-hosted workspace | Non-overwrite CLI, fixed systemd sandbox, state-only write path, SIGTERM-only shutdown, target-host verification contract, and portable generator evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -137,6 +138,8 @@ Loop 53 covers read-only pre-start diagnostics. It excludes repair, permission c
 Loop 54 covers only directory-backed connector credential reads. It excludes encryption at rest, secret distribution, IAM, OAuth, hosted vaults, automatic rotation, certificate/key parsing, and changes to the local-evaluation JSON credential file.
 
 Loop 55 covers only authenticated bounded reads of the current control snapshot. It excludes browser credential storage, CORS, live UI polling, remote mutations, pagination cursors, RBAC, hosted TLS, multi-tenant filtering, and remote audit storage.
+
+Loop 56 covers only generation of one manually enabled Linux systemd unit. It excludes account provisioning, automatic unit installation or enabling, service-manager alternatives, containers, log shipping, TLS/proxy automation, hosted monitoring, secret rotation, distributed coordination, and forceful provider-request abort.
 
 Selection rules:
 
@@ -227,6 +230,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 53: Operational Readiness Doctor | Complete | Fixed secret-free startup checks, descriptor-bound token validation, private runtime directories, stable exits, and real CLI failure evidence |
 | Loop 54: Descriptor-bound Connector Credentials | Complete | Private descriptor-bound value reads, bounded UTF-8 input, atomic rotation, fixed errors, and real transport-suppression evidence |
 | Loop 55: Authenticated Live Operator Snapshot | Complete | Zero-write authenticated service snapshot, fixed collection and byte bounds, safe CLI retrieval, private atomic output, and real-process observability evidence |
+| Loop 56: Linux systemd Supervision | Complete | Non-overwriting CLI unit generation, fixed Linux sandboxing, state-only write access, SIGTERM-only shutdown, target-host verification steps, and portable real-CLI evidence |
 
 ## Release Direction
 

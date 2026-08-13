@@ -27,7 +27,10 @@ state upgrade, retention, cancellation, and operator snapshot export.
 The qualification also starts a strict loopback fixture and makes the installed
 `control-snapshot` command perform one authenticated live fetch. It verifies the
 fixed endpoint, protected token-file path, bounded schema, empty standard output,
-and owner-only `0600` artifact from outside the source checkout.
+and owner-only `0600` artifact from outside the source checkout. It also runs
+the installed `systemd-unit` command against a fixed-port copy of the secure
+bootstrap configuration, checking the generated unit's permissions, journal
+output directives, state-only write path, sandboxing, and secret redaction.
 
 Before installation, the qualification opens the wheel itself. It requires
 the byte-for-byte official Apache-2.0 license under the single `dist-info`

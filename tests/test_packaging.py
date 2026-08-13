@@ -95,7 +95,9 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("skill2workflow", text)
         self.assertIn('command, "--help"', text)
         self.assertIn("validate", text)
+        self.assertIn("systemd-unit", text)
         self.assertIn('"live_snapshot_status": live_snapshot_status', text)
+        self.assertIn('"systemd_unit_status": systemd_unit_status', text)
 
     def test_release_docs_define_isolated_wheel_qualification(self):
         root = Path(__file__).resolve().parents[1]
@@ -106,6 +108,7 @@ class PackagingMetadataTests(TestCase):
 
         self.assertIn("isolated wheel", release_process)
         self.assertIn("scripts/package_smoke.py", release_process)
+        self.assertIn("systemd-unit", release_process)
         self.assertIn("wheel", harness)
         self.assertNotIn("verifies editable install", harness)
 
@@ -128,8 +131,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("Changelog", guide)
         self.assertIn("Security", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
-        self.assertIn("- Completed delivery loops: 1-55", roadmap)
-        self.assertIn("- Active loop: None; Loop 55 is complete", roadmap)
+        self.assertIn("- Completed delivery loops: 1-56", roadmap)
+        self.assertIn("- Active loop: None; Loop 56 is complete", roadmap)
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-55 are complete", readme)
+        self.assertIn("Delivery Loops 1-56 are complete", readme)
         self.assertIn("release-artifact qualification", readme)

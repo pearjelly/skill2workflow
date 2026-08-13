@@ -62,6 +62,12 @@ def load_service_config(path: Path) -> ServiceConfig:
         payload = json.loads(config_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError(f"service config could not be loaded: {config_path}") from error
+    return parse_service_config(payload)
+
+
+def parse_service_config(payload: object) -> ServiceConfig:
+    """Validate a decoded service configuration without reading the filesystem."""
+
     if not isinstance(payload, dict):
         raise ValueError("service config must be a JSON object")
     if set(payload) != {"schema_version", "service", "runtime", "auth", "credentials"}:
