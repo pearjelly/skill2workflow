@@ -124,6 +124,40 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_incomplete_request_body_times_out_with_bounded_error(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch(
+                "skill2workflow.service.REQUEST_SOCKET_TIMEOUT_SECONDS",
+                0.05,
+            ):
+                service = RuntimeService(_service_config(root))
+                host, port = service.server_address
+                thread = threading.Thread(
+                    target=service._server.handle_request,
+                    daemon=True,
+                )
+                thread.start()
+                with socket.create_connection((host, port), timeout=2) as connection:
+                    connection.sendall(
+                        (
+                            "POST /api/v1/retention-readiness HTTP/1.1\r\n"
+                            f"Host: {host}\r\n"
+                            f"Authorization: Bearer {AUTH_TOKEN}\r\n"
+                            "Content-Length: 2\r\n"
+                            "Connection: close\r\n"
+                            "\r\n"
+                        ).encode("ascii")
+                    )
+                    connection.settimeout(2)
+                    response = connection.recv(4096)
+                thread.join(timeout=2)
+                service._server.server_close()
+
+        self.assertIn(b"408 Request Timeout", response)
+        self.assertIn(b'"error": "request timed out"', response)
+        self.assertFalse(thread.is_alive())
+
     def test_audit_consistency_is_authenticated_bounded_and_read_only(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

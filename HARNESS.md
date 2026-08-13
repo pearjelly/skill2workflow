@@ -525,6 +525,7 @@ Implemented:
   - exposes compact trigger metadata under `run_state.context.trigger`
   - shares one mapping behavior across CLI, webhook, and scheduled-trigger runs
   - enforces one 1 MiB canonical UTF-8 input limit across CLI, webhook, one-shot, and recurring schedule triggers
+  - bounds advertised HTTP request-body reads to five seconds and returns fixed `408` errors for stalled clients
 - Runtime policy and recovery
   - documents retry and recovery semantics in `docs/runtime-policy.md`
   - treats `retry.max_attempts` as retries after the first connector attempt

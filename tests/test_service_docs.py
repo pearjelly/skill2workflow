@@ -56,10 +56,15 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("service-retention-readiness", guide)
         self.assertIn("remote-operational-readiness.md", guide)
         self.assertIn("service-operational-readiness", guide)
+        self.assertIn("REQUEST_SOCKET_TIMEOUT_SECONDS", guide)
+        self.assertIn("HTTP `408`", guide)
+        self.assertIn("request timed out", guide)
+        stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
+        self.assertIn("five-second request-body socket deadline", stability)
 
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-93 are complete", readme)
+        self.assertIn("Delivery Loops 1-94 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

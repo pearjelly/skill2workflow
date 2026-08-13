@@ -27,6 +27,9 @@ class TriggerDocumentationTests(TestCase):
             "Stable Workflow Version Aliases",
             "workflow_promoted",
             "requested alias",
+            "five-second socket deadline",
+            "HTTP `408`",
+            "request timed out",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("Loop 62: Durable SQLite Trigger Idempotency", roadmap)

@@ -237,6 +237,11 @@ The local adapter accepts at most 1 MiB of request body. It rejects transfer
 encoding, duplicate/invalid/negative `Content-Length` values, and oversized
 bodies before reading or triggering a workflow. An oversized request receives
 HTTP `413`; malformed length metadata receives HTTP `400`.
+After valid length parsing, body reads use a fixed five-second socket deadline.
+A client that stalls before sending the advertised bytes receives HTTP `408`
+with the fixed error `request timed out`; the adapter does not trigger a
+workflow from a partial body. The authenticated service uses the same deadline
+and error contract.
 
 The response shape matches the CLI trigger response:
 

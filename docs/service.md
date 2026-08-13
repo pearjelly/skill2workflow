@@ -137,6 +137,13 @@ proxy can observe liveness and remove a draining instance. The budget is
 process-local and protects one single-tenant service; it is not a distributed
 queue or a guarantee of exactly-once execution.
 
+Request bodies are read with a fixed five-second socket deadline
+(`REQUEST_SOCKET_TIMEOUT_SECONDS`). A client that advertises a body but stalls
+before delivering it receives HTTP `408` with `{"error":"request timed out"}`;
+the handler releases its admission slot and closes the connection. This bounds
+slow or half-open body reads during overload and graceful drain. It is a
+per-request read deadline, not a total workflow or connector execution timeout.
+
 The webhook request and response contract remains documented in [`triggers.md`](triggers.md). Health does not imply readiness: during shutdown, readiness is withdrawn before the HTTP server closes.
 
 The live snapshot remains available before readiness when authentication and

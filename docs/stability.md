@@ -49,6 +49,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Shared 1 MiB canonical UTF-8 JSON-object trigger-input limit and fixed oversize failure boundary documented in `docs/triggers.md`
 - Optional bounded declarative `input_schema` trigger contracts, publication validation, and pre-idempotency runtime rejection documented in `docs/workflow-dsl-contract.md` and `docs/triggers.md`
 - Fixed process-local business-request admission of 16 active handlers, `429`/`Retry-After` rejection, and probe availability documented in `docs/service.md`
+- Fixed five-second request-body socket deadline and `408` `request timed out` contract for the service and loopback webhook adapter, without changing connector execution deadlines
 - Local webhook route and response shape documented in `docs/triggers.md`
 - Self-hosted service configuration `skill2workflow-service-0.2.0` and its published JSON Schema
 - Local `service-token-rotate` and `skill2workflow-service-token-rotation-result-0.1.0` preserve owner-only atomic ingress-token replacement without returning the secret

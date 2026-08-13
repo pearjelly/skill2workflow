@@ -61,7 +61,12 @@ from .state_layout import (
 )
 from .telemetry import RuntimeTelemetry
 from .triggers import TriggerIdempotencyError
-from .webhooks import MAX_REQUEST_BODY_BYTES, WebhookError, handle_webhook_request
+from .webhooks import (
+    MAX_REQUEST_BODY_BYTES,
+    WebhookError,
+    handle_webhook_request,
+    read_request_body,
+)
 
 
 SERVICE_SCHEMA_VERSION = "skill2workflow-service-0.2.0"
@@ -93,6 +98,7 @@ MAX_RETENTION_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
+REQUEST_SOCKET_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -526,6 +532,10 @@ def _restore_signal_handlers(previous) -> None:
 
 def _handler_for(service: RuntimeService):
     class RuntimeRequestHandler(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(REQUEST_SOCKET_TIMEOUT_SECONDS)
+
         def do_GET(self):
             self._dispatch_request()
 
@@ -871,7 +881,7 @@ def _handler_for(service: RuntimeService):
                 "recurring_schedule_action",
             )
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 if not body:
                     raise ValueError(
                         "recurring schedule action body must be an empty JSON object"
@@ -1115,7 +1125,7 @@ def _handler_for(service: RuntimeService):
                 )
                 return
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 payload = json.loads(body.decode("utf-8"))
                 if (
                     not isinstance(payload, dict)
@@ -1329,7 +1339,7 @@ def _handler_for(service: RuntimeService):
                 "workflow_release",
             )
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 payload = json.loads(body.decode("utf-8"))
                 if (
                     not isinstance(payload, dict)
@@ -1395,7 +1405,7 @@ def _handler_for(service: RuntimeService):
                 "workflow_promotion",
             )
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 payload = json.loads(body.decode("utf-8"))
                 fields = {
                     "workflow_id",
@@ -1487,7 +1497,7 @@ def _handler_for(service: RuntimeService):
                 "workflow_deprecation",
             )
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 payload = json.loads(body.decode("utf-8"))
                 fields = {"workflow_id", "version"}
                 if (
@@ -1707,7 +1717,7 @@ def _handler_for(service: RuntimeService):
                 route,
             )
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 payload = handle_webhook_request(
                     service.control_plane,
                     self.command,
@@ -1756,7 +1766,7 @@ def _handler_for(service: RuntimeService):
                 "run_cancel",
             )
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 if not body:
                     raise ValueError("run cancellation body must be an empty JSON object")
                 payload = json.loads(body.decode("utf-8"))
@@ -1822,7 +1832,7 @@ def _handler_for(service: RuntimeService):
                 "run_resume",
             )
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 if not body:
                     raise ValueError("run resume body must contain approved boolean")
                 payload = json.loads(body.decode("utf-8"))

@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-93 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-94 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -910,6 +910,11 @@ the authenticated service and installed `service-operational-readiness` client
 combine lifecycle, artifact, audit-chain, and offline-backup checks into one
 bounded, value-free report without adding lifecycle mutation or claiming an
 atomic cross-database snapshot.
+
+Loop 94 adds a fixed request-body read deadline to the [self-hosted service](docs/service.md)
+and [local trigger adapter](docs/triggers.md): stalled clients receive a
+bounded `408` response, release admission capacity, and cannot hold the service
+open indefinitely while an advertised body remains incomplete.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a fixed five-second request-body socket deadline to the local webhook
+  adapter and authenticated service. Half-open or stalled bodies now receive a
+  bounded HTTP `408` response and release their handler slot without triggering
+  a workflow or blocking graceful drain.
 - Added authenticated remote operational readiness at
   `GET /api/v1/operational-readiness` and the protected
   `service-operational-readiness` CLI, combining fixed lifecycle,

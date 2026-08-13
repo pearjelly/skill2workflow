@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import socket
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Callable, Dict
 from urllib.parse import unquote, urlsplit
@@ -12,6 +13,7 @@ from .triggers import normalize_trigger_input
 
 
 MAX_REQUEST_BODY_BYTES = 1024 * 1024
+REQUEST_SOCKET_TIMEOUT_SECONDS = 5.0
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -80,6 +82,10 @@ def serve_webhook_requests(
 
 def _handler_for(control_plane):
     class LocalWebhookRequestHandler(BaseHTTPRequestHandler):
+        def setup(self):
+            super().setup()
+            self.connection.settimeout(REQUEST_SOCKET_TIMEOUT_SECONDS)
+
         def do_POST(self):
             self._handle_webhook()
 
@@ -94,7 +100,7 @@ def _handler_for(control_plane):
 
         def _handle_webhook(self):
             try:
-                body = self.rfile.read(_content_length(self))
+                body = read_request_body(self)
                 payload = handle_webhook_request(control_plane, self.command, self.path, body)
                 self._send_json(200, payload)
             except WebhookError as error:
@@ -170,3 +176,12 @@ def _content_length(handler: BaseHTTPRequestHandler) -> int:
             status_code=413,
         )
     return value
+
+
+def read_request_body(handler: BaseHTTPRequestHandler) -> bytes:
+    """Read one bounded request body and convert socket stalls to HTTP 408."""
+
+    try:
+        return handler.rfile.read(_content_length(handler))
+    except socket.timeout as error:
+        raise WebhookError("request timed out", status_code=408) from error

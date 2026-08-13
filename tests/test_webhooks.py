@@ -1,4 +1,5 @@
 import json
+import socket
 import threading
 import urllib.error
 import urllib.request
@@ -8,6 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.webhooks import (
@@ -21,6 +23,53 @@ from skill2workflow.webhooks import (
 
 
 class WebhookTests(TestCase):
+    def test_serve_webhook_requests_times_out_incomplete_body_without_triggering(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp))
+            control.publish_workflow(_workflow("3.2.0"))
+            ready = threading.Event()
+            address = {}
+            with patch(
+                "skill2workflow.webhooks.REQUEST_SOCKET_TIMEOUT_SECONDS",
+                0.05,
+            ):
+                thread = threading.Thread(
+                    target=serve_webhook_requests,
+                    kwargs={
+                        "host": "127.0.0.1",
+                        "port": 0,
+                        "control_plane": control,
+                        "once": True,
+                        "ready_callback": lambda server: (
+                            address.update({"server": server.server_address}),
+                            ready.set(),
+                        ),
+                    },
+                    daemon=True,
+                )
+                thread.start()
+                self.assertTrue(ready.wait(timeout=2))
+                host, port = address["server"]
+                with socket.create_connection((host, port), timeout=2) as connection:
+                    connection.sendall(
+                        (
+                            "POST /webhooks/workflow_webhook/3.2.0 HTTP/1.1\r\n"
+                            f"Host: {host}\r\n"
+                            "Content-Length: 2\r\n"
+                            "Connection: close\r\n"
+                            "\r\n"
+                        ).encode("ascii")
+                    )
+                    connection.settimeout(2)
+                    response = connection.recv(4096)
+                thread.join(timeout=2)
+            runs = control.list_runs()
+
+        self.assertIn(b"408 Request Timeout", response)
+        self.assertIn(b'"error": "request timed out"', response)
+        self.assertEqual(runs, [])
+        self.assertFalse(thread.is_alive())
+
     def test_serve_webhook_requests_rejects_non_loopback_binding(self):
         with TemporaryDirectory() as tmp:
             with self.assertRaisesRegex(ValueError, "loopback host"):
