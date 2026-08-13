@@ -226,6 +226,36 @@ class CompilerTests(TestCase):
         errors = validate_workflow_structured(workflow)
         self.assertIn("policy_timeout_invalid", {error["code"] for error in errors})
 
+    def test_declared_fallback_transition_requires_a_matching_edge(self):
+        unsupported = _http_mapping_workflow([])
+        unsupported["nodes"][0]["on_fallback"] = "call_api"
+        self.assertIn(
+            "fallback_transition_unsupported",
+            {error["code"] for error in validate_workflow_structured(unsupported)},
+        )
+
+        workflow = _http_mapping_workflow([])
+        workflow["nodes"][1]["on_fallback"] = "fallback"
+
+        errors = validate_workflow_structured(workflow)
+        self.assertTrue(any(error["code"] == "node_transition_target_missing" for error in errors), errors)
+
+        workflow["nodes"].insert(
+            2,
+            {"id": "fallback", "type": "step", "title": "Fallback", "on_success": "end", "on_failure": "failure"},
+        )
+        errors = validate_workflow_structured(workflow)
+        self.assertTrue(any(error["code"] == "transition_edge_missing" for error in errors), errors)
+        workflow["edges"].extend(
+            [
+                {"id": "edge_call_fallback", "from": "call_api", "to": "fallback", "label": "fallback"},
+                {"id": "edge_fallback_end", "from": "fallback", "to": "end", "label": "next"},
+                {"id": "edge_fallback_failure", "from": "fallback", "to": "failure", "label": "failure"},
+            ]
+        )
+        errors = validate_workflow_structured(workflow)
+        self.assertEqual(errors, [])
+
 
 def _http_mapping_workflow(input_mapping):
     return {

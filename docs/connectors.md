@@ -401,7 +401,7 @@ HTTP 4xx and 5xx responses produce a failed connector result instead of raising:
 }
 ```
 
-Invalid request metadata, unsupported URL schemes, JSON body serialization failures, connection failures, and timeouts raise `ConnectorExecutionError`. The executor catches those errors, records a failed connector node result, emits `connector_failed` and `node_failed`, and follows the node's `on_failure` transition.
+Invalid request metadata, unsupported URL schemes, JSON body serialization failures, connection failures, and timeouts raise `ConnectorExecutionError`. The executor catches those errors, records a failed connector node result, emits `connector_failed` and `node_failed`, and follows the node's `on_failure` transition unless the node declares an explicit `on_fallback` path.
 
 ## Retry And Timeout Boundary
 
@@ -414,6 +414,7 @@ Retry and recovery events are recorded in run state and published-run audit logs
 - `node_retrying`
 - `node_recovered`
 - `node_failed`
+- `node_fallback`
 
 See `docs/runtime-policy.md` for current policy semantics and limits.
 

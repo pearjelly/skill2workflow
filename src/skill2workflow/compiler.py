@@ -9,6 +9,7 @@ from .connectors import default_connector_binding
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
+_TRANSITION_KEYS = ("on_success", "on_failure", "on_fallback")
 
 
 def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
@@ -210,7 +211,7 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
         node_id = node.get("id")
         node_type = node.get("type")
         if node_type in {"end", "failure"}:
-            for key in ("on_success", "on_failure"):
+            for key in _TRANSITION_KEYS:
                 if node.get(key):
                     errors.append(
                         _validation_error(
@@ -236,8 +237,16 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
                     ["nodes", index, "on_failure"],
                 )
             )
+        if node.get("on_fallback") and node_type != "tool_call":
+            errors.append(
+                _validation_error(
+                    "fallback_transition_unsupported",
+                    f"{node_id} on_fallback is supported only for tool_call nodes",
+                    ["nodes", index, "on_fallback"],
+                )
+            )
         _validate_connector_binding(node, index, errors)
-        for key in ("on_success", "on_failure"):
+        for key in _TRANSITION_KEYS:
             target = node.get(key)
             if target is not None and target not in node_map:
                 errors.append(
@@ -332,7 +341,7 @@ def _validate_transition_edges(
     for node_id, node in node_map.items():
         if node.get("type") in {"end", "failure"}:
             continue
-        for key in ("on_success", "on_failure"):
+        for key in _TRANSITION_KEYS:
             target = node.get(key)
             if target is None or target not in node_map:
                 continue
@@ -486,7 +495,7 @@ def _validation_error(code: str, message: str, path: List[object]) -> Validation
 
 
 def _transition_targets(node: Dict[str, object]) -> Set[object]:
-    return {node[key] for key in ("on_success", "on_failure") if node.get(key) is not None}
+    return {node[key] for key in _TRANSITION_KEYS if node.get(key) is not None}
 
 
 def _node_type_for_step(title: str) -> str:
@@ -573,7 +582,7 @@ def _reachable_nodes(node_map: Dict[object, Dict[str, object]], entry: str) -> S
             continue
         seen.add(node_id)
         node = node_map[node_id]
-        for key in ("on_success", "on_failure"):
+        for key in _TRANSITION_KEYS:
             target = node.get(key)
             if isinstance(target, str) and target in node_map:
                 stack.append(target)

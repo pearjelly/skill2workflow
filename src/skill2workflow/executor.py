@@ -422,6 +422,7 @@ class LocalExecutor:
             self._event(state, "node_completed", current_id)
             next_node = node.get("on_success")
         else:
+            fallback_target = node.get("on_fallback")
             self._event(
                 state,
                 "node_failed",
@@ -435,7 +436,22 @@ class LocalExecutor:
                     **_connector_audit_event_fields(audit_summary),
                 },
             )
-            next_node = node.get("on_failure")
+            if isinstance(fallback_target, str) and fallback_target:
+                node_result["fallback_target"] = fallback_target
+                self._event(
+                    state,
+                    "node_fallback",
+                    current_id,
+                    {
+                        "target": fallback_target,
+                        "attempt": attempts,
+                        "max_attempts": max_attempts,
+                        "error": last_error,
+                    },
+                )
+                next_node = fallback_target
+            else:
+                next_node = node.get("on_failure")
 
         cancelled = self._cancel_if_requested(state)
         if cancelled is not None:

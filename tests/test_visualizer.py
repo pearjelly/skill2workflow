@@ -166,6 +166,38 @@ class VisualizerTests(TestCase):
             ],
         )
 
+    def test_workflow_to_litegraph_preserves_fallback_transition_slot(self):
+        workflow = _authoring_workflow()
+        workflow["nodes"][2]["on_fallback"] = "end"
+        workflow["edges"].append(
+            {"id": "edge_api_fallback", "from": "call_api", "to": "end", "label": "fallback"}
+        )
+
+        graph = workflow_to_litegraph(workflow)
+        api = next(node for node in graph["nodes"] if node["properties"]["workflow_node_id"] == "call_api")
+
+        self.assertEqual([output["name"] for output in api["outputs"]], ["success", "failure", "fallback"])
+        self.assertEqual(graph["links"][5], [6, 3, 2, 5, 1, "flow"])
+
+    def test_workflow_to_litegraph_compacts_fallback_slot_without_failure_transition(self):
+        workflow = _authoring_workflow()
+        workflow["nodes"][2].pop("on_failure")
+        workflow["nodes"][2]["on_fallback"] = "end"
+        workflow["edges"] = [
+            edge
+            for edge in workflow["edges"]
+            if edge.get("id") != "edge_api_failure"
+        ]
+        workflow["edges"].append(
+            {"id": "edge_api_fallback", "from": "call_api", "to": "end", "label": "fallback"}
+        )
+
+        graph = workflow_to_litegraph(workflow)
+        api = next(node for node in graph["nodes"] if node["properties"]["workflow_node_id"] == "call_api")
+
+        self.assertEqual([output["name"] for output in api["outputs"]], ["success", "fallback"])
+        self.assertEqual(graph["links"][-1], [5, 3, 1, 5, 1, "flow"])
+
     def test_apply_litegraph_edits_to_workflow_updates_parameters_only(self):
         workflow = _approval_workflow()
         graph = workflow_to_litegraph(workflow)

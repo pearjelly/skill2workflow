@@ -449,6 +449,8 @@ class LocalControlPlane:
                 "attempt",
                 "next_attempt",
                 "max_attempts",
+                "target",
+                "fallback_target",
                 "error",
                 "input_mapping_status",
                 "input_mapping_keys",
@@ -510,4 +512,5 @@ def _promote_runtime_event(event_type: str) -> bool:
         "node_retrying",
         "node_recovered",
         "node_failed",
+        "node_fallback",
     }

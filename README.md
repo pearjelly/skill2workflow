@@ -119,6 +119,7 @@ explicit connector boundaries. It currently supports:
 - Resolve local credential handles for HTTP connector request headers without storing secret values in Workflow DSL or audit output
 - Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
 - Honor connector-node `retry.max_attempts` and record retry/recovery events
+- Route exhausted `tool_call` retries through an explicit `on_fallback` path while preserving failed-attempt evidence
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
 - Derive read-only node-level run overlays from run state and audit evidence
 - Open a static LiteGraph visual editor for graph inspection and parameter edits
@@ -671,7 +672,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-63 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-64 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -720,6 +721,8 @@ Loop 61 adds an authenticated [redacted support bundle](docs/support-bundle.md):
 Loop 62 adds [durable trigger idempotency](docs/triggers.md#durable-trigger-idempotency): SQLite service and control-plane triggers claim a safe key before execution, replay identical requests without a second run, and fail closed on conflicts or unknown outcomes.
 
 Loop 63 adds [bounded active execution timeout](docs/runtime-policy.md): the existing `policies.default_timeout_ms` field is validated and enforced at durable executor safe points, persisted with the run, paused during human-gate review, and recorded as fixed timeout failure evidence.
+
+Loop 64 adds [declarative fallback transitions](docs/workflow-dsl-contract.md): exhausted `tool_call` retries preserve the failed node and route only through an explicit `on_fallback` edge, with fixed control-plane evidence and a third LiteGraph output slot. It does not claim provider failover, compensation, or exactly-once execution.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

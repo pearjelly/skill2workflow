@@ -48,6 +48,21 @@ downstream systems after a returned connector call, or local process scheduling.
 
 The local executor does not yet implement global workflow deadlines, node-level wall-clock deadlines, delayed retry backoff, or scheduled recovery. Those remain future runtime policy work.
 
+## Fallback Transitions
+
+Connector failures normally follow `on_failure`. A `tool_call` can instead
+declare an explicit `on_fallback` edge for a controlled alternate path:
+
+- all declared retries run first;
+- the failed node result, connector attempt metadata, and `node_failed` event
+  remain durable;
+- `node_fallback` records the target and the executor continues there;
+- no alternate provider call is synthesized and no failed output is erased.
+
+Use a fallback node for a safe notification, manual escalation, or compensating
+workflow step. It is not an exactly-once guarantee and it must not be used to
+blindly repeat an effect whose provider outcome is unknown.
+
 ## Run Events
 
 The executor records policy and recovery visibility in run state:
@@ -58,7 +73,8 @@ The executor records policy and recovery visibility in run state:
 | `connector_failed` | A connector attempt failed. Includes connector metadata, `attempt`, `max_attempts`, and `error`. |
 | `node_retrying` | A failed connector node will be retried. Includes `attempt`, `next_attempt`, `max_attempts`, and `error`. |
 | `node_recovered` | A connector node succeeded after at least one failed attempt. Includes final `attempt`, `max_attempts`, and last error. |
-| `node_failed` | A node reached terminal failure after exhausting available retry attempts. |
+| `node_failed` | A connector node failed after exhausting available retry attempts; it may still route through `on_fallback`. |
+| `node_fallback` | A failed connector node routed to its explicit `on_fallback` target after retries were exhausted. |
 | `run_interrupted` | A replacement service fenced an active execution owned by a lost process. The external outcome is unknown and no automatic retry occurs. |
 
 Node results for connector nodes include:

@@ -33,6 +33,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Authenticated `GET /api/v1/support-bundle`, redacted support-bundle schema `skill2workflow-support-bundle-0.1.0`, and protected `service-support-bundle` CLI documented in `docs/support-bundle.md`
 - SQLite trigger idempotency for keyed service/control-plane requests, including durable replay, fixed `409` conflicts, and unresolved-outcome fail-closed behavior documented in `docs/triggers.md`
 - Bounded active execution timeout semantics for `policies.default_timeout_ms`, including fixed `execution_timeout` evidence and human-gate pause behavior documented in `docs/runtime-policy.md`
+- Optional `tool_call.on_fallback` transition semantics, edge validation, LiteGraph slot projection, and fixed `node_fallback` evidence documented in `docs/workflow-dsl-contract.md`
 - Authenticated Prometheus text metric names, fixed label vocabularies, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`
 - Control snapshot `skill2workflow-control-snapshot-0.1.0`, `schemas/control-snapshot-0.1.0.schema.json`, authenticated `GET /api/v1/control-snapshot`, and live `window` semantics documented in `docs/live-control-snapshot.md`
 - Retention policies `skill2workflow-retention-policy-0.1.0`, `skill2workflow-retention-policy-0.2.0`, and `skill2workflow-retention-policy-0.3.0`, aggregate plan/apply summaries, and protected state semantics documented in `docs/data-retention.md`
@@ -61,7 +62,7 @@ These surfaces may change while the project learns from real workflows:
 - Connector package installation, marketplace indexing, OAuth, hosted callbacks, and distributed queues
 - HTTP connector request metadata beyond documented method, URL, headers, body, timeout, credential handles, and body-only input mapping
 - Credential providers beyond the documented local static file and mounted directory boundaries
-- Advanced retry behavior beyond documented connector-node retry execution
+- Advanced retry behavior beyond documented connector-node retry and fallback execution
 - Hosted secret storage, OAuth, multi-tenant RBAC, and IAM
 - Advanced input mapping beyond the body-only contract, templating, and connector request interpolation
 - Hosted webhook ingress, callback verification, distributed queues, cron/calendar scheduling, and multi-database schedulers

@@ -21,6 +21,8 @@ class RuntimePolicyDocumentationTests(TestCase):
             "execution_timeout",
             "human gate is waiting",
             "automatic idempotency enforcement for JSON/local evaluation",
+            "on_fallback",
+            "node_fallback",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("execution_timeout", compatibility)

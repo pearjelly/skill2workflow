@@ -75,6 +75,40 @@ class ExecutorTests(TestCase):
         self.assertEqual(failed["error_code"], "execution_timeout")
         self.assertEqual(failed["execution"]["deadline_at"], "")
 
+    def test_connector_failure_routes_to_declared_fallback_without_retrying_side_effect(self):
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["nodes"][1]["on_fallback"] = "fallback"
+        workflow["nodes"].insert(
+            2,
+            {
+                "id": "fallback",
+                "type": "step",
+                "title": "Fallback handling",
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+        )
+        workflow["edges"].extend(
+            [
+                {"id": "edge_call_fallback", "from": "call_api", "to": "fallback", "label": "fallback"},
+                {"id": "edge_fallback_end", "from": "fallback", "to": "end", "label": "next"},
+            ]
+        )
+        runtime = _FailingConnectorRuntime()
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(Path(tmp), connector_runtime=runtime).run(workflow)
+
+        self.assertEqual(state["status"], "completed")
+        self.assertEqual(runtime.calls, 1)
+        self.assertEqual(state["node_results"]["call_api"]["status"], "failed")
+        self.assertEqual(state["node_results"]["call_api"]["fallback_target"], "fallback")
+        self.assertEqual(state["current_node"], "end")
+        self.assertEqual(
+            [event["type"] for event in state["events"] if event.get("node_id") == "call_api"],
+            ["node_started", "connector_started", "connector_failed", "node_failed", "node_fallback"],
+        )
+
     def test_run_pauses_at_human_gate_and_resume_completes(self):
         workflow = {
             "schema_version": "0.1.0",
@@ -383,6 +417,20 @@ class _CapturingConnectorRuntime:
         return {
             "status": "completed",
             "connector": {"id": "http", "kind": "http"},
+            "output": {},
+        }
+
+
+class _FailingConnectorRuntime:
+    def __init__(self):
+        self.calls = 0
+
+    def execute_connector(self, node, credential_provider=None, context=None):
+        self.calls += 1
+        return {
+            "status": "failed",
+            "connector": {"id": "http", "kind": "http"},
+            "error": "provider unavailable",
             "output": {},
         }
 

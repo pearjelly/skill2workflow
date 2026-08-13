@@ -81,7 +81,29 @@ HTTP connector request metadata may declare body-only `input_mapping`. The built
 
 Validation requires `tool_call` nodes to declare `connector.id`. Missing bindings produce `connector_binding_missing`.
 
-Published runs promote connector runtime events into control-plane audit events, including `connector_started`, `connector_completed`, and `connector_failed`.
+Published runs promote connector runtime events into control-plane audit events, including `connector_started`, `connector_completed`, `connector_failed`, and explicit `node_fallback` routes.
+
+## Failure Transitions
+
+All executable nodes declare `on_success`; nodes that can fail normally declare
+`on_failure`. A `tool_call` may additionally declare `on_fallback`:
+
+```json
+{
+  "id": "call_primary",
+  "type": "tool_call",
+  "on_success": "end",
+  "on_failure": "failure",
+  "on_fallback": "manual_recovery"
+}
+```
+
+`on_fallback` is an explicit, edge-backed alternative path used only after the
+connector has exhausted its declared retries. The failed node result and its
+`node_failed` evidence remain durable; the executor records a `node_fallback`
+event and continues at the declared target. It does not invoke another
+provider automatically or erase the failed attempt. Only `tool_call` nodes may
+declare this field; malformed or missing targets fail validation.
 
 ## Validation
 

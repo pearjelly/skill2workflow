@@ -353,7 +353,11 @@ def _workflow_edges(workflow: Workflow, nodes: List[Dict[str, object]]) -> List[
     derived_edges = []
     for node in nodes:
         node_id = node.get("id")
-        for transition, label in (("on_success", "success"), ("on_failure", "failure")):
+        for transition, label in (
+            ("on_success", "success"),
+            ("on_failure", "failure"),
+            ("on_fallback", "fallback"),
+        ):
             target = node.get(transition)
             if target:
                 derived_edges.append(
@@ -390,7 +394,7 @@ def _assert_matching_topology(workflow: Workflow, graph: LiteGraph) -> None:
         (
             str(edge["from"]),
             str(edge["to"]),
-            "failure" if str(edge.get("label") or "").lower() == "failure" else "success",
+            _edge_label(edge),
         )
         for edge in workflow_edges
     }
@@ -423,7 +427,7 @@ def _graph_edge_set(graph: LiteGraph) -> set:
             output = source_outputs[source_slot]
             if isinstance(output, dict):
                 output_name = str(output.get("name") or "success")
-        if output_name != "failure":
+        if output_name not in {"failure", "fallback"}:
             output_name = "success"
         if source_graph_id in graph_workflow_ids and target_graph_id in graph_workflow_ids:
             edges.add((graph_workflow_ids[source_graph_id], graph_workflow_ids[target_graph_id], output_name))
@@ -460,6 +464,7 @@ def _litegraph_node(
     node_type = str(node.get("type") or "step")
     has_success = bool(node.get("on_success"))
     has_failure = bool(node.get("on_failure"))
+    has_fallback = bool(node.get("on_fallback"))
     source = _source_metadata(node)
 
     properties = {
@@ -488,18 +493,27 @@ def _litegraph_node(
         "mode": 0,
         "title": str(node.get("title") or node_id),
         "inputs": [] if node_type == "start" else [{"name": "in", "type": "flow", "link": None}],
-        "outputs": _outputs(has_success, has_failure),
+        "outputs": _outputs(has_success, has_failure, has_fallback),
         "properties": properties,
     }
 
 
-def _outputs(has_success: bool, has_failure: bool) -> List[Dict[str, object]]:
-    outputs = []
+def _outputs(has_success: bool, has_failure: bool, has_fallback: bool) -> List[Dict[str, object]]:
+    return [
+        {"name": name, "type": "flow", "links": []}
+        for name in _output_names(has_success, has_failure, has_fallback)
+    ]
+
+
+def _output_names(has_success: bool, has_failure: bool, has_fallback: bool) -> List[str]:
+    names = []
     if has_success:
-        outputs.append({"name": "success", "type": "flow", "links": []})
+        names.append("success")
     if has_failure:
-        outputs.append({"name": "failure", "type": "flow", "links": []})
-    return outputs
+        names.append("failure")
+    if has_fallback:
+        names.append("fallback")
+    return names
 
 
 def _source_metadata(node: Dict[str, object]) -> Dict[str, object]:
@@ -538,9 +552,26 @@ def _run_status(node_id: str, run_state: Optional[RunState]) -> str:
 
 def _source_slot(edge: Dict[str, object], source_node: Dict[str, object]) -> int:
     label = str(edge.get("label") or "").lower()
-    if label == "failure" or edge.get("to") == source_node.get("on_failure"):
-        return 1
-    return 0
+    if label not in {"success", "failure", "fallback"}:
+        if edge.get("to") == source_node.get("on_fallback"):
+            label = "fallback"
+        elif edge.get("to") == source_node.get("on_failure"):
+            label = "failure"
+        else:
+            label = "success"
+    output_names = _output_names(
+        bool(source_node.get("on_success")),
+        bool(source_node.get("on_failure")),
+        bool(source_node.get("on_fallback")),
+    )
+    return output_names.index(label) if label in output_names else 0
+
+
+def _edge_label(edge: Dict[str, object]) -> str:
+    label = str(edge.get("label") or "").lower()
+    if label in {"failure", "fallback"}:
+        return label
+    return "success"
 
 
 def _target_slot(existing_links: Iterable[List[object]], target_graph_id: int) -> int:

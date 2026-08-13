@@ -28,6 +28,7 @@ class DslContractTests(TestCase):
         self.assertIn("input_mapping", request_properties)
         self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["from"]["pattern"], "^/input/.+")
         self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["to"]["pattern"], "^/body/.+")
+        self.assertIn("on_fallback", schema["$defs"]["node"]["properties"])
 
     def test_approval_flow_example_is_a_golden_valid_workflow_fixture(self):
         workflow = json.loads(

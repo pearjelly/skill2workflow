@@ -557,6 +557,40 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(recovered_events[0]["node_id"], "call_api")
         self.assertEqual(recovered_events[0]["attempt"], 2)
 
+    def test_published_fallback_promotes_fixed_route_evidence_to_audit(self):
+        workflow = _connector_workflow("9.1.0", "https://unused.invalid")
+        workflow["nodes"][1]["on_fallback"] = "fallback"
+        workflow["nodes"].insert(
+            2,
+            {
+                "id": "fallback",
+                "type": "step",
+                "title": "Fallback handling",
+                "on_success": "end",
+                "on_failure": "failure",
+            },
+        )
+        workflow["edges"].extend(
+            [
+                {"id": "edge_call_fallback", "from": "call_api", "to": "fallback", "label": "fallback"},
+                {"id": "edge_fallback_end", "from": "fallback", "to": "end", "label": "next"},
+                {"id": "edge_fallback_failure", "from": "fallback", "to": "failure", "label": "failure"},
+            ]
+        )
+
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(workflow)
+            control.executor.connector_runtime = _FailingConnectorRuntime()
+            state = control.run_published_workflow("workflow_connector", "9.1.0")
+            fallback_events = control.list_audit_events(
+                run_id=state["run_id"], event_type="node_fallback"
+            )
+
+        self.assertEqual(state["status"], "completed")
+        self.assertEqual(fallback_events[0]["node_id"], "call_api")
+        self.assertEqual(fallback_events[0]["target"], "fallback")
+
 
 def _workflow(version: str):
     return {
@@ -597,6 +631,16 @@ class _AdvancingConnectorRuntime:
             "status": "completed",
             "connector": {"id": "http", "kind": "http"},
             "output": {"ok": True},
+        }
+
+
+class _FailingConnectorRuntime:
+    def execute_connector(self, node, credential_provider=None, context=None):
+        return {
+            "status": "failed",
+            "connector": {"id": "http", "kind": "http"},
+            "error": "provider unavailable",
+            "output": {},
         }
 
 

@@ -133,6 +133,10 @@
         },
         "on_failure": {
           "type": "string"
+        },
+        "on_fallback": {
+          "type": "string",
+          "description": "Optional tool_call transition used after connector retries are exhausted; the failed node remains recorded and the fallback path must be explicit in edges."
         }
       }
     },
