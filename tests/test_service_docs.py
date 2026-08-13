@@ -79,6 +79,7 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("Loop 110 adds the installed `service-wait`", guide)
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         self.assertIn("five-second socket deadline", stability)
+        self.assertIn("per-node active execution timeout", stability)
         self.assertIn("GET /metrics` zero-body request validation", stability)
         self.assertIn("shutdown request observed during scheduler startup", stability)
         self.assertIn("Lifecycle state transitions are serialized", stability)
@@ -86,6 +87,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-117 are complete", readme)
+        self.assertIn("Delivery Loops 1-118 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

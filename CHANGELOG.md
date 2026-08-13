@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added bounded per-node active execution deadlines through node `timeout_ms`.
+  Expiry records fixed `node_timeout` evidence, counts retry backoff inside the
+  same node window, pauses while human gates wait, and never follows a
+  successor after a safe-point timeout.
 - Added protected cursor-paged run discovery at `GET /api/v1/runs` and the
   `service-run-page` CLI. Operators can filter by status/workflow and continue
   through history without loading unbounded run state; the existing `/runs`

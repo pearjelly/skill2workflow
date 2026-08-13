@@ -127,6 +127,45 @@ class ExecutorTests(TestCase):
         self.assertEqual(completed["status"], "completed")
         self.assertNotIn("error_code", completed)
 
+    def test_node_timeout_fails_after_connector_return_without_successor(self):
+        clock = _TestClock()
+        runtime = _AdvancingConnectorRuntime(clock, milliseconds=10)
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["nodes"][1]["timeout_ms"] = 5
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(
+                Path(tmp),
+                storage="sqlite",
+                connector_runtime=runtime,
+                clock=clock,
+            ).run(workflow)
+            persisted = LocalExecutor(Path(tmp), storage="sqlite").get_run(state["run_id"])
+
+        self.assertEqual(state["status"], "failed")
+        self.assertEqual(state["error_code"], "node_timeout")
+        self.assertEqual(state["node_results"]["call_api"]["error_code"], "node_timeout")
+        self.assertEqual(state["events"][-1]["error_code"], "node_timeout")
+        self.assertEqual(state["execution"]["node_deadline_at"], "")
+        self.assertEqual(persisted["error_code"], "node_timeout")
+        self.assertEqual(runtime.calls, 1)
+
+    def test_node_timeout_is_paused_while_human_gate_waits(self):
+        clock = _TestClock()
+        workflow = _approval_workflow()
+        workflow["nodes"][1]["timeout_ms"] = 5
+
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp), clock=clock)
+            waiting = executor.run(workflow)
+            clock.advance(1000)
+            completed = executor.resume(waiting["run_id"], approved=True)
+
+        self.assertEqual(waiting["status"], "waiting")
+        self.assertEqual(waiting["execution"]["node_deadline_at"], "")
+        self.assertEqual(completed["status"], "completed")
+        self.assertNotIn("error_code", completed)
+
     def test_malformed_persisted_deadline_fails_closed(self):
         workflow = _approval_workflow()
         workflow["policies"] = {"default_timeout_ms": 5}

@@ -102,6 +102,12 @@
           "type": "string",
           "minLength": 1
         },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400000,
+          "description": "Maximum active execution time for this node in milliseconds; zero or omission disables the node boundary. Human-gate waiting is paused."
+        },
         "description": {
           "type": "string"
         },

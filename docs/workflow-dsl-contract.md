@@ -38,6 +38,10 @@ supports `max_attempts` plus an optional fixed `backoff_ms` from `0` to
 `60000`. The `policies` object also supports a bounded
 `workflow_timeout_ms` wall-clock deadline from `0` to `2592000000`
 milliseconds; zero disables it and human-gate waiting consumes the budget.
+Nodes may also declare `timeout_ms` from `0` to `86400000` milliseconds for a
+bounded active-execution window; zero or omission disables it, and
+human-gate waiting pauses it. Expiry records fixed `node_timeout` evidence at
+a safe point and does not follow a successor.
 The current schema intentionally allows additional properties so the compiler,
 executor, visual editor, and connector runtime can add metadata without
 breaking old readers.

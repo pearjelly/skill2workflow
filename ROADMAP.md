@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-117
+- Completed delivery loops: 1-118
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 117 is complete with filtered cursor-paged run discovery
+- Active loop: None; Loop 118 is complete with per-node active execution deadlines
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-117 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-118 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 117; the detailed
+The follow-on production hardening continues through Loop 118; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -92,13 +92,14 @@ contract and prevents unread request bytes from crossing the service boundary.
 
 Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; atomic workflow alias promotion became Loop 72 after review of the release-review drill; atomic workflow registry mutations became Loop 73 after review of the promotion transaction drill; workflow artifact consistency diagnostics became Loop 74 after review of the registry mutation drill; atomic run-audit emission and consistency diagnostics became Loop 75 after review of the artifact consistency drill; authenticated remote run-audit consistency became Loop 76 after review of the remote diagnostic drill; targeted remote run-audit inspection became Loop 77 after review of the global-window operator gap; remote recurring-schedule inventory became Loop 78 after review of the remote operator scheduling gap; protected remote recurring-schedule actions became Loop 79 after review of the inventory drill; remote recurring-schedule dispatch diagnostics became Loop 80 after review of the schedule action drill; remote workflow artifact consistency diagnostics became Loop 81 after review of the remote dispatch evidence; remote backup readiness diagnostics became Loop 82 after review of the remote artifact consistency evidence; remote audit-chain verification became Loop 83 after review of the backup-readiness evidence; remote runtime identity diagnostics became Loop 84 after review of the remote audit-integrity evidence; protected remote workflow triggering became Loop 85 after review of the remote runtime-info evidence; protected remote Workflow publication became Loop 86 after review of the remote-trigger evidence; protected remote Workflow promotion became Loop 87 after review of the remote-publication evidence; protected remote Workflow diff became Loop 88 after review of the remote-promotion evidence; protected local ingress-token rotation became Loop 89 after review of the remote-diff evidence; protected remote Workflow deprecation became Loop 90 after review of the token-rotation evidence; bounded remote Workflow inventory became Loop 91 after review of the remote-deprecation evidence; policy-bound remote retention readiness became Loop 92 after review of the remote-inventory evidence; aggregate remote operational readiness became Loop 93 after review of the retention evidence; bounded request-body reads became Loop 94 after review of the operational-readiness evidence; and the deployment service probe became Loop 95 after review of the transport-boundary evidence; exact-length request-body reads became Loop 96 after review of the service-probe evidence; the fail-closed service exception boundary became Loop 97 after review of the body-read evidence. The bounded global workflow deadline became Loop 115 after review of the retry-backoff evidence. Remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux systemd unit, an authenticated human-gate decision endpoint, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, workflow artifact consistency diagnostics, atomic run-audit emission and consistency diagnostics, targeted remote run-audit inspection, remote recurring-schedule inventory, protected remote recurring-schedule actions, bounded remote recurring-schedule dispatch diagnostics, remote workflow artifact consistency diagnostics, remote backup readiness diagnostics, remote audit-chain verification, remote runtime identity diagnostics, protected remote workflow triggering, protected remote Workflow publication, protected remote Workflow promotion, protected remote Workflow diff, protected local ingress-token rotation, protected remote Workflow deprecation, bounded remote Workflow inventory, policy-bound remote retention readiness, aggregate remote operational readiness, bounded request-body reads, the fixed deployment service probe, exact-length request-body reads, lifecycle event-logger isolation, deterministic service teardown, production-boundary CI gates for security, observability, and restart continuity, the uniform zero-body metrics boundary, startup-shutdown race protection, atomic lifecycle state transitions, atomic shutdown admission, and atomic scheduler dispatch admission, live in-flight request pressure metrics, a fixed Prometheus alert starter pack, a read-only Grafana dashboard starter pack, and a value-free release artifact provenance manifest, bounded connector retry backoff, and a bounded global workflow deadline and filtered cursor-paged run discovery, are achieved by Loops 44-117. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux systemd unit, an authenticated human-gate decision endpoint, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, workflow artifact consistency diagnostics, atomic run-audit emission and consistency diagnostics, targeted remote run-audit inspection, remote recurring-schedule inventory, protected remote recurring-schedule actions, bounded remote recurring-schedule dispatch diagnostics, remote workflow artifact consistency diagnostics, remote backup readiness diagnostics, remote audit-chain verification, remote runtime identity diagnostics, protected remote workflow triggering, protected remote Workflow publication, protected remote Workflow promotion, protected remote Workflow diff, protected local ingress-token rotation, protected remote Workflow deprecation, bounded remote Workflow inventory, policy-bound remote retention readiness, aggregate remote operational readiness, bounded request-body reads, the fixed deployment service probe, exact-length request-body reads, lifecycle event-logger isolation, deterministic service teardown, production-boundary CI gates for security, observability, and restart continuity, the uniform zero-body metrics boundary, startup-shutdown race protection, atomic lifecycle state transitions, atomic shutdown admission, and atomic scheduler dispatch admission, live in-flight request pressure metrics, a fixed Prometheus alert starter pack, a read-only Grafana dashboard starter pack, and a value-free release artifact provenance manifest, bounded connector retry backoff, and a bounded global workflow deadline, filtered cursor-paged run discovery, and per-node active execution deadlines, are achieved by Loops 44-118. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
-after review of the service's bounded run-list tail. Both are verified as
-bounded SQLite service controls, not maturity-gate advances; Production
-Baseline remains directional.
+after review of the service's bounded run-list tail. Per-node active execution
+deadlines became Loop 118 after review of the global deadline and retry-backoff
+boundaries. These are verified as bounded local controls, not maturity-gate
+advances; Production Baseline remains directional.
 
 ## Active Loop
 
@@ -2235,8 +2236,8 @@ expiring a waiting run. Service, runtime-policy, recurring-scheduling, README,
 stability, changelog, and roadmap documentation define the boundary.
 
 **Safety boundary:** This is one lease-owned local SQLite sweeper, capped at
-256 candidates per pass. It does not provide distributed scheduling, node-level
-deadlines, forceful provider cancellation, automatic retry of uncertain effects,
+256 candidates per pass. It does not provide distributed scheduling, forceful
+provider cancellation, automatic retry of uncertain effects,
 or exactly-once execution. Standalone executors remain safe-point only.
 
 The focused evidence commands are:
@@ -2283,9 +2284,46 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_service_client tests.test_cli tests.test_run_detail_docs -v
 ```
 
+### Loop 118: Per-Node Active Execution Deadlines
+
+**Status:** Complete.
+
+**Prior basis:** The runtime had a workflow-wide active execution budget and a
+global wall-clock deadline, but a single slow connector or retry sequence could
+consume the entire active segment without a node-specific limit. Operators
+could not distinguish that case from a broader workflow timeout.
+
+**Outcome:** Any node may declare `timeout_ms` from `0` to 24 hours. The
+deadline starts when the node becomes current, is persisted with the run, and
+is checked before node work, after connector returns, and after retry backoff.
+Expiry records fixed `error_code: "node_timeout"` evidence, preserves the
+failed node result, and suppresses successor execution. Human-gate waiting
+clears the node window so review time is not charged.
+
+**Evidence:** Workflow JSON Schema and compiler validation cover the bound;
+executor tests cover connector-return expiry, persistence, successor
+suppression, and human-gate pause behavior; LiteGraph round-trip tests cover
+the allowlisted authoring field. Runtime-policy, compatibility, stability,
+README, changelog, service, and roadmap documentation define the safe-point
+boundary.
+
+**Safety boundary:** This is a local safe-point budget, not forceful thread or
+socket cancellation, provider reconciliation, distributed scheduling, or an
+exactly-once guarantee. A provider request already in flight is observed only
+after it returns, and standalone executors remain safe-point only.
+
+The focused evidence commands are:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_executor tests.test_compiler tests.test_visualizer \
+  tests.test_dsl_contract tests.test_runtime_policy_docs \
+  tests.test_production_roadmap -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 117 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the production-boundary CI gate evidence.
+This rolling queue is ordered. Loop 118 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the production-boundary CI gate evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -2368,6 +2406,7 @@ This rolling queue is ordered. Loop 117 is complete and there is no active deliv
 | Loop 115: Bounded Global Workflow Deadline | Complete | Bound the wall-clock lifetime of one durable run, including human-gate waiting, without changing active timeout or stable remote contracts | Additive 30-day-bounded `workflow_timeout_ms`, persisted safe-point enforcement, fixed timeout evidence, late-resume suppression, compiler/schema/docs/tests |
 | Loop 116: Lease-Owned Workflow Deadline Sweep | Complete | Converge expired waiting runs in the self-hosted SQLite service without resuming workflow work or losing terminal audit evidence | Lease-owned one-second sweep, atomic 256-candidate expiry, cancellation precedence, audit reconciliation, scheduler and real-running-service evidence |
 | Loop 117: Filtered Cursor-Paged Run Discovery | Complete | Let operators find historical runs without unbounded state reads or direct SQLite access | Protected 0.2.0 route/CLI, status and workflow filters, opaque cursor, 100-item/64 KiB bounds, redaction and service evidence |
+| Loop 118: Per-Node Active Execution Deadlines | Complete | Bound one node's active work and retry sequence without forceful provider cancellation | Bounded `timeout_ms`, fixed `node_timeout` evidence, successor suppression, human-gate pause, DSL/compiler/LiteGraph/runtime tests |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -2417,7 +2456,7 @@ Loop 61 covers only one authenticated `GET /api/v1/support-bundle` projection an
 
 Loop 62 covers only durable idempotency for non-empty trigger keys in SQLite control-plane and authenticated service requests. It excludes exactly-once provider effects, automatic replay after unknown outcomes, key expiration, distributed coordination, cross-tenant identity, and JSON/local evaluation enforcement.
 
-Loop 63 covers only the bounded active execution segment controlled by `policies.default_timeout_ms`. It excludes human-gate expiry, delayed retry backoff, background workers, forceful provider cancellation, and exactly-once execution; the separate global wall-clock deadline was added by Loop 115.
+Loop 63 covers only the bounded active execution segment controlled by `policies.default_timeout_ms`. It excludes human-gate expiry, delayed retry backoff, background workers, forceful provider cancellation, and exactly-once execution; Loop 115 added the separate global wall-clock deadline and Loop 118 added the per-node active deadline.
 
 Loop 64 covers only an explicit `tool_call.on_fallback` transition after connector retries are exhausted. It excludes provider failover, compensation, delayed backoff, hidden transition mutation, expression evaluation, and exactly-once execution.
 

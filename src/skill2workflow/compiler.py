@@ -214,6 +214,7 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
             continue
         node_id = node.get("id")
         node_type = node.get("type")
+        _validate_node_timeout(node, index, errors)
         if node_type in {"end", "failure"}:
             for key in _TRANSITION_KEYS:
                 if node.get(key):
@@ -477,6 +478,31 @@ def _validate_retry_policy(
                 "retry_backoff_invalid",
                 "retry.backoff_ms must be an integer between 0 and 60000",
                 path + ["backoff_ms"],
+            )
+        )
+
+
+def _validate_node_timeout(
+    node: Dict[str, object],
+    index: int,
+    errors: List[ValidationError],
+) -> None:
+    """Validate the additive per-node active execution timeout."""
+
+    if "timeout_ms" not in node:
+        return
+    value = node.get("timeout_ms")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 0
+        or value > 86_400_000
+    ):
+        errors.append(
+            _validation_error(
+                "node_timeout_invalid",
+                f"{node.get('id')} timeout_ms must be an integer between 0 and 86400000",
+                ["nodes", index, "timeout_ms"],
             )
         )
 

@@ -100,6 +100,7 @@ Visual write-back is allowlisted. The editor may update:
 - Node description
 - Human approval prompt
 - Tool-call instruction
+- Node active timeout (`timeout_ms`, bounded to `0..86400000` milliseconds)
 - Retry max attempts
 - Fixed connector retry backoff in the bounded `0..60000` millisecond range
 - Built-in HTTP connector request method, URL, headers, body, body-only input mapping, and timeout
@@ -133,6 +134,12 @@ wall-clock deadline: zero disables it, human-gate waiting consumes it, and an
 expiry fails closed with `error_code: "workflow_timeout"`. These fields are
 preserved by readers, editable through the visual layer where supported, and
 documented in `docs/runtime-policy.md`.
+
+Nodes may additionally carry `timeout_ms`, an additive active-execution window
+for that node. Zero or omission disables it; human-gate waiting is paused, and
+expiry records fixed `error_code: "node_timeout"` evidence without following a
+successor. This field is preserved by older readers that ignore unknown
+metadata, while current validators reject values outside `0..86400000`.
 
 Workflow DSL examples and fixtures must not store secrets. They may reference credential handles under connector metadata, but resolved credential values must stay in a local provider boundary outside Workflow DSL, LiteGraph fixtures, trigger input, run state, and audit events. Hosted credential storage, secret redaction, IAM, connector marketplaces, and product-specific SaaS connectors are outside the `0.1.x` built-in connector boundary.
 

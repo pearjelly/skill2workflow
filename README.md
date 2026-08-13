@@ -119,6 +119,7 @@ explicit connector boundaries. It currently supports:
 - Resolve local credential handles for HTTP connector request headers without storing secret values in Workflow DSL or audit output
 - Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
 - Honor connector-node `retry.max_attempts` and bounded `retry.backoff_ms`, recording retry/recovery events
+- Enforce optional per-node `timeout_ms` active execution deadlines with fixed `node_timeout` evidence and successor suppression
 - Enforce optional bounded `policies.workflow_timeout_ms` wall-clock deadlines, including human-gate wait time, with fixed timeout evidence
 - Route exhausted `tool_call` retries through an explicit `on_fallback` path while preserving failed-attempt evidence
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
@@ -721,7 +722,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-117 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-118 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1041,6 +1042,11 @@ additive authenticated `GET /api/v1/runs` route and `service-run-page` CLI let
 operators find historical failed or waiting runs without reading SQLite
 directly. Pages remain redacted and bounded to 100 items/64 KiB, while the
 existing `/runs` 0.1.0 tail contract stays unchanged.
+
+Loop 118 adds bounded [per-node active execution deadlines](docs/runtime-policy.md).
+Nodes can declare `timeout_ms` up to 24 hours; connector returns and retry
+backoff are checked at safe points, human-gate waiting is paused, and expiry
+records fixed `node_timeout` evidence without running a successor.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

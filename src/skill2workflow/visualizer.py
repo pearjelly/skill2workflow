@@ -249,6 +249,8 @@ def apply_litegraph_edits_to_workflow(workflow: Workflow, graph: LiteGraph) -> W
             description = str(properties.get("description") or "")
             if description or "description" in node:
                 node["description"] = description
+            if "timeout_ms" in properties:
+                _apply_node_timeout_edit(node, properties.get("timeout_ms"))
             _apply_action_edits(node, properties.get("action"))
             _apply_retry_edits(node, properties.get("retry"))
             _apply_connector_edits(node, properties.get("connector"))
@@ -266,6 +268,18 @@ def _apply_action_edits(node: Dict[str, object], graph_action: object) -> None:
     for key in ("prompt", "instruction"):
         if key in graph_action and (key in action or _action_kind_supports_key(action.get("kind"), key)):
             action[key] = str(graph_action.get(key) or "")
+
+
+def _apply_node_timeout_edit(node: Dict[str, object], graph_timeout: object) -> None:
+    """Apply only an explicitly represented node timeout from the graph."""
+
+    if graph_timeout is None:
+        node.pop("timeout_ms", None)
+        return
+    timeout_ms = _non_negative_int(graph_timeout, f"{node['id']} timeout_ms")
+    if timeout_ms > 86_400_000:
+        raise ValueError(f"{node['id']} timeout_ms must be at most 86400000")
+    node["timeout_ms"] = timeout_ms
 
 
 def _action_kind_supports_key(kind: object, key: str) -> bool:
@@ -477,6 +491,7 @@ def _litegraph_node(
         "workflow_node_id": node_id,
         "node_type": node_type,
         "description": str(node.get("description") or ""),
+        **({"timeout_ms": node["timeout_ms"]} if "timeout_ms" in node else {}),
         "run_status": _run_status(node_id, run_state),
         "source": source,
         "requires": copy.deepcopy(node.get("requires", [])),

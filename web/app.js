@@ -97,6 +97,7 @@
     els.nodeOverlay = document.getElementById("node-overlay");
     els.nodeTitle = document.getElementById("node-title");
     els.nodeDescription = document.getElementById("node-description");
+    els.nodeTimeout = document.getElementById("node-timeout");
     els.nodeAction = document.getElementById("node-action");
     els.nodeRetryMax = document.getElementById("node-retry-max");
     els.nodeRetryBackoff = document.getElementById("node-retry-backoff");
@@ -298,6 +299,7 @@
           workflow_node_id: node.id,
           node_type: nodeType,
           description: node.description || "",
+          ...(Object.prototype.hasOwnProperty.call(node, "timeout_ms") ? { timeout_ms: node.timeout_ms } : {}),
           run_status: "not_started",
           source: source,
           requires: cloneOrDefault(node.requires, []),
@@ -593,6 +595,7 @@
     els.nodeOverlay.value = hasNode ? JSON.stringify(props.run_overlay || {}, null, 2) : "";
     els.nodeTitle.value = hasNode ? node.title || "" : "";
     els.nodeDescription.value = hasNode ? props.description || "" : "";
+    els.nodeTimeout.value = hasNode && props.timeout_ms !== undefined ? props.timeout_ms : "";
     els.nodeAction.value = action ? action.prompt || action.instruction || "" : "";
     els.nodeRetryMax.value = retry && retry.max_attempts !== undefined ? retry.max_attempts : "";
     els.nodeRetryBackoff.value = retry && retry.backoff_ms !== undefined ? retry.backoff_ms : "";
@@ -608,6 +611,7 @@
     els.httpSection.hidden = !connector || connector.id !== "http";
     els.nodeTitle.disabled = !hasNode;
     els.nodeDescription.disabled = !hasNode;
+    els.nodeTimeout.disabled = !hasNode;
     els.nodeAction.disabled = !hasNode || !action;
     els.nodeRetryMax.disabled = !hasNode || !retry;
     els.nodeRetryBackoff.disabled = !hasNode || !retry;
@@ -646,6 +650,15 @@
       } else if (Object.prototype.hasOwnProperty.call(props.action, "instruction")) {
         props.action.instruction = els.nodeAction.value;
       }
+    }
+    if (els.nodeTimeout.value !== "") {
+      const nodeTimeout = Number(els.nodeTimeout.value);
+      if (!Number.isInteger(nodeTimeout) || nodeTimeout < 0 || nodeTimeout > 86400000) {
+        return { ok: false, error: "Node timeout must be an integer between 0 and 86400000 ms." };
+      }
+      props.timeout_ms = nodeTimeout;
+    } else if (Object.prototype.hasOwnProperty.call(props, "timeout_ms")) {
+      props.timeout_ms = null;
     }
     if (props.retry && typeof props.retry === "object" && els.nodeRetryMax.value !== "") {
       const maxAttempts = Number(els.nodeRetryMax.value);
@@ -799,9 +812,25 @@
   }
 
   function applyAuthoringProperties(node, props) {
+    applyNodeTimeoutProperties(node, props.timeout_ms);
     applyActionProperties(node, props.action);
     applyRetryProperties(node, props.retry);
     applyConnectorProperties(node, props.connector);
+  }
+
+  function applyNodeTimeoutProperties(node, graphTimeout) {
+    if (graphTimeout === undefined) {
+      return;
+    }
+    if (graphTimeout === null) {
+      delete node.timeout_ms;
+      return;
+    }
+    const timeout = Number(graphTimeout);
+    if (!Number.isInteger(timeout) || timeout < 0 || timeout > 86400000) {
+      throw new Error(node.id + " timeout_ms must be an integer between 0 and 86400000.");
+    }
+    node.timeout_ms = timeout;
   }
 
   function applyActionProperties(node, graphAction) {
@@ -890,6 +919,12 @@
       errors.push("Graph topology does not match Workflow DSL.");
     }
     workflow.nodes.forEach(function (node) {
+      if (node.timeout_ms !== undefined) {
+        const nodeTimeout = Number(node.timeout_ms);
+        if (!Number.isInteger(nodeTimeout) || nodeTimeout < 0 || nodeTimeout > 86400000) {
+          errors.push(node.id + " timeout_ms must be an integer between 0 and 86400000.");
+        }
+      }
       if (TERMINAL_TYPES.has(node.type)) {
         if (node.on_success || node.on_failure) {
           errors.push(node.id + " is terminal and must not define transitions.");

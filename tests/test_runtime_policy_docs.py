@@ -34,6 +34,9 @@ class RuntimePolicyDocumentationTests(TestCase):
             "automatic idempotency enforcement for JSON/local evaluation",
             "on_fallback",
             "node_fallback",
+            "node_timeout",
+            "timeout_ms",
+            "Retry backoff belongs",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("execution_timeout", compatibility)
@@ -49,3 +52,4 @@ class RuntimePolicyDocumentationTests(TestCase):
             schema["$defs"]["policies"]["properties"]["workflow_timeout_ms"]["maximum"],
             2_592_000_000,
         )
+        self.assertEqual(schema["$defs"]["node"]["properties"]["timeout_ms"]["maximum"], 86400000)

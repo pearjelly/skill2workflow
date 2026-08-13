@@ -69,9 +69,20 @@ passed, records the same fixed failure evidence, and reconciles the terminal
 audit event. A pending cancellation wins over expiry. The sweep is capped at
 256 candidates per pass and never resumes the workflow or executes a successor.
 
-The local executor does not yet implement node-level wall-clock deadlines or
-general scheduled recovery. A configured retry backoff is part of the active
-execution segment and is checked against `default_timeout_ms` after the delay.
+Each node may also declare an optional `timeout_ms` active-execution boundary
+from `0` to 24 hours. A node timeout starts when that node becomes current and
+is checked before node work and after connector returns. Retry backoff belongs
+to the same node window, so a slow retry sequence cannot outlive the node's
+budget. Human-gate waiting clears the node window; review time is not charged
+against it. Expiry fails closed with `error_code: "node_timeout"`, preserves
+the failed node evidence, and never follows a successor transition. As with
+the other local deadlines, a provider call already in flight is observed only
+after it returns; this is a safe-point boundary rather than forceful thread or
+socket cancellation.
+
+The local executor does not yet implement general scheduled recovery. A
+configured retry backoff is part of both the active execution segment and,
+when declared, the current node window.
 
 ## Fallback Transitions
 
@@ -138,7 +149,6 @@ The local runtime intentionally does not yet provide:
 - distributed scheduling
 - automatic idempotency enforcement for JSON/local evaluation (SQLite service enforcement is documented in `docs/triggers.md`)
 - compensation or rollback handlers
-- node-level wall-clock deadlines
 - enterprise credential management
 - secret injection or redaction
 

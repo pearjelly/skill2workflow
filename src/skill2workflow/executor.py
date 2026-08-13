@@ -15,6 +15,7 @@ from .storage import create_run_store
 
 RunState = Dict[str, object]
 MAX_ACTIVE_TIMEOUT_MS = 86_400_000
+MAX_NODE_TIMEOUT_MS = 86_400_000
 MAX_WORKFLOW_TIMEOUT_MS = 2_592_000_000
 MAX_RETRY_BACKOFF_MS = 60_000
 MAX_WORKFLOW_DEADLINE_SWEEP_RUNS = 256
@@ -73,6 +74,10 @@ class LocalExecutor:
                 "workflow_timeout_ms": workflow_timeout_ms,
                 "workflow_started_at": "",
                 "workflow_deadline_at": "",
+                "node_timeout_ms": 0,
+                "node_id": "",
+                "node_started_at": "",
+                "node_deadline_at": "",
             },
         }
         self._start_workflow_window(state)
@@ -239,6 +244,21 @@ class LocalExecutor:
             current_id = state["current_node"]
             node = node_map[current_id]
             node_type = node.get("type")
+            self._start_node_window(state, node)
+            timed_out = self._node_timeout_if_exceeded(state)
+            if timed_out is not None:
+                timed_out.setdefault("node_results", {})
+                timed_out["node_results"].setdefault(
+                    current_id,
+                    {
+                        "status": "failed",
+                        "title": node.get("title", current_id),
+                        "error_code": timed_out.get("error_code", "node_timeout"),
+                        "timestamp": self._now(),
+                    },
+                )
+                self._save(timed_out)
+                return timed_out
 
             if node_type == "end":
                 state["status"] = "completed"
@@ -383,6 +403,8 @@ class LocalExecutor:
 
             timed_out = self._workflow_timeout_if_exceeded(state)
             if timed_out is None:
+                timed_out = self._node_timeout_if_exceeded(state)
+            if timed_out is None:
                 timed_out = self._timeout_if_exceeded(state)
             if timed_out is not None:
                 timed_out["node_results"][current_id] = {
@@ -441,6 +463,8 @@ class LocalExecutor:
                 if cancelled is not None:
                     return cancelled
                 timed_out = self._workflow_timeout_if_exceeded(state)
+                if timed_out is None:
+                    timed_out = self._node_timeout_if_exceeded(state)
                 if timed_out is None:
                     timed_out = self._timeout_if_exceeded(state)
                 if timed_out is not None:
@@ -603,6 +627,10 @@ class LocalExecutor:
                 "workflow_timeout_ms": _workflow_timeout_ms(state.get("workflow", {})),
                 "workflow_started_at": "",
                 "workflow_deadline_at": "",
+                "node_timeout_ms": 0,
+                "node_id": "",
+                "node_started_at": "",
+                "node_deadline_at": "",
             }
             state["execution"] = execution
         timeout_ms = _non_negative_int(execution.get("timeout_ms"))
@@ -622,6 +650,10 @@ class LocalExecutor:
                 "workflow_timeout_ms": _workflow_timeout_ms(state.get("workflow", {})),
                 "workflow_started_at": "",
                 "workflow_deadline_at": "",
+                "node_timeout_ms": 0,
+                "node_id": "",
+                "node_started_at": "",
+                "node_deadline_at": "",
             }
             state["execution"] = execution
         execution.setdefault(
@@ -637,13 +669,23 @@ class LocalExecutor:
         execution["workflow_started_at"] = started_at
         execution["workflow_deadline_at"] = _deadline_after(started_at, timeout_ms)
 
-    @staticmethod
-    def _clear_execution_window(state: RunState) -> None:
+    def _clear_execution_window(self, state: RunState) -> None:
         execution = state.get("execution")
         if not isinstance(execution, dict):
             return
         execution["started_at"] = ""
         execution["deadline_at"] = ""
+        self._clear_node_window(state)
+
+    @staticmethod
+    def _clear_node_window(state: RunState) -> None:
+        execution = state.get("execution")
+        if not isinstance(execution, dict):
+            return
+        execution["node_timeout_ms"] = 0
+        execution["node_id"] = ""
+        execution["node_started_at"] = ""
+        execution["node_deadline_at"] = ""
 
     @staticmethod
     def _clear_workflow_window(state: RunState) -> None:
@@ -652,6 +694,24 @@ class LocalExecutor:
             return
         execution["workflow_started_at"] = ""
         execution["workflow_deadline_at"] = ""
+
+    def _start_node_window(self, state: RunState, node: Dict[str, object]) -> None:
+        execution = state.get("execution")
+        if not isinstance(execution, dict):
+            execution = {}
+            state["execution"] = execution
+        node_id = str(node.get("id", state.get("current_node", "")))
+        if str(execution.get("node_id", "")) == node_id:
+            return
+        self._clear_node_window(state)
+        timeout_ms = _node_timeout_ms(node)
+        execution["node_id"] = node_id
+        execution["node_timeout_ms"] = timeout_ms
+        if timeout_ms <= 0:
+            return
+        started_at = self._now()
+        execution["node_started_at"] = started_at
+        execution["node_deadline_at"] = _deadline_after(started_at, timeout_ms)
 
     def _workflow_timeout_if_exceeded(self, state: RunState):
         execution = state.get("execution")
@@ -672,6 +732,7 @@ class LocalExecutor:
         state["error_code"] = "workflow_timeout"
         state["error"] = "workflow wall-clock deadline exceeded"
         self._clear_execution_window(state)
+        self._clear_node_window(state)
         self._clear_workflow_window(state)
         self._event(
             state,
@@ -701,11 +762,42 @@ class LocalExecutor:
         state["error_code"] = "execution_timeout"
         state["error"] = "workflow active execution exceeded default_timeout_ms"
         self._clear_execution_window(state)
+        self._clear_node_window(state)
         self._event(
             state,
             "run_failed",
             current_id,
             {"error_code": "execution_timeout", "timeout_ms": timeout_ms},
+        )
+        self._save(state)
+        return state
+
+    def _node_timeout_if_exceeded(self, state: RunState):
+        execution = state.get("execution")
+        if not isinstance(execution, dict):
+            return None
+        deadline_at = str(execution.get("node_deadline_at", ""))
+        if not deadline_at:
+            return None
+        try:
+            expired = _parse_timestamp(self._now()) >= _parse_timestamp(deadline_at)
+        except ValueError:
+            expired = True
+        if not expired:
+            return None
+        current_id = str(state.get("current_node", ""))
+        timeout_ms = _non_negative_int(execution.get("node_timeout_ms"))
+        state["status"] = "failed"
+        state["error_code"] = "node_timeout"
+        state["error"] = "workflow node active execution exceeded timeout_ms"
+        self._clear_execution_window(state)
+        self._clear_node_window(state)
+        self._clear_workflow_window(state)
+        self._event(
+            state,
+            "run_failed",
+            current_id,
+            {"error_code": "node_timeout", "timeout_ms": timeout_ms},
         )
         self._save(state)
         return state
@@ -796,6 +888,25 @@ def _workflow_timeout_ms(workflow: object) -> int:
         raise ValueError(
             "policies.workflow_timeout_ms must be an integer between 0 and "
             f"{MAX_WORKFLOW_TIMEOUT_MS}"
+        )
+    return value
+
+
+def _node_timeout_ms(node: object) -> int:
+    """Return the validated active timeout for one node, or zero when absent."""
+
+    if not isinstance(node, dict) or "timeout_ms" not in node:
+        return 0
+    value = node.get("timeout_ms")
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value < 0
+        or value > MAX_NODE_TIMEOUT_MS
+    ):
+        raise ValueError(
+            "node.timeout_ms must be an integer between 0 and "
+            f"{MAX_NODE_TIMEOUT_MS}"
         )
     return value
 

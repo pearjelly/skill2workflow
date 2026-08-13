@@ -76,6 +76,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Authenticated `GET /api/v1/support-bundle`, redacted support-bundle schema `skill2workflow-support-bundle-0.1.0`, and protected `service-support-bundle` CLI documented in `docs/support-bundle.md`
 - SQLite trigger idempotency for keyed service/control-plane requests, including durable replay, fixed `409` conflicts, and unresolved-outcome fail-closed behavior documented in `docs/triggers.md`
 - Bounded active execution timeout semantics for `policies.default_timeout_ms`, including fixed `execution_timeout` evidence and human-gate pause behavior documented in `docs/runtime-policy.md`
+- Bounded per-node active execution timeout semantics for node `timeout_ms`, including fixed `node_timeout` evidence, retry/backoff coverage, and human-gate pause behavior documented in `docs/runtime-policy.md`
 - Bounded global workflow deadline semantics for `policies.workflow_timeout_ms`, including fixed `workflow_timeout` evidence and human-gate wall-clock coverage documented in `docs/runtime-policy.md`
 - Lease-owned SQLite deadline sweep semantics for waiting runs, including bounded atomic expiry, cancellation precedence, audit reconciliation, and no-successor execution documented in `docs/recurring-scheduling.md`
 - Connector retry policy semantics for `max_attempts` and bounded fixed `backoff_ms`, including control-plane audit and local visual evidence documented in `docs/runtime-policy.md` and `docs/connectors.md`

@@ -226,6 +226,18 @@ class CompilerTests(TestCase):
         errors = validate_workflow_structured(workflow)
         self.assertIn("policy_timeout_invalid", {error["code"] for error in errors})
 
+    def test_node_timeout_has_a_bounded_contract(self):
+        root = Path(__file__).resolve().parents[1]
+        schema = json.loads((root / "schemas" / "workflow.schema.json").read_text(encoding="utf-8"))
+        timeout_schema = schema["$defs"]["node"]["properties"]["timeout_ms"]
+        self.assertEqual(timeout_schema["minimum"], 0)
+        self.assertEqual(timeout_schema["maximum"], 86400000)
+
+        workflow = _http_mapping_workflow([])
+        workflow["nodes"][1]["timeout_ms"] = 86400001
+        errors = validate_workflow_structured(workflow)
+        self.assertIn("node_timeout_invalid", {error["code"] for error in errors})
+
     def test_workflow_timeout_policy_has_a_bounded_contract(self):
         root = Path(__file__).resolve().parents[1]
         schema = json.loads((root / "schemas" / "workflow.schema.json").read_text(encoding="utf-8"))

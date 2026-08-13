@@ -74,6 +74,7 @@ Allowlisted fields:
 - HTTP `connector.request.headers`
 - HTTP `connector.request.body`
 - HTTP `connector.request.timeout_ms`
+- Node active timeout `timeout_ms` (0..86400000 milliseconds)
 
 Unsupported visual edits should be rejected or ignored rather than silently changing execution semantics.
 

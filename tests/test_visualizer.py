@@ -232,6 +232,7 @@ class VisualizerTests(TestCase):
         api["properties"]["connector"]["request"]["headers"] = {"X-Workflow": "approval"}
         api["properties"]["connector"]["request"]["body"] = {"approved": True}
         api["properties"]["connector"]["request"]["timeout_ms"] = 1000
+        api["properties"]["timeout_ms"] = 1500
 
         updated = apply_litegraph_edits_to_workflow(workflow, graph)
         updated_review = next(node for node in updated["nodes"] if node["id"] == "review")
@@ -241,6 +242,7 @@ class VisualizerTests(TestCase):
         self.assertEqual(updated_review["retry"]["max_attempts"], 2)
         self.assertEqual(updated_review["retry"]["backoff_ms"], 250)
         self.assertEqual(updated_api["action"]["instruction"], "Send the normalized approval payload.")
+        self.assertEqual(updated_api["timeout_ms"], 1500)
         self.assertEqual(
             updated_api["connector"],
             {
@@ -265,6 +267,18 @@ class VisualizerTests(TestCase):
 
         with self.assertRaisesRegex(ValueError, "connector identity cannot be changed"):
             apply_litegraph_edits_to_workflow(workflow, graph)
+
+    def test_apply_litegraph_edits_to_workflow_can_remove_node_timeout(self):
+        workflow = _authoring_workflow()
+        workflow["nodes"][2]["timeout_ms"] = 1500
+        graph = workflow_to_litegraph(workflow)
+        api = next(node for node in graph["nodes"] if node["properties"]["workflow_node_id"] == "call_api")
+        api["properties"]["timeout_ms"] = None
+
+        updated = apply_litegraph_edits_to_workflow(workflow, graph)
+
+        updated_api = next(node for node in updated["nodes"] if node["id"] == "call_api")
+        self.assertNotIn("timeout_ms", updated_api)
 
     def test_apply_litegraph_edits_to_workflow_accepts_object_links(self):
         workflow = _approval_workflow()
