@@ -124,6 +124,24 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_shutdown_requested_during_scheduler_start_does_not_restore_ready(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+            callback_called = []
+
+            def request_shutdown():
+                service.begin_shutdown()
+
+            with patch.object(service.scheduler, "start", side_effect=request_shutdown), patch.object(
+                service._server,
+                "handle_request",
+                side_effect=AssertionError("draining service must not accept requests"),
+            ):
+                service.serve(ready_callback=lambda _service: callback_called.append(True))
+
+        self.assertEqual(service.status, "stopped")
+        self.assertEqual(callback_called, [])
+
     def test_lifecycle_logger_failure_cannot_break_startup_or_shutdown(self):
         class FailingLifecycleLogger:
             def __init__(self):

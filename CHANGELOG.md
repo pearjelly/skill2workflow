@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Hardened service lifecycle startup so a shutdown request received during
+  scheduler initialization is preserved; the service no longer publishes
+  `ready` or enters the request loop after draining begins.
 - Hardened the authenticated `/metrics` read surface with the shared zero-body
   request contract: malformed, transfer-encoded, oversized, and non-empty
   scraper bodies are rejected before telemetry rendering.

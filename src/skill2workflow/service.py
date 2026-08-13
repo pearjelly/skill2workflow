@@ -347,6 +347,11 @@ class RuntimeService:
         try:
             try:
                 self.scheduler.start()
+                # A signal can arrive while scheduler startup is still in
+                # progress.  Preserve that drain request instead of
+                # publishing a ready state after shutdown has begun.
+                if self._status == "draining":
+                    return
                 self._status = "ready"
                 self._log_lifecycle("ready")
                 if ready_callback:
