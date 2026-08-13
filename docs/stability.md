@@ -75,7 +75,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Bounded active execution timeout semantics for `policies.default_timeout_ms`, including fixed `execution_timeout` evidence and human-gate pause behavior documented in `docs/runtime-policy.md`
 - Optional `tool_call.on_fallback` transition semantics, edge validation, LiteGraph slot projection, and fixed `node_fallback` evidence documented in `docs/workflow-dsl-contract.md`
 - SQLite audit integrity result contract `skill2workflow-audit-integrity-0.1.0` and the payload-free `audit-verify` CLI; this does not claim signatures or JSON/JSONL chain guarantees
-- Authenticated Prometheus text metric names, fixed label vocabularies, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`
+- Authenticated Prometheus text metric names, fixed label vocabularies, live HTTP/scheduler pressure gauges, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`
 - Authenticated `GET /metrics` zero-body request validation: malformed,
   transfer-encoded, oversized, and non-empty scraper bodies use the shared
   bounded request error contract before telemetry rendering

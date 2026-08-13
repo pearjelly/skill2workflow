@@ -1,6 +1,6 @@
 # Runtime Observability
 
-Loop 46 adds a dependency-free, machine-consumable observability boundary to the self-hosted service. Loop 108 adds one live in-flight-request pressure gauge to that boundary. It exposes authenticated Prometheus text metrics and emits structured operational lifecycle/request events as NDJSON. Both surfaces are deliberately aggregate and low-cardinality: they do not export workflow IDs, versions, run IDs, schedule IDs, request paths, bodies, credentials, remote addresses, or connector payloads.
+Loop 46 adds a dependency-free, machine-consumable observability boundary to the self-hosted service. Loop 108 adds live HTTP in-flight-request pressure and Loop 109 adds recurring scheduler-dispatch pressure to that boundary. It exposes authenticated Prometheus text metrics and emits structured operational lifecycle/request events as NDJSON. Both surfaces are deliberately aggregate and low-cardinality: they do not export workflow IDs, versions, run IDs, schedule IDs, request paths, bodies, credentials, remote addresses, or connector payloads.
 
 Workflow audit events remain the durable business evidence. Operational metrics and logs answer a narrower question: whether the service is healthy enough for an operator to detect and investigate runtime problems.
 
@@ -36,6 +36,13 @@ than counting itself. The value is intentionally omitted from the versioned
 support bundle 0.1.0, whose aggregate snapshot contract remains stable and
 whose durable run evidence is safer for incident handoff.
 
+The `skill2workflow_scheduler_dispatch_inflight` gauge reports recurring
+dispatcher calls that passed the shutdown admission gate and have not returned.
+It is process-local, has no labels, and is `0` when the scheduler is polling
+without owning the lease. During drain, a value of `1` means an already-admitted
+dispatch may still be finishing; it does not mean a second dispatch can start.
+This gauge is also omitted from support-bundle 0.1.0.
+
 The response content type is:
 
 ```text
@@ -50,6 +57,7 @@ text/plain; version=0.0.4; charset=utf-8
 | `skill2workflow_scheduler_lease_owned` | gauge | none | `1` when this process currently owns the local scheduler lease |
 | `skill2workflow_service_uptime_seconds` | gauge | none | Monotonic process uptime; resets at restart |
 | `skill2workflow_service_inflight_requests` | gauge | none | Admitted non-metrics handlers currently in flight; process-local and resets at restart |
+| `skill2workflow_scheduler_dispatch_inflight` | gauge | none | Admitted recurring scheduler dispatch calls currently in flight; process-local and resets at restart |
 | `skill2workflow_service_state` | gauge | fixed `status` | One-hot lifecycle state: `starting`, `ready`, `draining`, `stopped`, or `unknown` |
 | `skill2workflow_workflows` | gauge | fixed `status` | SQLite workflow-version counts: `published`, `deprecated`, or `other` |
 | `skill2workflow_runs` | gauge | fixed `status` | SQLite run counts: `created`, `running`, `waiting`, `completed`, `failed`, `cancelled`, `interrupted`, or `other` |

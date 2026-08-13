@@ -74,6 +74,7 @@ class RuntimeTelemetry:
         # handler itself is excluded so a scrape reports the workload that was
         # already in flight when the scrape began rather than counting itself.
         self._inflight_requests = 0
+        self._inflight_scheduler_dispatches = 0
         self._lock = threading.Lock()
 
     def observe_http(self, route: str, status_code: int) -> None:
@@ -108,10 +109,32 @@ class RuntimeTelemetry:
         with self._lock:
             return int(self._inflight_requests)
 
+    def begin_scheduler_dispatch(self) -> bool:
+        """Track one scheduler dispatch admitted before graceful shutdown."""
+
+        with self._lock:
+            self._inflight_scheduler_dispatches += 1
+        return True
+
+    def end_scheduler_dispatch(self, tracked: bool) -> None:
+        """Release one scheduler dispatch previously admitted for telemetry."""
+
+        if not tracked:
+            return
+        with self._lock:
+            if self._inflight_scheduler_dispatches > 0:
+                self._inflight_scheduler_dispatches -= 1
+
+    def inflight_scheduler_dispatches(self) -> int:
+        """Return the current in-process scheduler dispatch gauge."""
+
+        with self._lock:
+            return int(self._inflight_scheduler_dispatches)
+
     def aggregate(self, *, service_status: str, ready: bool, scheduler_lease_owned: bool) -> Dict[str, object]:
         """Return the fixed, value-free persisted aggregates used by snapshots.
 
-        The live in-flight gauge is intentionally rendered separately so the
+        The live in-flight gauges are intentionally rendered separately so the
         versioned support-bundle aggregate contract remains stable.
         """
 
@@ -165,6 +188,7 @@ class RuntimeTelemetry:
         lifecycle = aggregate["service_status"]
         http_requests = aggregate["http_requests"]
         inflight_requests = self.inflight_requests()
+        inflight_scheduler_dispatches = self.inflight_scheduler_dispatches()
         lines = [
             "# HELP skill2workflow_service_ready Whether the service is ready to accept workflow traffic.",
             "# TYPE skill2workflow_service_ready gauge",
@@ -178,6 +202,9 @@ class RuntimeTelemetry:
             "# HELP skill2workflow_service_inflight_requests Number of admitted non-metrics requests currently in flight.",
             "# TYPE skill2workflow_service_inflight_requests gauge",
             f"skill2workflow_service_inflight_requests {inflight_requests}",
+            "# HELP skill2workflow_scheduler_dispatch_inflight Number of admitted recurring scheduler dispatches currently in flight.",
+            "# TYPE skill2workflow_scheduler_dispatch_inflight gauge",
+            f"skill2workflow_scheduler_dispatch_inflight {inflight_scheduler_dispatches}",
             "# HELP skill2workflow_service_state Current service lifecycle state.",
             "# TYPE skill2workflow_service_state gauge",
         ]

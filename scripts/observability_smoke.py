@@ -109,6 +109,9 @@ def main(argv=None) -> int:
             "inflight_request_gauge_visible": (
                 "skill2workflow_service_inflight_requests 0" in second_metrics
             ),
+            "scheduler_dispatch_gauge_visible": (
+                "skill2workflow_scheduler_dispatch_inflight 0" in second_metrics
+            ),
             "low_cardinality_labels": label_keys <= {"status", "route", "status_class"},
             "private_values_absent": all(
                 value not in combined_metrics and value not in serialized_logs

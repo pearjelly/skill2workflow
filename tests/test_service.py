@@ -44,6 +44,7 @@ from skill2workflow.service_client import (
     post_workflow_trigger,
 )
 from skill2workflow.service_bootstrap import rotate_service_token
+from skill2workflow.telemetry import RuntimeTelemetry
 
 
 AUTH_TOKEN = "loop42-test-bearer-token-0123456789abcdef"
@@ -272,6 +273,33 @@ class RuntimeServiceTests(TestCase):
 
         self.assertEqual(service.status, "draining")
         dispatch_due.assert_not_called()
+        self.assertFalse(thread.is_alive())
+
+    def test_scheduler_dispatch_pressure_gauge_tracks_admitted_dispatch(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            telemetry = RuntimeTelemetry(state_dir)
+            scheduler = ServiceScheduleLoop(state_dir, telemetry=telemetry)
+            entered = threading.Event()
+            release = threading.Event()
+
+            scheduler.dispatcher.has_lease = lambda now_epoch: True
+
+            def blocking_dispatch(*_args, **_kwargs):
+                entered.set()
+                self.assertTrue(release.wait(timeout=2))
+
+            scheduler.dispatcher.dispatch_due = blocking_dispatch
+            thread = threading.Thread(target=scheduler._dispatch, daemon=True)
+            thread.start()
+            self.assertTrue(entered.wait(timeout=2))
+            self.assertEqual(telemetry.inflight_scheduler_dispatches(), 1)
+
+            release.set()
+            scheduler.stop_dispatching()
+            thread.join(timeout=2)
+
+        self.assertEqual(telemetry.inflight_scheduler_dispatches(), 0)
         self.assertFalse(thread.is_alive())
 
     def test_lifecycle_logger_failure_cannot_break_startup_or_shutdown(self):

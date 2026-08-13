@@ -53,6 +53,9 @@ Loop 108 exposes the live, label-free `skill2workflow_service_inflight_requests`
 gauge through `/metrics`, making the fixed request-admission pressure and
 graceful-drain progress visible without changing the support-bundle 0.1.0
 contract.
+Loop 109 adds the matching label-free
+`skill2workflow_scheduler_dispatch_inflight` gauge, so an already-admitted
+background recurring dispatch is visible while graceful drain waits for it.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 

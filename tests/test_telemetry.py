@@ -53,6 +53,37 @@ class RuntimeTelemetryTests(TestCase):
                 rendered,
             )
 
+    def test_scheduler_dispatch_gauge_is_live_and_route_free(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            LocalControlPlane(state_dir, storage="sqlite")
+            RecurringScheduleStore(state_dir)
+            telemetry = RuntimeTelemetry(state_dir)
+
+            tracked = telemetry.begin_scheduler_dispatch()
+            self.assertTrue(tracked)
+            rendered = telemetry.render(
+                service_status="draining",
+                ready=False,
+                scheduler_lease_owned=True,
+            )
+            self.assertIn(
+                "skill2workflow_scheduler_dispatch_inflight 1",
+                rendered,
+            )
+
+            telemetry.end_scheduler_dispatch(tracked)
+            self.assertEqual(telemetry.inflight_scheduler_dispatches(), 0)
+            rendered = telemetry.render(
+                service_status="draining",
+                ready=False,
+                scheduler_lease_owned=True,
+            )
+            self.assertIn(
+                "skill2workflow_scheduler_dispatch_inflight 0",
+                rendered,
+            )
+
     def test_cancelled_runs_have_a_fixed_aggregate_status(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"

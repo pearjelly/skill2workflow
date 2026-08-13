@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added the label-free `skill2workflow_scheduler_dispatch_inflight` gauge to
+  authenticated `/metrics`, exposing an already-admitted recurring dispatch
+  during graceful drain without changing the support-bundle 0.1.0 contract.
 - Added the authenticated, label-free `skill2workflow_service_inflight_requests`
   gauge to `/metrics`, aligned with the fixed request-admission budget while
   excluding probes and the scrape itself; the versioned support-bundle

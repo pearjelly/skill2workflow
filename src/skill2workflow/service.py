@@ -296,11 +296,13 @@ class RuntimeService:
         self.config = config
         validate_service_runtime_environment(config)
         ensure_service_state_layout(config.state_dir)
+        self.telemetry = RuntimeTelemetry(config.state_dir)
         self.authenticator = FileBearerTokenAuthenticator(config.auth_token_file)
         self.credential_provider = DirectoryCredentialProvider(config.credential_dir)
         self.scheduler = ServiceScheduleLoop(
             config.state_dir,
             credential_provider=self.credential_provider,
+            telemetry=self.telemetry,
         )
         self.control_plane = LocalControlPlane(
             config.state_dir,
@@ -313,7 +315,6 @@ class RuntimeService:
             require_stopped=False,
         )
         mark_service_state_initialized(config.state_dir)
-        self.telemetry = RuntimeTelemetry(config.state_dir)
         self.event_logger = event_logger
         self._request_admission = threading.BoundedSemaphore(
             MAX_CONCURRENT_BUSINESS_REQUESTS
@@ -473,12 +474,13 @@ def _require_private_directory(path: Path, label: str) -> None:
 class ServiceScheduleLoop:
     """Keep one dispatcher lease alive and poll recurring schedules off the HTTP thread."""
 
-    def __init__(self, state_dir: Path, credential_provider=None):
+    def __init__(self, state_dir: Path, credential_provider=None, telemetry=None):
         self.dispatcher = RecurringScheduleDispatcher(
             state_dir,
             credential_provider=credential_provider,
             lease_seconds=10,
         )
+        self.telemetry = telemetry
         self._dispatch_stop = threading.Event()
         self._heartbeat_stop = threading.Event()
         self._dispatch_thread = None
@@ -557,10 +559,25 @@ class ServiceScheduleLoop:
             try:
                 now_epoch = time.time()
                 if self.dispatcher.has_lease(now_epoch=now_epoch):
-                    self.dispatcher.dispatch_due(
-                        datetime.now(timezone.utc).isoformat(),
-                        now_epoch=now_epoch,
-                    )
+                    tracked_dispatch = False
+                    if self.telemetry is not None:
+                        try:
+                            tracked_dispatch = self.telemetry.begin_scheduler_dispatch()
+                        except Exception:
+                            # Operational metrics are best-effort and must not
+                            # change recurring-trigger execution semantics.
+                            tracked_dispatch = False
+                    try:
+                        self.dispatcher.dispatch_due(
+                            datetime.now(timezone.utc).isoformat(),
+                            now_epoch=now_epoch,
+                        )
+                    finally:
+                        if self.telemetry is not None:
+                            try:
+                                self.telemetry.end_scheduler_dispatch(tracked_dispatch)
+                            except Exception:
+                                pass
             except SchedulerLeaseError:
                 pass
             except Exception as error:
