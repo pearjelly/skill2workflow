@@ -119,6 +119,7 @@ class BackupDocumentationTests(TestCase):
             "inventory_truncated",
             "backup-retention-policy-0.1.0.schema.json",
             "backup-retention-plan-0.1.0.schema.json",
+            "workflow registry is read through a stable cursor",
         ):
             self.assertIn(text, guide)
 
@@ -141,10 +142,10 @@ class BackupDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-132 are complete", readme)
+        self.assertIn("Delivery Loops 1-133 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("docs/backup-restore.md", readme)
-        self.assertIn("- Completed delivery loops: 1-132", roadmap)
+        self.assertIn("- Completed delivery loops: 1-133", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 44: Verified Backup And Restore | Complete |", roadmap)
         self.assertIn("Production Baseline remains directional", roadmap)

@@ -152,15 +152,17 @@ def inspect_state_backup_readiness(
     with closing(
         sqlite3.connect(f"file:{source / 'control.sqlite3'}?mode=ro", uri=True)
     ) as control:
-        records = _workflow_artifact_records(control)
-    for relative_path, checksum in records:
-        _validate_workflow_artifact(source, relative_path, checksum)
+        records = _iter_workflow_artifact_records(control)
+        artifact_count = 0
+        for relative_path, checksum in records:
+            artifact_count += 1
+            _validate_workflow_artifact(source, relative_path, checksum)
     return {
         "schema_version": BACKUP_SCHEMA_VERSION,
         "status": "ready",
         "state_layout_version": layout,
         "database_count": len(_DATABASES),
-        "workflow_artifact_count": len(records),
+        "workflow_artifact_count": artifact_count,
         "active_scheduler_lease": active_lease,
         "scheduler_database_synthesized": scheduler_synthesized,
     }
@@ -240,7 +242,7 @@ def create_state_backup(
                 raise ValueError(
                     "state backup requires the service to be stopped; active scheduler lease found"
                 )
-            artifact_records = _workflow_artifact_records(guards["control.sqlite3"])
+            artifact_records = _iter_workflow_artifact_records(guards["control.sqlite3"])
             for database in _DATABASES:
                 destination = staging / database
                 if database == "scheduler.sqlite3" and scheduler_synthesized:
@@ -572,23 +574,29 @@ def _initialize_empty_scheduler_database(path: Path) -> None:
         connection.commit()
 
 
-def _workflow_artifact_records(connection) -> List[Tuple[str, str]]:
+def _iter_workflow_artifact_records(connection):
+    """Stream validated artifact references in stable path order."""
+
     rows = connection.execute(
         "select artifact, checksum from workflow_versions order by artifact"
-    ).fetchall()
-    records = []
-    seen = set()
+    )
+    previous_path = None
     for raw_path, raw_checksum in rows:
         path = str(raw_path)
         checksum = str(raw_checksum)
         _safe_relative_path(path, expected_prefix="workflows", expected_suffix=".json")
-        if path in seen:
+        if path == previous_path:
             continue
         if len(checksum) != 64 or any(char not in "0123456789abcdef" for char in checksum):
             raise ValueError("workflow record has an invalid checksum")
-        seen.add(path)
-        records.append((path, checksum))
-    return records
+        previous_path = path
+        yield path, checksum
+
+
+def _workflow_artifact_records(connection) -> List[Tuple[str, str]]:
+    """Return the compatibility list form for callers that need all records."""
+
+    return list(_iter_workflow_artifact_records(connection))
 
 
 def _copy_workflow_artifact(
@@ -799,20 +807,23 @@ def _validate_runtime_state(
         leases = connection.execute("select count(*) from scheduler_leases").fetchone()
         if leases and int(leases[0]) != 0:
             raise ValueError("backup scheduler lease table must be empty")
+    remaining = set(expected_artifacts) if expected_artifacts is not None else None
     with closing(sqlite3.connect(root / "control.sqlite3")) as connection:
-        records = _workflow_artifact_records(connection)
-    referenced = set()
-    for relative_path, expected_checksum in records:
-        referenced.add(relative_path)
-        path = root.joinpath(*PurePosixPath(relative_path).parts)
-        _require_regular_no_symlink(path, "workflow artifact")
-        try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise ValueError("workflow artifact is not valid UTF-8 JSON") from error
-        if _json_checksum(payload) != expected_checksum:
-            raise ValueError("workflow artifact checksum does not match control state")
-    if expected_artifacts is not None and referenced != set(expected_artifacts):
+        records = _iter_workflow_artifact_records(connection)
+        for relative_path, expected_checksum in records:
+            if remaining is not None:
+                if relative_path not in remaining:
+                    raise ValueError("backup workflow artifacts do not match control state")
+                remaining.remove(relative_path)
+            path = root.joinpath(*PurePosixPath(relative_path).parts)
+            _require_regular_no_symlink(path, "workflow artifact")
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError("workflow artifact is not valid UTF-8 JSON") from error
+            if _json_checksum(payload) != expected_checksum:
+                raise ValueError("workflow artifact checksum does not match control state")
+    if remaining:
         raise ValueError("backup workflow artifacts do not match control state")
 
 

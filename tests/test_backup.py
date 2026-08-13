@@ -21,6 +21,7 @@ from skill2workflow.backup import (
     build_backup_retention_plan,
     create_state_backup,
     inspect_state_backup_readiness,
+    _iter_workflow_artifact_records,
     list_state_backups,
     normalize_backup_retention_policy,
     restore_state_backup,
@@ -31,6 +32,34 @@ from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringSched
 
 
 class StateBackupTests(TestCase):
+    def test_workflow_artifact_registry_streams_without_fetchall(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            RecurringScheduleStore(state_dir)
+
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as raw:
+                connection = _NoArtifactFetchAllConnection(raw)
+                with raw:
+                    records = list(_iter_workflow_artifact_records(connection))
+
+            backup_dir = root / "backup"
+            restored_dir = root / "restored"
+            with patch(
+                "skill2workflow.backup._workflow_artifact_records",
+                side_effect=AssertionError("compatibility materialization path used"),
+            ):
+                readiness = inspect_state_backup_readiness(state_dir)
+                create_state_backup(state_dir, backup_dir)
+                verify_state_backup(backup_dir)
+                restore_state_backup(backup_dir, restored_dir)
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0][0], "workflows/workflow_backup/0.1.0.json")
+        self.assertEqual(readiness["workflow_artifact_count"], 1)
+
     def test_backup_preserves_and_validates_cancellation_ledger(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -516,6 +545,32 @@ class StateBackupTests(TestCase):
             ):
                 with self.assertRaisesRegex(ValueError, "backup retention"):
                     normalize_backup_retention_policy(invalid_policy)
+
+
+class _NoArtifactFetchAllCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+    def fetchall(self):
+        raise AssertionError("workflow artifact rows must be streamed")
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _NoArtifactFetchAllConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query, parameters=()):
+        cursor = self._connection.execute(query, parameters)
+        normalized = " ".join(str(query).lower().split())
+        if "select artifact, checksum from workflow_versions" in normalized:
+            return _NoArtifactFetchAllCursor(cursor)
+        return cursor
 
 
 def _populate_state(state_dir: Path):

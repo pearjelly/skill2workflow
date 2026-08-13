@@ -84,6 +84,12 @@ From a source checkout, prefix each command with `PYTHONPATH=src python3 -m skil
 
 Creation is staged in a sibling temporary directory and renamed only after validation succeeds. Failure removes the staging directory and never publishes a partial backup.
 
+The SQLite workflow registry is read through a stable cursor while backup
+preflight, creation, and restored-state validation process artifacts. The
+runtime does not first materialize every registry row just to copy or verify
+the referenced files; the manifest and artifact bytes remain the authoritative
+backup boundary.
+
 ## Backup Contents
 
 The backup contains only:
