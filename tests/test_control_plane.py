@@ -428,6 +428,39 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(report["status"], "clean")
         self.assertEqual(report["summary"]["attention_runs"], 0)
 
+    def test_run_audit_consistency_global_report_uses_bounded_run_window(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="1.3.0"))
+            control.run_published_workflow("workflow_control", "1.3.0")
+            original_list_runs = control.executor.list_runs
+
+            def bounded_only(*, limit=None):
+                if limit is None:
+                    raise AssertionError("unbounded run read")
+                return original_list_runs(limit=limit)
+
+            with patch.object(control.executor, "list_runs", side_effect=bounded_only) as listed:
+                report = control.inspect_run_audit()
+
+        listed.assert_called_once_with(limit=256)
+        self.assertEqual(report["summary"]["checked_runs"], 1)
+
+    def test_run_audit_consistency_target_reads_one_run_without_listing_all_runs(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="1.4.0"))
+            state = control.run_published_workflow("workflow_control", "1.4.0")
+            with patch.object(
+                control.executor,
+                "list_runs",
+                side_effect=AssertionError("unbounded run read"),
+            ):
+                report = control.inspect_run_audit(run_id=state["run_id"])
+
+        self.assertEqual(report["summary"]["checked_runs"], 1)
+        self.assertEqual(report["runs"][0]["run_id"], state["run_id"])
+
     def test_workflow_artifact_report_is_bounded_and_finds_registry_and_orphan_gaps(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

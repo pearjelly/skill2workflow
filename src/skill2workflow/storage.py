@@ -93,6 +93,11 @@ class JsonRunStore:
             raise FileNotFoundError(f"run not found: {run_id}")
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def count(self) -> int:
+        """Count persisted run documents without loading their contents."""
+
+        return sum(1 for path in self.runs_dir.glob("*.json") if path.is_file())
+
     def list(self) -> List[RunState]:
         return [json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.runs_dir.glob("*.json"))]
 
@@ -416,6 +421,12 @@ class SqliteRunStore:
         if row is None:
             raise FileNotFoundError(f"run not found: {run_id}")
         return json.loads(str(row[0]))
+
+    def count(self) -> int:
+        """Count persisted run rows without loading their state documents."""
+
+        with self._connection() as connection:
+            return int(connection.execute("select count(*) from runs").fetchone()[0])
 
     def list(self) -> List[RunState]:
         with self._connection() as connection:

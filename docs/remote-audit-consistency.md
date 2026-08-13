@@ -12,8 +12,10 @@ GET /api/v1/audit-consistency
 Authorization: Bearer <token>
 ```
 
-When the global 256-run window is truncated, target one run without shell
-access using the fixed path form:
+The global 256-run window is selected from the newest durable run summaries
+after a count-only scan; the service never materializes the complete run
+history for this diagnostic. When that window is truncated, target one run
+without shell access using the fixed path form:
 
 ```http
 GET /api/v1/audit-consistency/run_<opaque-id>

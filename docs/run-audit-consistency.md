@@ -25,11 +25,14 @@ skill2workflow audit-consistency \
 
 The command prints the `skill2workflow-run-audit-report-0.1.0` contract from
 [`schemas/run-audit-report-0.1.0.schema.json`](../schemas/run-audit-report-0.1.0.schema.json).
-It is bounded to 256 runs and 64 event-type counters per run. It reports only
-run identifiers, workflow identity, status, and event counts; it never prints
-workflow instructions, trigger input, connector output, credentials, or raw
-errors. When more than 256 runs exist, the top-level status is `attention` and
-`summary.truncated` is true; use `--run-id` to inspect a specific run.
+It is bounded to 256 runs and 64 event-type counters per run. Global inspection
+counts the durable run rows/files and reads only the newest 256 summaries; it
+does not load the complete run history into memory. A `--run-id` inspection
+reads that one run directly instead of scanning the run collection. It reports
+only run identifiers, workflow identity, status, and event counts; it never
+prints workflow instructions, trigger input, connector output, credentials, or
+raw errors. When more than 256 runs exist, the top-level status is `attention`
+and `summary.truncated` is true; use `--run-id` to inspect a specific run.
 
 `missing` means the durable run state implies an audit projection that is not
 present. `duplicate` means an expected event type appears more often than the

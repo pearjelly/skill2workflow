@@ -195,6 +195,16 @@ class LocalExecutor:
     def get_run(self, run_id: str) -> RunState:
         return self._load(run_id)
 
+    def get_run_summary(self, run_id: str) -> RunState:
+        """Read and redact one run summary without enumerating other runs."""
+
+        return _summarize_run(self._load(run_id))
+
+    def count_runs(self) -> int:
+        """Count durable runs without loading their state documents."""
+
+        return self.store.count()
+
     def recover_interrupted_runs(self) -> List[RunState]:
         if not self.execution_owner:
             raise ValueError("interrupted run recovery requires an execution owner")

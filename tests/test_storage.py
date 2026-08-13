@@ -8,6 +8,28 @@ from skill2workflow.storage import JsonControlStore, JsonRunStore, SqliteControl
 
 
 class StorageTests(TestCase):
+    def test_run_count_does_not_load_all_states(self):
+        with TemporaryDirectory() as tmp:
+            stores = [JsonRunStore(Path(tmp) / "json"), SqliteRunStore(Path(tmp) / "sqlite")]
+            for store in stores:
+                store.save(
+                    {
+                        "run_id": "run_count",
+                        "workflow_id": "workflow_storage",
+                        "workflow_version": "0.1.0",
+                        "status": "completed",
+                        "events": [],
+                    }
+                )
+                original_list = store.list
+                store.list = lambda: (_ for _ in ()).throw(
+                    AssertionError("unbounded run read")
+                )
+                try:
+                    self.assertEqual(store.count(), 1)
+                finally:
+                    store.list = original_list
+
     def test_run_windows_are_bounded_and_ordered_by_latest_state_timestamp(self):
         states = [
             {

@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded the source reads for `audit-consistency`: global inspection counts
+  durable runs and loads only the newest 256 summaries, while `--run-id` reads
+  one run directly; the fixed report contract and diagnostic-only semantics are
+  unchanged.
 - Added bounded compact local schedule inspection through `schedules --limit`
   and `schedule-dispatches --limit`. The 1-1000 windows omit trigger inputs,
   lease owners, and claim-expiry details while preserving complete-list

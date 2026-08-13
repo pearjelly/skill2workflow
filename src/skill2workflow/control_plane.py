@@ -363,18 +363,17 @@ class LocalControlPlane:
         operator to identify a cross-database interruption safely.
         """
 
-        summaries = self.executor.list_runs()
         if run_id:
-            summaries = [
-                summary
-                for summary in summaries
-                if str(summary.get("run_id", "")) == str(run_id)
-            ]
-            if not summaries:
-                raise ValueError(f"run not found: {run_id}")
-        total_runs = len(summaries)
-        truncated = total_runs > MAX_RUN_AUDIT_REPORT_RUNS
-        summaries = summaries[:MAX_RUN_AUDIT_REPORT_RUNS]
+            try:
+                summaries = [self.executor.get_run_summary(run_id)]
+            except FileNotFoundError as error:
+                raise ValueError(f"run not found: {run_id}") from error
+            total_runs = 1
+            truncated = False
+        else:
+            total_runs = self.executor.count_runs()
+            truncated = total_runs > MAX_RUN_AUDIT_REPORT_RUNS
+            summaries = self.executor.list_runs(limit=MAX_RUN_AUDIT_REPORT_RUNS)
         run_ids = [str(summary.get("run_id", "")) for summary in summaries]
         audit_by_run = self.store.audit_event_type_counts(run_ids)
 
