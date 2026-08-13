@@ -8,7 +8,12 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from .backup import create_state_backup, restore_state_backup, verify_state_backup
+from .backup import (
+    create_state_backup,
+    list_state_backups,
+    restore_state_backup,
+    verify_state_backup,
+)
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
@@ -277,6 +282,18 @@ def main(argv=None) -> int:
         help="Verify a self-hosted SQLite state backup",
     )
     backup_verify_cmd.add_argument("--backup-dir", type=Path, required=True)
+
+    backup_list_cmd = subparsers.add_parser(
+        "backup-list",
+        help="List bounded local SQLite backup integrity summaries",
+    )
+    backup_list_cmd.add_argument("--parent-dir", type=Path, required=True)
+    backup_list_cmd.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Return the newest backup summaries (1-1000; default 100)",
+    )
 
     restore_cmd = subparsers.add_parser(
         "restore",
@@ -861,6 +878,11 @@ def main(argv=None) -> int:
 
     if args.command == "backup-verify":
         return _backup_action(lambda: verify_state_backup(args.backup_dir))
+
+    if args.command == "backup-list":
+        return _backup_action(
+            lambda: list_state_backups(args.parent_dir, limit=args.limit)
+        )
 
     if args.command == "restore":
         return _backup_action(

@@ -47,6 +47,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "schedule-run-due",
     "backup",
     "backup-verify",
+    "backup-list",
     "restore",
     "state-upgrade",
     "state-retention-apply",

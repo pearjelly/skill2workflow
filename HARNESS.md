@@ -394,6 +394,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workfl
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --event-type node_recovered
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli audit-verify --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli backup-list --parent-dir /var/backups/skill2workflow --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
 PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --service-url http://127.0.0.1:8080 --auth-token-file /tmp/skill2workflow-ingress.token -o /tmp/skill2workflow-live-snapshot.json

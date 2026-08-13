@@ -157,6 +157,7 @@ explicit connector boundaries. It currently supports:
 - Inspect bounded, redacted recurring-schedule dispatch outcomes remotely, including uncertain recovery evidence
 - Inspect remote workflow artifact consistency without exposing workflow content or credentials
 - Create, verify, and atomically restore owner-only offline SQLite state backups
+- Inspect a bounded, read-only inventory of local backups with integrity status and size metadata
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Validate and inspect the minimum connector manifest contract for future extensions
@@ -587,6 +588,7 @@ After stopping the self-hosted service, create and verify an offline backup, the
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli backup --state-dir /var/lib/skill2workflow --output-dir /var/backups/skill2workflow/2026-08-11
 PYTHONPATH=src python3 -m skill2workflow.cli backup-verify --backup-dir /var/backups/skill2workflow/2026-08-11
+PYTHONPATH=src python3 -m skill2workflow.cli backup-list --parent-dir /var/backups/skill2workflow --limit 100
 PYTHONPATH=src python3 -m skill2workflow.cli restore --backup-dir /var/backups/skill2workflow/2026-08-11 --state-dir /var/lib/skill2workflow-restored
 ```
 
@@ -730,7 +732,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-123 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-124 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1081,6 +1083,11 @@ preserving aggregate totals. Live snapshots keep their fixed 100-item bound.
 Loop 123 adds [bounded local run discovery](docs/run-list.md).
 `runs --limit` and `control-runs --limit` retain only the newest compact
 summaries up to 1,000 while the omitted flag preserves the complete-list path.
+
+Loop 124 adds [bounded local backup inventory](docs/backup-restore.md).
+`backup-list` reports integrity, creation time, layout, file count, workflow
+artifact count, and byte totals for the newest local backup sets without
+deleting, uploading, or exposing backup paths or contents.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

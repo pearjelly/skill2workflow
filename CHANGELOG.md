@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added bounded read-only local backup inventory through `backup-list`, with
+  fixed integrity status, creation time, layout, file count, and byte totals;
+  it never deletes, uploads, or exposes backup paths or contents.
 - Added bounded local run discovery through `runs --limit` and
   `control-runs --limit`. JSON and SQLite retain only the newest 1-1000
   summaries in durable timestamp order while the omitted flag preserves the complete

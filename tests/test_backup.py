@@ -13,10 +13,12 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from skill2workflow.backup import (
+    BACKUP_LIST_SCHEMA_VERSION,
     BACKUP_SCHEMA_VERSION,
     STATE_LAYOUT_VERSION,
     create_state_backup,
     inspect_state_backup_readiness,
+    list_state_backups,
     restore_state_backup,
     verify_state_backup,
 )
@@ -362,6 +364,58 @@ class StateBackupTests(TestCase):
 
             with self.assertRaisesRegex(ValueError, "group or others"):
                 verify_state_backup(backup_dir)
+
+    def test_backup_list_is_bounded_and_reports_integrity_without_paths(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            parent = root / "backups"
+            parent.mkdir()
+            parent.chmod(0o700)
+            _populate_state(state_dir)
+            for name, timestamp in (
+                ("backup_old", "2026-08-14T00:00:01+00:00"),
+                ("backup_middle", "2026-08-14T00:00:02+00:00"),
+                ("backup_new", "2026-08-14T00:00:03+00:00"),
+            ):
+                backup_dir = parent / name
+                create_state_backup(state_dir, backup_dir)
+                manifest_path = backup_dir / "manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["created_at"] = timestamp
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+
+            result = list_state_backups(parent, limit=2)
+
+        self.assertEqual(result["schema_version"], BACKUP_LIST_SCHEMA_VERSION)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["total"], 3)
+        self.assertEqual(result["window"], {"max_items": 2, "returned": 2, "truncated": True})
+        self.assertEqual([item["name"] for item in result["backups"]], ["backup_middle", "backup_new"])
+        self.assertTrue(all(item["status"] == "valid" for item in result["backups"]))
+        self.assertTrue(all("path" not in item for item in result["backups"]))
+
+    def test_backup_list_reports_invalid_selected_sets_and_rejects_bad_limits(self):
+        with TemporaryDirectory() as tmp:
+            parent = Path(tmp) / "backups"
+            parent.mkdir()
+            parent.chmod(0o700)
+            invalid = parent / "broken"
+            invalid.mkdir()
+            invalid.chmod(0o700)
+            manifest = invalid / "manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+            manifest.chmod(0o600)
+
+            result = list_state_backups(parent, limit=1)
+            for limit in (0, -1, 1001, True, "2"):
+                with self.assertRaisesRegex(ValueError, "backup list limit"):
+                    list_state_backups(parent, limit=limit)
+
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["backups"][0]["status"], "invalid")
+        self.assertEqual(result["backups"][0]["name"], "broken")
 
 
 def _populate_state(state_dir: Path):

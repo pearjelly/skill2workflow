@@ -45,6 +45,25 @@ class BackupDocumentationTests(TestCase):
         )
         self.assertFalse(schema["additionalProperties"])
 
+    def test_inventory_schema_matches_bounded_value_free_contract(self):
+        schema = json.loads(
+            (ROOT / "schemas" / "state-backup-list-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-state-backup-list-0.1.0",
+        )
+        self.assertEqual(schema["properties"]["backups"]["maxItems"], 1000)
+        self.assertEqual(schema["$defs"]["window"]["properties"]["max_items"]["maximum"], 1000)
+        self.assertEqual(
+            schema["$defs"]["backup"]["properties"]["status"]["enum"],
+            ["valid", "invalid"],
+        )
+        self.assertNotIn("path", schema["$defs"]["backup"]["properties"])
+
     def test_operator_guide_defines_offline_security_and_recovery_drill(self):
         guide = (ROOT / "docs" / "backup-restore.md").read_text(encoding="utf-8")
 
@@ -60,17 +79,37 @@ class BackupDocumentationTests(TestCase):
             "owner-only",
             "encrypt",
             "backup_restore_smoke.py",
+            "backup-list",
+            "read-only",
+            "absolute paths",
+            "integrity status",
+            "state-backup-list-0.1.0.schema.json",
         ):
             self.assertIn(text, guide)
+
+    def test_inventory_contract_is_recorded_in_public_docs(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        guide = (ROOT / "docs" / "backup-restore.md").read_text(encoding="utf-8")
+        stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(
+            encoding="utf-8"
+        )
+
+        for document in (readme, stability, changelog, package_smoke):
+            self.assertIn("backup-list", document)
+        self.assertIn("1-1000", stability)
+        self.assertIn("does not delete, upload, or rewrite", guide)
+        self.assertIn('"backup-list"', package_smoke)
 
     def test_readme_and_roadmap_record_loop_44_without_overclaiming_production(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-123 are complete", readme)
+        self.assertIn("Delivery Loops 1-124 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("docs/backup-restore.md", readme)
-        self.assertIn("- Completed delivery loops: 1-123", roadmap)
+        self.assertIn("- Completed delivery loops: 1-124", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 44: Verified Backup And Restore | Complete |", roadmap)
         self.assertIn("Production Baseline remains directional", roadmap)

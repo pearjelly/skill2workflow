@@ -1216,6 +1216,61 @@ class CliTests(TestCase):
         self.assertEqual(outputs[4]["status"], "restored")
         self.assertEqual(restored_workflows[0]["workflow_id"], "workflow_demo")
 
+    def test_backup_list_command_reports_bounded_verified_inventory(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            state_dir = root / "state"
+            backup_parent = root / "backups"
+            backup_dir = backup_parent / "backup-2026-08-14"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            backup_parent.mkdir()
+            backup_parent.chmod(0o700)
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(workflow_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                RecurringScheduleStore(state_dir)
+                self.assertEqual(
+                    main(
+                        [
+                            "backup",
+                            "--state-dir",
+                            str(state_dir),
+                            "--output-dir",
+                            str(backup_dir),
+                        ]
+                    ),
+                    0,
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "backup-list",
+                        "--parent-dir",
+                        str(backup_parent),
+                        "--limit",
+                        "1",
+                    ]
+                )
+
+        inventory = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(inventory["status"], "ok")
+        self.assertEqual(inventory["window"]["max_items"], 1)
+        self.assertEqual(inventory["backups"][0]["status"], "valid")
+
     def test_backup_command_normalizes_unexpected_storage_failure(self):
         stderr = StringIO()
         with patch(

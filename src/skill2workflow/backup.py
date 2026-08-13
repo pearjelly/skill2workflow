@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import heapq
 import json
 import shutil
 import sqlite3
@@ -26,6 +27,8 @@ from .storage import verify_audit_integrity
 
 BACKUP_SCHEMA_VERSION = "skill2workflow-state-backup-0.1.0"
 BACKUP_READINESS_SCHEMA_VERSION = "skill2workflow-backup-readiness-0.1.0"
+BACKUP_LIST_SCHEMA_VERSION = "skill2workflow-state-backup-list-0.1.0"
+MAX_BACKUP_LIST_ITEMS = 1000
 STATE_LAYOUT_VERSION = CURRENT_STATE_LAYOUT_VERSION
 _DATABASES = ("control.sqlite3", "runs.sqlite3", "scheduler.sqlite3")
 _REQUIRED_TABLES = {
@@ -286,6 +289,49 @@ def verify_state_backup(backup_dir: Path) -> Dict[str, object]:
     backup = _existing_directory(backup_dir, "backup directory")
     _verify_backup_directory(backup)
     return _summary("valid", backup)
+
+
+def list_state_backups(parent_dir: Path, limit: int = 100) -> Dict[str, object]:
+    """Return a bounded, read-only inventory of direct child backup sets."""
+
+    _validate_backup_list_limit(limit)
+    parent = _existing_directory(parent_dir, "backup parent directory")
+    _require_owner_only_directory(parent, "backup parent directory")
+    selected = []
+    total = 0
+    for candidate in parent.iterdir():
+        if candidate.is_symlink() or not candidate.is_dir():
+            continue
+        total += 1
+        metadata, sort_key = _backup_inventory_metadata(candidate)
+        item = (sort_key, candidate.name, metadata)
+        if len(selected) < limit:
+            heapq.heappush(selected, item)
+        elif sort_key > selected[0][0]:
+            heapq.heapreplace(selected, item)
+
+    backups = []
+    for _, name, metadata in sorted(selected, key=lambda item: item[0]):
+        candidate = parent / name
+        item = {"name": name, **metadata}
+        try:
+            manifest = _verify_backup_directory(candidate)
+            item.update(_backup_inventory_summary(manifest))
+            item["status"] = "valid"
+        except (OSError, sqlite3.Error, ValueError):
+            item["status"] = "invalid"
+        backups.append(item)
+    return {
+        "schema_version": BACKUP_LIST_SCHEMA_VERSION,
+        "status": "ok",
+        "total": total,
+        "backups": backups,
+        "window": {
+            "max_items": limit,
+            "returned": len(backups),
+            "truncated": total > len(backups),
+        },
+    }
 
 
 def restore_state_backup(backup_dir: Path, state_dir: Path) -> Dict[str, object]:
@@ -871,6 +917,65 @@ def _aware_timestamp(value: object, label: str) -> str:
     if parsed.tzinfo is None:
         raise ValueError(f"{label} must be a timezone-aware ISO-8601 timestamp")
     return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _validate_backup_list_limit(limit: object) -> None:
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or not 1 <= limit <= MAX_BACKUP_LIST_ITEMS
+    ):
+        raise ValueError(
+            f"backup list limit must be an integer from 1 through {MAX_BACKUP_LIST_ITEMS}"
+        )
+
+
+def _backup_inventory_metadata(backup: Path):
+    metadata = {
+        "status": "invalid",
+        "created_at": "",
+        "state_layout_version": "",
+        "workflow_artifact_count": 0,
+        "file_count": 0,
+        "total_bytes": 0,
+    }
+    try:
+        manifest = _read_backup_manifest(backup)
+        metadata.update(_backup_inventory_summary(manifest))
+        sort_key = (
+            1,
+            _aware_timestamp(manifest["created_at"], "backup created_at"),
+            backup.name,
+        )
+        return metadata, sort_key
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        try:
+            fallback = f"{backup.stat().st_mtime_ns:020d}"
+        except OSError:
+            fallback = ""
+        return metadata, (0, fallback, backup.name)
+
+
+def _read_backup_manifest(backup: Path) -> Dict[str, object]:
+    _require_owner_only_directory(backup, "backup directory")
+    manifest_path = backup / "manifest.json"
+    _require_regular_no_symlink(manifest_path, "backup manifest")
+    _require_owner_only_file(manifest_path, "backup manifest")
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    _validate_manifest_shape(manifest)
+    for entry in manifest["files"]:
+        _validate_file_entry(entry)
+    return manifest
+
+
+def _backup_inventory_summary(manifest: Dict[str, object]) -> Dict[str, object]:
+    return {
+        "created_at": str(manifest["created_at"]),
+        "state_layout_version": str(manifest["state_layout_version"]),
+        "workflow_artifact_count": int(manifest["workflow_artifact_count"]),
+        "file_count": len(manifest["files"]),
+        "total_bytes": sum(int(entry["size_bytes"]) for entry in manifest["files"]),
+    }
 
 
 def _summary(status: str, backup_dir: Path) -> Dict[str, object]:

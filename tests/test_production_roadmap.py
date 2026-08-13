@@ -26,11 +26,11 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
-        self.assertIn("- Completed delivery loops: 1-123", roadmap)
-        self.assertIn("- Active loop: None; Loop 123 is complete with bounded local run discovery", roadmap)
+        self.assertIn("- Completed delivery loops: 1-124", roadmap)
+        self.assertIn("- Active loop: None; Loop 124 is complete with bounded local backup inventory", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
-        self.assertIn("This rolling queue is ordered. Loop 123 is complete", roadmap)
+        self.assertIn("This rolling queue is ordered. Loop 124 is complete", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
         self.assertIn("**Status:** Achieved.", roadmap)
@@ -41,7 +41,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-123 complete, further loop numbers unassigned.",
+            "**Status:** Directional; Loops 44-124 complete, further loop numbers unassigned.",
             roadmap,
         )
 
@@ -157,6 +157,11 @@ class ProductionRoadmapTests(TestCase):
             "| Loop 123: Bounded Local Run Discovery | Complete |",
             roadmap,
         )
+        self.assertIn(
+            "| Loop 124: Bounded Local Backup Inventory | Complete |",
+            roadmap,
+        )
+        self.assertIn("### Loop 124: Bounded Local Backup Inventory", roadmap)
         self.assertIn(
             "| Loop 45: State Upgrade And Migration | Complete |",
             roadmap,
@@ -318,7 +323,7 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-123 are complete", readme)
+        self.assertIn("Delivery Loops 1-124 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)

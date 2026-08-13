@@ -32,6 +32,23 @@ skill2workflow backup-verify \
   --backup-dir /var/backups/skill2workflow/2026-08-11
 ```
 
+For a read-only view of a backup parent directory, use the bounded inventory
+command:
+
+```bash
+skill2workflow backup-list \
+  --parent-dir /var/backups/skill2workflow \
+  --limit 100
+```
+
+`backup-list` scans direct child backup directories, retains the newest
+`1` through `1000` manifest entries, and verifies only the returned sets. Each
+entry reports a fixed integrity status, creation time, layout identity, file
+count, workflow-artifact count, and total bytes; it never returns absolute paths,
+workflow contents, credentials, or manifest error details. The command
+is read-only and does not delete, upload, or rewrite backups. Its contract is
+[`schemas/state-backup-list-0.1.0.schema.json`](../schemas/state-backup-list-0.1.0.schema.json).
+
 From a source checkout, prefix each command with `PYTHONPATH=src python3 -m skill2workflow.cli`.
 
 Creation is staged in a sibling temporary directory and renamed only after validation succeeds. Failure removes the staging directory and never publishes a partial backup.
