@@ -6,7 +6,7 @@ import hashlib
 import json
 import sqlite3
 import stat
-from collections import Counter
+from collections import Counter, deque
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,6 +22,7 @@ AuditEvent = Dict[str, object]
 
 AUDIT_INTEGRITY_SCHEMA_VERSION = "skill2workflow-audit-integrity-0.1.0"
 AUDIT_INTEGRITY_ALGORITHM = "sha256-chain-v1"
+MAX_AUDIT_LIST_ITEMS = 1000
 _AUDIT_GENESIS_DIGEST = ""
 _LEGACY_AUDIT_COLUMNS = {
     "sequence",
@@ -37,6 +38,40 @@ _CURRENT_AUDIT_COLUMNS = _LEGACY_AUDIT_COLUMNS | {"prev_digest", "digest"}
 
 class ExecutionFencedError(ValueError):
     """Raised when an obsolete runtime owner attempts to mutate a recovered run."""
+
+
+def _validate_audit_event_limit(limit: object) -> None:
+    if limit is None:
+        return
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or limit < 1
+        or limit > MAX_AUDIT_LIST_ITEMS
+    ):
+        raise ValueError(
+            f"audit event limit must be an integer from 1 to {MAX_AUDIT_LIST_ITEMS}"
+        )
+
+
+def _audit_event_matches(
+    event: object,
+    *,
+    workflow_id: str = "",
+    version: str = "",
+    run_id: str = "",
+    event_type: str = "",
+) -> bool:
+    if not isinstance(event, dict):
+        return not any((workflow_id, version, run_id, event_type))
+    return not any(
+        (
+            workflow_id and str(event.get("workflow_id", "")) != workflow_id,
+            version and str(event.get("workflow_version", "")) != version,
+            run_id and str(event.get("run_id", "")) != run_id,
+            event_type and str(event.get("type", "")) != event_type,
+        )
+    )
 
 
 class JsonRunStore:
@@ -674,14 +709,36 @@ class JsonControlStore:
         if missing:
             self.append_audit_batch(missing)
 
-    def list_audit_events(self) -> List[AuditEvent]:
+    def list_audit_events(
+        self,
+        workflow_id: str = "",
+        version: str = "",
+        run_id: str = "",
+        event_type: str = "",
+        limit: int = None,
+    ) -> List[AuditEvent]:
+        """Return audit events, optionally retaining only the newest matches."""
+
+        _validate_audit_event_limit(limit)
         if not self.audit_path.exists():
             return []
-        events = []
-        for line in self.audit_path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                events.append(json.loads(line))
-        return events
+        events = deque(maxlen=limit) if limit is not None else []
+        with self.audit_path.open("r", encoding="utf-8") as handle:
+            lines = handle
+            for line in lines:
+                if not line.strip():
+                    continue
+                event = json.loads(line)
+                if not _audit_event_matches(
+                    event,
+                    workflow_id=workflow_id,
+                    version=version,
+                    run_id=run_id,
+                    event_type=event_type,
+                ):
+                    continue
+                events.append(event)
+        return list(events)
 
     def audit_event_exists(self, event: AuditEvent) -> bool:
         """Return whether one canonical audit payload is already persisted."""
@@ -1159,10 +1216,41 @@ class SqliteControlStore:
                 ),
             )
 
-    def list_audit_events(self) -> List[AuditEvent]:
+    def list_audit_events(
+        self,
+        workflow_id: str = "",
+        version: str = "",
+        run_id: str = "",
+        event_type: str = "",
+        limit: int = None,
+    ) -> List[AuditEvent]:
+        """Return audit events, applying filters and a newest-first storage bound."""
+
+        _validate_audit_event_limit(limit)
+        clauses = []
+        parameters = []
+        for column, value in (
+            ("workflow_id", workflow_id),
+            ("workflow_version", version),
+            ("run_id", run_id),
+            ("event_type", event_type),
+        ):
+            if value:
+                clauses.append(f"{column} = ?")
+                parameters.append(value)
+        query = "select payload_json from audit_events"
+        if clauses:
+            query += " where " + " and ".join(clauses)
+        query += " order by sequence"
+        if limit is not None:
+            query += " desc limit ?"
+            parameters.append(limit)
         with self._connection() as connection:
-            rows = connection.execute("select payload_json from audit_events order by sequence").fetchall()
-        return [json.loads(str(row[0])) for row in rows]
+            rows = connection.execute(query, parameters).fetchall()
+        events = [json.loads(str(row[0])) for row in rows]
+        if limit is not None:
+            events.reverse()
+        return events
 
     def audit_event_exists(self, event: AuditEvent) -> bool:
         """Return whether one canonical audit payload is already persisted."""

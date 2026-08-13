@@ -37,6 +37,8 @@ class RuntimePolicyDocumentationTests(TestCase):
             "node_timeout",
             "timeout_ms",
             "Retry backoff belongs",
+            "--limit 100",
+            "storage-level tail bound",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("execution_timeout", compatibility)

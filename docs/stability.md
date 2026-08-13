@@ -84,6 +84,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Connector retry policy semantics for `max_attempts` and bounded fixed `backoff_ms`, including control-plane audit and local visual evidence documented in `docs/runtime-policy.md` and `docs/connectors.md`
 - Optional `tool_call.on_fallback` transition semantics, edge validation, LiteGraph slot projection, and fixed `node_fallback` evidence documented in `docs/workflow-dsl-contract.md`
 - SQLite audit integrity result contract `skill2workflow-audit-integrity-0.1.0` and the payload-free `audit-verify` CLI; this does not claim signatures or JSON/JSONL chain guarantees
+- Local `audit --limit` accepts a bounded 1-1000 tail after storage-level filters and preserves chronological output; omitting it retains the complete-list compatibility path
 - Authenticated Prometheus text metric names, fixed label vocabularies, live HTTP/scheduler pressure gauges, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`
 - The operator-managed `examples/observability/prometheus-alerts.yml` starter pack and its fixed-metric safety checks are documented in `docs/prometheus-alerts.md`; it adds no runtime route, dependency, or automatic remediation
 - The operator-managed `examples/observability/grafana-dashboard.json` read-only dashboard and its fixed-metric safety checks are documented in `docs/grafana-dashboard.md`; it adds no runtime route, dependency, or mutation

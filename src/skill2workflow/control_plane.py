@@ -843,17 +843,15 @@ class LocalControlPlane:
         version: str = "",
         run_id: str = "",
         event_type: str = "",
+        limit: int = None,
     ) -> List[AuditEvent]:
-        events = self.store.list_audit_events()
-        if workflow_id:
-            events = [event for event in events if str(event.get("workflow_id", "")) == workflow_id]
-        if version:
-            events = [event for event in events if str(event.get("workflow_version", "")) == version]
-        if run_id:
-            events = [event for event in events if str(event.get("run_id", "")) == run_id]
-        if event_type:
-            events = [event for event in events if str(event.get("type", "")) == event_type]
-        return events
+        return self.store.list_audit_events(
+            workflow_id=workflow_id,
+            version=version,
+            run_id=run_id,
+            event_type=event_type,
+            limit=limit,
+        )
 
     def verify_audit_integrity(self) -> Dict[str, object]:
         """Verify the storage-backed audit evidence without exposing payloads."""

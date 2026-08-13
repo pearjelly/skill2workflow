@@ -140,6 +140,10 @@ PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workfl
 ```
 
 The audit events include workflow identity, run id, node id, attempt metadata, and error text when available.
+For long-running state directories, add `--limit 100` (the accepted range is
+`1` through `1000`) to return only the newest matching events while preserving
+chronological order. Filters are applied before the storage-level tail bound;
+omitting the flag preserves the complete-list compatibility path.
 
 ## Current Limits
 

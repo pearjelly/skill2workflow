@@ -4,10 +4,50 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.storage import SqliteControlStore, SqliteRunStore
+from skill2workflow.storage import JsonControlStore, SqliteControlStore, SqliteRunStore
 
 
 class StorageTests(TestCase):
+    def test_audit_tail_limit_filters_before_bounding_for_json_and_sqlite(self):
+        events = [
+            {
+                "type": event_type,
+                "workflow_id": "workflow_audit" if index < 4 else "workflow_other",
+                "workflow_version": "0.1.0",
+                "run_id": "run_audit",
+                "timestamp": f"2026-08-14T00:00:{index:02d}Z",
+            }
+            for index, event_type in enumerate(
+                ("run_started", "connector_started", "connector_failed", "run_completed", "run_started")
+            )
+        ]
+
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            json_store = JsonControlStore(state_dir / "json")
+            sqlite_store = SqliteControlStore(state_dir / "sqlite")
+            for event in events:
+                json_store.append_audit(event)
+                sqlite_store.append_audit(event)
+
+            json_tail = json_store.list_audit_events(
+                workflow_id="workflow_audit", limit=2
+            )
+            sqlite_tail = sqlite_store.list_audit_events(
+                workflow_id="workflow_audit", limit=2
+            )
+
+        expected = ["connector_failed", "run_completed"]
+        self.assertEqual([event["type"] for event in json_tail], expected)
+        self.assertEqual([event["type"] for event in sqlite_tail], expected)
+
+    def test_audit_tail_limit_rejects_non_positive_or_oversized_values(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp))
+            for limit in (0, -1, 1001, True, "2"):
+                with self.assertRaisesRegex(ValueError, "audit event limit"):
+                    store.list_audit_events(limit=limit)
+
     def test_sqlite_run_page_filters_and_returns_stable_cursor_window(self):
         with TemporaryDirectory() as tmp:
             store = SqliteRunStore(Path(tmp))

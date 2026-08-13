@@ -112,6 +112,7 @@ explicit connector boundaries. It currently supports:
 - Resume waiting runs
 - Persist run state as JSON or opt-in SQLite
 - List run summaries and inspect full run logs
+- Inspect a bounded tail of filtered local audit events with `audit --limit`
 - Store queryable run event rows when SQLite storage is enabled
 - Bind `human_gate` nodes to the built-in manual connector
 - Bind and validate `tool_call` connector metadata
@@ -723,7 +724,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-120 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-121 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1060,6 +1061,11 @@ The owner-only state-layout marker is fully written and fsynced before a
 non-overwriting publication, so concurrent starters never parse a partial
 marker. This remains a single-directory startup boundary, not distributed
 locking or replication.
+
+Loop 121 adds [bounded local audit inspection](docs/audit-integrity.md).
+`audit --limit` applies workflow/version/run/event-type filters in the storage
+backend, retains only the newest matching events up to 1,000, and prints them
+in chronological order. Omitting the flag preserves the complete-list path.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

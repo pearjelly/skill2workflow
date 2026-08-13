@@ -2169,6 +2169,66 @@ class CliTests(TestCase):
         self.assertEqual([event["type"] for event in audit_events], ["run_completed"])
         self.assertEqual(audit_events[0]["run_id"], run_state["run_id"])
 
+    def test_audit_command_supports_bounded_tail_after_filters(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            from skill2workflow.control_plane import LocalControlPlane
+
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            for index, event_type in enumerate(
+                ("run_started", "connector_started", "connector_failed", "run_completed")
+            ):
+                control.store.append_audit(
+                    {
+                        "type": event_type,
+                        "workflow_id": "workflow_audit",
+                        "workflow_version": "0.1.0",
+                        "run_id": "run_audit",
+                        "timestamp": f"2026-08-14T00:00:{index:02d}Z",
+                    }
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "audit",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                        "--run-id",
+                        "run_audit",
+                        "--limit",
+                        "2",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            [event["type"] for event in json.loads(stdout.getvalue())],
+            ["connector_failed", "run_completed"],
+        )
+
+    def test_audit_command_rejects_unbounded_limit_without_traceback(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "audit",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                        "--limit",
+                        "1001",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "audit event limit must be an integer from 1 to 1000\n")
+
     def test_control_snapshot_command_writes_operator_snapshot(self):
         with TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

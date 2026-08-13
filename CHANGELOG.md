@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added bounded local audit inspection through `audit --limit`. Filters are
+  applied in JSON/SQLite storage before retaining the newest matching events,
+  with a fixed 1-1000 range and chronological output.
 - Added atomic first-use SQLite state-layout marker publication. Concurrent
   starters now observe either no marker or a complete owner-only marker, never
   a partially-written JSON document.

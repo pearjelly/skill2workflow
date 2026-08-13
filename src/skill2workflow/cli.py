@@ -567,6 +567,12 @@ def main(argv=None) -> int:
     audit_cmd.add_argument("--version", default="")
     audit_cmd.add_argument("--run-id", default="")
     audit_cmd.add_argument("--event-type", default="")
+    audit_cmd.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Return only the newest matching events (1-1000)",
+    )
 
     audit_consistency_cmd = subparsers.add_parser(
         "audit-consistency",
@@ -1134,15 +1140,17 @@ def main(argv=None) -> int:
         )
 
     if args.command == "audit":
-        _print_json(
-            LocalControlPlane(args.state_dir, storage=args.storage).list_audit_events(
+        return _control_action(
+            lambda: LocalControlPlane(
+                args.state_dir, storage=args.storage
+            ).list_audit_events(
                 workflow_id=args.workflow_id,
                 version=args.version,
                 run_id=args.run_id,
                 event_type=args.event_type,
+                limit=args.limit,
             )
         )
-        return 0
 
     if args.command == "audit-consistency":
         return _control_action(

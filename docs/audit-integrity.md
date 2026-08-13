@@ -60,12 +60,33 @@ it detects accidental edits, truncation, row replacement, and ordinary
 tampering, but it does not prove who controlled the database or replace
 operator-managed authenticated backup and access controls.
 
+## Bounded Local Inspection
+
+Use the optional `audit --limit` flag when inspecting a long-running state
+directory:
+
+```bash
+skill2workflow audit \
+  --state-dir /var/lib/skill2workflow \
+  --storage sqlite \
+  --run-id run_0123456789ab \
+  --limit 100
+```
+
+The limit accepts integers from `1` through `1000` and returns the newest
+matching events in their original chronological order. Storage applies the
+workflow/version/run/event-type filters before the tail bound, so the command
+does not load unrelated SQLite audit rows or emit a partial event. Omitting
+`--limit` preserves the historical complete-list behavior; use the bounded
+form for routine operator inspection and incident triage. This is an output
+and memory boundary, not retention or deletion policy.
+
 ## Boundary
 
-This loop covers one local SQLite audit database and a bounded, secret-free
-verification result. It excludes remote audit streaming, signed attestations,
-external key management, immutable storage, JSON/JSONL exactly-once guarantees,
-and hosted compliance retention policy.
+This loop covers one local audit database and bounded, secret-free inspection
+when the tail form is selected. It excludes remote audit streaming, signed
+attestations, external key management, immutable storage, JSON/JSONL
+exactly-once guarantees, and hosted compliance retention policy.
 
 Verification evidence:
 
