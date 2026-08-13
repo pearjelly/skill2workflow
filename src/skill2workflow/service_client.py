@@ -11,8 +11,10 @@ from typing import Dict, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 from .dashboard import (
+    MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     RUN_DETAIL_SCHEMA_VERSION,
     RUN_LIST_SCHEMA_VERSION,
+    RECURRING_SCHEDULE_LIST_SCHEMA_VERSION,
     SUPPORT_BUNDLE_SCHEMA_VERSION,
 )
 from .control_plane import (
@@ -26,6 +28,7 @@ from .service import read_service_bearer_token
 MAX_SERVICE_ACTION_RESPONSE_BYTES = 64 * 1024
 MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
+MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -128,6 +131,23 @@ def fetch_run_list(
         conflict_message="run list unavailable",
     )
     _validate_run_list(payload)
+    return payload
+
+
+def fetch_recurring_schedule_list(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch the bounded, authenticated recurring-schedule projection."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/recurring-schedules",
+        conflict_message="recurring schedule list unavailable",
+        max_response_bytes=MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_list(payload)
     return payload
 
 
@@ -369,6 +389,7 @@ def _validate_run_list(payload: Dict[str, object]) -> None:
 
     if set(payload) != {"schema_version", "summary", "runs", "window"}:
         raise ServiceActionError()
+
     if payload.get("schema_version") != RUN_LIST_SCHEMA_VERSION:
         raise ServiceActionError()
     summary = payload.get("summary")
@@ -404,6 +425,74 @@ def _validate_run_list(payload: Dict[str, object]) -> None:
         or not _is_non_negative_integer(window.get("total"))
         or not _is_non_negative_integer(window.get("returned"))
         or window.get("returned") != len(runs)
+        or window.get("returned") > window.get("total")
+        or window.get("returned") > window.get("max_items")
+        or not isinstance(window.get("truncated"), bool)
+        or window.get("truncated") != (window.get("returned") < window.get("total"))
+        or window.get("total") != summary.get("total")
+    ):
+        raise ServiceActionError()
+
+
+def _validate_recurring_schedule_list(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed redacted recurring-schedule contract."""
+
+    if set(payload) != {"schema_version", "summary", "schedules", "window"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RECURRING_SCHEDULE_LIST_SCHEMA_VERSION:
+        raise ServiceActionError()
+    statuses = {"active", "disabled", "other"}
+    summary = payload.get("summary")
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != {"total", "status_counts"}
+        or not _is_non_negative_integer(summary.get("total"))
+        or not isinstance(summary.get("status_counts"), dict)
+        or set(summary["status_counts"]) != statuses
+        or any(not _is_non_negative_integer(value) for value in summary["status_counts"].values())
+        or sum(summary["status_counts"].values()) != summary["total"]
+    ):
+        raise ServiceActionError()
+    schedules = payload.get("schedules")
+    schedule_fields = {
+        "schedule_id", "workflow_id", "workflow_version", "status", "enabled",
+        "starts_at", "next_run_at", "interval_seconds", "missed_run_policy",
+        "last_scheduled_for", "last_run_id", "last_trigger_id",
+    }
+    if not isinstance(schedules, list) or len(schedules) > MAX_RECURRING_SCHEDULE_LIST_ITEMS:
+        raise ServiceActionError()
+    for schedule in schedules:
+        if (
+            not isinstance(schedule, dict)
+            or set(schedule) != schedule_fields
+            or not isinstance(schedule.get("schedule_id"), str)
+            or not schedule.get("schedule_id")
+            or not isinstance(schedule.get("workflow_id"), str)
+            or not isinstance(schedule.get("workflow_version"), str)
+            or schedule.get("status") not in statuses
+            or not isinstance(schedule.get("enabled"), bool)
+            or any(
+                not isinstance(schedule.get(field), str)
+                for field in (
+                    "starts_at", "next_run_at", "missed_run_policy",
+                    "last_scheduled_for", "last_run_id", "last_trigger_id",
+                )
+            )
+            or schedule.get("missed_run_policy") not in {"latest", "skip"}
+            or not _is_non_negative_integer(schedule.get("interval_seconds"))
+            or schedule.get("interval_seconds") < 1
+        ):
+            raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_items", "total", "returned", "truncated"}
+        or not _is_non_negative_integer(window.get("max_items"))
+        or window.get("max_items") < 1
+        or window.get("max_items") > MAX_RECURRING_SCHEDULE_LIST_ITEMS
+        or not _is_non_negative_integer(window.get("total"))
+        or not _is_non_negative_integer(window.get("returned"))
+        or window.get("returned") != len(schedules)
         or window.get("returned") > window.get("total")
         or window.get("returned") > window.get("max_items")
         or not isinstance(window.get("truncated"), bool)

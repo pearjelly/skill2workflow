@@ -8,6 +8,7 @@ import json
 import secrets
 import sqlite3
 import time
+from collections import deque
 from contextlib import closing, contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -348,6 +349,30 @@ class RecurringScheduleStore:
                 "select definition_json from recurring_schedules order by schedule_id"
             ).fetchall()
         return [_load_recurring_definition(row[0]) for row in rows]
+
+    def list_bounded(self, max_items: int) -> Dict[str, object]:
+        """Stream definitions and retain only a bounded tail for read-only projections."""
+
+        if isinstance(max_items, bool) or not isinstance(max_items, int) or max_items <= 0:
+            raise ValueError("max_items must be a positive integer")
+        selected = deque(maxlen=max_items)
+        total = 0
+        status_counts = {"active": 0, "disabled": 0, "other": 0}
+        with self._connection() as connection:
+            rows = connection.execute(
+                "select definition_json from recurring_schedules order by schedule_id"
+            )
+            for row in rows:
+                definition = _load_recurring_definition(row[0])
+                total += 1
+                status = str(definition["schedule"].get("status", ""))
+                status_counts[status if status in {"active", "disabled"} else "other"] += 1
+                selected.append(definition)
+        return {
+            "items": list(selected),
+            "total": total,
+            "status_counts": status_counts,
+        }
 
     def set_enabled(self, schedule_id: str, enabled: bool) -> Schedule:
         if not isinstance(enabled, bool):

@@ -211,6 +211,37 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_recurring_schedules_command_prints_redacted_inventory(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-recurring-schedule-list-0.1.0",
+            "summary": {
+                "total": 0,
+                "status_counts": {"active": 0, "disabled": 0, "other": 0},
+            },
+            "schedules": [],
+            "window": {"max_items": 100, "total": 0, "returned": 0, "truncated": False},
+        }
+        with patch(
+            "skill2workflow.cli.fetch_recurring_schedule_list",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-recurring-schedules",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example", token_file)
+
     def test_service_audit_consistency_command_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

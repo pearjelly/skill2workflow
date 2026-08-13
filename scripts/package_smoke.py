@@ -50,6 +50,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-cancel",
     "service-show",
     "service-runs",
+    "service-recurring-schedules",
     "service-support-bundle",
     "service-audit-consistency",
     "control-snapshot",

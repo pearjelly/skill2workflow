@@ -42,6 +42,13 @@ class WorkflowReleaseDocumentationTests(TestCase):
             / "plans"
             / "2026-08-13-targeted-remote-audit.md"
         ).read_text(encoding="utf-8")
+        schedule_plan = (
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-08-13-remote-schedule-inventory.md"
+        ).read_text(encoding="utf-8")
         run_audit_schema = json.loads(
             (ROOT / "schemas" / "run-audit-report-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -97,9 +104,30 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("GET /api/v1/audit-consistency", remote_audit_guide)
         self.assertIn("service-audit-consistency", remote_audit_guide)
         self.assertIn("--run-id", remote_audit_guide)
+        schedule_guide = (ROOT / "docs" / "remote-schedule-inventory.md").read_text(
+            encoding="utf-8"
+        )
+        schedule_schema = json.loads(
+            (ROOT / "schemas" / "recurring-schedule-list-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn("service-recurring-schedules", schedule_guide)
+        self.assertIn("trigger input", schedule_guide)
+        self.assertEqual(
+            schedule_schema["$id"],
+            "https://skill2workflow.dev/schemas/recurring-schedule-list-0.1.0.json",
+        )
+        self.assertEqual(
+            schedule_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-recurring-schedule-list-0.1.0",
+        )
         self.assertIn("one known run", targeted_audit_plan)
         self.assertIn("pre-network rejection", targeted_audit_plan)
+        self.assertIn("trigger input", schedule_plan)
+        self.assertIn("support-bundle 0.1.0", schedule_plan)
         self.assertIn("Loop 77", roadmap)
+        self.assertIn("Loop 78: Remote Recurring-Schedule Inventory", roadmap)
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",
@@ -120,8 +148,10 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"workflow-artifacts"', cli)
         self.assertIn('"audit-consistency"', cli)
         self.assertIn('"service-audit-consistency"', cli)
+        self.assertIn('"service-recurring-schedules"', cli)
         self.assertIn("--expected-current-version", cli)
         self.assertIn('"workflow-diff"', package_smoke)
         self.assertIn('"workflow-artifacts"', package_smoke)
         self.assertIn('"audit-consistency"', package_smoke)
         self.assertIn('"service-audit-consistency"', package_smoke)
+        self.assertIn('"service-recurring-schedules"', package_smoke)

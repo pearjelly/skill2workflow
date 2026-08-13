@@ -30,6 +30,10 @@ does not append audit events, does not acquire the scheduler lease, or change ru
 It remains available while the service is starting, draining, or standby when
 the authenticated SQLite state is readable.
 
+The support-bundle `0.1.0` HTTP matrix is intentionally fixed: newer read-only
+routes such as `audit_consistency` and `recurring_schedule_list` remain in the
+live metrics route matrix but are omitted from this older bundle contract.
+
 Responses use `Cache-Control: no-store` and are bounded to 128 KiB after UTF-8
 encoding. Missing authentication returns `401`; a non-empty request body
 returns `400`; and a storage, validation, or response-bound failure returns

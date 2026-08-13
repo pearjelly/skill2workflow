@@ -218,6 +218,64 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(service.status, "starting")
         self.assertFalse(thread.is_alive())
 
+    def test_recurring_schedule_list_is_authenticated_redacted_and_available_before_readiness(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            service.scheduler.dispatcher.store.add(
+                {
+                    "schema_version": "skill2workflow-schedule-0.2.0",
+                    "schedule": {
+                        "id": "schedule_service_report",
+                        "workflow_id": "workflow_service",
+                        "version": "0.1.0",
+                        "starts_at": "2026-08-11T00:00:00Z",
+                        "interval_seconds": 60,
+                        "missed_run_policy": "latest",
+                        "enabled": True,
+                    },
+                    "trigger": {
+                        "idempotency_key_prefix": "schedule_service_report",
+                        "input": {"private": "private-schedule-input"},
+                    },
+                }
+            )
+            audit_count_before = len(
+                LocalControlPlane(root / "state", storage="sqlite").list_audit_events()
+            )
+            host, port = service.server_address
+            thread = threading.Thread(target=service._server.handle_request, daemon=True)
+            thread.start()
+            denied_status, denied = _get_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules"
+            )
+            thread.join(timeout=2)
+            thread = threading.Thread(target=service._server.handle_request, daemon=True)
+            thread.start()
+            accepted_status, payload = _get_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules",
+                token=AUTH_TOKEN,
+            )
+            thread.join(timeout=2)
+            service._server.server_close()
+            audit_count_after = len(
+                LocalControlPlane(root / "state", storage="sqlite").list_audit_events()
+            )
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            payload["schema_version"],
+            "skill2workflow-recurring-schedule-list-0.1.0",
+        )
+        self.assertEqual(payload["summary"]["total"], 1)
+        self.assertEqual(payload["schedules"][0]["schedule_id"], "schedule_service_report")
+        self.assertNotIn("private-schedule-input", json.dumps(payload, ensure_ascii=False))
+        self.assertEqual(service.status, "starting")
+        self.assertEqual(audit_count_after, audit_count_before)
+        self.assertFalse(thread.is_alive())
+
     def test_audit_consistency_can_target_one_run_beyond_the_global_window(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

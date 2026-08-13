@@ -17,6 +17,10 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added targeted remote audit inspection with a safe `/run_id` path and
   `service-audit-consistency --run-id`, avoiding global-window truncation while
   preserving the fixed report and error boundaries.
+- Added an authenticated, read-only recurring-schedule inventory at
+  `GET /api/v1/recurring-schedules` and the protected
+  `service-recurring-schedules` CLI, with fixed bounds and trigger-input
+  redaction.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

@@ -10,6 +10,7 @@ from skill2workflow.dashboard import (
     RUN_DETAIL_SCHEMA_VERSION,
     build_control_snapshot,
     build_control_snapshot_from_control,
+    build_recurring_schedule_list_from_store,
     build_run_detail,
     build_run_list,
     build_support_bundle_from_control,
@@ -310,6 +311,43 @@ class DashboardTests(TestCase):
         self.assertNotEqual(projected["runs"][0]["run_id"], "")
         self.assertIn(projected["runs"][0]["run_id"], {first["run_id"], second["run_id"]})
 
+    def test_recurring_schedule_list_is_bounded_and_excludes_trigger_input(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = RecurringScheduleStore(state_dir)
+            store.add(_recurring_schedule_definition("schedule_active", enabled=True))
+            store.add(_recurring_schedule_definition("schedule_disabled", enabled=False))
+
+            with patch.object(store, "list", side_effect=AssertionError("unbounded schedule read")):
+                projected = build_recurring_schedule_list_from_store(store, max_items=1)
+
+        self.assertEqual(
+            projected["schema_version"],
+            "skill2workflow-recurring-schedule-list-0.1.0",
+        )
+        self.assertEqual(projected["summary"], {
+            "total": 2,
+            "status_counts": {"active": 1, "disabled": 1, "other": 0},
+        })
+        self.assertEqual(projected["window"], {
+            "max_items": 1,
+            "total": 2,
+            "returned": 1,
+            "truncated": True,
+        })
+        self.assertEqual(len(projected["schedules"]), 1)
+        self.assertEqual(
+            set(projected["schedules"][0]),
+            {
+                "schedule_id", "workflow_id", "workflow_version", "status", "enabled",
+                "starts_at", "next_run_at", "interval_seconds", "missed_run_policy",
+                "last_scheduled_for", "last_run_id", "last_trigger_id",
+            },
+        )
+        serialized = json.dumps(projected, ensure_ascii=False)
+        self.assertNotIn("private-schedule-input", serialized)
+        self.assertNotIn("idempotency_key_prefix", serialized)
+
     def test_support_bundle_is_fixed_and_redacted(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)
@@ -358,6 +396,25 @@ def _workflow(version: str, node_title: str):
             {"id": "end", "type": "end", "title": "End"},
         ],
         "edges": [{"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}],
+    }
+
+
+def _recurring_schedule_definition(schedule_id: str, enabled: bool):
+    return {
+        "schema_version": "skill2workflow-schedule-0.2.0",
+        "schedule": {
+            "id": schedule_id,
+            "workflow_id": "workflow_dashboard",
+            "version": "1.0.0",
+            "starts_at": "2026-08-11T00:00:00Z",
+            "interval_seconds": 60,
+            "missed_run_policy": "latest",
+            "enabled": enabled,
+        },
+        "trigger": {
+            "idempotency_key_prefix": schedule_id,
+            "input": {"private": "private-schedule-input"},
+        },
     }
 
 

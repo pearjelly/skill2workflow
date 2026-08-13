@@ -9,11 +9,13 @@ from skill2workflow.service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
+    MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES,
     ServiceActionError,
     post_run_cancel,
     post_run_resume,
     fetch_run_detail,
     fetch_run_list,
+    fetch_recurring_schedule_list,
     fetch_support_bundle,
     fetch_audit_consistency,
 )
@@ -300,6 +302,81 @@ class ServiceClientTests(TestCase):
                 }
             ],
         )
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_schedule_list_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+        payload = _recurring_schedule_list_payload()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            listing = fetch_recurring_schedule_list(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(listing, payload)
+        self.assertEqual(
+            observed,
+            [{
+                "path": "/api/v1/recurring-schedules",
+                "authorization": f"Bearer {AUTH_TOKEN}",
+            }],
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_schedule_list_rejects_oversized_response(self):
+        body = b"x" * (MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_recurring_schedule_list(
+                    f"http://127.0.0.1:{server.server_port}", token_file
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
         self.assertFalse(thread.is_alive())
 
     def test_run_detail_uses_authenticated_get_and_validates_redacted_contract(self):
@@ -666,6 +743,38 @@ def _audit_consistency_payload():
                 "unexpected": [],
             }
         ],
+    }
+
+
+def _recurring_schedule_list_payload():
+    return {
+        "schema_version": "skill2workflow-recurring-schedule-list-0.1.0",
+        "summary": {
+            "total": 1,
+            "status_counts": {"active": 1, "disabled": 0, "other": 0},
+        },
+        "schedules": [
+            {
+                "schedule_id": "schedule_hourly_report",
+                "workflow_id": "workflow_service",
+                "workflow_version": "0.1.0",
+                "status": "active",
+                "enabled": True,
+                "starts_at": "2026-08-11T00:00:00+00:00",
+                "next_run_at": "2026-08-11T01:00:00+00:00",
+                "interval_seconds": 3600,
+                "missed_run_policy": "latest",
+                "last_scheduled_for": "",
+                "last_run_id": "",
+                "last_trigger_id": "",
+            }
+        ],
+        "window": {
+            "max_items": 100,
+            "total": 1,
+            "returned": 1,
+            "truncated": False,
+        },
     }
 
 

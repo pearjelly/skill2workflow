@@ -13,10 +13,12 @@ SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
 RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
 RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
 SUPPORT_BUNDLE_SCHEMA_VERSION = "skill2workflow-support-bundle-0.1.0"
+RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 MAX_RUN_DETAIL_EVENTS = 50
 MAX_RUN_LIST_ITEMS = 100
+MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
 
 
@@ -171,6 +173,77 @@ def build_run_list_from_control(
     }
 
 
+def build_recurring_schedule_list_from_store(
+    schedule_store,
+    max_items: int = MAX_RECURRING_SCHEDULE_LIST_ITEMS,
+) -> Dict[str, object]:
+    """Project recurring schedule definitions without exposing trigger input."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or max_items <= 0
+        or max_items > MAX_RECURRING_SCHEDULE_LIST_ITEMS
+    ):
+        raise ValueError("max_items must be a positive bounded integer")
+    if hasattr(schedule_store, "list_bounded"):
+        bounded = schedule_store.list_bounded(max_items)
+        selected = bounded["items"]
+        total = int(bounded["total"])
+        status_counts = dict(bounded["status_counts"])
+    else:
+        schedules = schedule_store.list()
+        total = len(schedules)
+        selected = schedules[-max_items:]
+        status_counts = {"active": 0, "disabled": 0, "other": 0}
+        for schedule in schedules:
+            meta = schedule.get("schedule") if isinstance(schedule, dict) else None
+            if not isinstance(meta, dict):
+                status_counts["other"] += 1
+                continue
+            status = _safe_string(meta.get("status", ""))
+            status_counts[status if status in {"active", "disabled"} else "other"] += 1
+    projected = []
+    for schedule in selected:
+        if not isinstance(schedule, dict):
+            continue
+        meta = schedule.get("schedule")
+        if not isinstance(meta, dict):
+            continue
+        status = _safe_string(meta.get("status", ""))
+        normalized_status = status if status in {"active", "disabled"} else "other"
+        projected.append(
+            {
+                "schedule_id": _safe_string(meta.get("id", "")),
+                "workflow_id": _safe_string(meta.get("workflow_id", "")),
+                "workflow_version": _safe_string(meta.get("version", "")),
+                "status": normalized_status,
+                "enabled": bool(meta.get("enabled", False)),
+                "starts_at": _safe_string(meta.get("starts_at", "")),
+                "next_run_at": _safe_string(meta.get("next_run_at", "")),
+                "interval_seconds": _safe_non_negative_int(meta.get("interval_seconds", 0)),
+                "missed_run_policy": _safe_string(meta.get("missed_run_policy", "")),
+                "last_scheduled_for": _safe_string(meta.get("last_scheduled_for", "")),
+                "last_run_id": _safe_string(meta.get("last_run_id", "")),
+                "last_trigger_id": _safe_string(meta.get("last_trigger_id", "")),
+            }
+        )
+    return {
+        "schema_version": RECURRING_SCHEDULE_LIST_SCHEMA_VERSION,
+        "summary": {
+            "total": total,
+            "status_counts": status_counts,
+        },
+        "schedules": projected,
+        "window": {
+            "max_items": max_items,
+            "total": total,
+            "returned": len(projected),
+            "truncated": len(projected) < total,
+        },
+    }
+
+
 def build_support_bundle_from_control(
     control: LocalControlPlane,
     telemetry,
@@ -196,6 +269,7 @@ def build_support_bundle_from_control(
     # are added; the live metrics endpoint remains the complete route matrix.
     http_requests = dict(observability.get("http_requests", {}))
     http_requests.pop("audit_consistency", None)
+    http_requests.pop("recurring_schedule_list", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests
     return {

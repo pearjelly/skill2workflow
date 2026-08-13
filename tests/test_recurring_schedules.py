@@ -125,6 +125,18 @@ class RecurringSchedulePersistenceTests(TestCase):
         self.assertEqual(stored, reloaded_schedule)
         self.assertEqual(dispatches, [])
 
+    def test_sqlite_store_streams_bounded_schedule_inventory(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            store.add(_recurring_definition())
+            store.add(_recurring_definition(extra_schedule={"id": "schedule_second"}))
+            inventory = store.list_bounded(1)
+
+        self.assertEqual(inventory["total"], 2)
+        self.assertEqual(inventory["status_counts"], {"active": 2, "disabled": 0, "other": 0})
+        self.assertEqual(len(inventory["items"]), 1)
+        self.assertEqual(inventory["items"][0]["schedule"]["id"], "schedule_second")
+
     def test_latest_policy_coalesces_missed_occurrences_into_one_durable_dispatch(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/recurring-schedule-list-0.1.0.json",
+  "title": "skill2workflow redacted recurring schedule list",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "summary", "schedules", "window"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-recurring-schedule-list-0.1.0"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "status_counts"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "status_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["active", "disabled", "other"],
+          "properties": {
+            "active": {"type": "integer", "minimum": 0},
+            "disabled": {"type": "integer", "minimum": 0},
+            "other": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "schedules": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schedule_id", "workflow_id", "workflow_version", "status", "enabled",
+          "starts_at", "next_run_at", "interval_seconds", "missed_run_policy",
+          "last_scheduled_for", "last_run_id", "last_trigger_id"
+        ],
+        "properties": {
+          "schedule_id": {"type": "string", "minLength": 1},
+          "workflow_id": {"type": "string"},
+          "workflow_version": {"type": "string"},
+          "status": {"enum": ["active", "disabled", "other"]},
+          "enabled": {"type": "boolean"},
+          "starts_at": {"type": "string"},
+          "next_run_at": {"type": "string"},
+          "interval_seconds": {"type": "integer", "minimum": 1},
+          "missed_run_policy": {"enum": ["latest", "skip"]},
+          "last_scheduled_for": {"type": "string"},
+          "last_run_id": {"type": "string"},
+          "last_trigger_id": {"type": "string"}
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_items", "total", "returned", "truncated"],
+      "properties": {
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 100},
+        "total": {"type": "integer", "minimum": 0},
+        "returned": {"type": "integer", "minimum": 0, "maximum": 100},
+        "truncated": {"type": "boolean"}
+      }
+    }
+  }
+}

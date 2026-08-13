@@ -23,10 +23,12 @@ from .control_plane import LocalControlPlane
 from .credentials import DirectoryCredentialProvider
 from .dashboard import (
     MAX_LIVE_SNAPSHOT_BYTES,
+    MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RUN_DETAIL_EVENTS,
     MAX_RUN_LIST_ITEMS,
     MAX_SUPPORT_BUNDLE_BYTES,
     build_control_snapshot_from_control,
+    build_recurring_schedule_list_from_store,
     build_run_detail_from_control,
     build_run_list_from_control,
     build_support_bundle_from_control,
@@ -52,6 +54,7 @@ MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
+MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
 
@@ -520,6 +523,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_metrics()
                 elif self.command == "GET" and path == "/api/v1/control-snapshot":
                     self._handle_control_snapshot()
+                elif self.command == "GET" and path == "/api/v1/recurring-schedules":
+                    self._handle_recurring_schedule_list()
                 elif self.command == "GET" and (
                     path == "/api/v1/audit-consistency"
                     or _audit_consistency_run_id(path)
@@ -714,6 +719,50 @@ def _handler_for(service: RuntimeService):
                     raise ValueError("run list exceeds response limit")
             except (ValueError, OSError, sqlite3.Error):
                 self._send_json(503, {"error": "run list unavailable"})
+                return
+            self._send_json(200, payload)
+
+        def _handle_recurring_schedule_list(self):
+            """Serve a bounded, redacted recurring-schedule inventory."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "recurring schedule list request must not include a body"},
+                )
+                return
+            try:
+                payload = build_recurring_schedule_list_from_store(
+                    service.scheduler.dispatcher.store,
+                    max_items=MAX_RECURRING_SCHEDULE_LIST_ITEMS,
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES:
+                    raise ValueError("recurring schedule list exceeds response limit")
+            except (ValueError, OSError, sqlite3.Error):
+                self._send_json(503, {"error": "recurring schedule list unavailable"})
                 return
             self._send_json(200, payload)
 
@@ -1031,6 +1080,8 @@ def _request_route(method: str, path: str) -> str:
         return "metrics"
     if method == "GET" and path == "/api/v1/control-snapshot":
         return "control_snapshot"
+    if method == "GET" and path == "/api/v1/recurring-schedules":
+        return "recurring_schedule_list"
     if method == "GET" and path == "/api/v1/audit-consistency":
         return "audit_consistency"
     if method == "GET" and _audit_consistency_run_id(path):

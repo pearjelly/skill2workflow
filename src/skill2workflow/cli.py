@@ -25,6 +25,7 @@ from .service_bootstrap import initialize_service_workspace
 from .service_doctor import diagnose_service
 from .service_client import (
     fetch_audit_consistency,
+    fetch_recurring_schedule_list,
     fetch_run_detail,
     fetch_run_list,
     fetch_support_bundle,
@@ -335,6 +336,13 @@ def main(argv=None) -> int:
     )
     service_runs_cmd.add_argument("--service-url", required=True)
     service_runs_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_schedules_cmd = subparsers.add_parser(
+        "service-recurring-schedules",
+        help="List bounded recurring schedules through the authenticated service",
+    )
+    service_schedules_cmd.add_argument("--service-url", required=True)
+    service_schedules_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_support_cmd = subparsers.add_parser(
         "service-support-bundle",
@@ -724,6 +732,14 @@ def main(argv=None) -> int:
     if args.command == "service-runs":
         return _service_action(
             lambda: fetch_run_list(
+                args.service_url,
+                args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-recurring-schedules":
+        return _service_action(
+            lambda: fetch_recurring_schedule_list(
                 args.service_url,
                 args.auth_token_file,
             )
