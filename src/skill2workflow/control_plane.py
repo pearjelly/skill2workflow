@@ -7,9 +7,11 @@ import hashlib
 import json
 import os
 import re
+import stat
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from pathlib import PurePosixPath
 from typing import Dict, List
 
 from .connectors import default_connectors
@@ -31,6 +33,11 @@ Workflow = Dict[str, object]
 WorkflowRecord = Dict[str, object]
 AuditEvent = Dict[str, object]
 WORKFLOW_DIFF_SCHEMA_VERSION = "skill2workflow-workflow-diff-0.1.0"
+WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION = (
+    "skill2workflow-workflow-artifact-report-0.1.0"
+)
+MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES = 256
+MAX_WORKFLOW_ARTIFACT_BYTES = 2 * 1024 * 1024
 
 
 class LocalControlPlane:
@@ -79,12 +86,13 @@ class LocalControlPlane:
         index = self._load_index() if self.storage != "sqlite" else {}
         existing_record = index.get(_record_key(workflow_id, version))
 
-        _ensure_immutable_artifact(
+        artifact_created = _ensure_immutable_artifact(
             artifact_path,
             published,
             checksum,
             workflow_id=workflow_id,
             version=version,
+            root=self.state_dir,
         )
         now = _now()
         record = {
@@ -96,31 +104,46 @@ class LocalControlPlane:
             "artifact": str(artifact_path.relative_to(self.state_dir)),
             "published_at": now,
         }
-        if self.storage == "sqlite" and hasattr(self.store, "publish_workflow_record"):
-            return self.store.publish_workflow_record(
-                record,
-                audit_event={
+        try:
+            if self.storage == "sqlite" and hasattr(self.store, "publish_workflow_record"):
+                return self.store.publish_workflow_record(
+                    record,
+                    artifact_path=artifact_path,
+                    audit_event={
+                        "type": "workflow_published",
+                        "workflow_id": workflow_id,
+                        "workflow_version": version,
+                        "checksum": checksum,
+                        "timestamp": now,
+                    },
+                )
+            if existing_record:
+                return existing_record
+            index[_record_key(workflow_id, version)] = record
+            self._save_index(index)
+            self._append_audit(
+                {
                     "type": "workflow_published",
                     "workflow_id": workflow_id,
                     "workflow_version": version,
                     "checksum": checksum,
                     "timestamp": now,
-                },
+                }
             )
-        if existing_record:
-            return existing_record
-        index[_record_key(workflow_id, version)] = record
-        self._save_index(index)
-        self._append_audit(
-            {
-                "type": "workflow_published",
-                "workflow_id": workflow_id,
-                "workflow_version": version,
-                "checksum": checksum,
-                "timestamp": now,
-            }
-        )
-        return record
+            return record
+        except BaseException:
+            if artifact_created and self.storage == "sqlite" and hasattr(
+                self.store, "cleanup_unregistered_artifact"
+            ):
+                try:
+                    self.store.cleanup_unregistered_artifact(
+                        _record_key(workflow_id, version),
+                        artifact_path,
+                        checksum,
+                    )
+                except Exception:
+                    pass
+            raise
 
     def deprecate_workflow(self, workflow_id: str, version: str) -> WorkflowRecord:
         """Mark a published workflow version as deprecated without mutating its artifact."""
@@ -248,6 +271,74 @@ class LocalControlPlane:
     def list_workflows(self) -> List[WorkflowRecord]:
         records = list(self._load_index().values())
         return sorted(records, key=lambda record: (str(record["workflow_id"]), str(record["version"])))
+
+    def inspect_workflow_artifacts(self) -> Dict[str, object]:
+        """Return a bounded, value-free registry/artifact consistency report."""
+
+        index = self._load_index()
+        issues = []
+        referenced = set()
+        healthy = 0
+
+        for key, record in sorted(index.items(), key=lambda item: str(item[0])):
+            workflow_id = str(record.get("workflow_id", ""))
+            version = str(record.get("version", ""))
+            artifact_value = record.get("artifact")
+            relative = _safe_artifact_reference(artifact_value)
+            if relative is None:
+                issues.append(
+                    _artifact_issue(
+                        "unsafe_reference", "<invalid>", workflow_id, version
+                    )
+                )
+                continue
+            referenced.add(relative)
+            path = self.state_dir.joinpath(*PurePosixPath(relative).parts)
+            issue_kind = _inspect_artifact_file(
+                self.state_dir,
+                path,
+                str(record.get("checksum", "")),
+            )
+            if issue_kind:
+                issues.append(_artifact_issue(issue_kind, relative, workflow_id, version))
+            else:
+                healthy += 1
+
+        filesystem = set(_iter_workflow_artifacts(self.workflows_dir, self.state_dir))
+        for relative in sorted(filesystem - referenced):
+            issues.append(_artifact_issue("orphaned", relative))
+
+        issues.sort(key=lambda issue: (str(issue["kind"]), str(issue["artifact"])))
+
+        issue_counts = {
+            kind: sum(1 for issue in issues if issue["kind"] == kind)
+            for kind in (
+                "missing",
+                "unsafe_reference",
+                "unsafe_artifact",
+                "invalid_json",
+                "oversized",
+                "checksum_mismatch",
+                "orphaned",
+            )
+        }
+        issue_count = len(issues)
+        truncated = issue_count > MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES
+        issues = issues[:MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES]
+        return {
+            "schema_version": WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
+            "status": "clean" if issue_count == 0 else "attention",
+            "summary": {
+                "registry_records": len(index),
+                "referenced_artifacts": len(referenced),
+                "filesystem_artifacts": len(filesystem),
+                "healthy": healthy,
+                "issue_count": issue_count,
+                **issue_counts,
+                "truncated": truncated,
+            },
+            "issues": issues,
+        }
 
     def diff_workflow_versions(
         self, workflow_id: str, from_version: str, to_version: str
@@ -846,12 +937,17 @@ def _ensure_immutable_artifact(
     *,
     workflow_id: str,
     version: str,
-) -> None:
+    root: Path,
+) -> bool:
     """Create one artifact without allowing a concurrent writer to replace it."""
 
     payload = json.dumps(workflow, ensure_ascii=False, indent=2).encode("utf-8")
 
     def verify_existing() -> None:
+        if _path_has_symlink_component(root, path):
+            raise ValueError(
+                f"published workflow artifact unavailable: {workflow_id}@{version}"
+            )
         try:
             existing = _load_json(path)
         except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
@@ -863,9 +959,13 @@ def _ensure_immutable_artifact(
                 f"published workflow version is immutable: {workflow_id}@{version}"
             )
 
+    if _path_has_symlink_component(root, path):
+        raise ValueError(
+            f"published workflow artifact unavailable: {workflow_id}@{version}"
+        )
     if path.exists():
         verify_existing()
-        return
+        return False
 
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", dir=str(path.parent)
@@ -879,6 +979,7 @@ def _ensure_immutable_artifact(
             os.fsync(handle.fileno())
         try:
             os.link(temporary_name, str(path))
+            return True
         except FileExistsError:
             verify_existing()
         except OSError as error:
@@ -897,6 +998,99 @@ def _ensure_immutable_artifact(
             pass
         except OSError:
             pass
+
+
+def _safe_artifact_reference(value: object):
+    if not isinstance(value, str) or not value or "\\" in value:
+        return None
+    relative = PurePosixPath(value)
+    if (
+        relative.is_absolute()
+        or relative.suffix != ".json"
+        or not relative.parts
+        or relative.parts[0] != "workflows"
+        or any(part in {"", ".", ".."} for part in relative.parts)
+    ):
+        return None
+    normalized = relative.as_posix()
+    if normalized == "workflows/index.json":
+        return None
+    return normalized
+
+
+def _inspect_artifact_file(state_dir: Path, path: Path, checksum: str):
+    if _path_has_symlink_component(state_dir, path):
+        return "unsafe_artifact"
+    try:
+        details = path.lstat()
+    except FileNotFoundError:
+        return "missing"
+    except (OSError, ValueError):
+        return "unsafe_artifact"
+    if not stat.S_ISREG(details.st_mode):
+        return "unsafe_artifact"
+    if details.st_size > MAX_WORKFLOW_ARTIFACT_BYTES:
+        return "oversized"
+    try:
+        workflow = _load_json(path)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return "invalid_json"
+    if not checksum or _checksum(workflow) != checksum:
+        return "checksum_mismatch"
+    return None
+
+
+def _path_has_symlink_component(root: Path, path: Path) -> bool:
+    try:
+        relative = Path(path).relative_to(Path(root))
+    except ValueError:
+        return True
+    current = Path(root)
+    try:
+        if stat.S_ISLNK(current.lstat().st_mode):
+            return True
+    except OSError:
+        return True
+    for part in relative.parts:
+        current = current / part
+        try:
+            if stat.S_ISLNK(current.lstat().st_mode):
+                return True
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True
+    return False
+
+
+def _iter_workflow_artifacts(root: Path, state_dir: Path):
+    if not root.exists() or root.is_symlink():
+        return []
+    paths = []
+    for base, directories, filenames in os.walk(root, topdown=True, followlinks=False):
+        directories[:] = [
+            name for name in directories
+            if not (Path(base) / name).is_symlink()
+        ]
+        for name in filenames:
+            if not name.endswith(".json"):
+                continue
+            path = Path(base) / name
+            try:
+                relative = path.relative_to(state_dir).as_posix()
+            except ValueError:
+                continue
+            if relative != "workflows/index.json":
+                paths.append(relative)
+    return paths
+
+
+def _artifact_issue(kind: str, artifact: object, workflow_id: str = "", version: str = ""):
+    issue = {"kind": str(kind), "artifact": str(artifact or "")}
+    if workflow_id or version:
+        issue["workflow_id"] = workflow_id
+        issue["version"] = version
+    return issue
 
 
 def _load_json(path: Path):

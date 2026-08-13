@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import stat
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -568,7 +569,11 @@ class SqliteControlStore:
             )
 
     def publish_workflow_record(
-        self, record: WorkflowRecord, *, audit_event: AuditEvent
+        self,
+        record: WorkflowRecord,
+        *,
+        artifact_path: Path = None,
+        audit_event: AuditEvent,
     ) -> WorkflowRecord:
         """Insert one immutable registry record and its audit row atomically."""
 
@@ -591,6 +596,13 @@ class SqliteControlStore:
                         f"published workflow version is immutable: {workflow_id}@{version}"
                     )
                 return existing
+
+            if artifact_path is not None:
+                _require_publish_artifact(
+                    artifact_path,
+                    str(record.get("checksum", "")),
+                    root=self.state_dir,
+                )
 
             connection.execute(
                 """
@@ -623,6 +635,32 @@ class SqliteControlStore:
             )
             _append_audit_connection(connection, audit_event)
             return dict(record)
+
+    def cleanup_unregistered_artifact(
+        self,
+        record_key: str,
+        artifact_path: Path,
+        checksum: str,
+    ) -> bool:
+        """Remove a newly-created artifact only while its registry key is absent."""
+
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            row = connection.execute(
+                "select 1 from workflow_versions where record_key = ?",
+                (str(record_key),),
+            ).fetchone()
+            if row is not None:
+                return False
+            if not _publish_artifact_matches(
+                artifact_path, checksum, root=self.state_dir
+            ):
+                return False
+            try:
+                artifact_path.unlink()
+            except FileNotFoundError:
+                return False
+            return True
 
     def deprecate_workflow_record(
         self,
@@ -1026,6 +1064,49 @@ def _event_value(event: Dict[str, object], key: str, default: str) -> str:
 
 def _workflow_record_key(workflow_id: str, version: str) -> str:
     return f"{workflow_id}@{version}"
+
+
+def _require_publish_artifact(path: Path, checksum: str, *, root: Path) -> None:
+    if not _publish_artifact_matches(path, checksum, root=root):
+        raise ValueError("published workflow artifact unavailable")
+
+
+def _publish_artifact_matches(path: Path, checksum: str, *, root: Path) -> bool:
+    value = Path(path)
+    if _path_has_symlink_component(Path(root), value):
+        return False
+    try:
+        details = value.lstat()
+        if stat.S_ISLNK(details.st_mode) or not stat.S_ISREG(details.st_mode):
+            return False
+        payload = json.loads(value.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, TypeError, ValueError, json.JSONDecodeError):
+        return False
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return bool(checksum) and hashlib.sha256(canonical.encode("utf-8")).hexdigest() == str(checksum)
+
+
+def _path_has_symlink_component(root: Path, path: Path) -> bool:
+    try:
+        relative = Path(path).relative_to(Path(root))
+    except ValueError:
+        return True
+    current = Path(root)
+    try:
+        if stat.S_ISLNK(current.lstat().st_mode):
+            return True
+    except OSError:
+        return True
+    for part in relative.parts:
+        current = current / part
+        try:
+            if stat.S_ISLNK(current.lstat().st_mode):
+                return True
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True
+    return False
 
 
 def _sqlite_record_aliases(record: WorkflowRecord) -> List[str]:

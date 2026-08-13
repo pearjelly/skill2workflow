@@ -83,6 +83,11 @@ the version deprecated, and writing `workflow_deprecated` either all commit or
 none commit. A failed audit append leaves the registry status unchanged, and a
 retry can safely complete publication or deprecation.
 
+Use [`workflow-artifacts.md`](workflow-artifacts.md) after a failed publication,
+manual state copy, or crash to inspect the separate filesystem half of the
+publication boundary. The report is bounded and value-free; it does not
+repair or delete artifacts.
+
 ## Boundary
 
 This is an operator review aid and a SQLite-backed local optimistic-concurrency

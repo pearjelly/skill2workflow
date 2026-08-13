@@ -112,6 +112,17 @@ def main(argv=None) -> int:
     workflows_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     workflows_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
+    workflow_artifacts_cmd = subparsers.add_parser(
+        "workflow-artifacts",
+        help="Inspect published workflow registry and artifact consistency",
+    )
+    workflow_artifacts_cmd.add_argument(
+        "--state-dir", type=Path, default=Path(".skill2workflow")
+    )
+    workflow_artifacts_cmd.add_argument(
+        "--storage", choices=["json", "sqlite"], default="json"
+    )
+
     workflow_cmd = subparsers.add_parser("workflow", help="Show a published workflow version")
     workflow_cmd.add_argument("workflow_id")
     workflow_cmd.add_argument("--version", required=True)
@@ -490,6 +501,13 @@ def main(argv=None) -> int:
     if args.command == "workflows":
         _print_json(LocalControlPlane(args.state_dir, storage=args.storage).list_workflows())
         return 0
+
+    if args.command == "workflow-artifacts":
+        return _control_action(
+            lambda: LocalControlPlane(
+                args.state_dir, storage=args.storage
+            ).inspect_workflow_artifacts()
+        )
 
     if args.command == "workflow":
         return _control_action(

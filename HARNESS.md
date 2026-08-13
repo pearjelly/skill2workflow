@@ -62,6 +62,9 @@ SQLite publication and deprecation also use single-record transactions: a
 published version and its audit row commit together, distinct concurrent
 versions cannot erase each other, and same-version matching retries are
 idempotent. See [`docs/workflow-releases.md`](docs/workflow-releases.md).
+The `workflow-artifacts` command adds a bounded, value-free consistency report
+for missing, unsafe, mismatched, invalid, oversized, and orphaned files; known
+SQLite publication failures clean up only still-unregistered matching files.
 
 Run the local scheduled-trigger smoke:
 
@@ -255,6 +258,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflo
 PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli workflows --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli workflow-artifacts --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli workflow workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
@@ -356,6 +360,7 @@ Implemented:
   - publishes immutable workflow artifacts
   - promotes published versions behind bounded control-plane aliases such as `production`
   - compares exact published versions through the bounded `workflow-diff` review contract
+  - reports registry/file consistency through bounded `workflow-artifacts` diagnostics
   - supports an optional expected-current-version compare-and-swap promotion guard
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions

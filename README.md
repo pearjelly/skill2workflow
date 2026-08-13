@@ -127,6 +127,8 @@ explicit connector boundaries. It currently supports:
 - Write safe action, retry, and HTTP connector request edits back to Workflow DSL
 - Load example workflows from the editor gallery
 - Publish immutable workflow versions into a local control plane
+- Inspect published workflow registry/artifact consistency with a bounded,
+  value-free `workflow-artifacts` report
 - Promote a published version behind a stable control-plane alias such as `production`
 - Run published workflow versions and write audit events
 - Trigger published workflow versions or stable aliases through a compact local API envelope
@@ -708,7 +710,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-73 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-74 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -796,6 +798,13 @@ last-writer-wins. Same-version matching publishes are idempotent, mismatched
 content fails closed, and deprecation updates its single registry record and
 audit row atomically.
 
+Loop 74 adds [workflow artifact consistency diagnostics](docs/workflow-artifacts.md):
+the installed `workflow-artifacts` command reports bounded, value-free missing,
+unsafe, invalid, oversized, checksum-mismatched, and orphaned files. Known
+SQLite publication failures clean up only a newly-created matching artifact
+whose registry key is still absent; the command does not perform automatic
+repair or garbage collection.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -838,6 +847,7 @@ See:
 - `docs/upgrade-migration.md`
 - `docs/workflow-dsl-contract.md`
 - `docs/workflow-dsl-compatibility.md`
+- `docs/workflow-artifacts.md`
 - `docs/superpowers/specs/2026-07-01-skill2workflow-design.md`
 
 ## License

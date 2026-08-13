@@ -8,6 +8,8 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded `workflow-artifacts` registry/file consistency report and
+  cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.
 - Added durable recurring scheduling with explicit missed-run policies, persisted dispatch records, lease takeover, and uncertain-recovery handling.
 - Added verified offline backup and restore, explicit copy-on-write state upgrade, and operator-controlled data retention for supported SQLite layouts.

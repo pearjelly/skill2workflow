@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/workflow-artifact-report-0.1.0.json",
+  "title": "skill2workflow workflow artifact consistency report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "summary", "issues"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-workflow-artifact-report-0.1.0"
+    },
+    "status": {
+      "enum": ["clean", "attention"]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry_records",
+        "referenced_artifacts",
+        "filesystem_artifacts",
+        "healthy",
+        "issue_count",
+        "missing",
+        "unsafe_reference",
+        "unsafe_artifact",
+        "invalid_json",
+        "oversized",
+        "checksum_mismatch",
+        "orphaned",
+        "truncated"
+      ],
+      "properties": {
+        "registry_records": {"type": "integer", "minimum": 0},
+        "referenced_artifacts": {"type": "integer", "minimum": 0},
+        "filesystem_artifacts": {"type": "integer", "minimum": 0},
+        "healthy": {"type": "integer", "minimum": 0},
+        "issue_count": {"type": "integer", "minimum": 0},
+        "missing": {"type": "integer", "minimum": 0},
+        "unsafe_reference": {"type": "integer", "minimum": 0},
+        "unsafe_artifact": {"type": "integer", "minimum": 0},
+        "invalid_json": {"type": "integer", "minimum": 0},
+        "oversized": {"type": "integer", "minimum": 0},
+        "checksum_mismatch": {"type": "integer", "minimum": 0},
+        "orphaned": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "issues": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "artifact"],
+        "properties": {
+          "kind": {
+            "enum": [
+              "missing",
+              "unsafe_reference",
+              "unsafe_artifact",
+              "invalid_json",
+              "oversized",
+              "checksum_mismatch",
+              "orphaned"
+            ]
+          },
+          "artifact": {"type": "string", "maxLength": 1024},
+          "workflow_id": {"type": "string", "maxLength": 256},
+          "version": {"type": "string", "maxLength": 128}
+        }
+      }
+    }
+  }
+}

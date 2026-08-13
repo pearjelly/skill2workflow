@@ -35,6 +35,9 @@ Within the `0.1.x` release line:
 - Published artifact reads verify the registry checksum before promotion or
   execution; missing, unavailable, malformed, or mismatched artifacts fail
   closed with a fixed redacted error.
+- The `workflow-artifacts` control-plane report remains additive and follows
+  the bounded `skill2workflow-workflow-artifact-report-0.1.0` schema; it does
+  not expose Workflow DSL values or mutate published artifacts.
 - Structured validation errors keep the `code`, `message`, `path`, and `severity` keys.
 - New metadata may be added through additional properties.
 - New node types may be added when schema and validator tests document their contract.
@@ -59,6 +62,11 @@ does not change the artifact contract or add fields to Workflow DSL.
 SQLite publication and deprecation likewise mutate one registry record and its
 audit row atomically. Concurrent publication of distinct immutable versions is
 additive; a same-version checksum mismatch remains an immutable-version error.
+
+Known SQLite publication failures may remove only a newly-created artifact
+while its registry key is absent and its content still matches the attempted
+checksum. The report and cleanup do not provide a filesystem transaction or
+JSON cross-process coordination guarantee.
 
 The runtime integrity guard is additive control-plane behavior. It does not
 change the Workflow DSL schema or canonical checksum algorithm used at

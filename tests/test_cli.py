@@ -1117,6 +1117,46 @@ class CliTests(TestCase):
         self.assertEqual(trigger_exit, 0)
         self.assertEqual(json.loads(trigger_stdout.getvalue())["workflow_version"], "0.1.0")
 
+    def test_workflow_artifacts_command_reports_bounded_consistency_without_values(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            workflow_path = root / "workflow.json"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                publish_exit = main(
+                    [
+                        "publish",
+                        str(workflow_path),
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            output = StringIO()
+            with redirect_stdout(output):
+                report_exit = main(
+                    [
+                        "workflow-artifacts",
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        report = json.loads(output.getvalue())
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(report_exit, 0)
+        self.assertEqual(
+            report["schema_version"],
+            "skill2workflow-workflow-artifact-report-0.1.0",
+        )
+        self.assertEqual(report["status"], "clean")
+        self.assertNotIn("Start", output.getvalue())
+        self.assertNotIn("Sensitive", output.getvalue())
+
     def test_workflow_diff_and_expected_promotion_version_are_safe_cli_contracts(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

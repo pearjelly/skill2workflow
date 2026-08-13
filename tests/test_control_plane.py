@@ -1,5 +1,6 @@
 import json
 import importlib.util
+import os
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
@@ -220,9 +221,135 @@ class ControlPlaneTests(TestCase):
 
             self.assertEqual(control.list_workflows(), [])
             self.assertEqual(control.list_audit_events(), [])
+            self.assertFalse(
+                (state_dir / "workflows" / "workflow_control" / "1.0.0.json").exists()
+            )
             record = control.publish_workflow(_workflow(version="1.0.0"))
 
         self.assertEqual(record["version"], "1.0.0")
+
+    def test_workflow_artifact_report_is_bounded_and_finds_registry_and_orphan_gaps(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            control.publish_workflow(_workflow(version="2.0.0"))
+
+            missing = state_dir / "workflows" / "workflow_control" / "1.0.0.json"
+            missing.unlink()
+            tampered = state_dir / "workflows" / "workflow_control" / "2.0.0.json"
+            tampered.write_text("{}", encoding="utf-8")
+            orphan = state_dir / "workflows" / "orphan" / "0.1.0.json"
+            orphan.parent.mkdir(parents=True)
+            orphan.write_text("{}", encoding="utf-8")
+
+            report = control.inspect_workflow_artifacts()
+
+        self.assertEqual(
+            report["schema_version"],
+            "skill2workflow-workflow-artifact-report-0.1.0",
+        )
+        self.assertEqual(report["status"], "attention")
+        self.assertEqual(report["summary"]["registry_records"], 2)
+        self.assertEqual(report["summary"]["filesystem_artifacts"], 2)
+        self.assertEqual(report["summary"]["missing"], 1)
+        self.assertEqual(report["summary"]["checksum_mismatch"], 1)
+        self.assertEqual(report["summary"]["orphaned"], 1)
+        self.assertFalse(report["summary"]["truncated"])
+        self.assertEqual(
+            [issue["kind"] for issue in report["issues"]],
+            ["checksum_mismatch", "missing", "orphaned"],
+        )
+
+    def test_workflow_artifact_report_ignores_json_control_index_and_accepts_clean_state(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="json")
+            control.publish_workflow(_workflow(version="1.0.0"))
+
+            report = control.inspect_workflow_artifacts()
+
+        self.assertEqual(report["status"], "clean")
+        self.assertEqual(report["summary"]["registry_records"], 1)
+        self.assertEqual(report["summary"]["filesystem_artifacts"], 1)
+        self.assertEqual(report["summary"]["healthy"], 1)
+        self.assertEqual(report["issues"], [])
+
+    def test_workflow_artifact_report_truncates_issue_records_without_values(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="json")
+            orphan_dir = state_dir / "workflows" / "orphan"
+            orphan_dir.mkdir(parents=True)
+            for index in range(300):
+                (orphan_dir / f"{index:03d}.json").write_text(
+                    json.dumps({"secret": "do-not-print"}), encoding="utf-8"
+                )
+
+            report = control.inspect_workflow_artifacts()
+            encoded = json.dumps(report, ensure_ascii=False)
+
+        self.assertEqual(report["status"], "attention")
+        self.assertEqual(report["summary"]["orphaned"], 300)
+        self.assertEqual(report["summary"]["issue_count"], 300)
+        self.assertTrue(report["summary"]["truncated"])
+        self.assertEqual(len(report["issues"]), 256)
+        self.assertNotIn("do-not-print", encoded)
+
+    def test_workflow_artifact_report_redacts_unsafe_registry_path(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="json")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            index_path = state_dir / "workflows" / "index.json"
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+            index["workflow_control@1.0.0"]["artifact"] = "secret-token"
+            index_path.write_text(json.dumps(index), encoding="utf-8")
+
+            report = control.inspect_workflow_artifacts()
+
+        unsafe = next(
+            issue for issue in report["issues"] if issue["kind"] == "unsafe_reference"
+        )
+        self.assertEqual(unsafe["artifact"], "<invalid>")
+        self.assertNotIn("secret-token", json.dumps(report))
+
+    def test_sqlite_publish_rejects_symlinked_artifact_path(self):
+        if not hasattr(os, "symlink"):
+            self.skipTest("symbolic links are unavailable")
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            target = state_dir / "outside.json"
+            target.write_text(json.dumps(_workflow(version="1.0.0")), encoding="utf-8")
+            artifact = state_dir / "workflows" / "workflow_control" / "1.0.0.json"
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                artifact.symlink_to(target)
+            except (OSError, NotImplementedError):
+                self.skipTest("symbolic links cannot be created")
+
+            with self.assertRaisesRegex(ValueError, "artifact unavailable"):
+                control.publish_workflow(_workflow(version="1.0.0"))
+
+            self.assertEqual(control.list_workflows(), [])
+
+    def test_sqlite_known_failure_cleanup_never_removes_registered_artifact(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            record = control.publish_workflow(_workflow(version="1.0.0"))
+            artifact = state_dir / record["artifact"]
+
+            removed = control.store.cleanup_unregistered_artifact(
+                "workflow_control@1.0.0",
+                artifact,
+                record["checksum"],
+            )
+            still_exists = artifact.exists()
+
+        self.assertFalse(removed)
+        self.assertTrue(still_exists)
 
     def test_sqlite_concurrent_publication_and_deprecation_preserve_both_mutations(self):
         with TemporaryDirectory() as tmp:
