@@ -26,8 +26,8 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
-        self.assertIn("- Completed delivery loops: 1-87", roadmap)
-        self.assertIn("- Active loop: None; Loop 87 is complete with protected remote Workflow promotion", roadmap)
+        self.assertIn("- Completed delivery loops: 1-88", roadmap)
+        self.assertIn("- Active loop: None; Loop 88 is complete with protected remote Workflow diff", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
 
@@ -40,7 +40,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-87 complete, further loop numbers unassigned.",
+            "**Status:** Directional; Loops 44-88 complete, further loop numbers unassigned.",
             roadmap,
         )
 
@@ -203,7 +203,7 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-87 are complete", readme)
+        self.assertIn("Delivery Loops 1-88 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)

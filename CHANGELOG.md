@@ -54,6 +54,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added protected `POST /api/v1/workflow-promotions` and the
   `service-workflow-promote` CLI, reusing transactional SQLite alias promotion,
   an optional compare-and-swap guard, and a fixed path-free summary response.
+- Added authenticated read-only `GET /api/v1/workflow-diffs/...` and the
+  `service-workflow-diff` CLI, reusing the value-free structural diff contract
+  with a bounded response and no scheduler or state mutation.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

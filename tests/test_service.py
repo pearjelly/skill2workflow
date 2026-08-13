@@ -37,6 +37,7 @@ from skill2workflow.service_client import (
     ServiceActionError,
     post_workflow_release,
     post_workflow_promotion,
+    fetch_workflow_diff,
     post_workflow_trigger,
 )
 
@@ -1824,6 +1825,69 @@ class RuntimeServiceTests(TestCase):
         )
         self.assertFalse(thread.is_alive())
 
+    def test_remote_workflow_diff_is_authenticated_value_free_and_read_only(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            first = _workflow()
+            second = json.loads(json.dumps(first))
+            second["workflow"]["version"] = "0.2.0"
+            second["nodes"][0]["title"] = "Private customer review title"
+            control.publish_workflow(first)
+            control.publish_workflow(second)
+            audit_count = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            url = f"{base_url}/api/v1/workflow-diffs/workflow_service/0.1.0/0.2.0"
+            try:
+                denied_status, denied = _get_json(url)
+                malformed_status, malformed = _get_raw_get(
+                    url,
+                    token=AUTH_TOKEN,
+                    body=b"{}",
+                )
+                diff = fetch_workflow_diff(
+                    base_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.1.0",
+                    "0.2.0",
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            audit_after = len(LocalControlPlane(state_dir, storage="sqlite").list_audit_events())
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "workflow diff request must not include a body"})
+        self.assertEqual(diff["schema_version"], "skill2workflow-workflow-diff-0.1.0")
+        self.assertTrue(diff["changed"])
+        self.assertEqual(diff["changes"]["nodes"]["changed"], ["start"])
+        serialized = json.dumps(diff, ensure_ascii=False)
+        self.assertNotIn("Private customer review title", serialized)
+        self.assertNotIn("artifact", serialized)
+        self.assertEqual(audit_after, audit_count)
+        self.assertFalse(thread.is_alive())
+
     def test_business_routes_require_rotatable_bearer_auth_and_write_compact_audit(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -2267,6 +2331,21 @@ def _get_json(url: str, token=None):
     request = urllib.request.Request(url)
     if token is not None:
         request.add_header("Authorization", f"Bearer {token}")
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.loads(error.read().decode("utf-8"))
+        finally:
+            error.close()
+
+
+def _get_raw_get(url: str, token=None, body=b""):
+    headers = {"Content-Type": "application/json"}
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, data=body, headers=headers, method="GET")
     try:
         with urllib.request.urlopen(request, timeout=2) as response:
             return response.status, json.loads(response.read().decode("utf-8"))

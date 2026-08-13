@@ -556,6 +556,56 @@ class CliTests(TestCase):
             expected_current_version="0.1.0",
         )
 
+    def test_service_workflow_diff_command_uses_version_options(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-workflow-diff-0.1.0",
+            "workflow_id": "workflow_demo",
+            "from": {"version": "0.1.0", "status": "published", "checksum": "a" * 64, "aliases": []},
+            "to": {"version": "0.2.0", "status": "published", "checksum": "b" * 64, "aliases": ["production"]},
+            "changed": False,
+            "changes": {
+                "sections": [],
+                "workflow_changed": False,
+                "entry_changed": False,
+                "input_schema_changed": False,
+                "policies_changed": False,
+                "other_changed": False,
+                "nodes": {"added": [], "removed": [], "changed": []},
+                "edges": {"added": [], "removed": [], "changed": []},
+            },
+        }
+        with patch(
+            "skill2workflow.cli.fetch_workflow_diff",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-workflow-diff",
+                        "workflow_demo",
+                        "--from-version",
+                        "0.1.0",
+                        "--to-version",
+                        "0.2.0",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            "workflow_demo",
+            "0.1.0",
+            "0.2.0",
+        )
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

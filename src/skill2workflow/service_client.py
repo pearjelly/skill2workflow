@@ -28,6 +28,7 @@ from .control_plane import (
     MAX_RUN_AUDIT_REPORT_TYPES,
     RUN_AUDIT_REPORT_SCHEMA_VERSION,
     WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
+    WORKFLOW_DIFF_SCHEMA_VERSION,
 )
 from .service import (
     RUNTIME_INFO_SCHEMA_VERSION,
@@ -56,6 +57,7 @@ MAX_REMOTE_WORKFLOW_RELEASE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
+MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 
@@ -244,6 +246,39 @@ def fetch_runtime_info(
         max_response_bytes=MAX_RUNTIME_INFO_RESPONSE_BYTES,
     )
     _validate_runtime_info(payload)
+    return payload
+
+
+def fetch_workflow_diff(
+    service_url: str,
+    token_file: Path,
+    workflow_id: str,
+    from_version: str,
+    to_version: str,
+) -> Dict[str, object]:
+    """Fetch a bounded, value-free diff of two published workflow versions."""
+
+    normalized_workflow_id = _validate_workflow_ref(workflow_id, "workflow_id")
+    normalized_from = _validate_workflow_ref(from_version, "from_version")
+    normalized_to = _validate_workflow_ref(to_version, "to_version")
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/workflow-diffs/{}/{}/{}".format(
+            quote(normalized_workflow_id, safe=""),
+            quote(normalized_from, safe=""),
+            quote(normalized_to, safe=""),
+        ),
+        conflict_message="workflow diff unavailable",
+        not_found_message="workflow version not found",
+        max_response_bytes=MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES,
+    )
+    _validate_workflow_diff_response(
+        payload,
+        workflow_id=normalized_workflow_id,
+        from_version=normalized_from,
+        to_version=normalized_to,
+    )
     return payload
 
 
@@ -1387,6 +1422,78 @@ def _validate_workflow_promotion_response(
         raise ServiceActionError()
 
 
+def _validate_workflow_diff_response(
+    payload: Dict[str, object],
+    *,
+    workflow_id: str,
+    from_version: str,
+    to_version: str,
+) -> None:
+    """Reject responses outside the fixed structural diff contract."""
+
+    if set(payload) != {"schema_version", "workflow_id", "from", "to", "changed", "changes"}:
+        raise ServiceActionError()
+    if (
+        payload.get("schema_version") != WORKFLOW_DIFF_SCHEMA_VERSION
+        or payload.get("workflow_id") != workflow_id
+        or not isinstance(payload.get("changed"), bool)
+    ):
+        raise ServiceActionError()
+
+    def validate_record(record, expected_version):
+        if (
+            not isinstance(record, dict)
+            or set(record) != {"version", "status", "checksum", "aliases"}
+            or record.get("version") != expected_version
+            or record.get("status") not in {"published", "deprecated"}
+            or not _is_hex_digest(record.get("checksum"))
+            or not isinstance(record.get("aliases"), list)
+            or record.get("aliases") != sorted(set(record.get("aliases")))
+            or any(not isinstance(alias, str) or not alias for alias in record.get("aliases"))
+        ):
+            raise ServiceActionError()
+
+    validate_record(payload.get("from"), from_version)
+    validate_record(payload.get("to"), to_version)
+    changes = payload.get("changes")
+    if not isinstance(changes, dict) or set(changes) != {
+        "sections",
+        "workflow_changed",
+        "entry_changed",
+        "input_schema_changed",
+        "policies_changed",
+        "other_changed",
+        "nodes",
+        "edges",
+    }:
+        raise ServiceActionError()
+    sections = changes.get("sections")
+    if (
+        not isinstance(sections, list)
+        or len(sections) != len(set(sections))
+        or any(
+            section not in {"workflow", "entry", "input_schema", "policies", "nodes", "edges", "other"}
+            for section in sections
+        )
+        or any(not isinstance(changes.get(field), bool) for field in (
+            "workflow_changed", "entry_changed", "input_schema_changed",
+            "policies_changed", "other_changed",
+        ))
+    ):
+        raise ServiceActionError()
+    for field in ("nodes", "edges"):
+        value = changes.get(field)
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"added", "removed", "changed"}
+            or any(
+                not isinstance(value.get(key), list)
+                or value.get(key) != sorted(set(value.get(key)))
+                or any(not isinstance(item, str) or not item for item in value.get(key))
+                for key in ("added", "removed", "changed")
+            )
+        ):
+            raise ServiceActionError()
 def _validate_workflow_alias(alias: str) -> str:
     value = str(alias).strip()
     if len(value.encode("utf-8")) > 64 or not _WORKFLOW_ALIAS_PATTERN.fullmatch(value):

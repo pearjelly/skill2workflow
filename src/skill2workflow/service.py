@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable, Dict, Optional
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from . import __version__
 from .backup import (
@@ -59,6 +59,7 @@ RUNTIME_INFO_SCHEMA_VERSION = "skill2workflow-runtime-info-0.1.0"
 WORKFLOW_DSL_SCHEMA_VERSION = "0.1.0"
 WORKFLOW_RELEASE_SCHEMA_VERSION = "skill2workflow-workflow-release-0.1.0"
 WORKFLOW_PROMOTION_SCHEMA_VERSION = "skill2workflow-workflow-promotion-0.1.0"
+WORKFLOW_DIFF_SCHEMA_VERSION = "skill2workflow-workflow-diff-0.1.0"
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 MAX_AUTH_TOKEN_BYTES = 16 * 1024
 LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
@@ -74,6 +75,7 @@ MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
+MAX_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
@@ -555,6 +557,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_workflow_release()
                 elif self.command == "POST" and path == "/api/v1/workflow-promotions":
                     self._handle_workflow_promotion()
+                elif self.command == "GET" and _workflow_diff_parts(path) is not None:
+                    self._handle_workflow_diff(_workflow_diff_parts(path))
                 elif self.command == "GET" and path == "/api/v1/recurring-schedules":
                     self._handle_recurring_schedule_list()
                 elif self.command == "POST" and _recurring_schedule_action(path):
@@ -1279,6 +1283,60 @@ def _handler_for(service: RuntimeService):
             except (OSError, sqlite3.Error):
                 self._send_json(503, {"error": "workflow promotion unavailable"})
 
+        def _handle_workflow_diff(self, parts):
+            """Serve a bounded, value-free diff of two published versions."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                if _content_length(self) != 0:
+                    self._send_json(
+                        400,
+                        {"error": "workflow diff request must not include a body"},
+                    )
+                    return
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            workflow_id, from_version, to_version = parts
+            try:
+                payload = service.control_plane.diff_workflow_versions(
+                    workflow_id,
+                    from_version,
+                    to_version,
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_WORKFLOW_DIFF_RESPONSE_BYTES:
+                    raise ValueError("workflow diff exceeds response limit")
+            except ValueError as error:
+                message = str(error).lower()
+                if "version not found" in message:
+                    self._send_json(404, {"error": "workflow version not found"})
+                elif "artifact unavailable" in message:
+                    self._send_json(503, {"error": "workflow diff unavailable"})
+                else:
+                    self._send_json(503, {"error": "workflow diff unavailable"})
+                return
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "workflow diff unavailable"})
+                return
+            self._send_json(200, payload)
+
         def _handle_audit_consistency(self, run_id: str = ""):
             """Serve the bounded, value-free run/audit consistency projection."""
 
@@ -1605,6 +1663,8 @@ def _request_route(method: str, path: str) -> str:
         return "workflow_release"
     if method == "POST" and path == "/api/v1/workflow-promotions":
         return "workflow_promotion"
+    if method == "GET" and _workflow_diff_parts(path) is not None:
+        return "workflow_diff"
     if method == "GET" and path == "/api/v1/recurring-schedules":
         return "recurring_schedule_list"
     if method == "GET" and _recurring_schedule_dispatch_list(path) is not None:
@@ -1715,6 +1775,21 @@ def _audit_consistency_run_id(path: str) -> str:
     ):
         return ""
     return run_id
+
+
+def _workflow_diff_parts(path: str):
+    parts = path.split("/")
+    if len(parts) != 7 or parts[:4] != ["", "api", "v1", "workflow-diffs"]:
+        return None
+    values = tuple(unquote(value) for value in parts[4:])
+    if any(not value or len(value) > 128 for value in values):
+        return None
+    if any(
+        any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+        for value in values
+    ):
+        return None
+    return values
 
 
 def _run_action_id(path: str, action: str) -> str:

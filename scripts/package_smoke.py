@@ -56,6 +56,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-backup-readiness",
     "service-audit-integrity",
     "service-runtime-info",
+    "service-workflow-diff",
     "service-workflow-publish",
     "service-workflow-promote",
     "service-trigger",

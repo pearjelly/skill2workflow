@@ -131,11 +131,11 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("Changelog", guide)
         self.assertIn("Security", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
-        self.assertIn("- Completed delivery loops: 1-87", roadmap)
+        self.assertIn("- Completed delivery loops: 1-88", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 87 is complete with protected remote Workflow promotion",
+            "- Active loop: None; Loop 88 is complete with protected remote Workflow diff",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-87 are complete", readme)
+        self.assertIn("Delivery Loops 1-88 are complete", readme)
         self.assertIn("release-artifact qualification", readme)

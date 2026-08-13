@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-87 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-88 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -881,6 +881,10 @@ the installed `service-workflow-promote` command moves one published version to
 a stable alias through the authenticated service, with an optional CAS guard
 and the same transactional SQLite alias semantics as the local `promote` path.
 
+Loop 88 adds [remote Workflow diff](docs/remote-workflow-diff.md): the
+installed `service-workflow-diff` command lets CI/CD and operators review the
+same value-free structural changes before a remote CAS promotion.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -909,6 +913,7 @@ See:
 - `docs/remote-trigger.md`
 - `docs/remote-workflow-release.md`
 - `docs/remote-workflow-promotion.md`
+- `docs/remote-workflow-diff.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`
 - `docs/controlled-pilot-deferral-review.md`

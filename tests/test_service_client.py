@@ -34,6 +34,7 @@ from skill2workflow.service_client import (
     post_workflow_trigger,
     post_workflow_release,
     post_workflow_promotion,
+    fetch_workflow_diff,
 )
 
 
@@ -42,6 +43,85 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_service_workflow_diff_uses_fixed_redacted_contract(self):
+        observed = {}
+        payload = {
+            "schema_version": "skill2workflow-workflow-diff-0.1.0",
+            "workflow_id": "workflow_remote_release",
+            "from": {
+                "version": "1.2.2",
+                "status": "published",
+                "checksum": "a" * 64,
+                "aliases": ["production"],
+            },
+            "to": {
+                "version": "1.2.3",
+                "status": "published",
+                "checksum": "b" * 64,
+                "aliases": [],
+            },
+            "changed": True,
+            "changes": {
+                "sections": ["workflow", "policies", "nodes"],
+                "workflow_changed": True,
+                "entry_changed": False,
+                "input_schema_changed": False,
+                "policies_changed": False,
+                "other_changed": False,
+                "nodes": {"added": ["review"], "removed": [], "changed": []},
+                "edges": {"added": [], "removed": [], "changed": []},
+            },
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = self.rfile.read(0)
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_workflow_diff(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "workflow_remote_release",
+                "1.2.2",
+                "1.2.3",
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(
+            observed["path"],
+            "/api/v1/workflow-diffs/workflow_remote_release/1.2.2/1.2.3",
+        )
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertFalse(thread.is_alive())
+
+    def test_service_workflow_diff_rejects_unsafe_reference_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaisesRegex(ValueError, "safe workflow identifier"):
+                fetch_workflow_diff(
+                    "https://service.example",
+                    token_file,
+                    "workflow/unsafe",
+                    "1.0.0",
+                    "2.0.0",
+                )
+
     def test_service_workflow_promote_uses_fixed_contract(self):
         observed = {}
         payload = {

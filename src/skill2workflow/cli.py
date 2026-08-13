@@ -31,6 +31,7 @@ from .service_client import (
     fetch_backup_readiness,
     fetch_audit_integrity,
     fetch_runtime_info,
+    fetch_workflow_diff,
     fetch_run_detail,
     fetch_run_list,
     fetch_support_bundle,
@@ -388,6 +389,16 @@ def main(argv=None) -> int:
     )
     service_runtime_cmd.add_argument("--service-url", required=True)
     service_runtime_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_diff_cmd = subparsers.add_parser(
+        "service-workflow-diff",
+        help="Compare two published Workflow DSL versions through the authenticated service",
+    )
+    service_diff_cmd.add_argument("workflow_id")
+    service_diff_cmd.add_argument("--from-version", required=True)
+    service_diff_cmd.add_argument("--to-version", required=True)
+    service_diff_cmd.add_argument("--service-url", required=True)
+    service_diff_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_release_cmd = subparsers.add_parser(
         "service-workflow-publish",
@@ -880,6 +891,17 @@ def main(argv=None) -> int:
             lambda: fetch_runtime_info(
                 args.service_url,
                 args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-workflow-diff":
+        return _service_action(
+            lambda: fetch_workflow_diff(
+                args.service_url,
+                args.auth_token_file,
+                args.workflow_id,
+                args.from_version,
+                args.to_version,
             )
         )
 
