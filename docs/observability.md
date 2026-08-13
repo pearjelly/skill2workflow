@@ -22,6 +22,11 @@ An absent, malformed, or invalid token returns `401` and `WWW-Authenticate: Bear
 
 Unlike workflow triggers, authenticated metrics remain available while `/readyz` reports `503`. This lets an operator diagnose a starting, draining, or standby process. The exported `skill2workflow_service_ready` and `skill2workflow_scheduler_lease_owned` gauges show that state directly. A SQLite read failure returns a compact `503 metrics unavailable` response without storage details.
 
+During graceful shutdown, new mutating routes are rejected before their
+authentication or request bodies are processed, but `/metrics` remains a
+read-only diagnostic surface. Its `service_state` gauge therefore continues to
+expose the transition through `draining` until the listener stops.
+
 The response content type is:
 
 ```text

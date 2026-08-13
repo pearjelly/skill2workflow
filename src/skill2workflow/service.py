@@ -99,6 +99,17 @@ MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 REQUEST_SOCKET_TIMEOUT_SECONDS = 5.0
+_MUTATING_REQUEST_ROUTES = frozenset(
+    {
+        "workflow_trigger",
+        "workflow_release",
+        "workflow_promotion",
+        "workflow_deprecation",
+        "recurring_schedule_action",
+        "run_resume",
+        "run_cancel",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -349,6 +360,26 @@ class RuntimeService:
                 self._status = "draining"
                 self._log_lifecycle("draining")
 
+    def admit_request(self, route: str) -> str:
+        """Atomically decide whether one request may enter the service.
+
+        The lifecycle decision and business-request semaphore acquisition share
+        one short critical section.  A request admitted before shutdown may
+        finish normally; a mutating request arriving after ``draining`` is
+        published is rejected before authentication, body parsing, or any
+        control-plane side effect.  Read-only diagnostics remain available for
+        shutdown investigation.
+        """
+
+        with self._lifecycle_lock:
+            if self._status == "draining" and route in _MUTATING_REQUEST_ROUTES:
+                return "draining"
+            if route in {"health", "readiness"}:
+                return "allowed"
+            if not self._request_admission.acquire(blocking=False):
+                return "busy"
+            return "admitted"
+
     def serve(self, ready_callback: Optional[Callable[["RuntimeService"], None]] = None) -> None:
         had_primary_error = False
         try:
@@ -592,10 +623,16 @@ def _handler_for(service: RuntimeService):
             route = _request_route(self.command, path)
             self._response_status = 500
             self._response_started = False
-            admitted = route in {"health", "readiness"} or self._try_admit_request()
+            admission = service.admit_request(route)
             try:
                 try:
-                    if not admitted:
+                    if admission == "draining":
+                        self._send_json(
+                            503,
+                            {"error": "service is draining"},
+                            headers={"Retry-After": "1"},
+                        )
+                    elif admission == "busy":
                         self._send_json(
                             429,
                             {"error": "service concurrency limit reached"},
@@ -666,7 +703,7 @@ def _handler_for(service: RuntimeService):
                 except Exception:
                     self._send_internal_error()
             finally:
-                if admitted and route not in {"health", "readiness"}:
+                if admission == "admitted":
                     service._request_admission.release()
                 try:
                     service.telemetry.observe_http(route, self._response_status)
@@ -682,9 +719,6 @@ def _handler_for(service: RuntimeService):
                         )
                     except Exception:
                         pass
-
-        def _try_admit_request(self) -> bool:
-            return service._request_admission.acquire(blocking=False)
 
         def _send_internal_error(self) -> None:
             """Return one fixed error without exposing unexpected exception details."""

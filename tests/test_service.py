@@ -186,6 +186,60 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(callback_called, [])
         self.assertEqual(statuses, ["starting", "draining", "stopped"])
 
+    def test_request_admission_is_atomic_against_shutdown_request(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+            service._status = "ready"
+
+            class ShutdownDuringAdmissionLock:
+                def __init__(self):
+                    self._lock = threading.RLock()
+                    self._triggered = False
+
+                def __enter__(self):
+                    self._lock.__enter__()
+                    if not self._triggered:
+                        self._triggered = True
+                        service.begin_shutdown()
+                    return self
+
+                def __exit__(self, exc_type, exc_value, traceback):
+                    return self._lock.__exit__(exc_type, exc_value, traceback)
+
+            service._lifecycle_lock = ShutdownDuringAdmissionLock()
+            self.assertEqual(service.admit_request("workflow_trigger"), "draining")
+            self.assertEqual(service.admit_request("metrics"), "admitted")
+            service._request_admission.release()
+            service._server.server_close()
+
+        self.assertEqual(service.status, "draining")
+
+    def test_draining_rejects_new_mutating_request_before_auth_or_body_side_effects(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+            service._status = "ready"
+            service.begin_shutdown()
+            host, port = service.server_address
+            with patch.object(service.authenticator, "authenticate") as authenticate, patch.object(
+                service.control_plane,
+                "trigger_workflow",
+            ) as trigger_workflow:
+                thread = threading.Thread(target=service._server.handle_request, daemon=True)
+                thread.start()
+                status, payload = _post_json(
+                    f"http://{host}:{port}/webhooks/workflow_service/0.1.0",
+                    {"idempotency_key": "must-not-be-consumed"},
+                    token=AUTH_TOKEN,
+                )
+                thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 503)
+        self.assertEqual(payload, {"error": "service is draining"})
+        authenticate.assert_not_called()
+        trigger_workflow.assert_not_called()
+        self.assertFalse(thread.is_alive())
+
     def test_lifecycle_logger_failure_cannot_break_startup_or_shutdown(self):
         class FailingLifecycleLogger:
             def __init__(self):

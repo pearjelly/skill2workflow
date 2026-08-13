@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added an atomic shutdown admission boundary: mutating routes now fail closed
+  with a bounded retryable response after `draining`, while health, metrics,
+  and read-only operator diagnostics remain available.
 - Serialized service lifecycle transitions across shutdown callers and the
   serving thread, preventing a concurrent shutdown from overwriting `draining`
   with `ready` and preserving ordered lifecycle events.
