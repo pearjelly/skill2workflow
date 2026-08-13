@@ -39,6 +39,9 @@ telemetry rendering.
 Loop 104 preserves a shutdown request that arrives during scheduler startup;
 the service now drains directly instead of publishing `ready` or entering the
 HTTP request loop after termination has begun.
+Loop 105 makes the lifecycle transition itself atomic across the serving thread
+and shutdown callers, preserving both the state decision and ordered lifecycle
+events when shutdown races the `ready` publication.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
@@ -209,7 +212,7 @@ contract, performs no writes or provider calls, and is documented in
 
 ## Shutdown And Restart Continuity
 
-`SIGINT` and `SIGTERM` begin graceful shutdown. The service stops accepting new work, lets already accepted concurrent handlers return, closes the listening socket, and exits normally. A shutdown request that arrives during scheduler startup is preserved; the service does not publish `ready`, invoke the ready callback, or enter the HTTP request loop after draining has begun. Startup or scheduler-cleanup failures also close the listener and force the observable lifecycle state to `stopped` before the original exception is reported. Operators should use `/readyz` for traffic removal and `/healthz` only for process liveness. A handler that already acquired an admission slot releases it on every response or socket failure path.
+`SIGINT` and `SIGTERM` begin graceful shutdown. The service stops accepting new work, lets already accepted concurrent handlers return, closes the listening socket, and exits normally. A shutdown request that arrives during scheduler startup is preserved; the service does not publish `ready`, invoke the ready callback, or enter the HTTP request loop after draining has begun. Lifecycle state transitions are serialized across signal and embedding callers, so the ready/draining decision cannot be overwritten and lifecycle events remain ordered. Startup or scheduler-cleanup failures also close the listener and force the observable lifecycle state to `stopped` before the original exception is reported. Operators should use `/readyz` for traffic removal and `/healthz` only for process liveness. A handler that already acquired an admission slot releases it on every response or socket failure path.
 
 Concurrent request handling allows a cancellation request to be persisted while another handler is blocked in a connector. Cancellation remains cooperative and does not interrupt an external request already in flight; see [`cancellation.md`](cancellation.md) before operating side-effecting connectors.
 

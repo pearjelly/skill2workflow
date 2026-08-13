@@ -59,6 +59,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - The authenticated service converts unexpected request-dispatch exceptions into the fixed `503` `service unavailable` response, suppresses exception details and second writes after connection aborts, and treats telemetry/event logging as best-effort across both request and lifecycle paths
 - Service startup and teardown always close the listener and publish `stopped` after scheduler cleanup attempts, while preserving the original scheduler failure for the caller
 - A shutdown request observed during scheduler startup is preserved: the service never publishes `ready`, invokes the ready callback, or enters the request loop after draining begins
+- Lifecycle state transitions are serialized across shutdown callers and the serving thread, preserving the ready/draining decision and ordered lifecycle events
 - Local webhook route and response shape documented in `docs/triggers.md`
 - Self-hosted service configuration `skill2workflow-service-0.2.0` and its published JSON Schema
 - Local `service-token-rotate` and `skill2workflow-service-token-rotation-result-0.1.0` preserve owner-only atomic ingress-token replacement without returning the secret

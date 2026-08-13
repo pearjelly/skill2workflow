@@ -307,6 +307,11 @@ class RuntimeService:
         self._request_admission = threading.BoundedSemaphore(
             MAX_CONCURRENT_BUSINESS_REQUESTS
         )
+        # Lifecycle transitions can be driven by the serving thread, a signal
+        # handler, or an embedding caller.  An RLock keeps the ready/draining
+        # decision atomic and remains safe when a signal is delivered while
+        # the serving thread already owns the lock.
+        self._lifecycle_lock = threading.RLock()
         self._status = "starting"
         self._server = _http_server(config.host, config.port, _handler_for(self))
         self._server.timeout = 0.2
@@ -314,14 +319,15 @@ class RuntimeService:
 
     @property
     def status(self) -> str:
-        return self._status
+        with self._lifecycle_lock:
+            return self._status
 
     @property
     def server_address(self):
         return self._server.server_address
 
     def readiness(self):
-        if self._status != "ready":
+        if self.status != "ready":
             return 503, {"service": "skill2workflow", "status": "not_ready"}
         try:
             if not self.authenticator.is_ready() or not self.credential_provider.is_ready():
@@ -338,25 +344,28 @@ class RuntimeService:
         }
 
     def begin_shutdown(self) -> None:
-        if self._status in {"starting", "ready"}:
-            self._status = "draining"
-            self._log_lifecycle("draining")
+        with self._lifecycle_lock:
+            if self._status in {"starting", "ready"}:
+                self._status = "draining"
+                self._log_lifecycle("draining")
 
     def serve(self, ready_callback: Optional[Callable[["RuntimeService"], None]] = None) -> None:
         had_primary_error = False
         try:
             try:
                 self.scheduler.start()
-                # A signal can arrive while scheduler startup is still in
-                # progress.  Preserve that drain request instead of
-                # publishing a ready state after shutdown has begun.
-                if self._status == "draining":
-                    return
-                self._status = "ready"
-                self._log_lifecycle("ready")
+                # Keep the drain check and ready publication atomic.  A
+                # signal can arrive after scheduler.start() returns but before
+                # the state is written; the lock prevents that request from
+                # being overwritten by the normal startup path.
+                with self._lifecycle_lock:
+                    if self._status == "draining":
+                        return
+                    self._status = "ready"
+                    self._log_lifecycle("ready")
                 if ready_callback:
                     ready_callback(self)
-                while self._status == "ready":
+                while self.status == "ready":
                     self._server.handle_request()
             except BaseException:
                 had_primary_error = True
@@ -373,8 +382,9 @@ class RuntimeService:
                 if cleanup_error is None:
                     cleanup_error = error
             finally:
-                self._status = "stopped"
-                self._log_lifecycle("stopped")
+                with self._lifecycle_lock:
+                    self._status = "stopped"
+                    self._log_lifecycle("stopped")
             if cleanup_error is not None and not had_primary_error:
                 raise cleanup_error
 

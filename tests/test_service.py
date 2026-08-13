@@ -142,6 +142,50 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(service.status, "stopped")
         self.assertEqual(callback_called, [])
 
+    def test_ready_transition_is_atomic_against_shutdown_request(self):
+        with TemporaryDirectory() as tmp:
+            statuses = []
+
+            class LifecycleLogger:
+                def lifecycle(self, status):
+                    statuses.append(status)
+
+                def request_completed(self, **_kwargs):
+                    return
+
+            service = RuntimeService(
+                _service_config(Path(tmp)),
+                event_logger=LifecycleLogger(),
+            )
+            callback_called = []
+
+            class ShutdownDuringTransitionLock:
+                def __init__(self):
+                    self._lock = threading.RLock()
+                    self._triggered = False
+
+                def __enter__(self):
+                    self._lock.__enter__()
+                    if not self._triggered:
+                        self._triggered = True
+                        service.begin_shutdown()
+                    return self
+
+                def __exit__(self, exc_type, exc_value, traceback):
+                    return self._lock.__exit__(exc_type, exc_value, traceback)
+
+            service._lifecycle_lock = ShutdownDuringTransitionLock()
+            with patch.object(service.scheduler, "start"), patch.object(
+                service._server,
+                "handle_request",
+                side_effect=AssertionError("draining service must not accept requests"),
+            ):
+                service.serve(ready_callback=lambda _service: callback_called.append(True))
+
+        self.assertEqual(service.status, "stopped")
+        self.assertEqual(callback_called, [])
+        self.assertEqual(statuses, ["starting", "draining", "stopped"])
+
     def test_lifecycle_logger_failure_cannot_break_startup_or_shutdown(self):
         class FailingLifecycleLogger:
             def __init__(self):

@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Serialized service lifecycle transitions across shutdown callers and the
+  serving thread, preventing a concurrent shutdown from overwriting `draining`
+  with `ready` and preserving ordered lifecycle events.
 - Hardened service lifecycle startup so a shutdown request received during
   scheduler initialization is preserved; the service no longer publishes
   `ready` or enters the request loop after draining begins.

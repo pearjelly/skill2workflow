@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-104 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-105 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -964,6 +964,10 @@ contract aligned with the rest of the service boundary.
 Loop 104 hardens [service shutdown](docs/service.md) against a startup race:
 an exit request received while the scheduler is starting is preserved, so the
 instance cannot publish `ready` or enter the request loop after draining began.
+
+Loop 105 makes service lifecycle transitions atomic across shutdown callers and
+the serving thread, preserving the ready/draining decision and ordered
+lifecycle events under concurrent shutdown.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

@@ -70,14 +70,16 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("retrying the same decision repairs only missing evidence", guide)
         self.assertIn("Loop 103 makes the authenticated `/metrics` route", guide)
         self.assertIn("Loop 104 preserves a shutdown request", guide)
+        self.assertIn("Loop 105 makes the lifecycle transition itself atomic", guide)
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         self.assertIn("five-second socket deadline", stability)
         self.assertIn("GET /metrics` zero-body request validation", stability)
         self.assertIn("shutdown request observed during scheduler startup", stability)
+        self.assertIn("Lifecycle state transitions are serialized", stability)
 
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-104 are complete", readme)
+        self.assertIn("Delivery Loops 1-105 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
