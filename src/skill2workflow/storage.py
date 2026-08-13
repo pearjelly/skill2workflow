@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from contextlib import closing, contextmanager
@@ -15,6 +16,21 @@ from .state_layout import ensure_current_state_layout
 RunState = Dict[str, object]
 WorkflowRecord = Dict[str, object]
 AuditEvent = Dict[str, object]
+
+
+AUDIT_INTEGRITY_SCHEMA_VERSION = "skill2workflow-audit-integrity-0.1.0"
+AUDIT_INTEGRITY_ALGORITHM = "sha256-chain-v1"
+_AUDIT_GENESIS_DIGEST = ""
+_LEGACY_AUDIT_COLUMNS = {
+    "sequence",
+    "event_type",
+    "workflow_id",
+    "workflow_version",
+    "run_id",
+    "timestamp",
+    "payload_json",
+}
+_CURRENT_AUDIT_COLUMNS = _LEGACY_AUDIT_COLUMNS | {"prev_digest", "digest"}
 
 
 class ExecutionFencedError(ValueError):
@@ -479,6 +495,19 @@ class JsonControlStore:
                 events.append(json.loads(line))
         return events
 
+    def verify_audit_integrity(self) -> Dict[str, object]:
+        """Report that JSON audit storage has no durable chain contract."""
+
+        return {
+            "schema_version": AUDIT_INTEGRITY_SCHEMA_VERSION,
+            "status": "legacy_unsealed",
+            "algorithm": "",
+            "event_count": len(self.list_audit_events()),
+            "head_digest": "",
+            "first_invalid_sequence": 0,
+            "reason": "sqlite_storage_required",
+        }
+
 
 class SqliteControlStore:
     """Persist workflow registry and audit metadata in SQLite."""
@@ -540,6 +569,14 @@ class SqliteControlStore:
 
     def append_audit(self, event: AuditEvent) -> None:
         with self._connection() as connection:
+            connection.execute("begin immediate")
+            previous_row = connection.execute(
+                "select digest from audit_events order by sequence desc limit 1"
+            ).fetchone()
+            previous_digest = (
+                str(previous_row[0]) if previous_row and previous_row[0] is not None else ""
+            )
+            payload_json = json.dumps(event, ensure_ascii=False, sort_keys=True)
             connection.execute(
                 """
                 insert into audit_events (
@@ -548,9 +585,11 @@ class SqliteControlStore:
                     workflow_version,
                     run_id,
                     timestamp,
-                    payload_json
+                    payload_json,
+                    prev_digest,
+                    digest
                 )
-                values (?, ?, ?, ?, ?, ?)
+                values (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     _event_value(event, "type", "event"),
@@ -558,9 +597,21 @@ class SqliteControlStore:
                     _event_value(event, "workflow_version", ""),
                     _event_value(event, "run_id", ""),
                     _event_value(event, "timestamp", ""),
-                    json.dumps(event, ensure_ascii=False, sort_keys=True),
+                    payload_json,
+                    previous_digest,
+                    "",
                 ),
             )
+            sequence = int(connection.execute("select last_insert_rowid()").fetchone()[0])
+            digest = _audit_digest(sequence, previous_digest, event)
+            connection.execute(
+                "update audit_events set digest = ? where sequence = ?",
+                (digest, sequence),
+            )
+
+    def verify_audit_integrity(self) -> Dict[str, object]:
+        with self._connection() as connection:
+            return _verify_audit_integrity_connection(connection)
 
     def claim_trigger_idempotency(
         self,
@@ -750,7 +801,9 @@ class SqliteControlStore:
                     workflow_version text not null,
                     run_id text not null,
                     timestamp text not null,
-                    payload_json text not null
+                    payload_json text not null,
+                    prev_digest text not null default '',
+                    digest text not null default ''
                 )
                 """
             )
@@ -769,6 +822,7 @@ class SqliteControlStore:
                 )
                 """
             )
+            _ensure_audit_integrity_schema(connection)
 
     def _import_json_state(self) -> None:
         if self.index_path.exists() and not self.load_index():
@@ -795,6 +849,23 @@ def create_control_store(state_dir: Path, storage: str):
     raise ValueError(f"unsupported control storage: {storage}")
 
 
+def rebuild_audit_integrity(database: Path) -> Dict[str, object]:
+    """Recompute the SQLite audit chain after an intentional row cutover."""
+
+    with closing(sqlite3.connect(Path(database))) as connection:
+        connection.execute("begin immediate")
+        _rebuild_audit_integrity_connection(connection)
+        connection.commit()
+        return _verify_audit_integrity_connection(connection)
+
+
+def verify_audit_integrity(database: Path) -> Dict[str, object]:
+    """Verify one SQLite audit database without returning event payloads."""
+
+    with closing(sqlite3.connect(f"file:{Path(database)}?mode=ro", uri=True)) as connection:
+        return _verify_audit_integrity_connection(connection)
+
+
 @contextmanager
 def _sqlite_connection(db_path: Path):
     with closing(sqlite3.connect(db_path)) as connection:
@@ -805,6 +876,190 @@ def _sqlite_connection(db_path: Path):
 def _event_value(event: Dict[str, object], key: str, default: str) -> str:
     value = event.get(key, default)
     return str(value) if value is not None else default
+
+
+def _ensure_audit_integrity_schema(connection) -> None:
+    columns = {
+        str(row[1])
+        for row in connection.execute('pragma table_info("audit_events")').fetchall()
+    }
+    if columns == _LEGACY_AUDIT_COLUMNS:
+        connection.execute(
+            "alter table audit_events add column prev_digest text not null default ''"
+        )
+        connection.execute(
+            "alter table audit_events add column digest text not null default ''"
+        )
+        _rebuild_audit_integrity_connection(connection)
+        return
+    if columns != _CURRENT_AUDIT_COLUMNS:
+        raise ValueError("SQLite table has an incompatible audit_events layout")
+
+
+def _rebuild_audit_integrity_connection(connection) -> None:
+    previous_digest = _AUDIT_GENESIS_DIGEST
+    rows = connection.execute(
+        "select sequence, payload_json from audit_events order by sequence"
+    ).fetchall()
+    for sequence, payload_json in rows:
+        try:
+            payload = json.loads(str(payload_json))
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError("audit event payload is invalid") from error
+        if not isinstance(payload, dict):
+            raise ValueError("audit event payload is invalid")
+        digest = _audit_digest(int(sequence), previous_digest, payload)
+        connection.execute(
+            "update audit_events set prev_digest = ?, digest = ? where sequence = ?",
+            (previous_digest, digest, int(sequence)),
+        )
+        previous_digest = digest
+
+
+def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
+    columns = {
+        str(row[1])
+        for row in connection.execute('pragma table_info("audit_events")').fetchall()
+    }
+    if columns == _LEGACY_AUDIT_COLUMNS:
+        count = int(connection.execute("select count(*) from audit_events").fetchone()[0])
+        return _audit_integrity_result(
+            status="legacy_unsealed",
+            event_count=count,
+            reason="integrity_columns_missing",
+        )
+    if columns != _CURRENT_AUDIT_COLUMNS:
+        return _audit_integrity_result(status="invalid", reason="schema_mismatch")
+
+    rows = connection.execute(
+        """
+        select sequence, event_type, workflow_id, workflow_version, run_id,
+               timestamp, payload_json, prev_digest, digest
+        from audit_events order by sequence
+        """
+    ).fetchall()
+    previous_sequence = 0
+    previous_digest = _AUDIT_GENESIS_DIGEST
+    for (
+        sequence_value,
+        stored_event_type,
+        stored_workflow_id,
+        stored_workflow_version,
+        stored_run_id,
+        stored_timestamp,
+        payload_json,
+        stored_previous,
+        stored_digest,
+    ) in rows:
+        try:
+            sequence = int(sequence_value)
+        except (TypeError, ValueError):
+            return _audit_integrity_result(
+                status="invalid",
+                event_count=len(rows),
+                reason="sequence_invalid",
+            )
+        if sequence <= previous_sequence:
+            return _audit_integrity_result(
+                status="invalid",
+                event_count=len(rows),
+                head_digest=previous_digest,
+                first_invalid_sequence=sequence,
+                reason="sequence_out_of_order",
+            )
+        try:
+            payload = json.loads(str(payload_json))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return _audit_integrity_result(
+                status="invalid",
+                event_count=len(rows),
+                head_digest=previous_digest,
+                first_invalid_sequence=sequence,
+                reason="payload_invalid",
+            )
+        if not isinstance(payload, dict):
+            return _audit_integrity_result(
+                status="invalid",
+                event_count=len(rows),
+                head_digest=previous_digest,
+                first_invalid_sequence=sequence,
+                reason="payload_invalid",
+            )
+        denormalized = {
+            "type": (stored_event_type, "event"),
+            "workflow_id": (stored_workflow_id, ""),
+            "workflow_version": (stored_workflow_version, ""),
+            "run_id": (stored_run_id, ""),
+            "timestamp": (stored_timestamp, ""),
+        }
+        if any(
+            key in payload and str(stored or "") != _event_value(payload, key, default)
+            for key, (stored, default) in denormalized.items()
+        ):
+            return _audit_integrity_result(
+                status="invalid",
+                event_count=len(rows),
+                head_digest=previous_digest,
+                first_invalid_sequence=sequence,
+                reason="column_mismatch",
+            )
+        if str(stored_previous or "") != previous_digest:
+            return _audit_integrity_result(
+                status="invalid",
+                event_count=len(rows),
+                head_digest=previous_digest,
+                first_invalid_sequence=sequence,
+                reason="prev_digest_mismatch",
+            )
+        expected_digest = _audit_digest(sequence, previous_digest, payload)
+        if str(stored_digest or "") != expected_digest:
+            return _audit_integrity_result(
+                status="invalid",
+                event_count=len(rows),
+                head_digest=previous_digest,
+                first_invalid_sequence=sequence,
+                reason="digest_mismatch",
+            )
+        previous_sequence = sequence
+        previous_digest = expected_digest
+    return _audit_integrity_result(
+        status="valid",
+        event_count=len(rows),
+        head_digest=previous_digest,
+    )
+
+
+def _audit_integrity_result(
+    *,
+    status: str,
+    event_count: int = 0,
+    head_digest: str = "",
+    first_invalid_sequence: int = 0,
+    reason: str = "",
+) -> Dict[str, object]:
+    return {
+        "schema_version": AUDIT_INTEGRITY_SCHEMA_VERSION,
+        "status": status,
+        "algorithm": AUDIT_INTEGRITY_ALGORITHM if status != "legacy_unsealed" else "",
+        "event_count": max(0, int(event_count)),
+        "head_digest": head_digest if status == "valid" else "",
+        "first_invalid_sequence": max(0, int(first_invalid_sequence)),
+        "reason": reason,
+    }
+
+
+def _audit_digest(sequence: int, previous_digest: str, payload: Dict[str, object]) -> str:
+    canonical = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    material = (
+        f"{AUDIT_INTEGRITY_ALGORITHM}\n{int(sequence)}\n"
+        f"{previous_digest}\n{canonical}"
+    ).encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
 
 
 def _cancel_state(state: RunState) -> RunState:

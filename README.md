@@ -531,7 +531,7 @@ After a crash, inspect `interrupted` runs with `control-runs`, `control-run`, an
 filtered `audit`; do not replay them until the provider outcome is reconciled.
 See [`docs/interrupted-recovery.md`](docs/interrupted-recovery.md).
 
-For SQLite-backed control-plane metadata, pass `--storage sqlite` to `workflows`, `workflow`, `deprecate`, and `audit` as well.
+For SQLite-backed control-plane metadata, pass `--storage sqlite` to `workflows`, `workflow`, `deprecate`, `audit`, and `audit-verify` as well.
 
 After stopping the self-hosted service, create and verify an offline backup, then restore it into a new directory:
 
@@ -557,6 +557,12 @@ Filter audit events:
 ```bash
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --workflow-id workflow_approval_flow --version 0.1.0
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type run_completed
+```
+
+Verify the SQLite audit chain without printing event payloads:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli audit-verify --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 ```
 
 List connector manifests:
@@ -672,7 +678,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-64 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-65 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -723,6 +729,8 @@ Loop 62 adds [durable trigger idempotency](docs/triggers.md#durable-trigger-idem
 Loop 63 adds [bounded active execution timeout](docs/runtime-policy.md): the existing `policies.default_timeout_ms` field is validated and enforced at durable executor safe points, persisted with the run, paused during human-gate review, and recorded as fixed timeout failure evidence.
 
 Loop 64 adds [declarative fallback transitions](docs/workflow-dsl-contract.md): exhausted `tool_call` retries preserve the failed node and route only through an explicit `on_fallback` edge, with fixed control-plane evidence and a third LiteGraph output slot. It does not claim provider failover, compensation, or exactly-once execution.
+
+Loop 65 adds [SQLite audit integrity](docs/audit-integrity.md): each current audit row participates in a `sha256-chain-v1`, `audit-verify` returns a fixed payload-free result, legacy audit tables are upgraded on open, invalid chains block backup verification, and retained copies are re-chained after intentional deletion. It is an integrity signal, not a signature or authenticity claim.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

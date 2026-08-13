@@ -40,6 +40,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "restore",
     "state-upgrade",
     "state-retention-apply",
+    "audit-verify",
     "cancel-run",
     "service-resume",
     "service-cancel",

@@ -46,7 +46,7 @@ The backup contains only:
 - the exact `workflows/**/*.json` artifacts referenced by `control.sqlite3`;
 - `manifest.json` using [`schemas/state-backup-manifest-0.1.0.schema.json`](../schemas/state-backup-manifest-0.1.0.schema.json).
 
-Each declared file has a byte length and lowercase SHA-256 digest. Verification rejects unknown fields, an unsupported or mismatched state layout marker, duplicate or unsafe paths, undeclared files, missing files, size or digest mismatches, invalid workflow JSON, workflow/control checksum disagreement, missing or incompatible core table columns, a malformed optional `run_cancellations` table, and any SQLite `integrity_check` result other than `ok`.
+Each declared file has a byte length and lowercase SHA-256 digest. Verification rejects unknown fields, an unsupported or mismatched state layout marker, duplicate or unsafe paths, undeclared files, missing files, size or digest mismatches, invalid workflow JSON, workflow/control checksum disagreement, missing or incompatible core table columns, a malformed optional `run_cancellations` table, an invalid current SQLite audit chain, and any SQLite `integrity_check` result other than `ok`.
 
 Scheduler lease rows are cleared in the snapshot. Durable dispatch claims are preserved; after restore, the scheduler applies its normal stale-claim `uncertain` recovery semantics. A recognized legacy `v0.1.0` source without `scheduler.sqlite3` is still backed up safely: the manifest sets `scheduler_database_synthesized: true` and the snapshot contains a new empty scheduler database while the source remains untouched.
 

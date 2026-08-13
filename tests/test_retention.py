@@ -16,6 +16,7 @@ from skill2workflow.retention import (
     normalize_retention_policy,
 )
 from skill2workflow.schedules import RecurringScheduleStore
+from skill2workflow.storage import rebuild_audit_integrity
 
 
 class StateRetentionTests(TestCase):
@@ -161,6 +162,7 @@ class StateRetentionTests(TestCase):
                         "{}",
                     ),
                 )
+            rebuild_audit_integrity(source / "control.sqlite3")
             output = root / "retained"
 
             plan = inspect_state_retention(source, _policy_v3())
@@ -398,9 +400,15 @@ def _populate_retention_state(state_dir: Path):
     with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection, connection:
         for index, (run_id, _, timestamp) in enumerate(runs, start=1):
             connection.execute(
-                "insert into audit_events values (?, ?, ?, ?, ?, ?, ?)",
+                """
+                insert into audit_events (
+                    sequence, event_type, workflow_id, workflow_version,
+                    run_id, timestamp, payload_json
+                ) values (?, ?, ?, ?, ?, ?, ?)
+                """,
                 (index, "run_event", "workflow_retention_private", "0.1.0", run_id, timestamp, "{}"),
             )
+    rebuild_audit_integrity(state_dir / "control.sqlite3")
     dispatches = [
         ("dispatch_old_completed_private", "completed", "2025-01-01T00:00:00+00:00"),
         ("dispatch_old_claimed_private", "claimed", "2025-01-01T00:00:00+00:00"),

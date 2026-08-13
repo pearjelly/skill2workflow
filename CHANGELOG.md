@@ -27,6 +27,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added durable SQLite trigger idempotency: identical keyed retries replay the compact result without a second run, mismatched requests return fixed conflicts, and unresolved outcomes fail closed without storing input values.
 - Enforced the existing bounded `policies.default_timeout_ms` runtime boundary at executor safe points, with persisted deadlines, human-gate pause semantics, and fixed timeout failure evidence.
 - Added explicit `tool_call.on_fallback` transitions after exhausted connector retries, preserving failed-attempt evidence and promoting fixed fallback audit events.
+- Added SQLite `sha256-chain-v1` audit integrity links, compact `audit-verify` verification, legacy-column upgrade, backup rejection for invalid current chains, and retained-copy re-chaining.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

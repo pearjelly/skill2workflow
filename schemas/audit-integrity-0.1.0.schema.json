@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/audit-integrity-0.1.0.schema.json",
+  "title": "skill2workflow SQLite audit integrity result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "algorithm",
+    "event_count",
+    "head_digest",
+    "first_invalid_sequence",
+    "reason"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-audit-integrity-0.1.0"
+    },
+    "status": {
+      "enum": ["valid", "invalid", "legacy_unsealed"]
+    },
+    "algorithm": {
+      "enum": ["sha256-chain-v1", ""]
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "head_digest": {
+      "type": "string",
+      "pattern": "^(|[a-f0-9]{64})$"
+    },
+    "first_invalid_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reason": {
+      "enum": [
+        "",
+        "sqlite_storage_required",
+        "integrity_columns_missing",
+        "schema_mismatch",
+        "sequence_invalid",
+        "sequence_out_of_order",
+        "payload_invalid",
+        "column_mismatch",
+        "prev_digest_mismatch",
+        "digest_mismatch"
+      ]
+    }
+  }
+}

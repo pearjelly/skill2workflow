@@ -326,6 +326,13 @@ def main(argv=None) -> int:
     audit_cmd.add_argument("--run-id", default="")
     audit_cmd.add_argument("--event-type", default="")
 
+    audit_verify_cmd = subparsers.add_parser(
+        "audit-verify",
+        help="Verify the SQLite audit evidence chain without printing events",
+    )
+    audit_verify_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    audit_verify_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
+
     connectors_cmd = subparsers.add_parser("connectors", help="List connector manifests")
     connectors_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
 
@@ -680,6 +687,11 @@ def main(argv=None) -> int:
             )
         )
         return 0
+
+    if args.command == "audit-verify":
+        result = LocalControlPlane(args.state_dir, storage=args.storage).verify_audit_integrity()
+        _print_json(result)
+        return 0 if result.get("status") == "valid" else 1
 
     if args.command == "connectors":
         _print_json(LocalControlPlane(args.state_dir).list_connectors())

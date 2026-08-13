@@ -354,6 +354,11 @@ class LocalControlPlane:
             events = [event for event in events if str(event.get("type", "")) == event_type]
         return events
 
+    def verify_audit_integrity(self) -> Dict[str, object]:
+        """Verify the storage-backed audit evidence without exposing payloads."""
+
+        return self.store.verify_audit_integrity()
+
     def record_ingress_authentication(
         self,
         authenticated: bool,

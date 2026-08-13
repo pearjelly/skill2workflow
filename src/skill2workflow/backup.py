@@ -21,6 +21,7 @@ from .state_layout import (
     inspect_state_layout,
     validate_current_state_marker,
 )
+from .storage import verify_audit_integrity
 
 
 BACKUP_SCHEMA_VERSION = "skill2workflow-state-backup-0.1.0"
@@ -617,6 +618,10 @@ def _validate_database(path: Path, name: str) -> None:
             if not integrity or str(integrity[0]).lower() != "ok":
                 raise ValueError(f"SQLite integrity check failed: {name}")
             _require_tables(connection, name)
+            if name == "control.sqlite3":
+                audit_result = verify_audit_integrity(path)
+                if audit_result.get("status") == "invalid":
+                    raise ValueError("SQLite audit integrity check failed")
     except sqlite3.Error as error:
         raise ValueError(f"SQLite validation failed: {name}") from error
 
@@ -651,6 +656,15 @@ def _require_tables(connection, name: str) -> None:
             str(row[1])
             for row in connection.execute(f'pragma table_info("{table}")').fetchall()
         }
+        if name == "control.sqlite3" and table == "audit_events":
+            audit_columns = {
+                *required_columns,
+                "prev_digest",
+                "digest",
+            }
+            if columns not in {frozenset(required_columns), frozenset(audit_columns)}:
+                raise ValueError(f"SQLite table has an incompatible layout: {name}:{table}")
+            continue
         if columns != required_columns:
             raise ValueError(f"SQLite table has an incompatible layout: {name}:{table}")
     for table, required_columns in _OPTIONAL_COLUMNS.get(name, {}).items():

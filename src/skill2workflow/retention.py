@@ -19,6 +19,7 @@ from .backup import (
     verify_state_backup,
 )
 from .state_layout import CURRENT_STATE_LAYOUT_VERSION, inspect_state_layout
+from .storage import rebuild_audit_integrity
 
 
 LEGACY_RETENTION_POLICY_SCHEMA_VERSION = "skill2workflow-retention-policy-0.1.0"
@@ -249,6 +250,9 @@ def _purge_retained_copy(
         deleted_audit = int(cursor.rowcount)
         connection.commit()
         connection.execute("detach database run_state")
+    rebuild_audit_integrity(control_database)
+    with closing(sqlite3.connect(control_database)) as connection:
+        connection.execute("pragma secure_delete = on")
         connection.execute("vacuum")
     with closing(sqlite3.connect(run_database)) as connection:
         connection.execute("pragma secure_delete = on")

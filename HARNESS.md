@@ -248,6 +248,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workfl
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --event-type node_retrying
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --event-type node_recovered
 PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
+PYTHONPATH=src python3 -m skill2workflow.cli audit-verify --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json
 PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --service-url http://127.0.0.1:8080 --auth-token-file /tmp/skill2workflow-ingress.token -o /tmp/skill2workflow-live-snapshot.json
@@ -334,6 +335,7 @@ Implemented:
   - records workflow publish, deprecate, and run events in JSONL or SQLite audit storage
   - adds trigger metadata to `run_started` audit events for triggered runs
   - filters audit events by workflow id, version, run id, and event type
+  - verifies the current SQLite audit chain with the payload-free `audit-verify` command
   - records connector execution events in audit storage for published runs
   - promotes runtime policy events such as retry and recovery into audit storage for published runs
   - imports existing JSON registry and audit files when opening SQLite control-plane storage

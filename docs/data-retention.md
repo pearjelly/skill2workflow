@@ -77,7 +77,7 @@ The apply path is copy-on-write:
 3. Restore that snapshot into private staging.
 4. Recompute eligibility against the exact snapshot.
 5. Enable SQLite `secure_delete`, delete the fixed eligible rows, and run `VACUUM` on all three databases so removed payload bytes do not remain in the published database pages.
-6. Verify table layouts, integrity, workflow artifact checksums, marker, and empty lease state through a second private backup.
+6. Rebuild the retained SQLite audit chain after intentional audit-row deletion, then verify table layouts, integrity, workflow artifact checksums, marker, and empty lease state through a second private backup.
 7. Atomically rename the retained state into the requested output path.
 
 Any failure before the final rename leaves the requested output absent and the source unchanged. Temporary full copies may have existed on the underlying filesystem; filesystem/SSD secure-erasure guarantees remain an infrastructure responsibility.
