@@ -45,7 +45,7 @@ it returns only `503 {"error":"service unavailable"}` and never serializes an
 exception message, traceback, request value, or credential. A client that has
 already closed the connection is not given a second write attempt. Telemetry
 and operational event logging are best-effort and cannot turn a request error
-into a secret-bearing response.
+into a secret-bearing response or prevent orderly service lifecycle cleanup.
 
 ## Execution-time Connector Credentials
 

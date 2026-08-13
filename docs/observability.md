@@ -60,6 +60,13 @@ Request-completion events contain only:
 
 The application logger never receives raw URLs, query strings, headers, bodies, workflow/run identifiers, credential values, or exception messages. Forward standard output with an operator-managed log collector. Configure the reverse proxy separately so its access logs also exclude Authorization headers and request bodies.
 
+Operational event delivery is best-effort. A closed pipe, unavailable
+collector, or custom logger exception is swallowed at the service boundary so
+logging cannot prevent startup, strand scheduler threads, raise from a signal
+handler, or mask shutdown cleanup. Durable workflow audit events remain the
+source of business evidence; an operational log gap must be investigated as an
+observability incident rather than treated as a workflow-state failure.
+
 ## Verification
 
 Run the real-process observability drill:

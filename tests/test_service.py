@@ -124,6 +124,36 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_lifecycle_logger_failure_cannot_break_startup_or_shutdown(self):
+        class FailingLifecycleLogger:
+            def __init__(self):
+                self.statuses = []
+
+            def lifecycle(self, status):
+                self.statuses.append(status)
+                raise RuntimeError("lifecycle collector failed")
+
+            def request_completed(self, **_kwargs):
+                return
+
+        with TemporaryDirectory() as tmp:
+            logger = FailingLifecycleLogger()
+            service = RuntimeService(
+                _service_config(Path(tmp)),
+                event_logger=logger,
+            )
+            thread = threading.Thread(
+                target=service.serve,
+                kwargs={"ready_callback": lambda running: running.begin_shutdown()},
+                daemon=True,
+            )
+            thread.start()
+            thread.join(timeout=3)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(service.status, "stopped")
+        self.assertEqual(logger.statuses, ["starting", "ready", "draining", "stopped"])
+
     def test_event_logger_failure_cannot_change_success_response(self):
         class FailingEventLogger:
             def lifecycle(self, _status):

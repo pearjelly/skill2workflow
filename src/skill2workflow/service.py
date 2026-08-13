@@ -358,8 +358,15 @@ class RuntimeService:
             self._log_lifecycle("stopped")
 
     def _log_lifecycle(self, status: str) -> None:
-        if self.event_logger is not None:
+        if self.event_logger is None:
+            return
+        # Operational logging is deliberately outside the service's control
+        # plane.  A broken pipe, closed collector, or user-supplied logger must
+        # never prevent startup/teardown or change the lifecycle state.
+        try:
             self.event_logger.lifecycle(status)
+        except Exception:
+            pass
 
 
 def validate_service_runtime_environment(config: ServiceConfig) -> str:

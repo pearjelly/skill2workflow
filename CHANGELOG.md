@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added lifecycle event-logger isolation: operational collector failures can no
+  longer abort service startup, strand scheduler threads, raise from shutdown
+  callbacks, or mask final cleanup; lifecycle logging remains best-effort.
 - Added a fail-closed service exception boundary: unexpected handler failures
   return a fixed `503 service unavailable` response without exception details,
   while connection aborts and telemetry failures cannot cause a second write or
