@@ -102,6 +102,7 @@ MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 REQUEST_SOCKET_TIMEOUT_SECONDS = 5.0
 WORKFLOW_DEADLINE_SWEEP_INTERVAL_SECONDS = 1.0
+MAX_SERVICE_DISPATCH_BATCH = 100
 _MUTATING_REQUEST_ROUTES = frozenset(
     {
         "workflow_trigger",
@@ -576,6 +577,7 @@ class ServiceScheduleLoop:
                         self.dispatcher.dispatch_due(
                             datetime.now(timezone.utc).isoformat(),
                             now_epoch=now_epoch,
+                            max_items=MAX_SERVICE_DISPATCH_BATCH,
                         )
                     finally:
                         if self.telemetry is not None:

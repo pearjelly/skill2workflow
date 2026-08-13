@@ -46,6 +46,9 @@ release; Roadmap loop completion alone does not publish a new version.
 - Stable-alias trigger resolution now performs a direct exact-version lookup
   and scans only the selected workflow's registry rows, avoiding global
   registry materialization while preserving alias and replay semantics.
+- Long-running service scheduler passes now claim at most 100 recurring
+  dispatches, keeping backlog processing batch-bounded while preserving the
+  existing lease and claim-before-execute semantics.
 - Added an optional `schedule-run-due --max-items` side-effect batch budget;
   bounded invocations process at most 100 schedule records and leave the rest
   eligible for a later run.

@@ -319,6 +319,28 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(telemetry.inflight_scheduler_dispatches(), 0)
         self.assertFalse(thread.is_alive())
 
+    def test_scheduler_dispatch_uses_fixed_batch_budget(self):
+        with TemporaryDirectory() as tmp:
+            scheduler = ServiceScheduleLoop(Path(tmp))
+            dispatched = threading.Event()
+            calls = []
+            scheduler.dispatcher.has_lease = lambda now_epoch: True
+
+            def dispatch(*args, **kwargs):
+                calls.append((args, kwargs))
+                dispatched.set()
+                scheduler.stop_dispatching()
+
+            scheduler.dispatcher.dispatch_due = dispatch
+            thread = threading.Thread(target=scheduler._dispatch, daemon=True)
+            thread.start()
+            self.assertTrue(dispatched.wait(timeout=2))
+            thread.join(timeout=2)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0][1]["max_items"], 100)
+
     def test_scheduler_lease_recovery_runs_workflow_deadline_sweep(self):
         with TemporaryDirectory() as tmp:
             scheduler = ServiceScheduleLoop(Path(tmp))

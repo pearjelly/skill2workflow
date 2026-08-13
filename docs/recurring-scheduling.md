@@ -82,6 +82,12 @@ the process releases the lease. A dispatch that already passed that gate may
 finish and record `completed`, `failed`, or `uncertain` evidence; no new
 scheduled trigger begins after `draining` is published.
 
+The long-running service scheduler applies the same fixed `1` through `100`
+batch boundary on every polling pass. A larger due backlog remains eligible
+for the next pass, so claim memory and side-effect admission stay bounded
+without changing the CLI's complete-batch compatibility when `--max-items` is
+omitted.
+
 ## Workflow Deadline Sweep
 
 The active service scheduler also owns a bounded workflow-deadline sweep. About

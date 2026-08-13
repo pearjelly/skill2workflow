@@ -136,12 +136,12 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("release-artifact-manifest.md", guide)
         self.assertIn("member SHA-256 hashes", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
-        self.assertIn("- Completed delivery loops: 1-139", roadmap)
+        self.assertIn("- Completed delivery loops: 1-140", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 139 is complete with bounded stable-alias resolution",
+            "- Active loop: None; Loop 140 is complete with bounded service dispatch batches",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-139 are complete", readme)
+        self.assertIn("Delivery Loops 1-140 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
