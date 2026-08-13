@@ -40,6 +40,7 @@ from .state_layout import (
     validate_current_state_marker,
 )
 from .telemetry import RuntimeTelemetry
+from .triggers import TriggerIdempotencyError
 from .webhooks import MAX_REQUEST_BODY_BYTES, WebhookError, handle_webhook_request
 
 
@@ -787,6 +788,8 @@ def _handler_for(service: RuntimeService):
                 )
                 self._send_json(200, payload)
             except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except TriggerIdempotencyError as error:
                 self._send_json(error.status_code, {"error": str(error)})
             except ValueError as error:
                 self._send_json(400, {"error": str(error)})

@@ -13,7 +13,14 @@ from .connectors import default_connectors
 from .compiler import validate_workflow
 from .executor import LocalExecutor, RunState
 from .storage import create_control_store
-from .triggers import normalize_trigger_request, trigger_audit_fields, trigger_response, trigger_run_context
+from .triggers import (
+    TriggerIdempotencyError,
+    normalize_trigger_request,
+    trigger_audit_fields,
+    trigger_request_fingerprint,
+    trigger_response,
+    trigger_run_context,
+)
 
 
 Workflow = Dict[str, object]
@@ -33,6 +40,7 @@ class LocalControlPlane:
         execution_owner: str = "",
     ):
         self.state_dir = Path(state_dir)
+        self.storage = storage
         self.workflows_dir = self.state_dir / "workflows"
         self.connectors_path = self.state_dir / "connectors.json"
         self.connector_runtime = connector_runtime
@@ -162,6 +170,58 @@ class LocalControlPlane:
         """Trigger a published workflow through the local control-plane boundary."""
 
         trigger = normalize_trigger_request(request)
+        workflow_id = str(trigger["workflow_id"])
+        workflow_version = str(trigger["version"])
+        idempotency_key = str(trigger.get("idempotency_key", ""))
+        if self.storage != "sqlite" or not idempotency_key:
+            return self._execute_trigger(trigger)
+
+        record = self._workflow_record(workflow_id, workflow_version)
+        if record.get("status") != "published":
+            raise ValueError(
+                f"workflow version is not published: {workflow_id}@{workflow_version}"
+            )
+        request_fingerprint = trigger_request_fingerprint(trigger)
+        claim = self.store.claim_trigger_idempotency(
+            workflow_id,
+            workflow_version,
+            idempotency_key,
+            request_fingerprint,
+        )
+        if str(claim.get("request_fingerprint", "")) != request_fingerprint:
+            raise TriggerIdempotencyError("conflict")
+        status = str(claim.get("status", ""))
+        if status == "completed":
+            try:
+                cached = json.loads(str(claim.get("response_json", "")))
+            except (TypeError, ValueError, json.JSONDecodeError) as error:
+                raise TriggerIdempotencyError("unresolved") from error
+            if not isinstance(cached, dict):
+                raise TriggerIdempotencyError("unresolved")
+            return copy.deepcopy(cached)
+        if status != "claimed":
+            raise TriggerIdempotencyError("unresolved")
+
+        try:
+            response = self._execute_trigger(trigger)
+            self.store.complete_trigger_idempotency(
+                workflow_id,
+                workflow_version,
+                idempotency_key,
+                request_fingerprint,
+                response,
+            )
+            return response
+        except BaseException:
+            self.store.mark_trigger_idempotency_unresolved(
+                workflow_id,
+                workflow_version,
+                idempotency_key,
+                request_fingerprint,
+            )
+            raise
+
+    def _execute_trigger(self, trigger: Dict[str, object]) -> Dict[str, object]:
         state = self.run_published_workflow(
             str(trigger["workflow_id"]),
             str(trigger["version"]),

@@ -65,6 +65,18 @@ _REQUIRED_COLUMNS = {
     },
 }
 _OPTIONAL_COLUMNS = {
+    "control.sqlite3": {
+        "trigger_idempotency": {
+            "workflow_id",
+            "workflow_version",
+            "idempotency_key",
+            "request_fingerprint",
+            "status",
+            "response_json",
+            "created_at",
+            "updated_at",
+        },
+    },
     "runs.sqlite3": {
         "run_cancellations": {
             "run_id",

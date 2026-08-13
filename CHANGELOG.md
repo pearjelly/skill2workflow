@@ -24,6 +24,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added authenticated redacted run detail at `GET /runs/{run_id}` and the protected `service-show` CLI with a fixed 50-event window and no raw workflow, input, connector, credential, or error payloads.
 - Added authenticated redacted run discovery at `GET /runs` and the protected `service-runs` CLI with fixed status counts, a 100-item window, and no payload or credential export.
 - Added an authenticated redacted support bundle at `GET /api/v1/support-bundle` and the protected `service-support-bundle` CLI with fixed aggregate observability, a nested run list, and owner-only atomic output.
+- Added durable SQLite trigger idempotency: identical keyed retries replay the compact result without a second run, mismatched requests return fixed conflicts, and unresolved outcomes fail closed without storing input values.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

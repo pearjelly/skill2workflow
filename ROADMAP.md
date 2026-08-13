@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-61
+- Completed delivery loops: 1-62
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 61 is complete with authenticated redacted support bundle
+- Active loop: None; Loop 62 is complete with durable SQLite trigger idempotency
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the redacted support-bundle drill
+- Next decision: select the next Production Baseline loop after reviewing the trigger-idempotency drill
 
 ## Production Readiness Path
 
@@ -52,11 +52,11 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-61 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-62 complete, further loop numbers unassigned.
 
-Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, and authenticated redacted support bundle became Loop 61 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
+Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, and durable trigger idempotency became Loop 62 after review of the preceding evidence; remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, and a bounded redacted support bundle are achieved by Loops 44-61. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-run initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux service unit, an authenticated human-gate decision route, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, and durable SQLite trigger idempotency are achieved by Loops 44-62. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 ## Active Loop
 
@@ -194,9 +194,34 @@ PYTHONPATH=src python3 -m unittest \
 
 Loop 61 closes the incident-handoff gap without changing workflow execution authority or the single-tenant network boundary. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
 
+### Loop 62: Durable SQLite Trigger Idempotency
+
+**Status:** Complete.
+
+**Prior basis:** The service already authenticated webhook requests and recurring dispatches, but `idempotency_key` was only metadata. A client retry could therefore start a second workflow run and repeat an external connector effect.
+
+**Outcome:** SQLite control-plane triggers now atomically claim a safe non-empty key before execution. An identical completed retry returns the original compact response without a new run or duplicate run-lifecycle audit event; a different request using the key returns a fixed conflict; and a concurrent or interrupted claim remains unresolved and fail-closed. The ledger stores only scope, a SHA-256 request fingerprint, compact response metadata, status, and timestamps. Authenticated HTTP ingress continues to record its normal authentication event for each accepted request.
+
+**Evidence:** [`docs/triggers.md`](docs/triggers.md) defines the key grammar, fingerprint boundary, replay contract, fixed `409` errors, and JSON/local compatibility boundary. Trigger normalization, SQLite storage, control-plane, authenticated service, recurring-dispatch, backup/restore, and full-suite tests prove duplicate suppression, mismatch rejection, concurrency safety, unknown-outcome fencing, no input-value persistence, and replay safety after restore.
+
+**Safety boundary:** This is durable idempotency for one self-hosted SQLite control plane. It excludes exactly-once provider effects, automatic retries after unknown outcomes, key expiration or garbage collection, distributed coordination, cross-tenant identity, and JSON/local evaluation enforcement.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_control_plane.ControlPlaneTests.test_sqlite_trigger_idempotency_replays_without_new_run_or_audit \
+  tests.test_control_plane.ControlPlaneTests.test_sqlite_trigger_idempotency_conflicts_on_changed_request \
+  tests.test_service.RuntimeServiceTests.test_authenticated_webhook_idempotency_replays_conflicts_and_does_not_duplicate_runs \
+  tests.test_backup.StateBackupTests.test_backup_round_trip_preserves_trigger_idempotency_replay_safety \
+  -v
+```
+
+Loop 62 closes the duplicate-trigger risk without changing Workflow DSL authority or claiming exactly-once provider execution. Current maturity remains Self-hosted Beta until the remaining Production Baseline evidence is explicitly completed and reviewed.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 61 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the redacted support-bundle drill.
+This rolling queue is ordered. Loop 62 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the trigger-idempotency drill.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -223,6 +248,7 @@ This rolling queue is ordered. Loop 61 is complete and there is no active delive
 | Loop 59: Authenticated Redacted Run Detail | Complete | Let an operator inspect one run safely before remote action | Fixed redacted schema, 50-event window, 64 KiB response bound, authenticated `service-show`, and leakage/read-only evidence |
 | Loop 60: Authenticated Redacted Run Discovery | Complete | Let an operator discover candidate runs safely before inspection or remote action | Fixed redacted schema, 100-run window, 64 KiB response bound, authenticated `service-runs`, and leakage/read-only evidence |
 | Loop 61: Authenticated Redacted Support Bundle | Complete | Give an operator one safe incident-handoff artifact without exporting raw state | Fixed support-bundle schema, structured aggregate observability, nested 100-run window, 128 KiB response bound, authenticated `service-support-bundle`, and 0600 output evidence |
+| Loop 62: Durable SQLite Trigger Idempotency | Complete | Prevent retried service/control-plane triggers from starting duplicate runs | Atomic pre-execution claim, compact replay, fixed mismatch/unresolved conflicts, no input-value ledger, and backup/restore evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -270,6 +296,8 @@ Loop 60 covers only one authenticated `GET /runs` projection and its protected C
 
 Loop 61 covers only one authenticated `GET /api/v1/support-bundle` projection and its protected CLI client. It excludes remote upload, tracing, raw logs, full state export, browser sessions, RBAC, hosted support, and automatic disclosure or retention decisions.
 
+Loop 62 covers only durable idempotency for non-empty trigger keys in SQLite control-plane and authenticated service requests. It excludes exactly-once provider effects, automatic replay after unknown outcomes, key expiration, distributed coordination, cross-tenant identity, and JSON/local evaluation enforcement.
+
 Selection rules:
 
 - Merge or explicitly defer the current loop before starting the next one.
@@ -287,7 +315,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, human gates, retry/recovery policy, run context, and connector events |
-| Control plane | Publish immutable workflow versions, trigger runs from CLI/webhook/schedules, query audit evidence, export read-only operator snapshots, inspect redacted runs, and write a redacted support bundle |
+| Control plane | Publish immutable workflow versions, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, and write a redacted support bundle |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:
@@ -365,6 +393,7 @@ The detailed implementation plans under `docs/superpowers/plans/` are the histor
 | Loop 59: Authenticated Redacted Run Detail | Complete | Fixed redacted run-detail schema, authenticated service route, protected `service-show` client, and bounded leakage/read-only evidence |
 | Loop 60: Authenticated Redacted Run Discovery | Complete | Fixed redacted run-list schema, authenticated service route, protected `service-runs` client, and bounded leakage/read-only evidence |
 | Loop 61: Authenticated Redacted Support Bundle | Complete | Fixed redacted support-bundle schema, structured aggregate observability, protected `service-support-bundle` client, 0600 atomic output, and bounded leakage/read-only evidence |
+| Loop 62: Durable SQLite Trigger Idempotency | Complete | Atomic SQLite trigger claims, compact replay, fixed conflicts, unresolved-outcome fencing, and backup/restore replay-safety evidence |
 
 ## Release Direction
 

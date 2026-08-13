@@ -3,12 +3,32 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
+import re
 import uuid
 from typing import Dict
 
 
 Trigger = Dict[str, object]
+MAX_IDEMPOTENCY_KEY_BYTES = 128
+_IDEMPOTENCY_KEY_PATTERN = re.compile(r"^[A-Za-z0-9_.:+-]+$")
+
+
+class TriggerIdempotencyError(ValueError):
+    """Raised when a durable trigger key cannot safely be reused."""
+
+    _MESSAGES = {
+        "conflict": "idempotency key conflicts with an existing request",
+        "unresolved": "idempotency key has an unresolved outcome; use a new key",
+    }
+    status_code = 409
+
+    def __init__(self, reason: str):
+        if reason not in self._MESSAGES:
+            reason = "unresolved"
+        self.reason = reason
+        super().__init__(self._MESSAGES[reason])
 
 
 def normalize_trigger_request(request: object) -> Trigger:
@@ -25,16 +45,48 @@ def normalize_trigger_request(request: object) -> Trigger:
     if not isinstance(trigger_input, dict):
         raise ValueError("trigger input must be a JSON object")
     normalized_input = _json_object_copy(trigger_input)
+    idempotency_key = _optional_text(request, "idempotency_key")
+    if idempotency_key:
+        encoded_key = idempotency_key.encode("utf-8")
+        if (
+            len(encoded_key) > MAX_IDEMPOTENCY_KEY_BYTES
+            or not _IDEMPOTENCY_KEY_PATTERN.fullmatch(idempotency_key)
+        ):
+            raise ValueError(
+                "idempotency_key must contain only letters, numbers, _, ., :, +, or - "
+                f"and be at most {MAX_IDEMPOTENCY_KEY_BYTES} UTF-8 bytes"
+            )
 
     return {
         "trigger_id": _optional_text(request, "trigger_id") or f"trigger_{uuid.uuid4().hex[:12]}",
         "workflow_id": workflow_id,
         "version": version,
         "source": _optional_text(request, "source") or "local",
-        "idempotency_key": _optional_text(request, "idempotency_key"),
+        "idempotency_key": idempotency_key,
         "input": normalized_input,
         "input_keys": sorted(normalized_input.keys()),
     }
+
+
+def trigger_request_fingerprint(trigger: Trigger) -> str:
+    """Hash the replay-relevant trigger request without persisting its values."""
+
+    payload = {
+        "workflow_id": str(trigger.get("workflow_id", "")),
+        "version": str(trigger.get("version", "")),
+        "source": str(trigger.get("source", "")),
+        "idempotency_key": str(trigger.get("idempotency_key", "")),
+        "input": copy.deepcopy(trigger.get("input", {}))
+        if isinstance(trigger.get("input", {}), dict)
+        else {},
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def trigger_audit_fields(trigger: Trigger) -> Dict[str, object]:

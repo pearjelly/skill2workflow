@@ -7,6 +7,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Callable, Dict
 from urllib.parse import unquote, urlsplit
 
+from .triggers import TriggerIdempotencyError
+
 
 MAX_REQUEST_BODY_BYTES = 1024 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
@@ -93,6 +95,8 @@ def _handler_for(control_plane):
                 payload = handle_webhook_request(control_plane, self.command, self.path, body)
                 self._send_json(200, payload)
             except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except TriggerIdempotencyError as error:
                 self._send_json(error.status_code, {"error": str(error)})
             except ValueError as error:
                 self._send_json(400, {"error": str(error)})

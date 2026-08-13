@@ -8,6 +8,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from contextlib import closing
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from tempfile import TemporaryDirectory
@@ -864,6 +865,74 @@ class RuntimeServiceTests(TestCase):
         self.assertNotEqual(first["run_id"], second["run_id"])
         self.assertEqual(run_ids, {first["run_id"], second["run_id"]})
         self.assertTrue(run_ids.issubset(audit_run_ids))
+
+    def test_authenticated_webhook_idempotency_replays_conflicts_and_does_not_duplicate_runs(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/webhooks/workflow_service/0.1.0"
+            request_body = {
+                "source": "partner",
+                "idempotency_key": "partner-event-001",
+                "input": {"customer_id": "private-customer-001"},
+            }
+            first_status, first = _post_json(url, request_body, token=AUTH_TOKEN)
+            replay_status, replay = _post_json(
+                url,
+                {**request_body, "trigger_id": "trigger-retry"},
+                token=AUTH_TOKEN,
+            )
+            conflict_status, conflict = _post_json(
+                url,
+                {**request_body, "input": {"customer_id": "private-customer-002"}},
+                token=AUTH_TOKEN,
+            )
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+            reloaded = LocalControlPlane(state_dir, storage="sqlite")
+            runs = reloaded.list_runs()
+            audit = reloaded.list_audit_events()
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection:
+                ledger = connection.execute(
+                    "select status, response_json from trigger_idempotency"
+                ).fetchall()
+
+        self.assertEqual(first_status, 200)
+        self.assertEqual(replay_status, 200)
+        self.assertEqual(replay, first)
+        self.assertEqual(conflict_status, 409)
+        self.assertEqual(
+            conflict,
+            {"error": "idempotency key conflicts with an existing request"},
+        )
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(
+            [event["type"] for event in audit if event.get("type") == "run_started"],
+            ["run_started"],
+        )
+        self.assertEqual(ledger[0][0], "completed")
+        self.assertNotIn("private-customer-001", json.dumps(ledger))
+        self.assertNotIn("private-customer-002", json.dumps(ledger))
+        self.assertFalse(thread.is_alive())
 
     def test_business_routes_require_rotatable_bearer_auth_and_write_compact_audit(self):
         with TemporaryDirectory() as tmp:

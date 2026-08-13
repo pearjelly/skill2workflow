@@ -1,7 +1,9 @@
 from unittest import TestCase
 
 from skill2workflow.triggers import (
+    MAX_IDEMPOTENCY_KEY_BYTES,
     normalize_trigger_request,
+    trigger_request_fingerprint,
     trigger_audit_fields,
     trigger_response,
     trigger_run_context,
@@ -59,6 +61,40 @@ class TriggerTests(TestCase):
                     "input": {"not_json": object()},
                 }
             )
+        with self.assertRaisesRegex(ValueError, "idempotency_key"):
+            normalize_trigger_request(
+                {
+                    "workflow_id": "workflow_control",
+                    "version": "1.0.0",
+                    "idempotency_key": "unsafe key",
+                }
+            )
+        with self.assertRaisesRegex(ValueError, "at most"):
+            normalize_trigger_request(
+                {
+                    "workflow_id": "workflow_control",
+                    "version": "1.0.0",
+                    "idempotency_key": "a" * (MAX_IDEMPOTENCY_KEY_BYTES + 1),
+                }
+            )
+
+    def test_trigger_request_fingerprint_is_stable_and_excludes_trigger_id(self):
+        first = normalize_trigger_request(
+            {
+                "workflow_id": "workflow_control",
+                "version": "1.0.0",
+                "trigger_id": "trigger_first",
+                "source": "partner",
+                "idempotency_key": "event-001",
+                "input": {"customer_id": "customer_123", "priority": "high"},
+            }
+        )
+        second = dict(first)
+        second["trigger_id"] = "trigger_second"
+        self.assertEqual(trigger_request_fingerprint(first), trigger_request_fingerprint(second))
+        changed = dict(second)
+        changed["input"] = {"customer_id": "customer_456", "priority": "high"}
+        self.assertNotEqual(trigger_request_fingerprint(first), trigger_request_fingerprint(changed))
 
     def test_trigger_audit_fields_and_response_keep_compact_metadata(self):
         trigger = normalize_trigger_request(

@@ -562,6 +562,116 @@ class SqliteControlStore:
                 ),
             )
 
+    def claim_trigger_idempotency(
+        self,
+        workflow_id: str,
+        workflow_version: str,
+        idempotency_key: str,
+        request_fingerprint: str,
+    ) -> Dict[str, object]:
+        """Atomically reserve one trigger key before executing its side effects."""
+
+        now = _utc_now()
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            row = connection.execute(
+                """
+                select request_fingerprint, status, response_json
+                from trigger_idempotency
+                where workflow_id = ? and workflow_version = ? and idempotency_key = ?
+                """,
+                (workflow_id, workflow_version, idempotency_key),
+            ).fetchone()
+            if row is None:
+                connection.execute(
+                    """
+                    insert into trigger_idempotency (
+                        workflow_id, workflow_version, idempotency_key,
+                        request_fingerprint, status, response_json, created_at, updated_at
+                    ) values (?, ?, ?, ?, 'pending', '', ?, ?)
+                    """,
+                    (
+                        workflow_id,
+                        workflow_version,
+                        idempotency_key,
+                        request_fingerprint,
+                        now,
+                        now,
+                    ),
+                )
+                return {
+                    "status": "claimed",
+                    "request_fingerprint": request_fingerprint,
+                    "response_json": "",
+                }
+            return {
+                "status": str(row[1]),
+                "request_fingerprint": str(row[0]),
+                "response_json": str(row[2]),
+            }
+
+    def complete_trigger_idempotency(
+        self,
+        workflow_id: str,
+        workflow_version: str,
+        idempotency_key: str,
+        request_fingerprint: str,
+        response: Dict[str, object],
+    ) -> None:
+        """Persist only the compact trigger response after execution completes."""
+
+        response_json = json.dumps(
+            response,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        with self._connection() as connection:
+            updated = connection.execute(
+                """
+                update trigger_idempotency
+                set status = 'completed', response_json = ?, updated_at = ?
+                where workflow_id = ? and workflow_version = ? and idempotency_key = ?
+                  and request_fingerprint = ? and status = 'pending'
+                """,
+                (
+                    response_json,
+                    _utc_now(),
+                    workflow_id,
+                    workflow_version,
+                    idempotency_key,
+                    request_fingerprint,
+                ),
+            ).rowcount
+            if updated != 1:
+                raise ValueError("trigger idempotency claim is no longer pending")
+
+    def mark_trigger_idempotency_unresolved(
+        self,
+        workflow_id: str,
+        workflow_version: str,
+        idempotency_key: str,
+        request_fingerprint: str,
+    ) -> None:
+        """Fail closed when execution outcome is not known to be safe to replay."""
+
+        with self._connection() as connection:
+            connection.execute(
+                """
+                update trigger_idempotency
+                set status = 'unresolved', updated_at = ?
+                where workflow_id = ? and workflow_version = ? and idempotency_key = ?
+                  and request_fingerprint = ? and status = 'pending'
+                """,
+                (
+                    _utc_now(),
+                    workflow_id,
+                    workflow_version,
+                    idempotency_key,
+                    request_fingerprint,
+                ),
+            )
+
     def list_audit_events(self) -> List[AuditEvent]:
         with self._connection() as connection:
             rows = connection.execute("select payload_json from audit_events order by sequence").fetchall()
@@ -641,6 +751,21 @@ class SqliteControlStore:
                     run_id text not null,
                     timestamp text not null,
                     payload_json text not null
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table if not exists trigger_idempotency (
+                    workflow_id text not null,
+                    workflow_version text not null,
+                    idempotency_key text not null,
+                    request_fingerprint text not null,
+                    status text not null,
+                    response_json text not null,
+                    created_at text not null,
+                    updated_at text not null,
+                    primary key (workflow_id, workflow_version, idempotency_key)
                 )
                 """
             )

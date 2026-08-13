@@ -4,6 +4,11 @@ This document describes the current local trigger boundary for published workflo
 
 Workflow DSL remains the execution truth source. The trigger API does not execute draft workflows and does not mutate published workflow artifacts. It accepts a small request envelope, delegates to the existing published-run control-plane path, and returns compact trigger/run identity.
 
+When the control plane uses SQLite (the self-hosted service production path), a
+non-empty `idempotency_key` is durable and enforced before execution. JSON/local
+evaluation remains metadata-only so the dependency-light behavior stays
+backward-compatible.
+
 ## Trigger Request Envelope
 
 A trigger request targets one immutable published workflow version:
@@ -27,7 +32,7 @@ Supported fields:
 | `workflow_id` | Yes | Published workflow id to run. |
 | `version` | Yes | Published workflow version to run. |
 | `source` | No | Local trigger source label. Defaults to `local`; the CLI uses `local-cli`. |
-| `idempotency_key` | No | Recorded as trigger metadata only. It is not enforced in this loop. |
+| `idempotency_key` | No | In SQLite, a safe non-empty key is durably enforced per workflow version; JSON/local evaluation records it as metadata only. |
 | `input` | No | JSON object accepted as trigger input. Values are persisted in run context; audit and trigger responses expose only keys. |
 
 `input` must be a JSON object when supplied. Trigger input keys are normalized as strings. The input payload is copied into durable run state and should contain local-pilot business metadata, identifiers, and other non-secret values.
@@ -75,6 +80,12 @@ The command prints a compact response:
 ```
 
 Use `--storage sqlite` when the control plane is using SQLite-backed metadata and run storage.
+
+For SQLite, retry the same request with the same key to receive the original
+compact response without starting another run. Reusing that key with a
+different source or input is rejected with a fixed conflict. A request whose
+first execution outcome is unresolved remains fail-closed; choose a new key
+only after investigating the original run.
 
 Inspect the run context:
 
@@ -156,7 +167,7 @@ Supported fields:
 | Field | Required | Behavior |
 | --- | --- | --- |
 | `source` | No | Local webhook source label. Defaults to `local-webhook`. |
-| `idempotency_key` | No | Recorded as trigger metadata only. It is not enforced. |
+| `idempotency_key` | No | SQLite service requests enforce the durable replay contract below; local JSON webhook runs record it only. |
 | `input` | No | JSON object copied into durable run context. Responses and audit events expose only keys. |
 
 The local adapter accepts at most 1 MiB of request body. It rejects transfer
@@ -258,6 +269,38 @@ The self-hosted SQLite service also supports persistent interval schedules using
 
 The service performs claim-before-execute and marks an expired in-flight claim `uncertain` instead of retrying an effect whose outcome is unknown. This is duplicate suppression, not exactly-once execution. Full contract, CLI examples, recovery guidance, and real-process evidence are in [`docs/recurring-scheduling.md`](recurring-scheduling.md).
 
+## Durable Trigger Idempotency
+
+The authenticated SQLite service and any `LocalControlPlane(storage="sqlite")`
+trigger share one durable ledger in `control.sqlite3`. The ledger stores only
+the workflow/version scope, the safe key, a SHA-256 request fingerprint, a
+small lifecycle status, timestamps, and the compact trigger response. It never
+stores trigger input values, credentials, headers, or provider payloads.
+
+Keys are at most 128 UTF-8 bytes and use only letters, numbers, `_`, `.`, `:`,
+`+`, or `-`. The fingerprint covers workflow id, version, source, key, and the
+canonical JSON input; the generated `trigger_id` is intentionally excluded so
+a client can retry after rebuilding its request envelope.
+
+The fixed behavior is:
+
+- The first request atomically claims the key before workflow execution.
+- A completed identical request returns the stored response and creates no
+  second run or duplicate run-lifecycle audit event. The authenticated
+  service still records its normal ingress-authentication event for each
+  accepted HTTP request.
+- A different request using the same key returns HTTP/CLI conflict and does
+  not execute.
+- A concurrent, interrupted, or otherwise unresolved claim returns a fixed
+  conflict. The runtime never guesses whether an external effect occurred and
+  never automatically replays that key.
+
+The service maps idempotency conflicts to HTTP `409` with one of the fixed
+messages `idempotency key conflicts with an existing request` or `idempotency
+key has an unresolved outcome; use a new key`. The ledger is inside the
+verified SQLite backup boundary, so replay safety survives a stopped-service
+backup and restore.
+
 ## Run Context Semantics
 
 Triggered runs use the same published-run execution path as `run-published`, plus an initial run context.
@@ -303,7 +346,7 @@ The trigger API intentionally does not provide:
 - cron/calendar expressions, queues, or distributed scheduling
 - authentication, RBAC, or IAM
 - secret injection
-- idempotency enforcement
+- automatic idempotency enforcement for JSON/local evaluation (SQLite service enforcement is documented above)
 - automatic retry of uncertain recurring effects across process restarts
 - arbitrary input templating or connector request interpolation
 - header, URL, query string, credential, environment, or file mapping

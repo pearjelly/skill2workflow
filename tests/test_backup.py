@@ -47,6 +47,36 @@ class StateBackupTests(TestCase):
         self.assertEqual(cancellation[0], waiting["run_id"])
         self.assertIn(cancellation[1], {"requested", "applied"})
 
+    def test_backup_round_trip_preserves_trigger_idempotency_replay_safety(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            request = {
+                "workflow_id": "workflow_backup",
+                "version": "0.1.0",
+                "source": "backup-test",
+                "idempotency_key": "backup-event-001",
+                "input": {"private_case": "must-not-be-in-ledger"},
+            }
+            first = control.trigger_workflow(request)
+            RecurringScheduleStore(state_dir)
+            backup_dir = root / "backup"
+            restored_dir = root / "restored"
+            create_state_backup(state_dir, backup_dir)
+            restore_state_backup(backup_dir, restored_dir)
+            restored = LocalControlPlane(restored_dir, storage="sqlite")
+            replay = restored.trigger_workflow(request)
+            with closing(sqlite3.connect(restored_dir / "control.sqlite3")) as connection:
+                ledger = connection.execute(
+                    "select status, response_json from trigger_idempotency"
+                ).fetchall()
+
+        self.assertEqual(replay, first)
+        self.assertEqual(ledger[0][0], "completed")
+        self.assertNotIn("must-not-be-in-ledger", json.dumps(ledger))
+
     def test_backup_rejects_malformed_optional_cancellation_ledger(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"
@@ -57,6 +87,18 @@ class StateBackupTests(TestCase):
                 connection.commit()
 
             with self.assertRaisesRegex(ValueError, "run_cancellations"):
+                inspect_state_backup_readiness(state_dir)
+
+    def test_backup_rejects_malformed_optional_trigger_idempotency_ledger(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            _populate_state(state_dir)
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection, connection:
+                connection.execute("drop table trigger_idempotency")
+                connection.execute("create table trigger_idempotency (workflow_id text)")
+                connection.commit()
+
+            with self.assertRaisesRegex(ValueError, "trigger_idempotency"):
                 inspect_state_backup_readiness(state_dir)
 
     def test_real_process_smoke_restores_snapshot_and_starts_service(self):

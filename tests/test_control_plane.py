@@ -7,10 +7,12 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.connectors import ConnectorRuntime, ExternalConnector
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.credentials import StaticCredentialProvider
+from skill2workflow.triggers import TriggerIdempotencyError
 
 
 class ControlPlaneTests(TestCase):
@@ -176,6 +178,109 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(started_events[0]["idempotency_key"], "demo-1")
         self.assertEqual(started_events[0]["input_keys"], ["customer_id"])
         self.assertNotIn("input", started_events[0])
+
+    def test_sqlite_trigger_idempotency_replays_without_new_run_or_audit(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="10.1.0"))
+            request = {
+                "workflow_id": "workflow_control",
+                "version": "10.1.0",
+                "source": "partner",
+                "idempotency_key": "event-001",
+                "input": {"customer_id": "customer_123"},
+            }
+
+            first = control.trigger_workflow(request)
+            audit_before_replay = control.list_audit_events()
+            second = control.trigger_workflow({**request, "trigger_id": "trigger_retry"})
+            runs = control.list_runs()
+            audit_after_replay = control.list_audit_events()
+            with closing(sqlite3.connect(Path(tmp) / "control.sqlite3")) as connection:
+                idempotency_rows = connection.execute(
+                    "select request_fingerprint, response_json from trigger_idempotency"
+                ).fetchall()
+
+        self.assertEqual(second, first)
+        self.assertEqual(len(runs), 1)
+        self.assertEqual(audit_after_replay, audit_before_replay)
+        self.assertNotIn("customer_123", json.dumps(idempotency_rows))
+
+    def test_sqlite_trigger_idempotency_conflicts_on_changed_request(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="10.2.0"))
+            base = {
+                "workflow_id": "workflow_control",
+                "version": "10.2.0",
+                "source": "partner",
+                "idempotency_key": "event-002",
+                "input": {"customer_id": "customer_123"},
+            }
+            control.trigger_workflow(base)
+
+            with self.assertRaises(TriggerIdempotencyError) as raised:
+                control.trigger_workflow({**base, "input": {"customer_id": "customer_456"}})
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(str(raised.exception), "idempotency key conflicts with an existing request")
+
+    def test_sqlite_trigger_idempotency_keeps_unknown_outcome_fail_closed(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="10.3.0"))
+            request = {
+                "workflow_id": "workflow_control",
+                "version": "10.3.0",
+                "idempotency_key": "event-003",
+                "input": {"customer_id": "customer_123"},
+            }
+            with patch.object(control, "run_published_workflow", side_effect=RuntimeError("private failure")):
+                with self.assertRaisesRegex(RuntimeError, "private failure"):
+                    control.trigger_workflow(request)
+            with self.assertRaises(TriggerIdempotencyError) as raised:
+                control.trigger_workflow(request)
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(str(raised.exception), "idempotency key has an unresolved outcome; use a new key")
+
+    def test_sqlite_trigger_idempotency_rejects_concurrent_claim_without_duplicate_run(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(_workflow(version="10.4.0"))
+            request = {
+                "workflow_id": "workflow_control",
+                "version": "10.4.0",
+                "idempotency_key": "event-004",
+            }
+            entered = threading.Event()
+            release = threading.Event()
+            result = {}
+
+            def slow_run(*args, **kwargs):
+                entered.set()
+                release.wait(timeout=2)
+                return {
+                    "run_id": "run_concurrent_001",
+                    "status": "completed",
+                    "workflow_id": "workflow_control",
+                    "workflow_version": "10.4.0",
+                }
+
+            with patch.object(control, "run_published_workflow", side_effect=slow_run):
+                first_thread = threading.Thread(
+                    target=lambda: result.update(first=control.trigger_workflow(request)),
+                    daemon=True,
+                )
+                first_thread.start()
+                self.assertTrue(entered.wait(timeout=2))
+                with self.assertRaises(TriggerIdempotencyError):
+                    control.trigger_workflow(request)
+                release.set()
+                first_thread.join(timeout=2)
+
+        self.assertFalse(first_thread.is_alive())
+        self.assertEqual(result["first"]["run_id"], "run_concurrent_001")
 
     def test_run_published_workflow_can_use_sqlite_run_storage(self):
         with TemporaryDirectory() as tmp:
