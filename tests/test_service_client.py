@@ -15,6 +15,7 @@ from skill2workflow.service_client import (
     MAX_BACKUP_READINESS_RESPONSE_BYTES,
     MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     MAX_RUNTIME_INFO_RESPONSE_BYTES,
+    MAX_REMOTE_TRIGGER_REQUEST_BYTES,
     ServiceActionError,
     post_recurring_schedule_state,
     post_run_cancel,
@@ -29,6 +30,7 @@ from skill2workflow.service_client import (
     fetch_runtime_info,
     fetch_support_bundle,
     fetch_audit_consistency,
+    post_workflow_trigger,
 )
 
 
@@ -37,6 +39,105 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_service_trigger_posts_bounded_idempotent_envelope(self):
+        observed = {}
+        payload = {
+            "trigger_id": "trigger_remote_001",
+            "workflow_id": "workflow_remote",
+            "workflow_version": "0.1.0",
+            "run_id": "run_remote_001",
+            "run_status": "waiting",
+            "source": "service-cli",
+            "idempotency_key": "remote-001",
+            "input_keys": ["customer_id"],
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = post_workflow_trigger(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "workflow_remote",
+                "production",
+                idempotency_key="remote-001",
+                trigger_input={"customer_id": "customer_123"},
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed["path"], "/webhooks/workflow_remote/production")
+        self.assertEqual(
+            observed["authorization"], f"Bearer {AUTH_TOKEN}"
+        )
+        self.assertEqual(
+            observed["body"],
+            {
+                "source": "service-cli",
+                "idempotency_key": "remote-001",
+                "input": {"customer_id": "customer_123"},
+            },
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_service_trigger_requires_idempotency_and_rejects_unsafe_path_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaisesRegex(ValueError, "idempotency_key is required"):
+                post_workflow_trigger(
+                    "https://service.example",
+                    token_file,
+                    "workflow_remote",
+                    "0.1.0",
+                    idempotency_key="",
+                )
+            with self.assertRaisesRegex(ValueError, "safe workflow identifier"):
+                post_workflow_trigger(
+                    "https://service.example",
+                    token_file,
+                    "../private",
+                    "0.1.0",
+                    idempotency_key="remote-001",
+                )
+
+    def test_service_trigger_rejects_oversized_complete_body_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaises(ServiceActionError) as raised:
+                post_workflow_trigger(
+                    "https://service.example",
+                    token_file,
+                    "workflow_remote",
+                    "0.1.0",
+                    idempotency_key="oversize-001",
+                    trigger_input={
+                        "value": "x" * (MAX_REMOTE_TRIGGER_REQUEST_BYTES - 60)
+                    },
+                )
+
+        self.assertEqual(raised.exception.status_code, 413)
+
     def test_audit_consistency_uses_authenticated_get_and_validates_contract(self):
         observed = []
         payload = _audit_consistency_payload()

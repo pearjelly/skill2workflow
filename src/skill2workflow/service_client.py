@@ -8,7 +8,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Dict, Optional
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 from .backup import BACKUP_READINESS_SCHEMA_VERSION
 from .dashboard import (
@@ -35,6 +35,8 @@ from .service import (
     read_service_bearer_token,
 )
 from .storage import AUDIT_INTEGRITY_ALGORITHM, AUDIT_INTEGRITY_SCHEMA_VERSION
+from .triggers import normalize_trigger_request
+from .webhooks import MAX_REQUEST_BODY_BYTES
 
 
 MAX_SERVICE_ACTION_RESPONSE_BYTES = 64 * 1024
@@ -46,6 +48,7 @@ MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
+MAX_REMOTE_TRIGGER_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -236,6 +239,63 @@ def fetch_runtime_info(
     return payload
 
 
+def post_workflow_trigger(
+    service_url: str,
+    token_file: Path,
+    workflow_id: str,
+    version: str,
+    *,
+    idempotency_key: str,
+    source: str = "service-cli",
+    trigger_input: Optional[Dict[str, object]] = None,
+) -> Dict[str, object]:
+    """Trigger one published workflow through the authenticated service."""
+
+    normalized_workflow_id = _validate_workflow_ref(workflow_id, "workflow_id")
+    normalized_version = _validate_workflow_ref(version, "version")
+    if not isinstance(idempotency_key, str) or not idempotency_key:
+        raise ValueError("idempotency_key is required for remote triggers")
+    if (
+        not isinstance(source, str)
+        or not source
+        or len(source) > 128
+        or any(ord(char) < 0x20 or ord(char) == 0x7F for char in source)
+    ):
+        raise ValueError("source must be a non-empty string of at most 128 characters")
+    request = normalize_trigger_request(
+        {
+            "workflow_id": normalized_workflow_id,
+            "version": normalized_version,
+            "source": source,
+            "idempotency_key": idempotency_key,
+            "input": {} if trigger_input is None else trigger_input,
+        }
+    )
+    payload = _post_json(
+        service_url,
+        token_file,
+        "/webhooks/{}/{}".format(
+            quote(normalized_workflow_id, safe=""),
+            quote(normalized_version, safe=""),
+        ),
+        {
+            "source": request["source"],
+            "idempotency_key": request["idempotency_key"],
+            "input": request["input"],
+        },
+        conflict_message="trigger idempotency conflict",
+        max_request_bytes=MAX_REMOTE_TRIGGER_REQUEST_BYTES,
+    )
+    _validate_trigger_response(
+        payload,
+        workflow_id=normalized_workflow_id,
+        source=str(request["source"]),
+        idempotency_key=str(request["idempotency_key"]),
+        input_keys=sorted(request["input"].keys()),
+    )
+    return payload
+
+
 def post_recurring_schedule_state(
     service_url: str,
     token_file: Path,
@@ -357,8 +417,11 @@ def _post_json(
     payload: Dict[str, object],
     conflict_message: str,
     not_found_message: str = "run not found",
+    max_request_bytes: int = 0,
 ) -> Dict[str, object]:
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    if max_request_bytes and len(body) > max_request_bytes:
+        raise ServiceActionError("service action body is too large", status_code=413)
     return _request_json(
         service_url,
         token_file,
@@ -1119,6 +1182,76 @@ def _validate_run_id(run_id: str) -> str:
     ):
         raise ValueError("run_id must be a safe run identifier")
     return value
+
+
+def _validate_workflow_ref(value: str, field: str) -> str:
+    """Validate one workflow path component before URL quoting."""
+
+    if not isinstance(value, str) or not value or len(value) > 128:
+        raise ValueError(f"{field} must be a non-empty safe workflow identifier")
+    if any(
+        ord(char) < 0x20
+        or ord(char) == 0x7F
+        or char in {"/", "?", "#"}
+        for char in value
+    ):
+        raise ValueError(f"{field} must be a non-empty safe workflow identifier")
+    return value
+
+
+def _validate_trigger_response(
+    payload: Dict[str, object],
+    *,
+    workflow_id: str,
+    source: str,
+    idempotency_key: str,
+    input_keys,
+) -> None:
+    """Reject responses outside the fixed published-trigger envelope."""
+
+    fields = {
+        "trigger_id",
+        "workflow_id",
+        "workflow_version",
+        "run_id",
+        "run_status",
+        "source",
+        "idempotency_key",
+        "input_keys",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    for field in ("trigger_id", "workflow_id", "workflow_version", "run_id", "run_status", "source", "idempotency_key"):
+        if not isinstance(payload.get(field), str) or not payload.get(field):
+            raise ServiceActionError()
+    if payload["workflow_id"] != workflow_id or payload["source"] != source:
+        raise ServiceActionError()
+    if payload["idempotency_key"] != idempotency_key:
+        raise ServiceActionError()
+    if not payload["trigger_id"].startswith("trigger_"):
+        raise ServiceActionError()
+    try:
+        _validate_run_id(payload["run_id"])
+    except ValueError as error:
+        raise ServiceActionError() from error
+    if payload["run_status"] not in {
+        "created",
+        "running",
+        "waiting",
+        "completed",
+        "failed",
+        "cancelled",
+        "interrupted",
+    }:
+        raise ServiceActionError()
+    response_input_keys = payload["input_keys"]
+    if (
+        not isinstance(response_input_keys, list)
+        or any(not isinstance(value, str) for value in response_input_keys)
+        or response_input_keys != sorted(set(response_input_keys))
+        or response_input_keys != list(input_keys)
+    ):
+        raise ServiceActionError()
 
 
 def _validate_schedule_id(schedule_id: str) -> str:

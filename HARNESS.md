@@ -183,6 +183,13 @@ skill2workflow service-runtime-info \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-trigger workflow_approval_flow \
+  --version production \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token \
+  --idempotency-key partner-event-001 \
+  --input /path/to/non-secret-input.json
+
 skill2workflow service-schedule-disable schedule_hourly_report \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token

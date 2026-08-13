@@ -30,6 +30,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Authenticated `GET /api/v1/backup-readiness` and `service-backup-readiness` reuse the fixed `skill2workflow-backup-readiness-0.1.0` value-free preflight contract with a 16 KiB remote bound, active-lease blocking semantics, and no backup mutation
 - Authenticated `GET /api/v1/audit-integrity` and `service-audit-integrity` reuse the fixed `skill2workflow-audit-integrity-0.1.0` payload-free verification contract with a 16 KiB remote bound, readiness-independent availability, and no repair mutation
 - Authenticated `GET /api/v1/runtime-info` and `service-runtime-info` reuse the fixed `skill2workflow-runtime-info-0.1.0` identity/compatibility contract with a 16 KiB remote bound, no path disclosure, and no upgrade mutation
+- Protected `service-trigger` reuses the authenticated webhook trigger contract with a required idempotency key, shared 1 MiB input/body bounds, safe URL-component validation, and exact compact response validation documented in [`remote-trigger.md`](remote-trigger.md)
 - Authenticated `POST /api/v1/recurring-schedules/{schedule_id}/enable|disable` and protected `service-schedule-enable`/`service-schedule-disable` reuse the fixed `skill2workflow-recurring-schedule-action-0.1.0` contract, exact empty-body boundary, idempotent state transitions, and bounded audit evidence documented in [`remote-schedule-actions.md`](remote-schedule-actions.md)
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode

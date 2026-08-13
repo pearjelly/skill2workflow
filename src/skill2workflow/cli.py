@@ -37,6 +37,7 @@ from .service_client import (
     post_recurring_schedule_state,
     post_run_cancel,
     post_run_resume,
+    post_workflow_trigger,
 )
 from .systemd_service import write_systemd_service_unit
 from .telemetry import OperationalEventLogger
@@ -385,6 +386,26 @@ def main(argv=None) -> int:
     )
     service_runtime_cmd.add_argument("--service-url", required=True)
     service_runtime_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_trigger_cmd = subparsers.add_parser(
+        "service-trigger",
+        help="Trigger one published workflow through the authenticated service",
+    )
+    service_trigger_cmd.add_argument("workflow_id")
+    service_trigger_cmd.add_argument("--version", required=True)
+    service_trigger_cmd.add_argument("--service-url", required=True)
+    service_trigger_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_trigger_cmd.add_argument(
+        "--idempotency-key",
+        required=True,
+        help="Stable retry key; required to prevent duplicate remote runs",
+    )
+    service_trigger_cmd.add_argument("--source", default="service-cli")
+    service_trigger_cmd.add_argument(
+        "--input",
+        type=Path,
+        help="JSON object with bounded non-secret trigger input metadata",
+    )
 
     for command, help_text in (
         ("service-schedule-enable", "Enable one recurring schedule through the authenticated service"),
@@ -834,6 +855,19 @@ def main(argv=None) -> int:
             lambda: fetch_runtime_info(
                 args.service_url,
                 args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-trigger":
+        return _service_action(
+            lambda: post_workflow_trigger(
+                args.service_url,
+                args.auth_token_file,
+                args.workflow_id,
+                args.version,
+                idempotency_key=args.idempotency_key,
+                source=args.source,
+                trigger_input=_load_trigger_input(args.input),
             )
         )
 

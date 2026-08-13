@@ -426,6 +426,58 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_trigger_command_loads_input_and_requires_retry_key(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "trigger_id": "trigger_remote_001",
+            "workflow_id": "workflow_remote",
+            "workflow_version": "0.1.0",
+            "run_id": "run_remote_001",
+            "run_status": "waiting",
+            "source": "service-cli",
+            "idempotency_key": "remote-001",
+            "input_keys": ["customer_id"],
+        }
+        with TemporaryDirectory() as tmp:
+            input_file = Path(tmp) / "input.json"
+            input_file.write_text(
+                json.dumps({"customer_id": "customer_123"}), encoding="utf-8"
+            )
+            with patch(
+                "skill2workflow.cli.post_workflow_trigger",
+                return_value=expected,
+            ) as trigger:
+                with redirect_stdout(stdout):
+                    exit_code = main(
+                        [
+                            "service-trigger",
+                            "workflow_remote",
+                            "--version",
+                            "production",
+                            "--service-url",
+                            "https://service.example",
+                            "--auth-token-file",
+                            str(token_file),
+                            "--idempotency-key",
+                            "remote-001",
+                            "--input",
+                            str(input_file),
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        trigger.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            "workflow_remote",
+            "production",
+            idempotency_key="remote-001",
+            source="service-cli",
+            trigger_input={"customer_id": "customer_123"},
+        )
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

@@ -33,6 +33,7 @@ from skill2workflow.service import (
     serve_runtime_service,
 )
 from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringScheduleStore
+from skill2workflow.service_client import ServiceActionError, post_workflow_trigger
 
 
 AUTH_TOKEN = "loop42-test-bearer-token-0123456789abcdef"
@@ -1583,6 +1584,66 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(ledger[0][0], "completed")
         self.assertNotIn("private-customer-001", json.dumps(ledger))
         self.assertNotIn("private-customer-002", json.dumps(ledger))
+
+    def test_service_trigger_client_round_trip_replays_and_rejects_key_conflict(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            service_url = f"http://{host}:{port}"
+            try:
+                first = post_workflow_trigger(
+                    service_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.1.0",
+                    idempotency_key="client-event-001",
+                    trigger_input={"customer_id": "private-customer-001"},
+                )
+                replay = post_workflow_trigger(
+                    service_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.1.0",
+                    idempotency_key="client-event-001",
+                    trigger_input={"customer_id": "private-customer-001"},
+                )
+                with self.assertRaises(ServiceActionError) as raised:
+                    post_workflow_trigger(
+                        service_url,
+                        config.auth_token_file,
+                        "workflow_service",
+                        "0.1.0",
+                        idempotency_key="client-event-001",
+                        trigger_input={"customer_id": "private-customer-002"},
+                    )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            runs = LocalControlPlane(state_dir, storage="sqlite").list_runs()
+
+        self.assertEqual(first, replay)
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(len(runs), 1)
+        self.assertFalse(thread.is_alive())
         self.assertFalse(thread.is_alive())
 
     def test_business_routes_require_rotatable_bearer_auth_and_write_compact_audit(self):

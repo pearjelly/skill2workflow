@@ -207,6 +207,12 @@ Webhook route:
 | --- | --- | --- |
 | `POST` | `/webhooks/<workflow_id>/<version-or-alias>` | Triggers the exact published workflow version or control-plane alias through `LocalControlPlane.trigger_workflow`. |
 
+For an installed self-hosted operator, use the protected `service-trigger`
+client documented in [`remote-trigger.md`](remote-trigger.md). It requires a
+stable idempotency key, reads the Bearer token from an owner-only file, and
+validates the compact response before output; the underlying route and
+execution authority remain unchanged.
+
 Request body:
 
 ```json

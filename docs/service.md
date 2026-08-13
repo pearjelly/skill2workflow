@@ -96,7 +96,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli service \
 | `GET /runs/{run_id}` | Requires Bearer authentication and returns one redacted, read-only run detail projection with at most 50 allowlisted events and a 64 KiB response cap. |
 | `GET /runs` | Requires Bearer authentication and returns at most 100 redacted run summaries for operator discovery, with fixed status counts and a 64 KiB response cap. |
 | `GET /api/v1/support-bundle` | Requires Bearer authentication and returns fixed lifecycle, aggregate observability, and nested redacted run-list data with a 128 KiB response cap. |
-| `POST /webhooks/<workflow_id>/<version>` | Requires Bearer authentication, then uses the existing trigger contract to start a published workflow. SQLite requests with a non-empty idempotency key claim and replay durably; key conflicts return `409`. |
+| `POST /webhooks/<workflow_id>/<version>` | Requires Bearer authentication, then uses the existing trigger contract to start a published workflow. SQLite requests with a non-empty idempotency key claim and replay durably; key conflicts return `409`. The installed `service-trigger` client wraps this route with a required retry key and fixed response validation; see [`remote-trigger.md`](remote-trigger.md). |
 | `POST /runs/{run_id}/resume` | Requires Bearer authentication and exactly `{"approved": true|false}`, then resumes one waiting human gate through the existing control-plane executor. |
 | `POST /runs/{run_id}/cancel` | Requires Bearer authentication and an empty JSON object, then durably requests idempotent cooperative cancellation. |
 

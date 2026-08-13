@@ -45,6 +45,9 @@ release; Roadmap loop completion alone does not publish a new version.
   the protected `service-runtime-info` CLI, exposing fixed package,
   compatibility-line, state-layout, lifecycle, readiness, and lease metadata
   with a 16 KiB bound and no configuration disclosure.
+- Added the protected `service-trigger` CLI for remote published-workflow
+  triggering, requiring a stable idempotency key, reusing shared input/body
+  bounds, and validating the compact response before output.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.
