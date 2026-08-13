@@ -13,6 +13,60 @@ from skill2workflow.executor import LocalExecutor
 
 
 class ExecutorTests(TestCase):
+    def test_workflow_timeout_includes_human_gate_wait_and_fails_on_resume(self):
+        clock = _TestClock()
+        workflow = _approval_workflow()
+        workflow["policies"] = {"workflow_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            executor = LocalExecutor(Path(tmp), storage="sqlite", clock=clock)
+            waiting = executor.run(workflow)
+            self.assertEqual(waiting["status"], "waiting")
+            self.assertEqual(waiting["execution"]["workflow_timeout_ms"], 5)
+            self.assertNotEqual(waiting["execution"]["workflow_deadline_at"], "")
+            clock.advance(5)
+            failed = executor.resume(waiting["run_id"], approved=True)
+
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(failed["error_code"], "workflow_timeout")
+        self.assertEqual(failed["events"][-1]["error_code"], "workflow_timeout")
+        self.assertEqual(failed["execution"]["workflow_deadline_at"], "")
+
+    def test_workflow_timeout_after_connector_return_does_not_run_successor(self):
+        clock = _TestClock()
+        runtime = _AdvancingConnectorRuntime(clock, milliseconds=10)
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["policies"] = {"workflow_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(
+                Path(tmp),
+                connector_runtime=runtime,
+                clock=clock,
+            ).run(workflow)
+
+        self.assertEqual(state["status"], "failed")
+        self.assertEqual(state["error_code"], "workflow_timeout")
+        self.assertEqual(state["node_results"]["call_api"]["error_code"], "workflow_timeout")
+        self.assertEqual(runtime.calls, 1)
+
+    def test_workflow_deadline_survives_restart_before_late_resume(self):
+        clock = _TestClock()
+        workflow = _approval_workflow()
+        workflow["policies"] = {"workflow_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            waiting = LocalExecutor(state_dir, storage="sqlite", clock=clock).run(workflow)
+            clock.advance(5)
+            failed = LocalExecutor(state_dir, storage="sqlite", clock=clock).resume(
+                waiting["run_id"], approved=False
+            )
+
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(failed["error_code"], "workflow_timeout")
+        self.assertEqual(failed["node_results"]["review"]["approved"], False)
+
     def test_default_timeout_fails_closed_at_a_safe_point_and_persists_fixed_error(self):
         clock = _TestClock()
         runtime = _AdvancingConnectorRuntime(clock, milliseconds=10)

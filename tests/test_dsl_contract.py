@@ -35,6 +35,10 @@ class DslContractTests(TestCase):
             schema["$defs"]["policies"]["properties"]["default_retry"]["$ref"],
             "#/$defs/retry_policy",
         )
+        self.assertEqual(
+            schema["$defs"]["policies"]["properties"]["workflow_timeout_ms"]["maximum"],
+            2_592_000_000,
+        )
 
     def test_input_schema_contract_is_additive_and_bounded_in_schema(self):
         schema = json.loads((ROOT / "schemas" / "workflow.schema.json").read_text(encoding="utf-8"))

@@ -23,6 +23,10 @@ class RuntimePolicyDocumentationTests(TestCase):
             "active-execution segment",
             "execution_timeout",
             "human gate is waiting",
+            "policies.workflow_timeout_ms",
+            "workflow_timeout",
+            "30 days",
+            "global wall-clock deadline",
             "automatic idempotency enforcement for JSON/local evaluation",
             "on_fallback",
             "node_fallback",
@@ -36,4 +40,8 @@ class RuntimePolicyDocumentationTests(TestCase):
         self.assertEqual(
             schema["$defs"]["retry_policy"]["properties"]["backoff_ms"]["maximum"],
             60000,
+        )
+        self.assertEqual(
+            schema["$defs"]["policies"]["properties"]["workflow_timeout_ms"]["maximum"],
+            2_592_000_000,
         )

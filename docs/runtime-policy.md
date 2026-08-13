@@ -53,10 +53,20 @@ the run and is cleared while a human gate is waiting, so operator review time
 does not consume execution budget. It does not cover queueing, downstream
 systems after a returned connector call, or local process scheduling.
 
-The local executor does not yet implement global workflow deadlines, node-level
-wall-clock deadlines, or scheduled recovery. Those remain future runtime policy
-work. A configured retry backoff is part of the active execution segment and is
-checked against `default_timeout_ms` after the delay.
+`policies.workflow_timeout_ms` is an optional global wall-clock deadline for the
+whole run. `0` disables it; positive values are bounded to 30 days and start
+when the run is created. Unlike `default_timeout_ms`, the global deadline keeps
+running while a human gate is waiting and fails closed with fixed
+`error_code: "workflow_timeout"` evidence when the operator resumes after the
+deadline. The executor checks it before each node, after connector returns, and
+after retry backoff. It is persisted in the run's internal execution state and
+cleared only at terminal completion, cancellation, or failure. It cannot
+forcefully interrupt a provider call already in flight, and it does not provide
+background expiry or scheduled recovery for a run that is never resumed.
+
+The local executor does not yet implement node-level wall-clock deadlines or
+scheduled recovery. A configured retry backoff is part of the active execution
+segment and is checked against `default_timeout_ms` after the delay.
 
 ## Fallback Transitions
 
@@ -123,7 +133,7 @@ The local runtime intentionally does not yet provide:
 - distributed scheduling
 - automatic idempotency enforcement for JSON/local evaluation (SQLite service enforcement is documented in `docs/triggers.md`)
 - compensation or rollback handlers
-- global workflow deadlines
+- node-level wall-clock deadlines
 - enterprise credential management
 - secret injection or redaction
 

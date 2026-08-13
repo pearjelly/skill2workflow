@@ -35,6 +35,23 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(events[-1]["type"], "run_failed")
         self.assertEqual(events[-1]["error_code"], "execution_timeout")
 
+    def test_workflow_timeout_terminal_audit_contains_fixed_error_code(self):
+        clock = _TestClock()
+        workflow = _connector_workflow("8.0.0", "https://unused.invalid")
+        workflow["policies"] = {"workflow_timeout_ms": 5}
+
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.publish_workflow(workflow)
+            control.executor._clock = clock
+            control.executor.connector_runtime = _AdvancingConnectorRuntime(clock)
+            state = control.run_published_workflow("workflow_connector", "8.0.0")
+            events = control.list_audit_events(run_id=state["run_id"])
+
+        self.assertEqual(state["status"], "failed")
+        self.assertEqual(events[-1]["type"], "run_failed")
+        self.assertEqual(events[-1]["error_code"], "workflow_timeout")
+
     def test_ingress_authentication_audit_is_strictly_allowlisted(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp), storage="sqlite")

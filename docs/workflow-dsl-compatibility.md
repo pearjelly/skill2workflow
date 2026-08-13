@@ -128,8 +128,11 @@ waiting pauses it, and an expiry fails closed with
 `on_fallback`
 transition; after connector retries are exhausted, the executor records the
 failed node and routes to that explicit edge without automatically invoking
-another provider. These fields are preserved by readers, editable through the
-visual layer where supported, and documented in `docs/runtime-policy.md`.
+another provider. `policies.workflow_timeout_ms` is a separate bounded global
+wall-clock deadline: zero disables it, human-gate waiting consumes it, and an
+expiry fails closed with `error_code: "workflow_timeout"`. These fields are
+preserved by readers, editable through the visual layer where supported, and
+documented in `docs/runtime-policy.md`.
 
 Workflow DSL examples and fixtures must not store secrets. They may reference credential handles under connector metadata, but resolved credential values must stay in a local provider boundary outside Workflow DSL, LiteGraph fixtures, trigger input, run state, and audit events. Hosted credential storage, secret redaction, IAM, connector marketplaces, and product-specific SaaS connectors are outside the `0.1.x` built-in connector boundary.
 

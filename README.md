@@ -119,6 +119,7 @@ explicit connector boundaries. It currently supports:
 - Resolve local credential handles for HTTP connector request headers without storing secret values in Workflow DSL or audit output
 - Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
 - Honor connector-node `retry.max_attempts` and bounded `retry.backoff_ms`, recording retry/recovery events
+- Enforce optional bounded `policies.workflow_timeout_ms` wall-clock deadlines, including human-gate wait time, with fixed timeout evidence
 - Route exhausted `tool_call` retries through an explicit `on_fallback` path while preserving failed-attempt evidence
 - Convert Workflow DSL into LiteGraph-compatible graph JSON
 - Derive read-only node-level run overlays from run state and audit evidence
@@ -720,7 +721,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-114 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-115 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1021,6 +1022,12 @@ Workflows can declare a fixed `backoff_ms` delay on a connector retry policy or
 its default, capped at 60 seconds and recorded in run state, control-plane
 audit, and local visual overlays. The default remains zero; this does not add background
 workers, provider-specific retry classification, or exactly-once execution.
+
+Loop 115 adds a bounded global Workflow deadline to the [runtime policy](docs/runtime-policy.md).
+Workflows can declare `policies.workflow_timeout_ms` up to 30 days; it starts at
+run creation, continues through human-gate waiting, and fails closed with fixed
+`workflow_timeout` evidence at resume and other executor safe points. It does
+not forcefully abort in-flight provider calls or add background expiry.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

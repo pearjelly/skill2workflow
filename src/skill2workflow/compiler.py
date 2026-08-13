@@ -427,6 +427,21 @@ def _validate_policies(policies: object, errors: List[ValidationError]) -> None:
                     ["policies", "default_timeout_ms"],
                 )
             )
+    if "workflow_timeout_ms" in policies:
+        value = policies.get("workflow_timeout_ms")
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int)
+            or value < 0
+            or value > 2_592_000_000
+        ):
+            errors.append(
+                _validation_error(
+                    "policy_workflow_timeout_invalid",
+                    "policies.workflow_timeout_ms must be an integer between 0 and 2592000000",
+                    ["policies", "workflow_timeout_ms"],
+                )
+            )
 
 
 def _validate_retry_policy(

@@ -35,9 +35,12 @@ The schema documents the stable top-level shape:
 
 It also documents the initial node and edge shapes. Connector retry policy
 supports `max_attempts` plus an optional fixed `backoff_ms` from `0` to
-`60000`. The current schema intentionally allows additional properties so the
-compiler, executor, visual editor, and connector runtime can add metadata
-without breaking old readers.
+`60000`. The `policies` object also supports a bounded
+`workflow_timeout_ms` wall-clock deadline from `0` to `2592000000`
+milliseconds; zero disables it and human-gate waiting consumes the budget.
+The current schema intentionally allows additional properties so the compiler,
+executor, visual editor, and connector runtime can add metadata without
+breaking old readers.
 
 ## Declarative Trigger Input Contracts
 

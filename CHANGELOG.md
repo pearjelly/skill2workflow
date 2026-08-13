@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded global workflow deadline: `policies.workflow_timeout_ms`
+  starts at run creation, continues while human gates wait, and records fixed
+  `workflow_timeout` failure evidence at executor safe points. The deadline is
+  capped at 30 days and does not forcefully abort an in-flight provider call.
 - Added bounded connector retry backoff: `retry.backoff_ms` and
   `policies.default_retry.backoff_ms` now provide a fixed, capped delay before
   connector retries, with timeout/cancellation safe points and run-state,
