@@ -69,10 +69,26 @@ both the alias registry and the audit chain unchanged. This is the production
 concurrency contract; JSON storage remains the dependency-light local
 evaluation mode and does not provide cross-process transaction coordination.
 
+## Atomic Publication and Deprecation
+
+SQLite publication inserts one immutable workflow registry record and its
+`workflow_published` audit row in one transaction. Concurrent publication of
+different versions therefore preserves both records instead of allowing a
+stale full-index write to erase one. Concurrent publication of the same
+version is idempotent when the artifact checksum matches; different content
+for an existing version fails with the immutable-version error.
+
+Deprecation uses the same single-record transaction. Removing aliases, marking
+the version deprecated, and writing `workflow_deprecated` either all commit or
+none commit. A failed audit append leaves the registry status unchanged, and a
+retry can safely complete publication or deprecation.
+
 ## Boundary
 
 This is an operator review aid and a SQLite-backed local optimistic-concurrency
 guard. It is not a policy engine, approval workflow, semantic business-risk
 analyzer, automatic canary, health-based rollout, rollback controller,
 signature, or multi-tenant release service. Operators remain responsible for
-reviewing the published diff and choosing the target version.
+reviewing the published diff and choosing the target version. JSON registry
+writes remain the dependency-light local evaluation mode and do not claim
+cross-process transaction coordination.

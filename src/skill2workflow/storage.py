@@ -567,6 +567,111 @@ class SqliteControlStore:
                 ],
             )
 
+    def publish_workflow_record(
+        self, record: WorkflowRecord, *, audit_event: AuditEvent
+    ) -> WorkflowRecord:
+        """Insert one immutable registry record and its audit row atomically."""
+
+        workflow_id = str(record.get("workflow_id", ""))
+        version = str(record.get("version", ""))
+        key = _workflow_record_key(workflow_id, version)
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            row = connection.execute(
+                "select record_json from workflow_versions where record_key = ?",
+                (key,),
+            ).fetchone()
+            if row is not None:
+                try:
+                    existing = json.loads(str(row[0]))
+                except (TypeError, ValueError, json.JSONDecodeError) as error:
+                    raise ValueError("workflow registry record is invalid") from error
+                if str(existing.get("checksum", "")) != str(record.get("checksum", "")):
+                    raise ValueError(
+                        f"published workflow version is immutable: {workflow_id}@{version}"
+                    )
+                return existing
+
+            connection.execute(
+                """
+                insert into workflow_versions (
+                    record_key,
+                    workflow_id,
+                    name,
+                    version,
+                    status,
+                    checksum,
+                    artifact,
+                    published_at,
+                    deprecated_at,
+                    record_json
+                )
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    key,
+                    workflow_id,
+                    str(record.get("name", "")),
+                    version,
+                    str(record.get("status", "")),
+                    str(record.get("checksum", "")),
+                    str(record.get("artifact", "")),
+                    str(record.get("published_at", "")),
+                    str(record.get("deprecated_at", "")),
+                    json.dumps(record, ensure_ascii=False, sort_keys=True),
+                ),
+            )
+            _append_audit_connection(connection, audit_event)
+            return dict(record)
+
+    def deprecate_workflow_record(
+        self,
+        workflow_id: str,
+        version: str,
+        *,
+        deprecated_at: str,
+        audit_event: AuditEvent,
+    ) -> WorkflowRecord:
+        """Deprecate one registry record and its audit row atomically."""
+
+        key = _workflow_record_key(workflow_id, version)
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            row = connection.execute(
+                "select record_json from workflow_versions where record_key = ?",
+                (key,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"workflow version not found: {workflow_id}@{version}")
+            try:
+                current = json.loads(str(row[0]))
+            except (TypeError, ValueError, json.JSONDecodeError) as error:
+                raise ValueError("workflow registry record is invalid") from error
+            record = dict(current)
+            was_deprecated = record.get("status") == "deprecated"
+            aliases = _sqlite_record_aliases(record)
+            changed = bool(aliases) or not was_deprecated
+            if aliases:
+                record.pop("aliases", None)
+            if not was_deprecated:
+                record["status"] = "deprecated"
+                record["deprecated_at"] = str(deprecated_at)
+            if not changed:
+                return record
+
+            connection.execute(
+                "update workflow_versions set status = ?, deprecated_at = ?, record_json = ? where record_key = ?",
+                (
+                    str(record.get("status", "deprecated")),
+                    str(record.get("deprecated_at", "")),
+                    json.dumps(record, ensure_ascii=False, sort_keys=True),
+                    key,
+                ),
+            )
+            if not was_deprecated:
+                _append_audit_connection(connection, audit_event)
+            return record
+
     def promote_workflow_alias(
         self,
         workflow_id: str,

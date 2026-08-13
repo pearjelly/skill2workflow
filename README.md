@@ -708,7 +708,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-72 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-73 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -788,6 +788,13 @@ SQLite-backed compare-and-swap validation, alias mutation, and the
 so concurrent operators cannot overwrite a newer alias target. JSON remains the
 dependency-light local evaluation mode and does not claim cross-process
 transaction coordination.
+
+Loop 73 hardens [workflow publication](docs/workflow-releases.md): SQLite
+inserts each immutable version and its `workflow_published` audit row in one
+transaction, making concurrent version publication additive instead of
+last-writer-wins. Same-version matching publishes are idempotent, mismatched
+content fails closed, and deprecation updates its single registry record and
+audit row atomically.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

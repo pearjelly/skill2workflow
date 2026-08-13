@@ -35,6 +35,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added runtime published-artifact integrity verification: reads, promotions, triggers, and executions now compare each artifact with its control-plane checksum and fail closed before side effects when state is missing, malformed, or modified.
 - Added reviewable published workflow releases with a bounded `workflow-diff` contract and an optional compare-and-swap precondition for alias promotion.
 - Made SQLite workflow alias promotion atomic: the compare-and-swap check, alias mutation, and `workflow_promoted` audit row now commit together, preventing concurrent stale operators from overwriting a newer target.
+- Made SQLite workflow publication and deprecation atomic: immutable registry changes and their audit rows commit together, concurrent versions are additive, and same-version matching publication retries are idempotent.
 - Added the scoped domestic Feishu task connector and finalized redacted evidence from its controlled paid Pilot.
 
 ### Changed

@@ -56,6 +56,10 @@ When SQLite is the control-plane backend, the promotion guard, alias metadata
 update, and promotion audit append commit in one transaction. This hardening
 does not change the artifact contract or add fields to Workflow DSL.
 
+SQLite publication and deprecation likewise mutate one registry record and its
+audit row atomically. Concurrent publication of distinct immutable versions is
+additive; a same-version checksum mismatch remains an immutable-version error.
+
 The runtime integrity guard is additive control-plane behavior. It does not
 change the Workflow DSL schema or canonical checksum algorithm used at
 publication. Existing records without a checksum are not executed

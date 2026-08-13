@@ -5,7 +5,9 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import re
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
@@ -74,17 +76,16 @@ class LocalControlPlane:
         artifact_path = self._artifact_path(workflow_id, version)
         artifact_path.parent.mkdir(parents=True, exist_ok=True)
         checksum = _checksum(published)
-        index = self._load_index()
+        index = self._load_index() if self.storage != "sqlite" else {}
         existing_record = index.get(_record_key(workflow_id, version))
 
-        if artifact_path.exists():
-            existing = _load_json(artifact_path)
-            if _checksum(existing) != checksum:
-                raise ValueError(f"published workflow version is immutable: {workflow_id}@{version}")
-            if existing_record:
-                return existing_record
-
-        artifact_path.write_text(json.dumps(published, ensure_ascii=False, indent=2), encoding="utf-8")
+        _ensure_immutable_artifact(
+            artifact_path,
+            published,
+            checksum,
+            workflow_id=workflow_id,
+            version=version,
+        )
         now = _now()
         record = {
             "workflow_id": workflow_id,
@@ -95,6 +96,19 @@ class LocalControlPlane:
             "artifact": str(artifact_path.relative_to(self.state_dir)),
             "published_at": now,
         }
+        if self.storage == "sqlite" and hasattr(self.store, "publish_workflow_record"):
+            return self.store.publish_workflow_record(
+                record,
+                audit_event={
+                    "type": "workflow_published",
+                    "workflow_id": workflow_id,
+                    "workflow_version": version,
+                    "checksum": checksum,
+                    "timestamp": now,
+                },
+            )
+        if existing_record:
+            return existing_record
         index[_record_key(workflow_id, version)] = record
         self._save_index(index)
         self._append_audit(
@@ -110,6 +124,20 @@ class LocalControlPlane:
 
     def deprecate_workflow(self, workflow_id: str, version: str) -> WorkflowRecord:
         """Mark a published workflow version as deprecated without mutating its artifact."""
+        if self.storage == "sqlite" and hasattr(self.store, "deprecate_workflow_record"):
+            deprecated_at = _now()
+            return self.store.deprecate_workflow_record(
+                workflow_id,
+                version,
+                deprecated_at=deprecated_at,
+                audit_event={
+                    "type": "workflow_deprecated",
+                    "workflow_id": workflow_id,
+                    "workflow_version": version,
+                    "timestamp": deprecated_at,
+                },
+            )
+
         index = self._load_index()
         key = _record_key(workflow_id, version)
         if key not in index:
@@ -809,6 +837,66 @@ def _canonical_without(value: object, excluded: set) -> object:
 def _checksum(value: object) -> str:
     payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _ensure_immutable_artifact(
+    path: Path,
+    workflow: Workflow,
+    checksum: str,
+    *,
+    workflow_id: str,
+    version: str,
+) -> None:
+    """Create one artifact without allowing a concurrent writer to replace it."""
+
+    payload = json.dumps(workflow, ensure_ascii=False, indent=2).encode("utf-8")
+
+    def verify_existing() -> None:
+        try:
+            existing = _load_json(path)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError(
+                f"published workflow artifact unavailable: {workflow_id}@{version}"
+            ) from error
+        if _checksum(existing) != checksum:
+            raise ValueError(
+                f"published workflow version is immutable: {workflow_id}@{version}"
+            )
+
+    if path.exists():
+        verify_existing()
+        return
+
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", dir=str(path.parent)
+    )
+    descriptor_open = True
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor_open = False
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary_name, str(path))
+        except FileExistsError:
+            verify_existing()
+        except OSError as error:
+            raise ValueError(
+                f"published workflow artifact unavailable: {workflow_id}@{version}"
+            ) from error
+    finally:
+        if descriptor_open:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            pass
 
 
 def _load_json(path: Path):

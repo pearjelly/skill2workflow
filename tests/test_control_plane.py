@@ -89,6 +89,203 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(audit_events[0]["workflow_id"], "workflow_control")
         self.assertIn("checksum", record)
 
+    def test_sqlite_concurrent_publication_preserves_each_version_and_audit(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            bootstrap = LocalControlPlane(state_dir, storage="sqlite")
+            bootstrap.publish_workflow(_workflow(version="1.0.0"))
+            barrier = threading.Barrier(2)
+            published_versions = []
+            failures = []
+
+            def publish(version):
+                operator = LocalControlPlane(state_dir, storage="sqlite")
+                barrier.wait()
+                try:
+                    operator.publish_workflow(_workflow(version=version))
+                except BaseException as error:
+                    failures.append(error)
+                else:
+                    published_versions.append(version)
+
+            threads = [
+                threading.Thread(target=publish, args=(version,))
+                for version in ("2.0.0", "3.0.0")
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+            records = {
+                record["version"]: record for record in bootstrap.list_workflows()
+            }
+            audits = bootstrap.list_audit_events()
+
+        self.assertEqual(sorted(published_versions), ["2.0.0", "3.0.0"])
+        self.assertEqual(failures, [])
+        self.assertEqual(
+            sorted(records), ["1.0.0", "2.0.0", "3.0.0"]
+        )
+        self.assertEqual(
+            [event["type"] for event in audits].count("workflow_published"),
+            3,
+        )
+
+    def test_sqlite_concurrent_same_version_publication_is_idempotent(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            workflow = _workflow(version="1.0.0")
+            barrier = threading.Barrier(2)
+            results = []
+            failures = []
+
+            def publish():
+                operator = LocalControlPlane(state_dir, storage="sqlite")
+                barrier.wait()
+                try:
+                    results.append(operator.publish_workflow(workflow))
+                except BaseException as error:
+                    failures.append(error)
+
+            threads = [threading.Thread(target=publish) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+            records = LocalControlPlane(state_dir, storage="sqlite").list_workflows()
+            audits = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(failures, [])
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["version"], "1.0.0")
+        self.assertEqual(
+            [event["type"] for event in audits].count("workflow_published"),
+            1,
+        )
+
+    def test_concurrent_different_content_same_version_fails_closed(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            LocalControlPlane(state_dir, storage="sqlite")
+            first = _workflow(version="1.0.0")
+            second = _workflow(version="1.0.0")
+            second["nodes"][0]["title"] = "Different immutable release"
+            barrier = threading.Barrier(2)
+            successes = []
+            failures = []
+
+            def publish(workflow):
+                operator = LocalControlPlane(state_dir, storage="sqlite")
+                barrier.wait()
+                try:
+                    successes.append(operator.publish_workflow(workflow))
+                except ValueError as error:
+                    failures.append(str(error))
+
+            threads = [
+                threading.Thread(target=publish, args=(workflow,))
+                for workflow in (first, second)
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            record = control.list_workflows()[0]
+            stored = control.get_workflow("workflow_control", "1.0.0")
+
+        self.assertEqual(len(successes), 1)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("published workflow version is immutable", failures[0])
+        self.assertEqual(record["version"], "1.0.0")
+        self.assertIn(
+            stored["nodes"][0]["title"],
+            {"Start", "Different immutable release"},
+        )
+
+    def test_sqlite_publication_rolls_back_registry_when_audit_append_fails(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            with patch(
+                "skill2workflow.storage._append_audit_connection",
+                side_effect=RuntimeError("audit append failed"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "audit append failed"):
+                    control.publish_workflow(_workflow(version="1.0.0"))
+
+            self.assertEqual(control.list_workflows(), [])
+            self.assertEqual(control.list_audit_events(), [])
+            record = control.publish_workflow(_workflow(version="1.0.0"))
+
+        self.assertEqual(record["version"], "1.0.0")
+
+    def test_sqlite_concurrent_publication_and_deprecation_preserve_both_mutations(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            bootstrap = LocalControlPlane(state_dir, storage="sqlite")
+            bootstrap.publish_workflow(_workflow(version="1.0.0"))
+            barrier = threading.Barrier(2)
+            failures = []
+
+            def publish_new_version():
+                operator = LocalControlPlane(state_dir, storage="sqlite")
+                barrier.wait()
+                try:
+                    operator.publish_workflow(_workflow(version="2.0.0"))
+                except BaseException as error:
+                    failures.append(error)
+
+            def deprecate_old_version():
+                operator = LocalControlPlane(state_dir, storage="sqlite")
+                barrier.wait()
+                try:
+                    operator.deprecate_workflow("workflow_control", "1.0.0")
+                except BaseException as error:
+                    failures.append(error)
+
+            threads = [
+                threading.Thread(target=publish_new_version),
+                threading.Thread(target=deprecate_old_version),
+            ]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+            records = {
+                record["version"]: record for record in bootstrap.list_workflows()
+            }
+
+        self.assertEqual(failures, [])
+        self.assertEqual(records["1.0.0"]["status"], "deprecated")
+        self.assertEqual(records["2.0.0"]["status"], "published")
+
+    def test_sqlite_deprecation_rolls_back_registry_when_audit_append_fails(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0"))
+            with patch(
+                "skill2workflow.storage._append_audit_connection",
+                side_effect=RuntimeError("audit append failed"),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "audit append failed"):
+                    control.deprecate_workflow("workflow_control", "1.0.0")
+
+            record = control.list_workflows()[0]
+            audits = control.list_audit_events()
+
+        self.assertEqual(record["status"], "published")
+        self.assertEqual(
+            [event["type"] for event in audits].count("workflow_deprecated"),
+            0,
+        )
+
     def test_tampered_published_artifact_is_rejected_before_execution(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

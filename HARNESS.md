@@ -58,6 +58,11 @@ promotions therefore fail without changing the alias or audit chain. JSON
 storage remains intended for local evaluation and does not provide
 cross-process transaction coordination.
 
+SQLite publication and deprecation also use single-record transactions: a
+published version and its audit row commit together, distinct concurrent
+versions cannot erase each other, and same-version matching retries are
+idempotent. See [`docs/workflow-releases.md`](docs/workflow-releases.md).
+
 Run the local scheduled-trigger smoke:
 
 ```bash

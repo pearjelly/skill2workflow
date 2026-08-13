@@ -31,8 +31,19 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("workflow alias precondition failed", guide)
         self.assertIn("BEGIN IMMEDIATE", guide)
         self.assertIn("cross-process transaction coordination", guide)
+        self.assertIn("## Atomic Publication and Deprecation", guide)
+        self.assertIn("publication of the same", guide)
         self.assertIn("Exactly one promotion succeeds", plan)
         self.assertIn("BEGIN IMMEDIATE", plan)
+        publication_plan = (
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-08-13-atomic-workflow-publication.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("matching same-version publication retries idempotent", publication_plan)
+        self.assertIn("exclusive immutable", publication_plan)
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",
@@ -41,7 +52,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
             schema["properties"]["schema_version"]["const"],
             "skill2workflow-workflow-diff-0.1.0",
         )
-        self.assertIn("Loop 72: Atomic Workflow Alias Promotion", roadmap)
+        self.assertIn("Loop 73: Atomic Workflow Registry Mutations", roadmap)
         self.assertIn("workflow-diff", readme)
 
     def test_cli_registers_review_and_cas_commands(self):
