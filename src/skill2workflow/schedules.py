@@ -963,13 +963,8 @@ class RecurringScheduleDispatcher:
             connection.execute("begin immediate")
             if not self._owns_lease(connection, now_value):
                 raise SchedulerLeaseError("scheduler lease is not held by this dispatcher")
-            rows = connection.execute(
-                """
-                select dispatch_id, record_json from schedule_dispatches
-                where status = 'claimed' and claim_expires_at <= ?
-                """,
-                (now_value,),
-            ).fetchall()
+            rows = _iter_stale_claim_rows(connection, now_value)
+            recovered = 0
             for dispatch_id, raw_record in rows:
                 record = json.loads(str(raw_record))
                 record["status"] = "uncertain"
@@ -978,7 +973,8 @@ class RecurringScheduleDispatcher:
                     "update schedule_dispatches set status = 'uncertain', record_json = ? where dispatch_id = ?",
                     (_json_text(record), str(dispatch_id)),
                 )
-        return len(rows)
+                recovered += 1
+        return recovered
 
     def _finish_claim(
         self,
@@ -1145,6 +1141,18 @@ def _recurring_trigger_request(schedule: Schedule, scheduled_for: str) -> Dict[s
         "idempotency_key": f"{trigger['idempotency_key_prefix']}:{scheduled_for}",
         "input": copy.deepcopy(trigger["input"]),
     }
+
+
+def _iter_stale_claim_rows(connection, now_epoch: float):
+    """Return a cursor for stale claims without materializing the result set."""
+
+    return connection.execute(
+        """
+        select dispatch_id, record_json from schedule_dispatches
+        where status = 'claimed' and claim_expires_at <= ?
+        """,
+        (float(now_epoch),),
+    )
 
 
 def _load_recurring_definition(value: object) -> Schedule:

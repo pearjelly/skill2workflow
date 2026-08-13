@@ -1,3 +1,5 @@
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -8,6 +10,7 @@ from skill2workflow.schedules import (
     LocalScheduleRunner,
     RecurringScheduleDispatcher,
     RecurringScheduleStore,
+    _iter_stale_claim_rows,
     normalize_recurring_schedule_definition,
 )
 from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
@@ -336,6 +339,48 @@ class RecurringSchedulePersistenceTests(TestCase):
         self.assertEqual(recovered, 1)
         self.assertEqual(rerun["count"], 0)
         self.assertEqual(records[0]["status"], "uncertain")
+
+    def test_stale_claim_rows_stream_without_fetchall(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = RecurringScheduleStore(state_dir)
+            store.add(_recurring_definition())
+            first = RecurringScheduleDispatcher(state_dir, owner_id="owner-a", lease_seconds=5)
+            self.assertTrue(first.try_acquire(now_epoch=1000))
+            first.claim_due("2026-08-11T00:00:00Z", now_epoch=1001)
+
+            with closing(sqlite3.connect(state_dir / "scheduler.sqlite3")) as raw:
+                connection = _NoStaleClaimFetchAllConnection(raw)
+                with raw:
+                    rows = list(_iter_stale_claim_rows(connection, 1007))
+
+        self.assertEqual(len(rows), 1)
+
+
+class _NoStaleClaimFetchAllCursor:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def __iter__(self):
+        return iter(self._cursor)
+
+    def fetchall(self):
+        raise AssertionError("stale claim rows must be streamed")
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+class _NoStaleClaimFetchAllConnection:
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query, parameters=()):
+        cursor = self._connection.execute(query, parameters)
+        normalized = " ".join(str(query).lower().split())
+        if "select dispatch_id, record_json from schedule_dispatches" in normalized:
+            return _NoStaleClaimFetchAllCursor(cursor)
+        return cursor
 
 
 def _recurring_definition(

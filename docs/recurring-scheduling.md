@@ -57,6 +57,12 @@ Dispatch uses claim-before-execute inside a SQLite transaction. The scheduler fi
 
 On restart, an expired `claimed` record becomes `uncertain`. It is not retried automatically because the external effect might already have happened. An operator must inspect the workflow or connector result before deciding on a new manual action.
 
+Stale-claim recovery reads eligible dispatch rows through the SQLite cursor in
+the same recovery transaction. It updates each claim as it is read and keeps
+only the recovery counter in memory, so a long-running dispatch ledger does not
+turn restart recovery into an unbounded source read. The `uncertain` transition,
+transaction boundary, and return count are unchanged.
+
 This design suppresses duplicate claims in one SQLite state directory, but it is not exactly-once. A crash can leave execution outcome uncertain, and a downstream system can still accept a duplicate if an operator retries. Use provider-native idempotency for effectful connectors and treat `schedule-dispatches` as the recovery ledger.
 
 ## SQLite Lease And Standby
