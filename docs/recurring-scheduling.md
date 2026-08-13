@@ -97,10 +97,27 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/hourly.json \
 PYTHONPATH=src python3 -m skill2workflow.cli schedules \
   --state-dir /var/lib/skill2workflow --storage sqlite
 
+PYTHONPATH=src python3 -m skill2workflow.cli schedules \
+  --state-dir /var/lib/skill2workflow --storage sqlite --limit 100
+
 PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches \
   --state-dir /var/lib/skill2workflow --storage sqlite \
   --schedule-id schedule_hourly_report
+
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches \
+  --state-dir /var/lib/skill2workflow --storage sqlite \
+  --schedule-id schedule_hourly_report --limit 100
 ```
+
+The optional local `--limit` windows accept `1` through `1000`. Bounded
+schedule output uses `skill2workflow-local-schedule-list-0.1.0` and omits
+trigger inputs; bounded dispatch output uses
+`skill2workflow-local-schedule-dispatch-list-0.1.0` and omits lease owner and
+claim-expiry fields. Both retain newest records, include aggregate totals and
+status counts, and leave the complete-list compatibility path unchanged when
+the flag is omitted. Their schemas are
+[`local-schedule-list-0.1.0.schema.json`](../schemas/local-schedule-list-0.1.0.schema.json)
+and [`local-schedule-dispatch-list-0.1.0.schema.json`](../schemas/local-schedule-dispatch-list-0.1.0.schema.json).
 
 Pause and resume future dispatch:
 

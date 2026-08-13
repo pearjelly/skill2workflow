@@ -313,6 +313,18 @@ List schedules:
 PYTHONPATH=src python3 -m skill2workflow.cli schedules --state-dir /tmp/skill2workflow-control
 ```
 
+For a bounded operator view, add `--limit 1` through `--limit 1000`:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli schedules \
+  --state-dir /tmp/skill2workflow-control --limit 100
+```
+
+The bounded form returns `skill2workflow-local-schedule-list-0.1.0`, keeps only
+the newest compact schedule summaries, and omits `trigger.input`. The complete
+array form remains unchanged when `--limit` is omitted. The fixed contract is
+[`schemas/local-schedule-list-0.1.0.schema.json`](../schemas/local-schedule-list-0.1.0.schema.json).
+
 Run due schedules with an explicit timestamp:
 
 ```bash

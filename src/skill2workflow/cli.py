@@ -189,6 +189,7 @@ def main(argv=None) -> int:
     schedules_cmd = subparsers.add_parser("schedules", help="List local schedule definitions")
     schedules_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     schedules_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedules_cmd.add_argument("--limit", type=int, help="Return a compact newest window (1-1000)")
 
     schedule_dispatches_cmd = subparsers.add_parser(
         "schedule-dispatches",
@@ -197,6 +198,7 @@ def main(argv=None) -> int:
     schedule_dispatches_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     schedule_dispatches_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     schedule_dispatches_cmd.add_argument("--schedule-id", default="")
+    schedule_dispatches_cmd.add_argument("--limit", type=int, help="Return a compact newest window (1-1000)")
 
     for command, help_text in (
         ("schedule-enable", "Enable a durable recurring schedule"),
@@ -809,15 +811,22 @@ def main(argv=None) -> int:
         )
 
     if args.command == "schedules":
-        _print_json(LocalScheduleRunner(args.state_dir, storage=args.storage).list_schedules())
-        return 0
+        runner = LocalScheduleRunner(args.state_dir, storage=args.storage)
+        if args.limit is None:
+            _print_json(runner.list_schedules())
+            return 0
+        return _control_action(lambda: runner.list_schedules_bounded(args.limit))
 
     if args.command == "schedule-dispatches":
+        runner = LocalScheduleRunner(args.state_dir, storage=args.storage)
+        if args.limit is None:
+            return _control_action(
+                lambda: runner.list_dispatches(schedule_id=args.schedule_id)
+            )
         return _control_action(
-            lambda: LocalScheduleRunner(
-                args.state_dir,
-                storage=args.storage,
-            ).list_dispatches(schedule_id=args.schedule_id)
+            lambda: runner.list_dispatches_bounded(
+                args.limit, schedule_id=args.schedule_id
+            )
         )
 
     if args.command in {"schedule-enable", "schedule-disable"}:

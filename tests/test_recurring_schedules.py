@@ -190,6 +190,34 @@ class RecurringSchedulePersistenceTests(TestCase):
             filtered["items"][0]["schedule_id"], "schedule_hourly_report"
         )
 
+    def test_local_dispatch_cli_projection_is_bounded_and_has_fixed_window(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            runner = LocalScheduleRunner(state_dir, storage="sqlite")
+            runner.add_schedule(_recurring_definition())
+            dispatcher = RecurringScheduleDispatcher(state_dir, owner_id="owner-a", lease_seconds=30)
+            self.assertTrue(dispatcher.try_acquire(now_epoch=1000))
+            dispatcher.dispatch_due("2026-08-11T00:00:00Z", now_epoch=1001)
+            inventory = runner.list_dispatches_bounded(1)
+
+        self.assertEqual(
+            inventory["schema_version"],
+            "skill2workflow-local-schedule-dispatch-list-0.1.0",
+        )
+        self.assertEqual(inventory["summary"]["total"], 1)
+        self.assertEqual(
+            inventory["window"],
+            {"max_items": 1, "total": 1, "returned": 1, "truncated": False},
+        )
+        self.assertEqual(inventory["dispatches"][0]["status"], "completed")
+        self.assertNotIn("owner_id", inventory["dispatches"][0])
+        self.assertNotIn("claim_expires_at", inventory["dispatches"][0])
+
+        with self.assertRaisesRegex(ValueError, "schedule dispatch list limit"):
+            runner.list_dispatches_bounded(0)
+
     def test_latest_policy_coalesces_missed_occurrences_into_one_durable_dispatch(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

@@ -123,6 +123,31 @@ class ScheduleTests(TestCase):
         self.assertEqual([item["schedule"]["id"] for item in loaded], ["schedule_daily_report"])
         self.assertEqual(loaded[0]["trigger"]["input"], {"customer_id": "customer_123"})
 
+    def test_bounded_local_schedule_inventory_is_newest_compact_and_value_free(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = LocalScheduleStore(state_dir)
+            store.save(_schedule_definition(schedule_id="schedule_old", run_at="2026-07-06T00:00:00Z"))
+            store.save(
+                _schedule_definition(
+                    schedule_id="schedule_new",
+                    run_at="2026-07-07T00:00:00Z",
+                    input_value={"private": "must-not-be-in-bounded-view"},
+                )
+            )
+            inventory = LocalScheduleRunner(state_dir).list_schedules_bounded(1)
+
+        self.assertEqual(inventory["schema_version"], "skill2workflow-local-schedule-list-0.1.0")
+        self.assertEqual(inventory["summary"]["total"], 2)
+        self.assertEqual(inventory["window"], {"max_items": 1, "total": 2, "returned": 1, "truncated": True})
+        self.assertEqual(inventory["schedules"][0]["schedule_id"], "schedule_new")
+        self.assertNotIn("trigger", inventory["schedules"][0])
+        self.assertNotIn("must-not-be-in-bounded-view", json.dumps(inventory))
+
+        for limit in (0, -1, 1001, True, "2"):
+            with self.assertRaisesRegex(ValueError, "schedule list limit"):
+                LocalScheduleRunner(state_dir).list_schedules_bounded(limit)
+
     def test_runner_selects_due_schedules_without_wall_clock_waiting(self):
         with TemporaryDirectory() as tmp:
             runner = LocalScheduleRunner(Path(tmp))
@@ -203,18 +228,24 @@ class ScheduleTests(TestCase):
         self.assertEqual(completed_events[0]["input_mapping_keys"], ["customer_id"])
 
 
-def _schedule_definition():
+def _schedule_definition(
+    schedule_id="schedule_daily_report",
+    run_at="2026-07-06T00:00:00Z",
+    input_value=None,
+):
+    if input_value is None:
+        input_value = {"customer_id": "customer_123"}
     return {
         "schema_version": "skill2workflow-schedule-0.1.0",
         "schedule": {
-            "id": "schedule_daily_report",
+            "id": schedule_id,
             "workflow_id": "workflow_control",
             "version": "1.0.0",
-            "run_at": "2026-07-06T00:00:00Z",
+            "run_at": run_at,
         },
         "trigger": {
             "input": {
-                "customer_id": "customer_123",
+                **input_value,
             }
         },
     }

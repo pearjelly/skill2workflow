@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import heapq
 import hashlib
 import json
 import secrets
@@ -21,6 +22,10 @@ from .triggers import normalize_trigger_input
 
 SCHEDULE_SCHEMA_VERSION = "skill2workflow-schedule-0.1.0"
 RECURRING_SCHEDULE_SCHEMA_VERSION = "skill2workflow-schedule-0.2.0"
+LOCAL_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-local-schedule-list-0.1.0"
+LOCAL_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-local-schedule-dispatch-list-0.1.0"
+MAX_LOCAL_SCHEDULE_LIST_ITEMS = 1000
+MAX_LOCAL_SCHEDULE_DISPATCH_LIST_ITEMS = 1000
 
 Schedule = Dict[str, object]
 ScheduleRunResult = Dict[str, object]
@@ -56,6 +61,31 @@ class LocalScheduleStore:
         for path in sorted(self.schedules_dir.glob("*.json")):
             schedules.append(normalize_schedule_definition(json.loads(path.read_text(encoding="utf-8"))))
         return schedules
+
+    def list_compact_bounded(self, max_items: int) -> Dict[str, object]:
+        """Stream one-shot schedules into a bounded value-free projection."""
+
+        _validate_local_window(max_items, "schedule list limit")
+        selected = []
+        total = 0
+        status_counts = _empty_schedule_status_counts()
+        for path in sorted(self.schedules_dir.glob("*.json")):
+            schedule = normalize_schedule_definition(
+                json.loads(path.read_text(encoding="utf-8"))
+            )
+            total += 1
+            compact, sort_key = _compact_schedule(schedule, "one_shot")
+            status_counts[_schedule_status_bucket(compact["status"])] += 1
+            item = (sort_key, compact["schedule_id"], "one_shot", compact)
+            if len(selected) < max_items:
+                heapq.heappush(selected, item)
+            elif item[:3] > selected[0][:3]:
+                heapq.heapreplace(selected, item)
+        return {
+            "items": [item[3] for item in sorted(selected, key=lambda value: value[:3])],
+            "total": total,
+            "status_counts": status_counts,
+        }
 
     def _schedule_path(self, schedule_id: str) -> Path:
         return self.schedules_dir / f"{_safe_schedule_id(schedule_id)}.json"
@@ -114,10 +144,65 @@ class LocalScheduleRunner:
             schedules.extend(self.recurring_store.list())
         return sorted(schedules, key=lambda item: str(item["schedule"]["id"]))
 
+    def list_schedules_bounded(self, max_items: int) -> Dict[str, object]:
+        """Return a bounded local schedule inventory without trigger inputs."""
+
+        _validate_local_window(max_items, "schedule list limit")
+        inventories = [self.store.list_compact_bounded(max_items)]
+        if self.recurring_store is not None:
+            inventories.append(self.recurring_store.list_compact_bounded(max_items))
+        items = [item for inventory in inventories for item in inventory["items"]]
+        items.sort(key=lambda item: (str(item["last_activity_at"]), str(item["schedule_id"]), str(item["kind"])))
+        selected = items[-max_items:]
+        total = sum(int(inventory["total"]) for inventory in inventories)
+        status_counts = _empty_schedule_status_counts()
+        for inventory in inventories:
+            for status, count in inventory["status_counts"].items():
+                status_counts[status] += int(count)
+        return {
+            "schema_version": LOCAL_SCHEDULE_LIST_SCHEMA_VERSION,
+            "summary": {"total": total, "status_counts": status_counts},
+            "schedules": selected,
+            "window": {
+                "max_items": max_items,
+                "total": total,
+                "returned": len(selected),
+                "truncated": len(selected) < total,
+            },
+        }
+
     def list_dispatches(self, schedule_id: str = "") -> List[Dict[str, object]]:
         if self.recurring_store is None:
             raise ValueError("recurring dispatch records requires sqlite storage")
         return self.recurring_store.list_dispatches(schedule_id=schedule_id)
+
+    def list_dispatches_bounded(
+        self, max_items: int, schedule_id: str = ""
+    ) -> Dict[str, object]:
+        """Return a bounded local dispatch inventory with no trigger payloads."""
+
+        _validate_local_window(max_items, "schedule dispatch list limit")
+        if self.recurring_store is None:
+            raise ValueError("recurring dispatch records requires sqlite storage")
+        bounded = self.recurring_store.list_dispatches_bounded(
+            max_items, schedule_id=schedule_id
+        )
+        dispatches = [_compact_dispatch(record) for record in bounded["items"]]
+        return {
+            "schema_version": LOCAL_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION,
+            "schedule_id": str(schedule_id),
+            "summary": {
+                "total": int(bounded["total"]),
+                "status_counts": dict(bounded["status_counts"]),
+            },
+            "dispatches": dispatches,
+            "window": {
+                "max_items": max_items,
+                "total": int(bounded["total"]),
+                "returned": len(dispatches),
+                "truncated": len(dispatches) < int(bounded["total"]),
+            },
+        }
 
     def set_recurring_enabled(self, schedule_id: str, enabled: bool) -> Schedule:
         if self.recurring_store is None:
@@ -238,6 +323,97 @@ def normalize_schedule_definition(definition: object) -> Schedule:
             or f"{schedule_id}:{run_at}",
             "input": normalized_input,
         },
+    }
+
+
+def _validate_local_window(value: object, label: str) -> None:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 1 <= value <= MAX_LOCAL_SCHEDULE_LIST_ITEMS
+    ):
+        raise ValueError(
+            f"{label} must be an integer from 1 through {MAX_LOCAL_SCHEDULE_LIST_ITEMS}"
+        )
+
+
+def _empty_schedule_status_counts() -> Dict[str, int]:
+    return {
+        "active": 0,
+        "pending": 0,
+        "completed": 0,
+        "disabled": 0,
+        "other": 0,
+    }
+
+
+def _schedule_status_bucket(status: object) -> str:
+    value = str(status)
+    return value if value in {"active", "pending", "completed", "disabled"} else "other"
+
+
+def _non_negative_int(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, number)
+
+
+def _compact_schedule(schedule: Schedule, kind: str):
+    meta = schedule.get("schedule")
+    if not isinstance(meta, dict):
+        raise ValueError("schedule metadata must be an object")
+    last_run_at = _optional_text(meta, "last_run_at")
+    last_scheduled_for = _optional_text(meta, "last_scheduled_for")
+    next_run_at = _optional_text(meta, "next_run_at")
+    run_at = _optional_text(meta, "run_at")
+    starts_at = _optional_text(meta, "starts_at")
+    last_activity_at = (
+        last_run_at
+        or last_scheduled_for
+        or next_run_at
+        or run_at
+        or starts_at
+    )
+    compact = {
+        "kind": kind,
+        "schedule_id": _optional_text(meta, "id"),
+        "workflow_id": _optional_text(meta, "workflow_id"),
+        "workflow_version": _optional_text(meta, "version"),
+        "status": _optional_text(meta, "status"),
+        "enabled": bool(meta.get("enabled", False)),
+        "run_at": run_at,
+        "starts_at": starts_at,
+        "next_run_at": next_run_at,
+        "interval_seconds": _non_negative_int(meta.get("interval_seconds", 0)),
+        "missed_run_policy": _optional_text(meta, "missed_run_policy"),
+        "last_activity_at": last_activity_at,
+        "last_run_at": last_run_at,
+        "last_scheduled_for": last_scheduled_for,
+        "last_run_id": _optional_text(meta, "last_run_id"),
+        "last_trigger_id": _optional_text(meta, "last_trigger_id"),
+    }
+    return compact, (last_activity_at, compact["schedule_id"])
+
+
+def _compact_dispatch(record: object) -> Dict[str, object]:
+    if not isinstance(record, dict):
+        raise ValueError("schedule dispatch record must be an object")
+    return {
+        "dispatch_id": _optional_text(record, "dispatch_id"),
+        "schedule_id": _optional_text(record, "schedule_id"),
+        "scheduled_for": _optional_text(record, "scheduled_for"),
+        "status": _optional_text(record, "status"),
+        "coalesced_occurrences": _non_negative_int(
+            record.get("coalesced_occurrences", 0)
+        ),
+        "run_id": _optional_text(record, "run_id"),
+        "trigger_id": _optional_text(record, "trigger_id"),
+        "error_type": _optional_text(record, "error_type"),
+        "completed_at": _optional_text(record, "completed_at"),
     }
 
 
@@ -370,6 +546,33 @@ class RecurringScheduleStore:
                 selected.append(definition)
         return {
             "items": list(selected),
+            "total": total,
+            "status_counts": status_counts,
+        }
+
+    def list_compact_bounded(self, max_items: int) -> Dict[str, object]:
+        """Stream recurring definitions into a bounded value-free projection."""
+
+        _validate_local_window(max_items, "schedule list limit")
+        selected = []
+        total = 0
+        status_counts = _empty_schedule_status_counts()
+        with self._connection() as connection:
+            rows = connection.execute(
+                "select definition_json from recurring_schedules order by schedule_id"
+            )
+            for row in rows:
+                schedule = _load_recurring_definition(row[0])
+                total += 1
+                compact, sort_key = _compact_schedule(schedule, "recurring")
+                status_counts[_schedule_status_bucket(compact["status"])] += 1
+                item = (sort_key, compact["schedule_id"], "recurring", compact)
+                if len(selected) < max_items:
+                    heapq.heappush(selected, item)
+                elif item[:3] > selected[0][:3]:
+                    heapq.heapreplace(selected, item)
+        return {
+            "items": [item[3] for item in sorted(selected, key=lambda value: value[:3])],
             "total": total,
             "status_counts": status_counts,
         }

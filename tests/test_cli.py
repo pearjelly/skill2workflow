@@ -1708,6 +1708,51 @@ class CliTests(TestCase):
         self.assertEqual(audit_events[0]["trigger_source"], "local-schedule:schedule_daily_report")
         self.assertNotIn("input", audit_events[0])
 
+    def test_schedule_list_command_supports_bounded_compact_window(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            definitions = []
+            for schedule_id, run_at in (
+                ("schedule_old", "2026-07-06T00:00:00Z"),
+                ("schedule_new", "2026-07-07T00:00:00Z"),
+            ):
+                path = root / f"{schedule_id}.json"
+                path.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "skill2workflow-schedule-0.1.0",
+                            "schedule": {
+                                "id": schedule_id,
+                                "workflow_id": "workflow_demo",
+                                "version": "0.1.0",
+                                "run_at": run_at,
+                            },
+                            "trigger": {"input": {"private": "not-in-bounded-output"}},
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                definitions.append(path)
+            with redirect_stdout(StringIO()):
+                for definition in definitions:
+                    self.assertEqual(
+                        main(["schedule-add", str(definition), "--state-dir", str(state_dir)]),
+                        0,
+                    )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    ["schedules", "--state-dir", str(state_dir), "--limit", "1"]
+                )
+
+        inventory = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(inventory["schema_version"], "skill2workflow-local-schedule-list-0.1.0")
+        self.assertEqual(inventory["window"]["total"], 2)
+        self.assertEqual(inventory["schedules"][0]["schedule_id"], "schedule_new")
+        self.assertNotIn("not-in-bounded-output", stdout.getvalue())
+
     def test_schedule_commands_support_sqlite_recurring_definitions_and_dispatch_records(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
