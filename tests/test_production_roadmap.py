@@ -26,8 +26,8 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
-        self.assertIn("- Completed delivery loops: 1-91", roadmap)
-        self.assertIn("- Active loop: None; Loop 91 is complete with bounded remote Workflow inventory", roadmap)
+        self.assertIn("- Completed delivery loops: 1-92", roadmap)
+        self.assertIn("- Active loop: None; Loop 92 is complete with policy-bound remote retention readiness", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
 
@@ -40,7 +40,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-91 complete, further loop numbers unassigned.",
+            "**Status:** Directional; Loops 44-92 complete, further loop numbers unassigned.",
             roadmap,
         )
 
@@ -74,6 +74,10 @@ class ProductionRoadmapTests(TestCase):
         )
         self.assertIn(
             "| Loop 91: Bounded Remote Workflow Inventory | Complete |",
+            roadmap,
+        )
+        self.assertIn(
+            "| Loop 92: Policy-bound Remote Retention Readiness | Complete |",
             roadmap,
         )
         self.assertIn(
@@ -207,7 +211,7 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-91 are complete", readme)
+        self.assertIn("Delivery Loops 1-92 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)

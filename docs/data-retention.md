@@ -47,6 +47,12 @@ Invalid or unparseable stored timestamps are not eligible. This fails closed rat
 
 ## Read-only Plan
 
+Remote operators can bind the same policy to a safe preflight with the
+authenticated [`remote-retention-readiness`](remote-retention-readiness.md)
+route. It reports an active scheduler lease as blocked and returns aggregate
+counts only after a quiesced inspection; the local plan below remains the
+authoritative stopped-state check.
+
 Stop the service and every other writer, then inspect aggregate eligibility:
 
 ```bash

@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/retention-readiness-0.1.0.json",
+  "title": "skill2workflow remote SQLite retention readiness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "storage",
+    "state_layout_version",
+    "active_scheduler_lease",
+    "plan_available",
+    "policy_sha256",
+    "delete_before",
+    "eligible",
+    "preserved",
+    "blocking_reasons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-retention-readiness-0.1.0"
+    },
+    "status": {
+      "enum": ["ready", "blocked"]
+    },
+    "storage": {
+      "const": "sqlite"
+    },
+    "state_layout_version": {
+      "const": "skill2workflow-sqlite-layout-0.1.0"
+    },
+    "active_scheduler_lease": {
+      "type": "boolean"
+    },
+    "plan_available": {
+      "type": "boolean"
+    },
+    "policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "delete_before": {
+      "type": "string",
+      "minLength": 1
+    },
+    "eligible": {
+      "$ref": "#/$defs/counts"
+    },
+    "preserved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nonterminal_runs", "claimed_dispatches"],
+      "properties": {
+        "nonterminal_runs": { "type": ["integer", "null"], "minimum": 0 },
+        "claimed_dispatches": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "maxItems": 1,
+      "items": { "const": "active_scheduler_lease" }
+    }
+  },
+  "$defs": {
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "terminal_runs",
+        "run_events",
+        "run_cancellations",
+        "run_executions",
+        "run_audit_events",
+        "terminal_dispatches"
+      ],
+      "properties": {
+        "terminal_runs": { "type": ["integer", "null"], "minimum": 0 },
+        "run_events": { "type": ["integer", "null"], "minimum": 0 },
+        "run_cancellations": { "type": ["integer", "null"], "minimum": 0 },
+        "run_executions": { "type": ["integer", "null"], "minimum": 0 },
+        "run_audit_events": { "type": ["integer", "null"], "minimum": 0 },
+        "terminal_dispatches": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

@@ -544,6 +544,67 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(accepted["blocking_reasons"], ["active_scheduler_lease"])
         self.assertFalse(thread.is_alive())
 
+    def test_retention_readiness_is_authenticated_bounded_and_blocks_live_service(self):
+        policy = {
+            "schema_version": "skill2workflow-retention-policy-0.3.0",
+            "retention": {
+                "delete_before": "2026-01-01T00:00:00Z",
+                "terminal_run_statuses": ["completed", "failed", "cancelled", "interrupted"],
+                "terminal_dispatch_statuses": ["completed", "failed", "skipped", "uncertain"],
+            },
+        }
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/api/v1/retention-readiness"
+            try:
+                denied_status, denied = _post_json(url, {"policy": policy})
+                malformed_status, malformed = _post_json(
+                    url,
+                    {"policy": {"schema_version": "unsupported"}},
+                    token=AUTH_TOKEN,
+                )
+                accepted_status, accepted = _post_json(
+                    url,
+                    {"policy": policy},
+                    token=AUTH_TOKEN,
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "retention readiness rejected"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted["schema_version"],
+            "skill2workflow-retention-readiness-0.1.0",
+        )
+        self.assertEqual(accepted["status"], "blocked")
+        self.assertTrue(accepted["active_scheduler_lease"])
+        self.assertFalse(accepted["plan_available"])
+        self.assertEqual(accepted["blocking_reasons"], ["active_scheduler_lease"])
+        self.assertTrue(all(value is None for value in accepted["eligible"].values()))
+        self.assertFalse(thread.is_alive())
+
     def test_audit_integrity_is_authenticated_payload_free_and_read_only(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

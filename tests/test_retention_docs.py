@@ -54,9 +54,26 @@ class RetentionDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-91 are complete", readme)
+        self.assertIn("Delivery Loops 1-92 are complete", readme)
         self.assertIn("Loop 47", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("- Completed delivery loops: 1-91", roadmap)
+        self.assertIn("- Completed delivery loops: 1-92", roadmap)
         self.assertIn("Loop 47: Data Retention And Disposal", roadmap)
         self.assertIn("Current maturity remains Self-hosted Beta", roadmap)
+
+    def test_remote_readiness_guide_and_schema_define_quiesced_contract(self):
+        guide = (ROOT / "docs/remote-retention-readiness.md").read_text(encoding="utf-8")
+        schema = json.loads(
+            (ROOT / "schemas/retention-readiness-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn("POST /api/v1/retention-readiness", guide)
+        self.assertIn("service-retention-readiness", guide)
+        self.assertIn("null", guide)
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-retention-readiness-0.1.0",
+        )
+        self.assertIn("eligible", schema["required"])
+        self.assertIn("preserved", schema["required"])

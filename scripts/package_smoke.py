@@ -55,6 +55,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-recurring-dispatches",
     "service-workflow-artifacts",
     "service-backup-readiness",
+    "service-retention-readiness",
     "service-audit-integrity",
     "service-runtime-info",
     "service-workflows",

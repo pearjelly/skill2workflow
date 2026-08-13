@@ -13,6 +13,7 @@ from skill2workflow.service_client import (
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES,
     MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
     MAX_BACKUP_READINESS_RESPONSE_BYTES,
+    MAX_RETENTION_READINESS_RESPONSE_BYTES,
     MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     MAX_RUNTIME_INFO_RESPONSE_BYTES,
     MAX_REMOTE_TRIGGER_REQUEST_BYTES,
@@ -28,6 +29,7 @@ from skill2workflow.service_client import (
     fetch_workflow_artifact_report,
     fetch_workflow_inventory,
     fetch_backup_readiness,
+    fetch_retention_readiness,
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_support_bundle,
@@ -952,6 +954,109 @@ class ServiceClientTests(TestCase):
             with self.assertRaises(ServiceActionError):
                 fetch_backup_readiness(
                     f"http://127.0.0.1:{server.server_port}", token_file
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
+    def test_retention_readiness_posts_policy_and_validates_fixed_contract(self):
+        policy = {
+            "schema_version": "skill2workflow-retention-policy-0.3.0",
+            "retention": {
+                "delete_before": "2026-01-01T00:00:00+00:00",
+                "terminal_run_statuses": ["completed", "failed", "cancelled", "interrupted"],
+                "terminal_dispatch_statuses": ["completed", "failed", "skipped", "uncertain"],
+            },
+        }
+        payload = {
+            "schema_version": "skill2workflow-retention-readiness-0.1.0",
+            "status": "blocked",
+            "storage": "sqlite",
+            "state_layout_version": "skill2workflow-sqlite-layout-0.1.0",
+            "active_scheduler_lease": True,
+            "plan_available": False,
+            "policy_sha256": "a" * 64,
+            "delete_before": "2026-01-01T00:00:00+00:00",
+            "eligible": {
+                "terminal_runs": None,
+                "run_events": None,
+                "run_cancellations": None,
+                "run_executions": None,
+                "run_audit_events": None,
+                "terminal_dispatches": None,
+            },
+            "preserved": {"nonterminal_runs": None, "claimed_dispatches": None},
+            "blocking_reasons": ["active_scheduler_lease"],
+        }
+        observed = {}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_retention_readiness(
+                f"http://127.0.0.1:{server.server_port}", token_file, policy
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed["path"], "/api/v1/retention-readiness")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(observed["body"], {"policy": policy})
+        self.assertFalse(thread.is_alive())
+
+    def test_retention_readiness_rejects_oversized_response(self):
+        policy = {
+            "schema_version": "skill2workflow-retention-policy-0.3.0",
+            "retention": {
+                "delete_before": "2026-01-01T00:00:00+00:00",
+                "terminal_run_statuses": ["completed", "failed", "cancelled", "interrupted"],
+                "terminal_dispatch_statuses": ["completed", "failed", "skipped", "uncertain"],
+            },
+        }
+        body = b"x" * (MAX_RETENTION_READINESS_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_retention_readiness(
+                    f"http://127.0.0.1:{server.server_port}", token_file, policy
                 )
             thread.join(timeout=2)
             server.server_close()

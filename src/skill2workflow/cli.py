@@ -30,6 +30,7 @@ from .service_client import (
     fetch_workflow_artifact_report,
     fetch_workflow_inventory,
     fetch_backup_readiness,
+    fetch_retention_readiness,
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_workflow_diff,
@@ -383,6 +384,14 @@ def main(argv=None) -> int:
     )
     service_backup_cmd.add_argument("--service-url", required=True)
     service_backup_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_retention_cmd = subparsers.add_parser(
+        "service-retention-readiness",
+        help="Check retention policy readiness through the authenticated service",
+    )
+    service_retention_cmd.add_argument("policy", type=Path)
+    service_retention_cmd.add_argument("--service-url", required=True)
+    service_retention_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_integrity_cmd = subparsers.add_parser(
         "service-audit-integrity",
@@ -904,6 +913,15 @@ def main(argv=None) -> int:
             lambda: fetch_backup_readiness(
                 args.service_url,
                 args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-retention-readiness":
+        return _service_action(
+            lambda: fetch_retention_readiness(
+                args.service_url,
+                args.auth_token_file,
+                _load_json(args.policy),
             )
         )
 

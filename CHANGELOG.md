@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added authenticated remote retention readiness at
+  `POST /api/v1/retention-readiness` and the protected
+  `service-retention-readiness` CLI, binding the normalized copy-on-write
+  policy to a fixed preflight, blocking active leases with null counts, and
+  returning aggregate eligibility only after a quiesced read-only inspection.
 - Added local `service-token-rotate` for atomic owner-only ingress-token replacement without secret output or service restart.
 - Added protected remote Workflow deprecation at
   `POST /api/v1/workflow-deprecations` and the installed

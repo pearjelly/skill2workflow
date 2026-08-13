@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-91 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-92 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -899,6 +899,12 @@ the installed `service-workflows` command discovers bounded published-version
 metadata, lifecycle status, aliases, and checksums without exporting Workflow
 content, artifact paths, or audit data.
 
+Loop 92 adds [remote retention readiness](docs/remote-retention-readiness.md):
+the authenticated service and installed `service-retention-readiness` client
+bind a normalized copy-on-write retention policy to a fixed preflight, report
+an active scheduler lease without unsafe counts, and expose aggregate
+eligibility only after a quiesced read-only inspection.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -930,6 +936,7 @@ See:
 - `docs/remote-workflow-diff.md`
 - `docs/remote-workflow-deprecation.md`
 - `docs/remote-workflow-inventory.md`
+- `docs/remote-retention-readiness.md`
 - `docs/service-token-rotation.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`

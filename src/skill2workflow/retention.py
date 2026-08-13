@@ -26,6 +26,7 @@ LEGACY_RETENTION_POLICY_SCHEMA_VERSION = "skill2workflow-retention-policy-0.1.0"
 CANCELLATION_RETENTION_POLICY_SCHEMA_VERSION = "skill2workflow-retention-policy-0.2.0"
 RETENTION_POLICY_SCHEMA_VERSION = "skill2workflow-retention-policy-0.3.0"
 RETENTION_EVIDENCE_SCHEMA_VERSION = "skill2workflow-state-retention-0.3.0"
+RETENTION_READINESS_SCHEMA_VERSION = "skill2workflow-retention-readiness-0.1.0"
 LEGACY_TERMINAL_RUN_STATUSES = ("completed", "failed")
 CANCELLATION_TERMINAL_RUN_STATUSES = ("completed", "failed", "cancelled")
 TERMINAL_RUN_STATUSES = ("completed", "failed", "cancelled", "interrupted")
@@ -126,6 +127,70 @@ def inspect_state_retention(
             source / "scheduler.sqlite3"
         ),
     }
+
+
+def build_state_retention_readiness_report(
+    state_dir: Path,
+    policy: object,
+    now_epoch: float = None,
+) -> Dict[str, object]:
+    """Return a fixed, read-only remote preflight for a retention plan.
+
+    A live scheduler lease makes the aggregate plan unsafe to claim: the
+    service may be writing different databases between read-only queries.  In
+    that case the report deliberately returns null counts and tells the
+    operator to quiesce the service before using the local retention plan.
+    """
+
+    source = _existing_directory(state_dir, "state directory")
+    normalized = normalize_retention_policy(policy)
+    readiness = inspect_state_backup_readiness(
+        source,
+        now_epoch=now_epoch,
+        require_stopped=False,
+    )
+    if readiness["state_layout_version"] != CURRENT_STATE_LAYOUT_VERSION:
+        raise ValueError("state retention requires the current SQLite state layout")
+    active_lease = bool(readiness["active_scheduler_lease"])
+    base = {
+        "schema_version": RETENTION_READINESS_SCHEMA_VERSION,
+        "status": "blocked" if active_lease else "ready",
+        "storage": "sqlite",
+        "state_layout_version": readiness["state_layout_version"],
+        "active_scheduler_lease": active_lease,
+        "plan_available": not active_lease,
+        "policy_sha256": _policy_checksum(normalized),
+        "delete_before": normalized["retention"]["delete_before"],
+        "eligible": {
+            "terminal_runs": None,
+            "run_events": None,
+            "run_cancellations": None,
+            "run_executions": None,
+            "run_audit_events": None,
+            "terminal_dispatches": None,
+        },
+        "preserved": {
+            "nonterminal_runs": None,
+            "claimed_dispatches": None,
+        },
+        "blocking_reasons": ["active_scheduler_lease"] if active_lease else [],
+    }
+    if active_lease:
+        return base
+    plan = inspect_state_retention(source, normalized, now_epoch=now_epoch)
+    base["eligible"] = {
+        "terminal_runs": plan["eligible_terminal_runs"],
+        "run_events": plan["eligible_run_events"],
+        "run_cancellations": plan["eligible_run_cancellations"],
+        "run_executions": plan["eligible_run_executions"],
+        "run_audit_events": plan["eligible_run_audit_events"],
+        "terminal_dispatches": plan["eligible_terminal_dispatches"],
+    }
+    base["preserved"] = {
+        "nonterminal_runs": plan["preserved_nonterminal_runs"],
+        "claimed_dispatches": plan["preserved_claimed_dispatches"],
+    }
+    return base
 
 
 def apply_state_retention(

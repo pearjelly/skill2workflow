@@ -59,6 +59,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry.observe_http("recurring_schedule_dispatch_list", 200)
             telemetry.observe_http("workflow_artifact_report", 200)
             telemetry.observe_http("backup_readiness", 200)
+            telemetry.observe_http("retention_readiness", 200)
             telemetry.observe_http("audit_integrity", 200)
             telemetry.observe_http("runtime_info", 200)
             telemetry.observe_http("workflow_release", 200)
@@ -92,6 +93,7 @@ class RuntimeTelemetryTests(TestCase):
             'skill2workflow_http_requests_total{route="recurring_schedule_dispatch_list",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_artifact_report",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="backup_readiness",status_class="2xx"} 1',
+            'skill2workflow_http_requests_total{route="retention_readiness",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="audit_integrity",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="runtime_info",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_release",status_class="2xx"} 1',
@@ -153,6 +155,7 @@ class RuntimeTelemetryTests(TestCase):
                 "recurring_schedule_action", "recurring_schedule_dispatch_list",
                 "workflow_artifact_report",
                 "backup_readiness",
+                "retention_readiness",
                 "audit_integrity",
                 "runtime_info",
                 "audit_consistency",

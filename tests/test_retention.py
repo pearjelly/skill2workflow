@@ -10,8 +10,10 @@ from unittest.mock import patch
 
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.retention import (
+    RETENTION_READINESS_SCHEMA_VERSION,
     RETENTION_POLICY_SCHEMA_VERSION,
     apply_state_retention,
+    build_state_retention_readiness_report,
     inspect_state_retention,
     normalize_retention_policy,
 )
@@ -20,6 +22,39 @@ from skill2workflow.storage import rebuild_audit_integrity
 
 
 class StateRetentionTests(TestCase):
+    def test_remote_readiness_returns_counts_only_when_state_is_quiesced(self):
+        with TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source"
+            _populate_retention_state(source)
+            report = build_state_retention_readiness_report(source, _policy())
+
+        self.assertEqual(report["schema_version"], RETENTION_READINESS_SCHEMA_VERSION)
+        self.assertEqual(report["status"], "ready")
+        self.assertTrue(report["plan_available"])
+        self.assertFalse(report["active_scheduler_lease"])
+        self.assertEqual(report["eligible"]["terminal_runs"], 1)
+        self.assertEqual(report["eligible"]["run_events"], 1)
+        self.assertEqual(report["preserved"]["nonterminal_runs"], 1)
+        self.assertEqual(report["blocking_reasons"], [])
+
+    def test_remote_readiness_with_active_lease_is_blocked_without_counts(self):
+        with TemporaryDirectory() as tmp:
+            source = Path(tmp) / "source"
+            _populate_retention_state(source)
+            with closing(sqlite3.connect(source / "scheduler.sqlite3")) as connection, connection:
+                connection.execute(
+                    "insert into scheduler_leases values (?, ?, ?)",
+                    ("active-owner", "active-token", 4102444800.0),
+                )
+            report = build_state_retention_readiness_report(source, _policy())
+
+        self.assertEqual(report["status"], "blocked")
+        self.assertFalse(report["plan_available"])
+        self.assertTrue(report["active_scheduler_lease"])
+        self.assertEqual(report["blocking_reasons"], ["active_scheduler_lease"])
+        self.assertTrue(all(value is None for value in report["eligible"].values()))
+        self.assertTrue(all(value is None for value in report["preserved"].values()))
+
     def test_policy_requires_aware_cutoff_and_exact_safe_terminal_statuses(self):
         normalized = normalize_retention_policy(_policy())
 
