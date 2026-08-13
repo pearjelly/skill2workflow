@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/recurring-schedule-dispatch-list-0.1.0.json",
+  "title": "skill2workflow redacted recurring schedule dispatch list",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schedule_id", "summary", "dispatches", "window"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
+    },
+    "schedule_id": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]*$"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["total", "status_counts"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "status_counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["claimed", "completed", "failed", "skipped", "uncertain", "other"],
+          "properties": {
+            "claimed": {"type": "integer", "minimum": 0},
+            "completed": {"type": "integer", "minimum": 0},
+            "failed": {"type": "integer", "minimum": 0},
+            "skipped": {"type": "integer", "minimum": 0},
+            "uncertain": {"type": "integer", "minimum": 0},
+            "other": {"type": "integer", "minimum": 0}
+          }
+        }
+      }
+    },
+    "dispatches": {
+      "type": "array",
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "dispatch_id", "schedule_id", "scheduled_for", "status",
+          "coalesced_occurrences", "run_id", "trigger_id", "error_type", "completed_at"
+        ],
+        "properties": {
+          "dispatch_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "schedule_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "scheduled_for": {"type": "string"},
+          "status": {"enum": ["claimed", "completed", "failed", "skipped", "uncertain", "other"]},
+          "coalesced_occurrences": {"type": "integer", "minimum": 0},
+          "run_id": {"type": "string"},
+          "trigger_id": {"type": "string"},
+          "error_type": {"type": "string", "maxLength": 64},
+          "completed_at": {"type": "string"}
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_items", "total", "returned", "truncated"],
+      "properties": {
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 100},
+        "total": {"type": "integer", "minimum": 0},
+        "returned": {"type": "integer", "minimum": 0, "maximum": 100},
+        "truncated": {"type": "boolean"}
+      }
+    }
+  }
+}

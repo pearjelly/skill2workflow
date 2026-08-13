@@ -15,11 +15,13 @@ RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
 SUPPORT_BUNDLE_SCHEMA_VERSION = "skill2workflow-support-bundle-0.1.0"
 RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list-0.1.0"
 RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION = "skill2workflow-recurring-schedule-action-0.1.0"
+RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 MAX_RUN_DETAIL_EVENTS = 50
 MAX_RUN_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
+MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
 
 
@@ -245,6 +247,84 @@ def build_recurring_schedule_list_from_store(
     }
 
 
+def build_recurring_schedule_dispatch_list_from_store(
+    schedule_store,
+    schedule_id: str = "",
+    max_items: int = MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
+) -> Dict[str, object]:
+    """Project recent dispatch metadata without lease or trigger payloads."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or max_items <= 0
+        or max_items > MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS
+    ):
+        raise ValueError("max_items must be a positive bounded integer")
+    normalized_schedule_id = _safe_string(schedule_id)
+    if hasattr(schedule_store, "list_dispatches_bounded"):
+        bounded = schedule_store.list_dispatches_bounded(
+            max_items,
+            schedule_id=normalized_schedule_id,
+        )
+        selected = bounded["items"]
+        total = int(bounded["total"])
+        status_counts = dict(bounded["status_counts"])
+    else:
+        records = schedule_store.list_dispatches(schedule_id=normalized_schedule_id)
+        total = len(records)
+        selected = records[-max_items:]
+        status_counts = {
+            "claimed": 0,
+            "completed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "uncertain": 0,
+            "other": 0,
+        }
+        for record in records:
+            status = _safe_string(record.get("status", "")) if isinstance(record, dict) else ""
+            status_counts[status if status in status_counts and status != "other" else "other"] += 1
+    projected = []
+    for record in selected:
+        if not isinstance(record, dict):
+            continue
+        status = _safe_string(record.get("status", ""))
+        normalized_status = status if status in {
+            "claimed", "completed", "failed", "skipped", "uncertain"
+        } else "other"
+        projected.append(
+            {
+                "dispatch_id": _safe_string(record.get("dispatch_id", "")),
+                "schedule_id": _safe_string(record.get("schedule_id", "")),
+                "scheduled_for": _safe_string(record.get("scheduled_for", "")),
+                "status": normalized_status,
+                "coalesced_occurrences": _safe_non_negative_int(
+                    record.get("coalesced_occurrences", 0)
+                ),
+                "run_id": _safe_string(record.get("run_id", "")),
+                "trigger_id": _safe_string(record.get("trigger_id", "")),
+                "error_type": _safe_dispatch_error_type(record.get("error_type", "")),
+                "completed_at": _safe_string(record.get("completed_at", "")),
+            }
+        )
+    return {
+        "schema_version": RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION,
+        "schedule_id": normalized_schedule_id,
+        "summary": {
+            "total": total,
+            "status_counts": status_counts,
+        },
+        "dispatches": projected,
+        "window": {
+            "max_items": max_items,
+            "total": total,
+            "returned": len(projected),
+            "truncated": len(projected) < total,
+        },
+    }
+
+
 def build_support_bundle_from_control(
     control: LocalControlPlane,
     telemetry,
@@ -272,6 +352,7 @@ def build_support_bundle_from_control(
     http_requests.pop("audit_consistency", None)
     http_requests.pop("recurring_schedule_list", None)
     http_requests.pop("recurring_schedule_action", None)
+    http_requests.pop("recurring_schedule_dispatch_list", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests
     return {
@@ -472,6 +553,17 @@ def _safe_string(value: object, limit: int = 256) -> str:
 
 def _safe_non_negative_int(value: object) -> int:
     return value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+
+
+def _safe_dispatch_error_type(value: object) -> str:
+    """Keep only a bounded exception type token, never provider error text."""
+
+    if not isinstance(value, str):
+        return ""
+    candidate = value[:64]
+    if candidate and all(char.isalnum() or char in {"_", ".", "-"} for char in candidate):
+        return candidate
+    return ""
 
 
 def _tail(items: List[object], max_items: Optional[int]) -> List[object]:

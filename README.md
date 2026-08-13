@@ -148,6 +148,7 @@ explicit connector boundaries. It currently supports:
 - Plan and publish verified retained SQLite copies that remove expired terminal run payloads while preserving waiting work and the source
 - Trigger published workflow versions from deterministic one-shot local schedules
 - Dispatch durable recurring interval schedules with explicit missed-run and recovery semantics
+- Inspect bounded, redacted recurring-schedule dispatch outcomes remotely, including uncertain recovery evidence
 - Create, verify, and atomically restore owner-only offline SQLite state backups
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
@@ -710,7 +711,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-79 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-80 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -839,6 +840,11 @@ the authenticated service and installed `service-schedule-enable`/
 with an exact empty-body contract, dispatcher-safe SQLite serialization,
 idempotent retries, and bounded audit evidence.
 
+Loop 80 adds [remote recurring-schedule dispatch diagnostics](docs/remote-schedule-dispatches.md):
+the authenticated service and installed `service-recurring-dispatches` client
+show bounded completed, failed, skipped, and uncertain dispatch evidence while
+redacting scheduler leases and trigger input.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -859,6 +865,7 @@ See:
 - `docs/remote-audit-consistency.md`
 - `docs/remote-schedule-inventory.md`
 - `docs/remote-schedule-actions.md`
+- `docs/remote-schedule-dispatches.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`
 - `docs/controlled-pilot-deferral-review.md`

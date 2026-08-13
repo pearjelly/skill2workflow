@@ -51,6 +51,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-show",
     "service-runs",
     "service-recurring-schedules",
+    "service-recurring-dispatches",
     "service-schedule-enable",
     "service-schedule-disable",
     "service-support-bundle",

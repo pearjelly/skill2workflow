@@ -166,6 +166,30 @@ class RecurringSchedulePersistenceTests(TestCase):
         self.assertEqual(len(inventory["items"]), 1)
         self.assertEqual(inventory["items"][0]["schedule"]["id"], "schedule_second")
 
+    def test_sqlite_store_streams_bounded_dispatch_inventory_and_filters(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow())
+            store = RecurringScheduleStore(state_dir)
+            store.add(_recurring_definition())
+            store.add(_recurring_definition(extra_schedule={"id": "schedule_second"}))
+            dispatcher = RecurringScheduleDispatcher(state_dir, owner_id="owner-a", lease_seconds=30)
+            self.assertTrue(dispatcher.try_acquire(now_epoch=1000))
+            dispatcher.dispatch_due("2026-08-11T00:00:00Z", now_epoch=1001)
+            inventory = store.list_dispatches_bounded(1)
+            filtered = store.list_dispatches_bounded(
+                1, schedule_id="schedule_hourly_report"
+            )
+
+        self.assertEqual(inventory["total"], 2)
+        self.assertEqual(inventory["status_counts"]["completed"], 2)
+        self.assertEqual(len(inventory["items"]), 1)
+        self.assertEqual(filtered["total"], 1)
+        self.assertEqual(
+            filtered["items"][0]["schedule_id"], "schedule_hourly_report"
+        )
+
     def test_latest_policy_coalesces_missed_occurrences_into_one_durable_dispatch(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

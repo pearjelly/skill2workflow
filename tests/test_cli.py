@@ -242,6 +242,49 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_recurring_dispatches_command_supports_schedule_filter(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-recurring-schedule-dispatch-list-0.1.0",
+            "schedule_id": "schedule_hourly_report",
+            "summary": {
+                "total": 0,
+                "status_counts": {
+                    "claimed": 0,
+                    "completed": 0,
+                    "failed": 0,
+                    "skipped": 0,
+                    "uncertain": 0,
+                    "other": 0,
+                },
+            },
+            "dispatches": [],
+            "window": {"max_items": 100, "total": 0, "returned": 0, "truncated": False},
+        }
+        with patch(
+            "skill2workflow.cli.fetch_recurring_schedule_dispatches",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-recurring-dispatches",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                        "--schedule-id",
+                        "schedule_hourly_report",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with(
+            "https://service.example", token_file, "schedule_hourly_report"
+        )
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

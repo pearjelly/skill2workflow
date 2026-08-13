@@ -11,11 +11,12 @@ from skill2workflow.dashboard import (
     build_control_snapshot,
     build_control_snapshot_from_control,
     build_recurring_schedule_list_from_store,
+    build_recurring_schedule_dispatch_list_from_store,
     build_run_detail,
     build_run_list,
     build_support_bundle_from_control,
 )
-from skill2workflow.schedules import RecurringScheduleStore
+from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringScheduleStore
 from skill2workflow.telemetry import RuntimeTelemetry
 
 
@@ -348,6 +349,52 @@ class DashboardTests(TestCase):
         self.assertNotIn("private-schedule-input", serialized)
         self.assertNotIn("idempotency_key_prefix", serialized)
 
+    def test_recurring_dispatch_list_is_bounded_and_excludes_lease_or_input_values(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            store = RecurringScheduleStore(state_dir)
+            store.add(
+                _recurring_schedule_definition(
+                    "schedule_dispatch", enabled=True,
+                    input_value="private-dispatch-input",
+                )
+            )
+            dispatcher = RecurringScheduleDispatcher(
+                state_dir, owner_id="private-dispatch-owner", lease_seconds=30
+            )
+            self.assertTrue(dispatcher.try_acquire(now_epoch=1000))
+            dispatcher.dispatch_due("2026-08-11T00:00:00Z", now_epoch=1001)
+
+            with patch.object(
+                store,
+                "list_dispatches",
+                side_effect=AssertionError("unbounded dispatch read"),
+            ):
+                projected = build_recurring_schedule_dispatch_list_from_store(
+                    store, max_items=1
+                )
+
+        self.assertEqual(
+            projected["schema_version"],
+            "skill2workflow-recurring-schedule-dispatch-list-0.1.0",
+        )
+        self.assertEqual(projected["summary"]["total"], 1)
+        self.assertEqual(projected["window"]["returned"], 1)
+        self.assertEqual(
+            set(projected["dispatches"][0]),
+            {
+                "dispatch_id", "schedule_id", "scheduled_for", "status",
+                "coalesced_occurrences", "run_id", "trigger_id", "error_type",
+                "completed_at",
+            },
+        )
+        serialized = json.dumps(projected, ensure_ascii=False)
+        self.assertNotIn("private-dispatch-input", serialized)
+        self.assertNotIn("private-dispatch-owner", serialized)
+        self.assertNotIn("claim_expires_at", serialized)
+
     def test_support_bundle_is_fixed_and_redacted(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)
@@ -399,7 +446,9 @@ def _workflow(version: str, node_title: str):
     }
 
 
-def _recurring_schedule_definition(schedule_id: str, enabled: bool):
+def _recurring_schedule_definition(
+    schedule_id: str, enabled: bool, input_value: str = "private-schedule-input"
+):
     return {
         "schema_version": "skill2workflow-schedule-0.2.0",
         "schedule": {
@@ -413,7 +462,7 @@ def _recurring_schedule_definition(schedule_id: str, enabled: bool):
         },
         "trigger": {
             "idempotency_key_prefix": schedule_id,
-            "input": {"private": "private-schedule-input"},
+            "input": {"private": input_value},
         },
     }
 

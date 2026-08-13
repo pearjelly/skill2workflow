@@ -12,6 +12,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
+    MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
+    RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION,
     RUN_DETAIL_SCHEMA_VERSION,
     RUN_LIST_SCHEMA_VERSION,
     RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION,
@@ -30,6 +32,7 @@ MAX_SERVICE_ACTION_RESPONSE_BYTES = 64 * 1024
 MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
@@ -173,6 +176,28 @@ def post_recurring_schedule_state(
         not_found_message="recurring schedule not found",
     )
     _validate_recurring_schedule_action(payload, normalized_schedule_id, enabled)
+    return payload
+
+
+def fetch_recurring_schedule_dispatches(
+    service_url: str,
+    token_file: Path,
+    schedule_id: str = "",
+) -> Dict[str, object]:
+    """Fetch bounded recurring dispatch evidence, optionally for one schedule."""
+
+    normalized_schedule_id = _validate_schedule_id(schedule_id) if schedule_id else ""
+    path = "/api/v1/recurring-schedule-dispatches"
+    if normalized_schedule_id:
+        path = f"/api/v1/recurring-schedules/{normalized_schedule_id}/dispatches"
+    payload = _get_json(
+        service_url,
+        token_file,
+        path,
+        conflict_message="recurring schedule dispatch list unavailable",
+        max_response_bytes=MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_dispatch_list(payload, normalized_schedule_id)
     return payload
 
 
@@ -542,6 +567,72 @@ def _validate_recurring_schedule_action(
         or payload.get("enabled") is not enabled
         or payload.get("status") not in {"active", "disabled"}
         or not isinstance(payload.get("changed"), bool)
+    ):
+        raise ServiceActionError()
+
+
+def _validate_recurring_schedule_dispatch_list(
+    payload: Dict[str, object], schedule_id: str
+) -> None:
+    statuses = {"claimed", "completed", "failed", "skipped", "uncertain", "other"}
+    if set(payload) != {"schema_version", "schedule_id", "summary", "dispatches", "window"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if payload.get("schedule_id") != schedule_id:
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != {"total", "status_counts"}
+        or not _is_non_negative_integer(summary.get("total"))
+        or not isinstance(summary.get("status_counts"), dict)
+        or set(summary["status_counts"]) != statuses
+        or any(not _is_non_negative_integer(value) for value in summary["status_counts"].values())
+        or sum(summary["status_counts"].values()) != summary["total"]
+    ):
+        raise ServiceActionError()
+    dispatches = payload.get("dispatches")
+    fields = {
+        "dispatch_id", "schedule_id", "scheduled_for", "status",
+        "coalesced_occurrences", "run_id", "trigger_id", "error_type", "completed_at",
+    }
+    if not isinstance(dispatches, list) or len(dispatches) > MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS:
+        raise ServiceActionError()
+    for dispatch in dispatches:
+        if (
+            not isinstance(dispatch, dict)
+            or set(dispatch) != fields
+            or not isinstance(dispatch.get("dispatch_id"), str)
+            or not dispatch.get("dispatch_id")
+            or len(dispatch.get("dispatch_id")) > 128
+            or not isinstance(dispatch.get("schedule_id"), str)
+            or not dispatch.get("schedule_id")
+            or len(dispatch.get("schedule_id")) > 128
+            or (schedule_id and dispatch.get("schedule_id") != schedule_id)
+            or dispatch.get("status") not in statuses
+            or any(not isinstance(dispatch.get(field), str) for field in (
+                "scheduled_for", "run_id", "trigger_id", "error_type", "completed_at"
+            ))
+            or len(dispatch.get("error_type", "")) > 64
+            or not _is_non_negative_integer(dispatch.get("coalesced_occurrences"))
+        ):
+            raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_items", "total", "returned", "truncated"}
+        or not _is_non_negative_integer(window.get("max_items"))
+        or window.get("max_items") < 1
+        or window.get("max_items") > MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS
+        or not _is_non_negative_integer(window.get("total"))
+        or not _is_non_negative_integer(window.get("returned"))
+        or window.get("returned") != len(dispatches)
+        or window.get("returned") > window.get("total")
+        or window.get("returned") > window.get("max_items")
+        or not isinstance(window.get("truncated"), bool)
+        or window.get("truncated") != (window.get("returned") < window.get("total"))
+        or window.get("total") != summary.get("total")
     ):
         raise ServiceActionError()
 

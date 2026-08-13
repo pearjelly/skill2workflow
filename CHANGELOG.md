@@ -26,6 +26,10 @@ release; Roadmap loop completion alone does not publish a new version.
   `service-schedule-enable`/`service-schedule-disable` CLI commands, with
   dispatcher-safe SQLite serialization, fixed response schema, and bounded
   mutation audit evidence.
+- Added bounded, authenticated recurring-schedule dispatch diagnostics at
+  `GET /api/v1/recurring-schedule-dispatches` and the targeted schedule route,
+  plus the protected `service-recurring-dispatches` CLI, with uncertain-state
+  visibility and lease/input redaction.
 - Added a bounded `workflow-artifacts` registry/file consistency report and
   cleanup of newly-created SQLite publication artifacts after known failures.
 - Added an authenticated self-hosted runtime service with loopback-safe defaults, health and readiness probes, graceful shutdown, and durable SQLite state.

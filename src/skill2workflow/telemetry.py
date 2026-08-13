@@ -24,6 +24,7 @@ _ROUTES = (
     "control_snapshot",
     "recurring_schedule_list",
     "recurring_schedule_action",
+    "recurring_schedule_dispatch_list",
     "audit_consistency",
     "support_bundle",
     "run_list",

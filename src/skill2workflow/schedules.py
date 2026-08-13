@@ -420,6 +420,57 @@ class RecurringScheduleStore:
             rows = connection.execute(query, parameters).fetchall()
         return [json.loads(str(row[0])) for row in rows]
 
+    def list_dispatches_bounded(
+        self, max_items: int, schedule_id: str = ""
+    ) -> Dict[str, object]:
+        """Return bounded recent dispatch records and aggregate status counts."""
+
+        if isinstance(max_items, bool) or not isinstance(max_items, int) or max_items <= 0:
+            raise ValueError("max_items must be a positive integer")
+        normalized_schedule_id = str(schedule_id)
+        where = ""
+        parameters = ()
+        if normalized_schedule_id:
+            where = " where schedule_id = ?"
+            parameters = (normalized_schedule_id,)
+        status_counts = {
+            "claimed": 0,
+            "completed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "uncertain": 0,
+            "other": 0,
+        }
+        with self._connection() as connection:
+            total = int(
+                connection.execute(
+                    f"select count(*) from schedule_dispatches{where}", parameters
+                ).fetchone()[0]
+            )
+            rows = connection.execute(
+                f"select status, count(*) from schedule_dispatches{where} group by status",
+                parameters,
+            ).fetchall()
+            for status, count in rows:
+                normalized_status = str(status)
+                if normalized_status not in status_counts:
+                    normalized_status = "other"
+                status_counts[normalized_status] += int(count)
+            recent = connection.execute(
+                f"""
+                select record_json from schedule_dispatches{where}
+                order by scheduled_for desc, dispatch_id desc limit ?
+                """,
+                parameters + (max_items,),
+            ).fetchall()
+        records = [json.loads(str(row[0])) for row in recent]
+        records.reverse()
+        return {
+            "items": records,
+            "total": total,
+            "status_counts": status_counts,
+        }
+
     def _initialize(self) -> None:
         with self._connection() as connection:
             connection.execute(

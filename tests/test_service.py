@@ -361,6 +361,86 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("must-not-leak", json.dumps(audit, ensure_ascii=False))
         self.assertFalse(serve_thread.is_alive())
 
+    def test_recurring_schedule_dispatch_list_is_authenticated_bounded_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            service = RuntimeService(config)
+            store = service.scheduler.dispatcher.store
+            record = {
+                "dispatch_id": "dispatch_private_001",
+                "schedule_id": "schedule_private_report",
+                "scheduled_for": "2026-08-11T00:00:00+00:00",
+                "status": "uncertain",
+                "owner_id": "private-dispatch-owner",
+                "claim_expires_at": 1234.0,
+                "coalesced_occurrences": 1,
+                "run_id": "run_dispatch_private_001",
+                "trigger_id": "trigger_dispatch_private_001",
+                "error_type": "ProviderPrivateError",
+                "completed_at": "2026-08-11T00:01:00+00:00",
+                "input": "private-dispatch-input",
+            }
+            with store._connection() as connection:
+                connection.execute(
+                    """
+                    insert into schedule_dispatches (
+                        dispatch_id, schedule_id, scheduled_for, status,
+                        owner_id, claim_expires_at, record_json
+                    ) values (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        record["dispatch_id"], record["schedule_id"], record["scheduled_for"],
+                        record["status"], record["owner_id"], record["claim_expires_at"],
+                        json.dumps(record),
+                    ),
+                )
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (holder.update({"service": running}), ready.set()),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            denied_status, denied = _get_json(
+                f"http://{host}:{port}/api/v1/recurring-schedule-dispatches"
+            )
+            accepted_status, accepted = _get_json(
+                f"http://{host}:{port}/api/v1/recurring-schedule-dispatches",
+                token=AUTH_TOKEN,
+            )
+            targeted_status, targeted = _get_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_private_report/dispatches",
+                token=AUTH_TOKEN,
+            )
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted["schema_version"],
+            "skill2workflow-recurring-schedule-dispatch-list-0.1.0",
+        )
+        self.assertEqual(accepted["summary"]["status_counts"]["uncertain"], 1)
+        self.assertEqual(targeted_status, 200)
+        self.assertEqual(targeted["schedule_id"], "schedule_private_report")
+        self.assertEqual(targeted["dispatches"][0]["status"], "uncertain")
+        self.assertEqual(targeted["dispatches"][0]["error_type"], "ProviderPrivateError")
+        serialized = json.dumps(accepted, ensure_ascii=False)
+        self.assertNotIn("private-dispatch-owner", serialized)
+        self.assertNotIn("private-dispatch-input", serialized)
+        self.assertNotIn("claim_expires_at", serialized)
+        self.assertFalse(thread.is_alive())
+
     def test_audit_consistency_can_target_one_run_beyond_the_global_window(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

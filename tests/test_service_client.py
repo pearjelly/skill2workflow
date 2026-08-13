@@ -10,6 +10,7 @@ from skill2workflow.service_client import (
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES,
+    MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES,
     ServiceActionError,
     post_recurring_schedule_state,
     post_run_cancel,
@@ -17,6 +18,7 @@ from skill2workflow.service_client import (
     fetch_run_detail,
     fetch_run_list,
     fetch_recurring_schedule_list,
+    fetch_recurring_schedule_dispatches,
     fetch_support_bundle,
     fetch_audit_consistency,
 )
@@ -373,6 +375,106 @@ class ServiceClientTests(TestCase):
             thread.start()
             with self.assertRaises(ServiceActionError):
                 fetch_recurring_schedule_list(
+                    f"http://127.0.0.1:{server.server_port}", token_file
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_dispatch_list_uses_authenticated_global_and_targeted_paths(self):
+        observed = []
+        payload = _recurring_schedule_dispatch_list_payload()
+        targeted_payload = _recurring_schedule_dispatch_list_payload(
+            schedule_id="schedule_hourly_report"
+        )
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(
+                    self,
+                    200,
+                    targeted_payload
+                    if self.path.endswith("/dispatches")
+                    and "/recurring-schedules/" in self.path
+                    else payload,
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            first = threading.Thread(target=server.handle_request, daemon=True)
+            first.start()
+            global_listing = fetch_recurring_schedule_dispatches(
+                f"http://127.0.0.1:{server.server_port}", token_file
+            )
+            first.join(timeout=2)
+            second = threading.Thread(target=server.handle_request, daemon=True)
+            second.start()
+            targeted_listing = fetch_recurring_schedule_dispatches(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                schedule_id="schedule_hourly_report",
+            )
+            second.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(global_listing, payload)
+        self.assertEqual(targeted_listing, targeted_payload)
+        self.assertEqual(
+            observed,
+            [
+                {
+                    "path": "/api/v1/recurring-schedule-dispatches",
+                    "authorization": f"Bearer {AUTH_TOKEN}",
+                },
+                {
+                    "path": "/api/v1/recurring-schedules/schedule_hourly_report/dispatches",
+                    "authorization": f"Bearer {AUTH_TOKEN}",
+                },
+            ],
+        )
+        self.assertFalse(first.is_alive())
+        self.assertFalse(second.is_alive())
+
+    def test_recurring_dispatch_list_rejects_oversized_response(self):
+        body = b"x" * (MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_recurring_schedule_dispatches(
                     f"http://127.0.0.1:{server.server_port}", token_file
                 )
             thread.join(timeout=2)
@@ -853,6 +955,43 @@ def _recurring_schedule_list_payload():
                 "last_scheduled_for": "",
                 "last_run_id": "",
                 "last_trigger_id": "",
+            }
+        ],
+        "window": {
+            "max_items": 100,
+            "total": 1,
+            "returned": 1,
+            "truncated": False,
+        },
+    }
+
+
+def _recurring_schedule_dispatch_list_payload(schedule_id=""):
+    return {
+        "schema_version": "skill2workflow-recurring-schedule-dispatch-list-0.1.0",
+        "schedule_id": schedule_id,
+        "summary": {
+            "total": 1,
+            "status_counts": {
+                "claimed": 0,
+                "completed": 0,
+                "failed": 0,
+                "skipped": 0,
+                "uncertain": 1,
+                "other": 0,
+            },
+        },
+        "dispatches": [
+            {
+                "dispatch_id": "dispatch_001",
+                "schedule_id": "schedule_hourly_report",
+                "scheduled_for": "2026-08-11T00:00:00+00:00",
+                "status": "uncertain",
+                "coalesced_occurrences": 1,
+                "run_id": "run_dispatch_001",
+                "trigger_id": "trigger_dispatch_001",
+                "error_type": "ProviderTimeout",
+                "completed_at": "2026-08-11T00:01:00+00:00",
             }
         ],
         "window": {

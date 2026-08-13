@@ -25,7 +25,7 @@ release command set: publish/run, service, recurring dispatch, backup/restore,
 state upgrade, retention, cancellation, and operator snapshot export.
 The installed command set also includes the protected `service-resume`,
 `service-cancel`, redacted `service-show`, bounded `service-runs`, bounded
-`service-recurring-schedules`, protected `service-schedule-enable` and
+`service-recurring-schedules`, bounded `service-recurring-dispatches`, protected `service-schedule-enable` and
 `service-schedule-disable`, and owner-only `service-support-bundle` operator
 clients.
 
