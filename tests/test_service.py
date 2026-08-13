@@ -276,6 +276,91 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(audit_count_after, audit_count_before)
         self.assertFalse(thread.is_alive())
 
+    def test_recurring_schedule_action_is_authenticated_idempotent_and_audited(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            service = RuntimeService(config)
+            service.scheduler.dispatcher.store.add(
+                {
+                    "schema_version": "skill2workflow-schedule-0.2.0",
+                    "schedule": {
+                        "id": "schedule_service_report",
+                        "workflow_id": "workflow_service",
+                        "version": "0.1.0",
+                        "starts_at": "2026-08-11T00:00:00Z",
+                        "interval_seconds": 60,
+                        "missed_run_policy": "latest",
+                        "enabled": True,
+                    },
+                    "trigger": {"input": {"private": "must-not-leak"}},
+                }
+            )
+            ready = threading.Event()
+            serve_thread = threading.Thread(
+                target=service.serve,
+                kwargs={"ready_callback": lambda _service: ready.set()},
+                daemon=True,
+            )
+            serve_thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = service.server_address
+            denied_status, denied = _post_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_service_report/disable",
+                {},
+            )
+            invalid_status, invalid = _post_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_service_report/disable",
+                {"unexpected": True},
+                token=AUTH_TOKEN,
+            )
+            action_status, action = _post_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_service_report/disable",
+                {},
+                token=AUTH_TOKEN,
+            )
+            repeat_status, repeated = _post_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_service_report/disable",
+                {},
+                token=AUTH_TOKEN,
+            )
+            service.begin_shutdown()
+            serve_thread.join(timeout=3)
+            stored = service.scheduler.dispatcher.store.get("schedule_service_report")
+            audit = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(invalid_status, 400)
+        self.assertEqual(
+            invalid,
+            {"error": "recurring schedule action body must be an empty JSON object"},
+        )
+        self.assertEqual(action_status, 200)
+        self.assertEqual(action["schema_version"], "skill2workflow-recurring-schedule-action-0.1.0")
+        self.assertEqual(action["schedule_id"], "schedule_service_report")
+        self.assertFalse(action["enabled"])
+        self.assertEqual(action["status"], "disabled")
+        self.assertTrue(action["changed"])
+        self.assertEqual(repeat_status, 200)
+        self.assertFalse(repeated["changed"])
+        self.assertFalse(stored["schedule"]["enabled"])
+        self.assertEqual(
+            [event["type"] for event in audit if event.get("route") == "recurring_schedule_action"],
+            [
+                "ingress_authentication_denied",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+            ],
+        )
+        mutations = [event for event in audit if event.get("type") == "recurring_schedule_updated"]
+        self.assertEqual(len(mutations), 2)
+        self.assertEqual([event["changed"] for event in mutations], [True, False])
+        self.assertNotIn("must-not-leak", json.dumps(audit, ensure_ascii=False))
+        self.assertFalse(serve_thread.is_alive())
+
     def test_audit_consistency_can_target_one_run_beyond_the_global_window(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

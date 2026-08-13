@@ -25,6 +25,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Authenticated `GET /api/v1/audit-consistency` and `service-audit-consistency` reuse the exact run-audit report contract with a 64 KiB response bound, zero-write semantics, and readiness-independent availability when auth and SQLite state are readable
 - Targeted `GET /api/v1/audit-consistency/{run_id}` and `service-audit-consistency --run-id` reuse the same report contract and safe `run_` identifier grammar to inspect one run beyond the global report window
 - Authenticated `GET /api/v1/recurring-schedules` and `service-recurring-schedules` reuse the fixed `skill2workflow-recurring-schedule-list-0.1.0` redacted inventory contract with a 64 KiB response bound and no schedule mutation
+- Authenticated `POST /api/v1/recurring-schedules/{schedule_id}/enable|disable` and protected `service-schedule-enable`/`service-schedule-disable` reuse the fixed `skill2workflow-recurring-schedule-action-0.1.0` contract, exact empty-body boundary, idempotent state transitions, and bounded audit evidence documented in [`remote-schedule-actions.md`](remote-schedule-actions.md)
 - JSON storage as the dependency-light default
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`

@@ -49,6 +49,23 @@ class WorkflowReleaseDocumentationTests(TestCase):
             / "plans"
             / "2026-08-13-remote-schedule-inventory.md"
         ).read_text(encoding="utf-8")
+        schedule_action_guide = (
+            ROOT / "docs" / "remote-schedule-actions.md"
+        ).read_text(encoding="utf-8")
+        schedule_action_plan = (
+            ROOT
+            / "docs"
+            / "superpowers"
+            / "plans"
+            / "2026-08-13-remote-schedule-actions.md"
+        ).read_text(encoding="utf-8")
+        schedule_action_schema = json.loads(
+            (
+                ROOT
+                / "schemas"
+                / "recurring-schedule-action-0.1.0.schema.json"
+            ).read_text(encoding="utf-8")
+        )
         run_audit_schema = json.loads(
             (ROOT / "schemas" / "run-audit-report-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -128,6 +145,18 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("support-bundle 0.1.0", schedule_plan)
         self.assertIn("Loop 77", roadmap)
         self.assertIn("Loop 78: Remote Recurring-Schedule Inventory", roadmap)
+        self.assertIn("POST /api/v1/recurring-schedules/{schedule_id}/disable", schedule_action_guide)
+        self.assertIn("service-schedule-enable", schedule_action_guide)
+        self.assertIn("BEGIN IMMEDIATE", schedule_action_plan)
+        self.assertEqual(
+            schedule_action_schema["$id"],
+            "https://skill2workflow.dev/schemas/recurring-schedule-action-0.1.0.json",
+        )
+        self.assertEqual(
+            schedule_action_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-recurring-schedule-action-0.1.0",
+        )
+        self.assertIn("Loop 79: Protected Remote Recurring-Schedule Actions", roadmap)
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-diff-0.1.0.json",
@@ -149,9 +178,13 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"audit-consistency"', cli)
         self.assertIn('"service-audit-consistency"', cli)
         self.assertIn('"service-recurring-schedules"', cli)
+        self.assertIn('"service-schedule-enable"', cli)
+        self.assertIn('"service-schedule-disable"', cli)
         self.assertIn("--expected-current-version", cli)
         self.assertIn('"workflow-diff"', package_smoke)
         self.assertIn('"workflow-artifacts"', package_smoke)
         self.assertIn('"audit-consistency"', package_smoke)
         self.assertIn('"service-audit-consistency"', package_smoke)
         self.assertIn('"service-recurring-schedules"', package_smoke)
+        self.assertIn('"service-schedule-enable"', package_smoke)
+        self.assertIn('"service-schedule-disable"', package_smoke)

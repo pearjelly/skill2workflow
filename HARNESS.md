@@ -162,6 +162,13 @@ skill2workflow service-recurring-schedules \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-schedule-disable schedule_hourly_report \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+skill2workflow service-schedule-enable schedule_hourly_report \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
 skill2workflow service-audit-consistency \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
@@ -376,7 +383,7 @@ Implemented:
   - reports registry/file consistency through bounded `workflow-artifacts` diagnostics
   - reports run-state/control-audit divergence through bounded `audit-consistency` diagnostics
   - exposes the same diagnostic through authenticated `service-audit-consistency` for remote operators
-  - exposes durable recurring schedule timing and state through authenticated `service-recurring-schedules` without schedule mutation
+  - exposes durable recurring schedule timing and state through authenticated `service-recurring-schedules` and controlled enable/disable actions through `service-schedule-enable`/`service-schedule-disable`
   - supports an optional expected-current-version compare-and-swap promotion guard
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage
   - runs published workflow versions

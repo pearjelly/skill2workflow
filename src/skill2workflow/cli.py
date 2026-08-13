@@ -29,6 +29,7 @@ from .service_client import (
     fetch_run_detail,
     fetch_run_list,
     fetch_support_bundle,
+    post_recurring_schedule_state,
     post_run_cancel,
     post_run_resume,
 )
@@ -343,6 +344,15 @@ def main(argv=None) -> int:
     )
     service_schedules_cmd.add_argument("--service-url", required=True)
     service_schedules_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    for command, help_text in (
+        ("service-schedule-enable", "Enable one recurring schedule through the authenticated service"),
+        ("service-schedule-disable", "Disable one recurring schedule through the authenticated service"),
+    ):
+        service_schedule_state_cmd = subparsers.add_parser(command, help=help_text)
+        service_schedule_state_cmd.add_argument("schedule_id")
+        service_schedule_state_cmd.add_argument("--service-url", required=True)
+        service_schedule_state_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_support_cmd = subparsers.add_parser(
         "service-support-bundle",
@@ -742,6 +752,16 @@ def main(argv=None) -> int:
             lambda: fetch_recurring_schedule_list(
                 args.service_url,
                 args.auth_token_file,
+            )
+        )
+
+    if args.command in {"service-schedule-enable", "service-schedule-disable"}:
+        return _service_action(
+            lambda: post_recurring_schedule_state(
+                args.service_url,
+                args.auth_token_file,
+                args.schedule_id,
+                enabled=args.command == "service-schedule-enable",
             )
         )
 

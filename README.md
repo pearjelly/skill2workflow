@@ -710,7 +710,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-78 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-79 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -831,7 +831,13 @@ Loop 78 adds [remote recurring-schedule inventory](docs/remote-schedule-inventor
 the authenticated service exposes the bounded durable schedule definitions and
 the installed `service-recurring-schedules` client shows next-run, interval,
 missed-run policy, and compact last-run metadata without exposing trigger input
-or allowing schedule mutation.
+or allowing schedule mutation through the inventory route.
+
+Loop 79 adds [protected remote recurring-schedule actions](docs/remote-schedule-actions.md):
+the authenticated service and installed `service-schedule-enable`/
+`service-schedule-disable` clients let an operator pause or resume one schedule
+with an exact empty-body contract, dispatcher-safe SQLite serialization,
+idempotent retries, and bounded audit evidence.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
@@ -852,6 +858,7 @@ See:
 - `docs/support-bundle.md`
 - `docs/remote-audit-consistency.md`
 - `docs/remote-schedule-inventory.md`
+- `docs/remote-schedule-actions.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`
 - `docs/controlled-pilot-deferral-review.md`

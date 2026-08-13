@@ -55,6 +55,7 @@ MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
 
@@ -525,6 +526,12 @@ def _handler_for(service: RuntimeService):
                     self._handle_control_snapshot()
                 elif self.command == "GET" and path == "/api/v1/recurring-schedules":
                     self._handle_recurring_schedule_list()
+                elif self.command == "POST" and _recurring_schedule_action(path):
+                    schedule_id, action = _recurring_schedule_action(path)
+                    self._handle_recurring_schedule_action(
+                        schedule_id,
+                        enabled=action == "enable",
+                    )
                 elif self.command == "GET" and (
                     path == "/api/v1/audit-consistency"
                     or _audit_consistency_run_id(path)
@@ -765,6 +772,91 @@ def _handler_for(service: RuntimeService):
                 self._send_json(503, {"error": "recurring schedule list unavailable"})
                 return
             self._send_json(200, payload)
+
+        def _handle_recurring_schedule_action(self, schedule_id: str, enabled: bool):
+            """Apply one authenticated, idempotent recurring-schedule state change."""
+
+            readiness_status, _ = service.readiness()
+            if readiness_status != 200:
+                self._send_json(503, {"error": "service is not ready"})
+                return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                service.control_plane.record_ingress_authentication(
+                    False,
+                    self.command,
+                    "recurring_schedule_action",
+                    reason=reason,
+                )
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            service.control_plane.record_ingress_authentication(
+                True,
+                self.command,
+                "recurring_schedule_action",
+            )
+            try:
+                body = self.rfile.read(_content_length(self))
+                if not body:
+                    raise ValueError(
+                        "recurring schedule action body must be an empty JSON object"
+                    )
+                payload = json.loads(body.decode("utf-8"))
+                if payload != {}:
+                    raise ValueError(
+                        "recurring schedule action body must be an empty JSON object"
+                    )
+                definition, changed = (
+                    service.scheduler.dispatcher.store.set_enabled_with_result(
+                        schedule_id,
+                        enabled,
+                    )
+                )
+                service.control_plane.record_recurring_schedule_change(
+                    schedule_id,
+                    enabled,
+                    changed,
+                )
+                response = {
+                    "schema_version": "skill2workflow-recurring-schedule-action-0.1.0",
+                    "schedule_id": schedule_id,
+                    "enabled": bool(definition["schedule"]["enabled"]),
+                    "status": str(definition["schedule"]["status"]),
+                    "changed": changed,
+                }
+                encoded = json.dumps(response, ensure_ascii=False).encode("utf-8")
+                if len(encoded) > MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES:
+                    raise ValueError("recurring schedule action exceeds response limit")
+                self._send_json(200, response)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._send_json(
+                    400,
+                    {"error": "recurring schedule action body must be valid JSON"},
+                )
+            except ValueError as error:
+                if "recurring schedule not found" in str(error):
+                    self._send_json(404, {"error": "recurring schedule not found"})
+                elif "body must" in str(error):
+                    self._send_json(400, {"error": str(error)})
+                else:
+                    self._send_json(503, {"error": "recurring schedule action unavailable"})
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "recurring schedule action unavailable"})
 
         def _handle_audit_consistency(self, run_id: str = ""):
             """Serve the bounded, value-free run/audit consistency projection."""
@@ -1082,6 +1174,8 @@ def _request_route(method: str, path: str) -> str:
         return "control_snapshot"
     if method == "GET" and path == "/api/v1/recurring-schedules":
         return "recurring_schedule_list"
+    if method == "POST" and _recurring_schedule_action(path):
+        return "recurring_schedule_action"
     if method == "GET" and path == "/api/v1/audit-consistency":
         return "audit_consistency"
     if method == "GET" and _audit_consistency_run_id(path):
@@ -1112,6 +1206,24 @@ def _http_server(host: str, port: int, handler):
 
         return IPv6HTTPServer((host, port), handler)
     return RuntimeHTTPServer((host, port), handler)
+
+
+def _recurring_schedule_action(path: str):
+    parts = path.split("/")
+    if (
+        len(parts) != 6
+        or parts[:4] != ["", "api", "v1", "recurring-schedules"]
+        or parts[5] not in {"enable", "disable"}
+    ):
+        return None
+    schedule_id = parts[4]
+    if (
+        not schedule_id
+        or len(schedule_id) > 128
+        or any(not (char.isalnum() or char in {"-", "_", "."}) for char in schedule_id)
+    ):
+        return None
+    return schedule_id, parts[5]
 
 
 def _cancel_run_id(path: str) -> str:

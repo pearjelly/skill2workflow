@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/recurring-schedule-action-0.1.0.json",
+  "title": "skill2workflow authenticated recurring schedule action",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "schedule_id", "enabled", "status", "changed"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-recurring-schedule-action-0.1.0"
+    },
+    "schedule_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]{1,128}$"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "status": {
+      "enum": ["active", "disabled"]
+    },
+    "changed": {
+      "type": "boolean"
+    }
+  }
+}

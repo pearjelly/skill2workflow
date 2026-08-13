@@ -23,6 +23,7 @@ _ROUTES = (
     "metrics",
     "control_snapshot",
     "recurring_schedule_list",
+    "recurring_schedule_action",
     "audit_consistency",
     "support_bundle",
     "run_list",

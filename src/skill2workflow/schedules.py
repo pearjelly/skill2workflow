@@ -12,7 +12,7 @@ from collections import deque
 from contextlib import closing, contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from .control_plane import LocalControlPlane
 from .state_layout import ensure_current_state_layout
@@ -375,6 +375,18 @@ class RecurringScheduleStore:
         }
 
     def set_enabled(self, schedule_id: str, enabled: bool) -> Schedule:
+        definition, _changed = self.set_enabled_with_result(schedule_id, enabled)
+        return definition
+
+    def set_enabled_with_result(self, schedule_id: str, enabled: bool) -> Tuple[Schedule, bool]:
+        """Set one recurring schedule state and report whether it changed.
+
+        The state transition remains serialized with dispatcher claims by the
+        same ``BEGIN IMMEDIATE`` transaction used by :meth:`set_enabled`.
+        ``changed`` lets a remote operator retry an idempotent action without
+        manufacturing a second state transition.
+        """
+
         if not isinstance(enabled, bool):
             raise ValueError("schedule enabled state must be a boolean")
         with self._connection() as connection:
@@ -386,13 +398,16 @@ class RecurringScheduleStore:
             if row is None:
                 raise ValueError(f"recurring schedule not found: {schedule_id}")
             definition = _load_recurring_definition(row[0])
-            definition["schedule"]["enabled"] = enabled
-            definition["schedule"]["status"] = "active" if enabled else "disabled"
-            connection.execute(
-                "update recurring_schedules set definition_json = ?, updated_at = ? where schedule_id = ?",
-                (_json_text(definition), _utc_now(), str(schedule_id)),
-            )
-        return definition
+            previous_enabled = bool(definition["schedule"].get("enabled", False))
+            changed = previous_enabled != enabled
+            if changed:
+                definition["schedule"]["enabled"] = enabled
+                definition["schedule"]["status"] = "active" if enabled else "disabled"
+                connection.execute(
+                    "update recurring_schedules set definition_json = ?, updated_at = ? where schedule_id = ?",
+                    (_json_text(definition), _utc_now(), str(schedule_id)),
+                )
+        return definition, changed
 
     def list_dispatches(self, schedule_id: str = "") -> List[Dict[str, object]]:
         query = "select record_json from schedule_dispatches"

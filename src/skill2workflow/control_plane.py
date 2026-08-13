@@ -777,6 +777,7 @@ class LocalControlPlane:
             "run_resume",
             "run_list",
             "run_detail",
+            "recurring_schedule_action",
             "unknown",
         }:
             normalized_route = "unknown"
@@ -792,6 +793,33 @@ class LocalControlPlane:
         if not authenticated:
             event["reason"] = normalized_reason
         self._append_audit(event)
+
+    def record_recurring_schedule_change(
+        self,
+        schedule_id: str,
+        enabled: bool,
+        changed: bool,
+    ) -> None:
+        """Persist bounded evidence for an authenticated schedule mutation."""
+
+        normalized_id = str(schedule_id)
+        if (
+            not normalized_id
+            or len(normalized_id) > 128
+            or any(not (char.isalnum() or char in {"-", "_", "."}) for char in normalized_id)
+        ):
+            raise ValueError("schedule_id must be a safe schedule identifier")
+        if not isinstance(enabled, bool) or not isinstance(changed, bool):
+            raise ValueError("schedule mutation state must be boolean")
+        self._append_audit(
+            {
+                "type": "recurring_schedule_updated",
+                "schedule_id": normalized_id,
+                "enabled": enabled,
+                "changed": changed,
+                "timestamp": _now(),
+            }
+        )
 
     def list_connectors(self) -> List[Dict[str, object]]:
         if self.connectors_path.exists():

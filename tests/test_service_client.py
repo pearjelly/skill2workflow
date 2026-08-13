@@ -11,6 +11,7 @@ from skill2workflow.service_client import (
     MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES,
     ServiceActionError,
+    post_recurring_schedule_state,
     post_run_cancel,
     post_run_resume,
     fetch_run_detail,
@@ -377,6 +378,91 @@ class ServiceClientTests(TestCase):
             thread.join(timeout=2)
             server.server_close()
 
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_schedule_state_posts_authenticated_empty_object_and_validates_contract(self):
+        observed = []
+        payload = {
+            "schema_version": "skill2workflow-recurring-schedule-action-0.1.0",
+            "schedule_id": "schedule_hourly_report",
+            "enabled": False,
+            "status": "disabled",
+            "changed": True,
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                        "body": self.rfile.read(int(self.headers["Content-Length"])),
+                    }
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            result = post_recurring_schedule_state(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "schedule_hourly_report",
+                enabled=False,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(result, payload)
+        self.assertEqual(
+            observed,
+            [{
+                "path": "/api/v1/recurring-schedules/schedule_hourly_report/disable",
+                "authorization": f"Bearer {AUTH_TOKEN}",
+                "body": b"{}",
+            }],
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_schedule_state_rejects_unsafe_identifier_and_contract_drift(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaises(ValueError):
+                post_recurring_schedule_state(
+                    "http://127.0.0.1:1",
+                    token_file,
+                    "../scheduler",
+                    enabled=True,
+                )
+
+            class Handler(BaseHTTPRequestHandler):
+                def do_POST(self):
+                    _send_json(self, 200, {"schema_version": "wrong"})
+
+                def log_message(self, *_args):
+                    return
+
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                post_recurring_schedule_state(
+                    f"http://127.0.0.1:{server.server_port}",
+                    token_file,
+                    "schedule_hourly_report",
+                    enabled=True,
+                )
+            thread.join(timeout=2)
+            server.server_close()
         self.assertFalse(thread.is_alive())
 
     def test_run_detail_uses_authenticated_get_and_validates_redacted_contract(self):

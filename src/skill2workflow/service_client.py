@@ -14,6 +14,7 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     RUN_DETAIL_SCHEMA_VERSION,
     RUN_LIST_SCHEMA_VERSION,
+    RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION,
     RECURRING_SCHEDULE_LIST_SCHEMA_VERSION,
     SUPPORT_BUNDLE_SCHEMA_VERSION,
 )
@@ -151,6 +152,30 @@ def fetch_recurring_schedule_list(
     return payload
 
 
+def post_recurring_schedule_state(
+    service_url: str,
+    token_file: Path,
+    schedule_id: str,
+    enabled: bool,
+) -> Dict[str, object]:
+    """Enable or disable one recurring schedule through the service boundary."""
+
+    if not isinstance(enabled, bool):
+        raise ValueError("enabled must be a boolean")
+    normalized_schedule_id = _validate_schedule_id(schedule_id)
+    action = "enable" if enabled else "disable"
+    payload = _post_json(
+        service_url,
+        token_file,
+        f"/api/v1/recurring-schedules/{normalized_schedule_id}/{action}",
+        {},
+        conflict_message="recurring schedule action conflicts with current state",
+        not_found_message="recurring schedule not found",
+    )
+    _validate_recurring_schedule_action(payload, normalized_schedule_id, enabled)
+    return payload
+
+
 def fetch_support_bundle(
     service_url: str,
     token_file: Path,
@@ -225,6 +250,7 @@ def _post_json(
     path: str,
     payload: Dict[str, object],
     conflict_message: str,
+    not_found_message: str = "run not found",
 ) -> Dict[str, object]:
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     return _request_json(
@@ -234,6 +260,7 @@ def _post_json(
         method="POST",
         body=body,
         conflict_message=conflict_message,
+        not_found_message=not_found_message,
     )
 
 
@@ -243,6 +270,7 @@ def _get_json(
     path: str,
     conflict_message: str,
     max_response_bytes: int = MAX_SERVICE_ACTION_RESPONSE_BYTES,
+    not_found_message: str = "run not found",
 ) -> Dict[str, object]:
     return _request_json(
         service_url,
@@ -251,6 +279,7 @@ def _get_json(
         method="GET",
         body=None,
         conflict_message=conflict_message,
+        not_found_message=not_found_message,
         max_response_bytes=max_response_bytes,
     )
 
@@ -264,6 +293,7 @@ def _request_json(
     body: Optional[bytes],
     conflict_message: str,
     max_response_bytes: int = MAX_SERVICE_ACTION_RESPONSE_BYTES,
+    not_found_message: str = "run not found",
 ) -> Dict[str, object]:
     endpoint = service_endpoint(service_url, path)
     token = read_service_bearer_token(token_file)
@@ -301,7 +331,7 @@ def _request_json(
         finally:
             error.close()
         raise ServiceActionError(
-            _error_message(status_code, conflict_message),
+            _error_message(status_code, conflict_message, not_found_message),
             status_code=status_code,
         ) from error
     except ServiceActionError:
@@ -498,6 +528,20 @@ def _validate_recurring_schedule_list(payload: Dict[str, object]) -> None:
         or not isinstance(window.get("truncated"), bool)
         or window.get("truncated") != (window.get("returned") < window.get("total"))
         or window.get("total") != summary.get("total")
+    ):
+        raise ServiceActionError()
+
+
+def _validate_recurring_schedule_action(
+    payload: Dict[str, object], schedule_id: str, enabled: bool
+) -> None:
+    if (
+        set(payload) != {"schema_version", "schedule_id", "enabled", "status", "changed"}
+        or payload.get("schema_version") != RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION
+        or payload.get("schedule_id") != schedule_id
+        or payload.get("enabled") is not enabled
+        or payload.get("status") not in {"active", "disabled"}
+        or not isinstance(payload.get("changed"), bool)
     ):
         raise ServiceActionError()
 
@@ -708,11 +752,24 @@ def _validate_run_id(run_id: str) -> str:
     return value
 
 
-def _error_message(status_code: int, conflict_message: str) -> str:
+def _validate_schedule_id(schedule_id: str) -> str:
+    value = str(schedule_id)
+    if (
+        not value
+        or len(value) > 128
+        or any(not (char.isalnum() or char in {"-", "_", "."}) for char in value)
+    ):
+        raise ValueError("schedule_id must be a safe schedule identifier")
+    return value
+
+
+def _error_message(
+    status_code: int, conflict_message: str, not_found_message: str = "run not found"
+) -> str:
     return {
         400: "invalid service action",
         401: "authentication required",
-        404: "run not found",
+        404: not_found_message,
         409: conflict_message,
         413: "service action body is too large",
         503: "service unavailable",

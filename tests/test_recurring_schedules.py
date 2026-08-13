@@ -64,6 +64,35 @@ class RecurringScheduleContractTests(TestCase):
 
 
 class RecurringSchedulePersistenceTests(TestCase):
+    def test_set_enabled_with_result_is_idempotent_and_serialized(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            store.add(_recurring_definition())
+
+            disabled, changed = store.set_enabled_with_result(
+                "schedule_hourly_report", False
+            )
+            with store._connection() as connection:
+                first_updated_at = connection.execute(
+                    "select updated_at from recurring_schedules where schedule_id = ?",
+                    ("schedule_hourly_report",),
+                ).fetchone()[0]
+            repeated, repeated_changed = store.set_enabled_with_result(
+                "schedule_hourly_report", False
+            )
+            with store._connection() as connection:
+                second_updated_at = connection.execute(
+                    "select updated_at from recurring_schedules where schedule_id = ?",
+                    ("schedule_hourly_report",),
+                ).fetchone()[0]
+
+        self.assertFalse(disabled["schedule"]["enabled"])
+        self.assertEqual(disabled["schedule"]["status"], "disabled")
+        self.assertTrue(changed)
+        self.assertFalse(repeated_changed)
+        self.assertEqual(repeated, disabled)
+        self.assertEqual(second_updated_at, first_updated_at)
+
     def test_existing_schedule_cli_boundary_accepts_recurring_only_with_sqlite(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

@@ -1,9 +1,9 @@
 # Remote Recurring Schedule Inventory
 
 The self-hosted service exposes the durable recurring schedules needed for
-remote operator diagnosis without granting schedule mutation access. This is
-a read-only inventory: it never enables, disables, claims, dispatches, or
-rewrites a schedule.
+remote operator diagnosis. The inventory itself remains read-only: it never
+enables, disables, claims, dispatches, or rewrites a schedule. Protected state
+changes are documented separately in [`remote-schedule-actions.md`](remote-schedule-actions.md).
 
 ## HTTP Contract
 
@@ -37,9 +37,9 @@ skill2workflow service-recurring-schedules \
 
 The CLI keeps the token out of argv, disables proxies and redirects, validates
 the response headers and schema, and prints only the fixed redacted contract.
-Use the local `schedule-enable`, `schedule-disable`, and
-`schedule-dispatches` commands for deliberate changes on the service host;
-this remote inventory intentionally provides no write operation.
+Use the protected `service-schedule-enable` and `service-schedule-disable`
+commands for deliberate remote changes, or the local `schedule-enable`,
+`schedule-disable`, and `schedule-dispatches` commands on the service host.
 
 ## Evidence
 

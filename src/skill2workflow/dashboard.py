@@ -14,6 +14,7 @@ RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
 RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
 SUPPORT_BUNDLE_SCHEMA_VERSION = "skill2workflow-support-bundle-0.1.0"
 RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list-0.1.0"
+RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION = "skill2workflow-recurring-schedule-action-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 MAX_RUN_DETAIL_EVENTS = 50
@@ -270,6 +271,7 @@ def build_support_bundle_from_control(
     http_requests = dict(observability.get("http_requests", {}))
     http_requests.pop("audit_consistency", None)
     http_requests.pop("recurring_schedule_list", None)
+    http_requests.pop("recurring_schedule_action", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests
     return {
