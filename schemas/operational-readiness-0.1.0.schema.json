@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/operational-readiness-0.1.0.json",
+  "title": "skill2workflow remote operational readiness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "service",
+    "checks",
+    "blocking_reasons",
+    "operator_notes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-operational-readiness-0.1.0"
+    },
+    "status": {
+      "enum": ["ready", "attention"]
+    },
+    "service": {
+      "$ref": "#/$defs/service"
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflow_artifacts", "audit_integrity", "offline_backup"],
+      "properties": {
+        "workflow_artifacts": { "$ref": "#/$defs/artifacts" },
+        "audit_integrity": { "$ref": "#/$defs/audit" },
+        "offline_backup": { "$ref": "#/$defs/backup" }
+      }
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 7,
+      "items": {
+        "enum": [
+          "service_not_ready",
+          "state_layout_not_current",
+          "workflow_artifacts_attention",
+          "workflow_artifacts_unavailable",
+          "audit_integrity_not_valid",
+          "audit_integrity_unavailable",
+          "offline_backup_unavailable"
+        ]
+      }
+    },
+    "operator_notes": {
+      "type": "array",
+      "maxItems": 1,
+      "items": { "const": "offline_backup_requires_stop" }
+    }
+  },
+  "$defs": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "ready",
+        "storage",
+        "state_layout_version",
+        "scheduler_lease_owned"
+      ],
+      "properties": {
+        "status": { "enum": ["starting", "ready", "draining", "stopped"] },
+        "ready": { "type": "boolean" },
+        "storage": { "const": "sqlite" },
+        "state_layout_version": { "const": "skill2workflow-sqlite-layout-0.1.0" },
+        "scheduler_lease_owned": { "type": "boolean" }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "issue_count"],
+      "properties": {
+        "status": { "enum": ["clean", "attention", "unavailable"] },
+        "issue_count": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["valid", "invalid", "legacy_unsealed", "unavailable"] }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "active_scheduler_lease"],
+      "properties": {
+        "status": { "enum": ["ready", "blocked", "unavailable"] },
+        "active_scheduler_lease": { "type": ["boolean", "null"] }
+      }
+    }
+  }
+}

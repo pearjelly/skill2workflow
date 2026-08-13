@@ -13,6 +13,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from .backup import BACKUP_READINESS_SCHEMA_VERSION
 from .retention import RETENTION_READINESS_SCHEMA_VERSION
+from .operational_readiness import OPERATIONAL_READINESS_SCHEMA_VERSION
 from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
@@ -56,6 +57,7 @@ MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RETENTION_READINESS_REQUEST_BYTES = 64 * 1024
 MAX_RETENTION_READINESS_RESPONSE_BYTES = 16 * 1024
+MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_TRIGGER_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
@@ -260,6 +262,23 @@ def fetch_retention_readiness(
         max_response_bytes=MAX_RETENTION_READINESS_RESPONSE_BYTES,
     )
     _validate_retention_readiness(payload)
+    return payload
+
+
+def fetch_operational_readiness(
+    service_url: str,
+    token_file: Path,
+) -> Dict[str, object]:
+    """Fetch the authenticated aggregate operator readiness report."""
+
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/operational-readiness",
+        conflict_message="operational readiness unavailable",
+        max_response_bytes=MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
+    )
+    _validate_operational_readiness(payload)
     return payload
 
 
@@ -1101,6 +1120,111 @@ def _validate_retention_readiness(payload: Dict[str, object]) -> None:
         if any(value is not None for value in values):
             raise ServiceActionError()
     elif any(not _is_non_negative_integer(value) for value in values):
+        raise ServiceActionError()
+
+
+def _validate_operational_readiness(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed aggregate readiness contract."""
+
+    fields = {
+        "schema_version",
+        "status",
+        "service",
+        "checks",
+        "blocking_reasons",
+        "operator_notes",
+    }
+    if set(payload) != fields or payload.get("schema_version") != OPERATIONAL_READINESS_SCHEMA_VERSION:
+        raise ServiceActionError()
+    service = payload.get("service")
+    if (
+        not isinstance(service, dict)
+        or set(service)
+        != {
+            "status",
+            "ready",
+            "storage",
+            "state_layout_version",
+            "scheduler_lease_owned",
+        }
+        or service.get("status") not in {"starting", "ready", "draining", "stopped"}
+        or not isinstance(service.get("ready"), bool)
+        or service.get("storage") != "sqlite"
+        or service.get("state_layout_version")
+        != "skill2workflow-sqlite-layout-0.1.0"
+        or not isinstance(service.get("scheduler_lease_owned"), bool)
+    ):
+        raise ServiceActionError()
+    checks = payload.get("checks")
+    if not isinstance(checks, dict) or set(checks) != {
+        "workflow_artifacts", "audit_integrity", "offline_backup"
+    }:
+        raise ServiceActionError()
+    artifacts = checks.get("workflow_artifacts")
+    if (
+        not isinstance(artifacts, dict)
+        or set(artifacts) != {"status", "issue_count"}
+        or artifacts.get("status") not in {"clean", "attention", "unavailable"}
+        or (
+            artifacts.get("issue_count") is not None
+            and not _is_non_negative_integer(artifacts.get("issue_count"))
+        )
+        or (artifacts.get("status") == "unavailable" and artifacts.get("issue_count") is not None)
+        or (artifacts.get("status") != "unavailable" and artifacts.get("issue_count") is None)
+    ):
+        raise ServiceActionError()
+    audit = checks.get("audit_integrity")
+    if (
+        not isinstance(audit, dict)
+        or set(audit) != {"status"}
+        or audit.get("status") not in {"valid", "invalid", "legacy_unsealed", "unavailable"}
+    ):
+        raise ServiceActionError()
+    backup = checks.get("offline_backup")
+    if (
+        not isinstance(backup, dict)
+        or set(backup) != {"status", "active_scheduler_lease"}
+        or backup.get("status") not in {"ready", "blocked", "unavailable"}
+        or (
+            backup.get("active_scheduler_lease") is not None
+            and not isinstance(backup.get("active_scheduler_lease"), bool)
+        )
+        or (backup.get("status") == "unavailable" and backup.get("active_scheduler_lease") is not None)
+        or (backup.get("status") != "unavailable" and backup.get("active_scheduler_lease") is None)
+    ):
+        raise ServiceActionError()
+    reasons = payload.get("blocking_reasons")
+    allowed_reasons = {
+        "service_not_ready",
+        "state_layout_not_current",
+        "workflow_artifacts_attention",
+        "workflow_artifacts_unavailable",
+        "audit_integrity_not_valid",
+        "audit_integrity_unavailable",
+        "offline_backup_unavailable",
+    }
+    if (
+        not isinstance(reasons, list)
+        or len(reasons) > len(allowed_reasons)
+        or any(reason not in allowed_reasons for reason in reasons)
+        or len(set(reasons)) != len(reasons)
+    ):
+        raise ServiceActionError()
+    notes = payload.get("operator_notes")
+    if (
+        not isinstance(notes, list)
+        or len(notes) > 1
+        or any(note != "offline_backup_requires_stop" for note in notes)
+        or ("offline_backup_requires_stop" in notes
+            and backup.get("status") != "blocked")
+        or (backup.get("status") == "blocked"
+            and notes != ["offline_backup_requires_stop"])
+    ):
+        raise ServiceActionError()
+    if payload.get("status") not in {"ready", "attention"}:
+        raise ServiceActionError()
+    expected_status = "ready" if not reasons else "attention"
+    if payload.get("status") != expected_status:
         raise ServiceActionError()
 
 

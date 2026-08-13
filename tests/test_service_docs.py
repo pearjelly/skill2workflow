@@ -25,6 +25,7 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("GET /api/v1/workflow-artifacts", guide)
         self.assertIn("GET /api/v1/backup-readiness", guide)
         self.assertIn("POST /api/v1/retention-readiness", guide)
+        self.assertIn("GET /api/v1/operational-readiness", guide)
         self.assertIn("GET /api/v1/audit-integrity", guide)
         self.assertIn("GET /api/v1/runtime-info", guide)
         self.assertIn("service-trigger", guide)
@@ -53,10 +54,12 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("service-workflows", guide)
         self.assertIn("remote-retention-readiness.md", guide)
         self.assertIn("service-retention-readiness", guide)
+        self.assertIn("remote-operational-readiness.md", guide)
+        self.assertIn("service-operational-readiness", guide)
 
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-92 are complete", readme)
+        self.assertIn("Delivery Loops 1-93 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

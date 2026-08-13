@@ -31,6 +31,7 @@ from .service_client import (
     fetch_workflow_inventory,
     fetch_backup_readiness,
     fetch_retention_readiness,
+    fetch_operational_readiness,
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_workflow_diff,
@@ -392,6 +393,13 @@ def main(argv=None) -> int:
     service_retention_cmd.add_argument("policy", type=Path)
     service_retention_cmd.add_argument("--service-url", required=True)
     service_retention_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_operational_cmd = subparsers.add_parser(
+        "service-operational-readiness",
+        help="Show aggregate operational readiness through the authenticated service",
+    )
+    service_operational_cmd.add_argument("--service-url", required=True)
+    service_operational_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_integrity_cmd = subparsers.add_parser(
         "service-audit-integrity",
@@ -922,6 +930,14 @@ def main(argv=None) -> int:
                 args.service_url,
                 args.auth_token_file,
                 _load_json(args.policy),
+            )
+        )
+
+    if args.command == "service-operational-readiness":
+        return _service_action(
+            lambda: fetch_operational_readiness(
+                args.service_url,
+                args.auth_token_file,
             )
         )
 

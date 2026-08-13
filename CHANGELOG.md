@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added authenticated remote operational readiness at
+  `GET /api/v1/operational-readiness` and the protected
+  `service-operational-readiness` CLI, combining fixed lifecycle,
+  artifact-consistency, audit-integrity, and offline-backup statuses without
+  lifecycle mutation or sensitive-value export.
 - Added authenticated remote retention readiness at
   `POST /api/v1/retention-readiness` and the protected
   `service-retention-readiness` CLI, binding the normalized copy-on-write

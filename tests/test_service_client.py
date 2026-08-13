@@ -14,6 +14,7 @@ from skill2workflow.service_client import (
     MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
     MAX_BACKUP_READINESS_RESPONSE_BYTES,
     MAX_RETENTION_READINESS_RESPONSE_BYTES,
+    MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
     MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     MAX_RUNTIME_INFO_RESPONSE_BYTES,
     MAX_REMOTE_TRIGGER_REQUEST_BYTES,
@@ -30,6 +31,7 @@ from skill2workflow.service_client import (
     fetch_workflow_inventory,
     fetch_backup_readiness,
     fetch_retention_readiness,
+    fetch_operational_readiness,
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_support_bundle,
@@ -1057,6 +1059,91 @@ class ServiceClientTests(TestCase):
             with self.assertRaises(ServiceActionError):
                 fetch_retention_readiness(
                     f"http://127.0.0.1:{server.server_port}", token_file, policy
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
+    def test_operational_readiness_uses_authenticated_get_and_validates_contract(self):
+        payload = {
+            "schema_version": "skill2workflow-operational-readiness-0.1.0",
+            "status": "ready",
+            "service": {
+                "status": "ready",
+                "ready": True,
+                "storage": "sqlite",
+                "state_layout_version": "skill2workflow-sqlite-layout-0.1.0",
+                "scheduler_lease_owned": True,
+            },
+            "checks": {
+                "workflow_artifacts": {"status": "clean", "issue_count": 0},
+                "audit_integrity": {"status": "valid"},
+                "offline_backup": {
+                    "status": "blocked",
+                    "active_scheduler_lease": True,
+                },
+            },
+            "blocking_reasons": [],
+            "operator_notes": ["offline_backup_requires_stop"],
+        }
+        observed = {}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_operational_readiness(
+                f"http://127.0.0.1:{server.server_port}", token_file
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed["path"], "/api/v1/operational-readiness")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertFalse(thread.is_alive())
+
+    def test_operational_readiness_rejects_oversized_response(self):
+        body = b"x" * (MAX_OPERATIONAL_READINESS_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_operational_readiness(
+                    f"http://127.0.0.1:{server.server_port}", token_file
                 )
             thread.join(timeout=2)
             server.server_close()

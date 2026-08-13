@@ -391,6 +391,32 @@ class CliTests(TestCase):
         load.assert_called_once_with(policy_file)
         fetch.assert_called_once_with("https://service.example", token_file, policy)
 
+    def test_service_operational_readiness_command_prints_report(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-operational-readiness-0.1.0",
+            "status": "ready",
+        }
+        with patch(
+            "skill2workflow.cli.fetch_operational_readiness",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-operational-readiness",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example", token_file)
+
     def test_service_audit_integrity_command_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

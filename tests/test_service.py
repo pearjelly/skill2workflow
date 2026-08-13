@@ -39,6 +39,7 @@ from skill2workflow.service_client import (
     post_workflow_promotion,
     post_workflow_deprecation,
     fetch_workflow_inventory,
+    fetch_operational_readiness,
     fetch_workflow_diff,
     post_workflow_trigger,
 )
@@ -603,6 +604,60 @@ class RuntimeServiceTests(TestCase):
         self.assertFalse(accepted["plan_available"])
         self.assertEqual(accepted["blocking_reasons"], ["active_scheduler_lease"])
         self.assertTrue(all(value is None for value in accepted["eligible"].values()))
+        self.assertFalse(thread.is_alive())
+
+    def test_operational_readiness_is_authenticated_aggregate_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            try:
+                denied_status, denied = _get_json(
+                    f"{base_url}/api/v1/operational-readiness"
+                )
+                report = fetch_operational_readiness(
+                    base_url,
+                    config.auth_token_file,
+                )
+                body_status, body = _get_raw_get(
+                    f"{base_url}/api/v1/operational-readiness",
+                    token=AUTH_TOKEN,
+                    body=b"{}",
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(report["status"], "ready")
+        self.assertEqual(report["service"]["status"], "ready")
+        self.assertTrue(report["service"]["ready"])
+        self.assertEqual(report["checks"]["workflow_artifacts"], {
+            "status": "clean",
+            "issue_count": 0,
+        })
+        self.assertEqual(report["checks"]["audit_integrity"]["status"], "valid")
+        self.assertEqual(report["checks"]["offline_backup"]["status"], "blocked")
+        self.assertEqual(report["operator_notes"], ["offline_backup_requires_stop"])
+        self.assertEqual(body_status, 400)
+        self.assertEqual(body, {"error": "operational readiness request must not include a body"})
         self.assertFalse(thread.is_alive())
 
     def test_audit_integrity_is_authenticated_payload_free_and_read_only(self):

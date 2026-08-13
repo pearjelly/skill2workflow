@@ -54,10 +54,10 @@ class RetentionDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-92 are complete", readme)
+        self.assertIn("Delivery Loops 1-93 are complete", readme)
         self.assertIn("Loop 47", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("- Completed delivery loops: 1-92", roadmap)
+        self.assertIn("- Completed delivery loops: 1-93", roadmap)
         self.assertIn("Loop 47: Data Retention And Disposal", roadmap)
         self.assertIn("Current maturity remains Self-hosted Beta", roadmap)
 
@@ -77,3 +77,21 @@ class RetentionDocumentationTests(TestCase):
         )
         self.assertIn("eligible", schema["required"])
         self.assertIn("preserved", schema["required"])
+
+    def test_operational_readiness_guide_and_schema_define_fixed_aggregate_contract(self):
+        guide = (ROOT / "docs/remote-operational-readiness.md").read_text(
+            encoding="utf-8"
+        )
+        schema = json.loads(
+            (ROOT / "schemas/operational-readiness-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn("GET /api/v1/operational-readiness", guide)
+        self.assertIn("best-effort", guide)
+        self.assertIn("service-operational-readiness", guide)
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-operational-readiness-0.1.0",
+        )
+        self.assertIn("checks", schema["required"])

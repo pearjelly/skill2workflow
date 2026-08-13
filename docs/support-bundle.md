@@ -32,7 +32,8 @@ the authenticated SQLite state is readable.
 
 The support-bundle `0.1.0` HTTP matrix is intentionally fixed: newer read-only
 routes such as `audit_consistency`, `recurring_schedule_list`,
-`recurring_schedule_action`, and `retention_readiness` remain in the
+`recurring_schedule_action`, `retention_readiness`, and
+`operational_readiness` remain in the
 live metrics route matrix but are omitted from this older bundle contract.
 
 Responses use `Cache-Control: no-store` and are bounded to 128 KiB after UTF-8
