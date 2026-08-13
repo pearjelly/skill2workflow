@@ -606,6 +606,43 @@ class CliTests(TestCase):
             "0.2.0",
         )
 
+    def test_service_workflow_deprecate_command_uses_version_options(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-workflow-deprecation-0.1.0",
+            "workflow_id": "workflow_demo",
+            "version": "0.1.0",
+            "status": "deprecated",
+            "checksum": "a" * 64,
+        }
+        with patch(
+            "skill2workflow.cli.post_workflow_deprecation",
+            return_value=expected,
+        ) as deprecate:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-workflow-deprecate",
+                        "workflow_demo",
+                        "--version",
+                        "0.1.0",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        deprecate.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            "workflow_demo",
+            "0.1.0",
+        )
+
     def test_service_schedule_state_command_prints_action(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

@@ -37,6 +37,7 @@ from skill2workflow.service_client import (
     ServiceActionError,
     post_workflow_release,
     post_workflow_promotion,
+    post_workflow_deprecation,
     fetch_workflow_diff,
     post_workflow_trigger,
 )
@@ -1887,6 +1888,84 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("Private customer review title", serialized)
         self.assertNotIn("artifact", serialized)
         self.assertEqual(audit_after, audit_count)
+        self.assertFalse(thread.is_alive())
+
+    def test_remote_workflow_deprecation_is_authenticated_idempotent_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            workflow = _workflow()
+            control.publish_workflow(workflow)
+            control.promote_workflow("workflow_service", "0.1.0")
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            url = f"{base_url}/api/v1/workflow-deprecations"
+            try:
+                denied_status, denied = _post_json(
+                    url,
+                    {"workflow_id": "workflow_service", "version": "0.1.0"},
+                )
+                malformed_status, malformed = _post_json(
+                    url,
+                    {"workflow_id": "workflow_service"},
+                    token=AUTH_TOKEN,
+                )
+                first = post_workflow_deprecation(
+                    base_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.1.0",
+                )
+                replay = post_workflow_deprecation(
+                    base_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.1.0",
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            records = LocalControlPlane(state_dir, storage="sqlite").list_workflows()
+            audit = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+            artifact_preserved = (state_dir / records[0]["artifact"]).is_file()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "workflow deprecation rejected"})
+        self.assertEqual(first, replay)
+        self.assertEqual(
+            set(first),
+            {"schema_version", "workflow_id", "version", "status", "checksum"},
+        )
+        self.assertEqual(first["status"], "deprecated")
+        self.assertNotIn("deprecated_at", first)
+        self.assertNotIn("artifact", first)
+        record = next(item for item in records if item.get("version") == "0.1.0")
+        self.assertEqual(record["status"], "deprecated")
+        self.assertNotIn("aliases", record)
+        self.assertTrue(artifact_preserved)
+        self.assertEqual(
+            sum(event.get("type") == "workflow_deprecated" for event in audit),
+            1,
+        )
         self.assertFalse(thread.is_alive())
 
     def test_business_routes_require_rotatable_bearer_auth_and_write_compact_audit(self):

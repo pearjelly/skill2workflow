@@ -40,6 +40,7 @@ from .service_client import (
     post_run_resume,
     post_workflow_release,
     post_workflow_promotion,
+    post_workflow_deprecation,
     post_workflow_trigger,
 )
 from .systemd_service import write_systemd_service_unit
@@ -428,6 +429,15 @@ def main(argv=None) -> int:
     )
     service_promotion_cmd.add_argument("--service-url", required=True)
     service_promotion_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_deprecation_cmd = subparsers.add_parser(
+        "service-workflow-deprecate",
+        help="Deprecate one published Workflow DSL version through the authenticated service",
+    )
+    service_deprecation_cmd.add_argument("workflow_id")
+    service_deprecation_cmd.add_argument("--version", required=True)
+    service_deprecation_cmd.add_argument("--service-url", required=True)
+    service_deprecation_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_trigger_cmd = subparsers.add_parser(
         "service-trigger",
@@ -934,6 +944,16 @@ def main(argv=None) -> int:
                 args.version,
                 alias=args.alias,
                 expected_current_version=args.expected_current_version,
+            )
+        )
+
+    if args.command == "service-workflow-deprecate":
+        return _service_action(
+            lambda: post_workflow_deprecation(
+                args.service_url,
+                args.auth_token_file,
+                args.workflow_id,
+                args.version,
             )
         )
 

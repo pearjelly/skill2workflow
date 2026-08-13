@@ -389,6 +389,7 @@ def build_support_bundle_from_control(
     http_requests.pop("runtime_info", None)
     http_requests.pop("workflow_release", None)
     http_requests.pop("workflow_promotion", None)
+    http_requests.pop("workflow_deprecation", None)
     http_requests.pop("workflow_diff", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests

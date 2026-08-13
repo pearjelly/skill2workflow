@@ -31,6 +31,7 @@ The installed command set also includes the protected `service-resume`,
 `service-workflow-publish`, protected
 `service-workflow-promote`, protected
 `service-workflow-diff`, protected
+`service-workflow-deprecate`, protected
 `service-trigger`, protected
 `service-schedule-enable` and
 `service-schedule-disable`, and owner-only `service-support-bundle` operator

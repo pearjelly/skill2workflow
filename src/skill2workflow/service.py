@@ -60,6 +60,7 @@ WORKFLOW_DSL_SCHEMA_VERSION = "0.1.0"
 WORKFLOW_RELEASE_SCHEMA_VERSION = "skill2workflow-workflow-release-0.1.0"
 WORKFLOW_PROMOTION_SCHEMA_VERSION = "skill2workflow-workflow-promotion-0.1.0"
 WORKFLOW_DIFF_SCHEMA_VERSION = "skill2workflow-workflow-diff-0.1.0"
+WORKFLOW_DEPRECATION_SCHEMA_VERSION = "skill2workflow-workflow-deprecation-0.1.0"
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 MAX_AUTH_TOKEN_BYTES = 16 * 1024
 LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
@@ -76,6 +77,7 @@ MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
+MAX_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
 MAX_CONCURRENT_BUSINESS_REQUESTS = 16
 
@@ -557,6 +559,8 @@ def _handler_for(service: RuntimeService):
                     self._handle_workflow_release()
                 elif self.command == "POST" and path == "/api/v1/workflow-promotions":
                     self._handle_workflow_promotion()
+                elif self.command == "POST" and path == "/api/v1/workflow-deprecations":
+                    self._handle_workflow_deprecation()
                 elif self.command == "GET" and _workflow_diff_parts(path) is not None:
                     self._handle_workflow_diff(_workflow_diff_parts(path))
                 elif self.command == "GET" and path == "/api/v1/recurring-schedules":
@@ -1283,6 +1287,83 @@ def _handler_for(service: RuntimeService):
             except (OSError, sqlite3.Error):
                 self._send_json(503, {"error": "workflow promotion unavailable"})
 
+        def _handle_workflow_deprecation(self):
+            """Deprecate one published workflow version through the service."""
+
+            readiness_status, _ = service.readiness()
+            if readiness_status != 200:
+                self._send_json(503, {"error": "service is not ready"})
+                return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                service.control_plane.record_ingress_authentication(
+                    False,
+                    self.command,
+                    "workflow_deprecation",
+                    reason=reason,
+                )
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            service.control_plane.record_ingress_authentication(
+                True,
+                self.command,
+                "workflow_deprecation",
+            )
+            try:
+                body = self.rfile.read(_content_length(self))
+                payload = json.loads(body.decode("utf-8"))
+                fields = {"workflow_id", "version"}
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != fields
+                    or any(
+                        not isinstance(payload.get(field), str) or not payload.get(field)
+                        for field in fields
+                    )
+                ):
+                    raise ValueError("workflow deprecation request is malformed")
+                record = service.control_plane.deprecate_workflow(
+                    payload["workflow_id"],
+                    payload["version"],
+                )
+                response = {
+                    "schema_version": WORKFLOW_DEPRECATION_SCHEMA_VERSION,
+                    "workflow_id": str(record.get("workflow_id", "")),
+                    "version": str(record.get("version", "")),
+                    "status": str(record.get("status", "")),
+                    "checksum": str(record.get("checksum", "")),
+                }
+                encoded = json.dumps(response, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_WORKFLOW_DEPRECATION_RESPONSE_BYTES:
+                    raise ValueError("workflow deprecation response exceeds response limit")
+                if response["status"] != "deprecated":
+                    raise ValueError("workflow deprecation did not persist status")
+                self._send_json(200, response)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except ValueError as error:
+                if "version not found" in str(error).lower():
+                    self._send_json(404, {"error": "workflow version not found"})
+                else:
+                    self._send_json(400, {"error": "workflow deprecation rejected"})
+            except (UnicodeDecodeError, json.JSONDecodeError, TypeError, OverflowError, RecursionError):
+                self._send_json(400, {"error": "workflow deprecation rejected"})
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "workflow deprecation unavailable"})
+
         def _handle_workflow_diff(self, parts):
             """Serve a bounded, value-free diff of two published versions."""
 
@@ -1663,6 +1744,8 @@ def _request_route(method: str, path: str) -> str:
         return "workflow_release"
     if method == "POST" and path == "/api/v1/workflow-promotions":
         return "workflow_promotion"
+    if method == "POST" and path == "/api/v1/workflow-deprecations":
+        return "workflow_deprecation"
     if method == "GET" and _workflow_diff_parts(path) is not None:
         return "workflow_diff"
     if method == "GET" and path == "/api/v1/recurring-schedules":

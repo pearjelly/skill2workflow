@@ -35,6 +35,7 @@ from .service import (
     SERVICE_SCHEMA_VERSION,
     WORKFLOW_RELEASE_SCHEMA_VERSION,
     WORKFLOW_PROMOTION_SCHEMA_VERSION,
+    WORKFLOW_DEPRECATION_SCHEMA_VERSION,
     WORKFLOW_DSL_SCHEMA_VERSION,
     read_service_bearer_token,
 )
@@ -58,6 +59,8 @@ MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
+MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_REMOTE_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 
@@ -402,6 +405,37 @@ def post_workflow_promotion(
         workflow_id=normalized_workflow_id,
         version=normalized_version,
         alias=normalized_alias,
+    )
+    return payload
+
+
+def post_workflow_deprecation(
+    service_url: str,
+    token_file: Path,
+    workflow_id: str,
+    version: str,
+) -> Dict[str, object]:
+    """Deprecate one published workflow version through the service boundary."""
+
+    normalized_workflow_id = _validate_workflow_ref(workflow_id, "workflow_id")
+    normalized_version = _validate_workflow_ref(version, "version")
+    payload = _post_json(
+        service_url,
+        token_file,
+        "/api/v1/workflow-deprecations",
+        {
+            "workflow_id": normalized_workflow_id,
+            "version": normalized_version,
+        },
+        conflict_message="workflow deprecation rejected",
+        not_found_message="workflow version not found",
+        max_request_bytes=MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES,
+        max_response_bytes=MAX_REMOTE_WORKFLOW_DEPRECATION_RESPONSE_BYTES,
+    )
+    _validate_workflow_deprecation_response(
+        payload,
+        workflow_id=normalized_workflow_id,
+        version=normalized_version,
     )
     return payload
 
@@ -1417,6 +1451,26 @@ def _validate_workflow_promotion_response(
         or payload.get("version") != version
         or payload.get("alias") != alias
         or payload.get("status") != "promoted"
+        or not _is_hex_digest(payload.get("checksum"))
+    ):
+        raise ServiceActionError()
+
+
+def _validate_workflow_deprecation_response(
+    payload: Dict[str, object],
+    *,
+    workflow_id: str,
+    version: str,
+) -> None:
+    """Reject responses outside the fixed redacted deprecation contract."""
+
+    fields = {"schema_version", "workflow_id", "version", "status", "checksum"}
+    if set(payload) != fields or payload.get("schema_version") != WORKFLOW_DEPRECATION_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if (
+        payload.get("workflow_id") != workflow_id
+        or payload.get("version") != version
+        or payload.get("status") != "deprecated"
         or not _is_hex_digest(payload.get("checksum"))
     ):
         raise ServiceActionError()

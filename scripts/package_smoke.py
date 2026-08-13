@@ -60,6 +60,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-workflow-diff",
     "service-workflow-publish",
     "service-workflow-promote",
+    "service-workflow-deprecate",
     "service-trigger",
     "service-schedule-enable",
     "service-schedule-disable",

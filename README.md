@@ -712,7 +712,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-89 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-90 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -889,6 +889,11 @@ Loop 89 adds [local ingress-token rotation](docs/service-token-rotation.md):
 the installed `service-token-rotate` command atomically replaces the owner-only
 service credential without printing it or restarting the running service.
 
+Loop 90 adds [remote Workflow deprecation](docs/remote-workflow-deprecation.md):
+the installed `service-workflow-deprecate` command retires one published version
+through the authenticated service, removes its stable aliases, preserves the
+immutable artifact, and returns a fixed redacted summary with idempotent replay.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -918,6 +923,7 @@ See:
 - `docs/remote-workflow-release.md`
 - `docs/remote-workflow-promotion.md`
 - `docs/remote-workflow-diff.md`
+- `docs/remote-workflow-deprecation.md`
 - `docs/service-token-rotation.md`
 - `docs/interrupted-recovery.md`
 - `docs/connectors.md`

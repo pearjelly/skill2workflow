@@ -778,6 +778,9 @@ class LocalControlPlane:
             "run_list",
             "run_detail",
             "recurring_schedule_action",
+            "workflow_release",
+            "workflow_promotion",
+            "workflow_deprecation",
             "unknown",
         }:
             normalized_route = "unknown"
