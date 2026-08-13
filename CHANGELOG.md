@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added bounded read-only backup expiration planning through
+  `backup-retention-plan`. An explicit cutoff and minimum-valid-backup floor
+  produce candidates only from a complete inventory; truncation, invalid sets,
+  and minimum retention fail closed, and the command never deletes or rewrites.
 - Added bounded read-only local backup inventory through `backup-list`, with
   fixed integrity status, creation time, layout, file count, and byte totals;
   it never deletes, uploads, or exposes backup paths or contents.

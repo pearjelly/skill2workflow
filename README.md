@@ -158,6 +158,7 @@ explicit connector boundaries. It currently supports:
 - Inspect remote workflow artifact consistency without exposing workflow content or credentials
 - Create, verify, and atomically restore owner-only offline SQLite state backups
 - Inspect a bounded, read-only inventory of local backups with integrity status and size metadata
+- Produce a bounded, read-only backup expiration plan with a minimum-valid-backup floor
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Validate and inspect the minimum connector manifest contract for future extensions
@@ -589,6 +590,7 @@ After stopping the self-hosted service, create and verify an offline backup, the
 PYTHONPATH=src python3 -m skill2workflow.cli backup --state-dir /var/lib/skill2workflow --output-dir /var/backups/skill2workflow/2026-08-11
 PYTHONPATH=src python3 -m skill2workflow.cli backup-verify --backup-dir /var/backups/skill2workflow/2026-08-11
 PYTHONPATH=src python3 -m skill2workflow.cli backup-list --parent-dir /var/backups/skill2workflow --limit 100
+PYTHONPATH=src python3 -m skill2workflow.cli backup-retention-plan /etc/skill2workflow/backup-retention.json --parent-dir /var/backups/skill2workflow
 PYTHONPATH=src python3 -m skill2workflow.cli restore --backup-dir /var/backups/skill2workflow/2026-08-11 --state-dir /var/lib/skill2workflow-restored
 ```
 
@@ -732,7 +734,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-124 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-125 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1088,6 +1090,11 @@ Loop 124 adds [bounded local backup inventory](docs/backup-restore.md).
 `backup-list` reports integrity, creation time, layout, file count, workflow
 artifact count, and byte totals for the newest local backup sets without
 deleting, uploading, or exposing backup paths or contents.
+
+Loop 125 adds bounded [backup retention planning](docs/backup-restore.md).
+`backup-retention-plan` requires an explicit expiration cutoff and minimum
+valid-backup floor, blocks incomplete inventories, and produces candidates
+without deleting or rewriting any backup.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

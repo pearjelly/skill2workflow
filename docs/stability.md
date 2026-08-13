@@ -101,6 +101,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Recurring dispatch states, missed-run policies, and single-SQLite lease semantics documented in `docs/recurring-scheduling.md`
 - State backup manifest `skill2workflow-state-backup-0.1.0`, current `skill2workflow-sqlite-layout-0.1.0`, and verified offline restore contract documented in `docs/backup-restore.md`
 - Local `backup-list` contract `skill2workflow-state-backup-list-0.1.0` provides a read-only 1-1000 newest-set inventory with fixed integrity, size, and layout metadata; it does not delete or upload backups
+- Local `backup-retention-plan` contracts `skill2workflow-backup-retention-policy-0.1.0` and `skill2workflow-backup-retention-plan-0.1.0` provide a read-only, complete-inventory-only expiration plan with an explicit cutoff and minimum-valid-backup floor; truncation blocks candidates and no backup is mutated
 - State layout marker `skill2workflow-state-layout-marker-0.1.0`, fail-closed compatibility preflight, and legacy-to-current copy-on-write migration documented in `docs/upgrade-migration.md`
 - Body-only HTTP connector input mapping documented in `docs/connectors.md`
 - Minimum connector manifest contract documented in `docs/connectors.md`

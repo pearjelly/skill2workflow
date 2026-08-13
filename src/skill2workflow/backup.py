@@ -28,6 +28,8 @@ from .storage import verify_audit_integrity
 BACKUP_SCHEMA_VERSION = "skill2workflow-state-backup-0.1.0"
 BACKUP_READINESS_SCHEMA_VERSION = "skill2workflow-backup-readiness-0.1.0"
 BACKUP_LIST_SCHEMA_VERSION = "skill2workflow-state-backup-list-0.1.0"
+BACKUP_RETENTION_POLICY_SCHEMA_VERSION = "skill2workflow-backup-retention-policy-0.1.0"
+BACKUP_RETENTION_PLAN_SCHEMA_VERSION = "skill2workflow-backup-retention-plan-0.1.0"
 MAX_BACKUP_LIST_ITEMS = 1000
 STATE_LAYOUT_VERSION = CURRENT_STATE_LAYOUT_VERSION
 _DATABASES = ("control.sqlite3", "runs.sqlite3", "scheduler.sqlite3")
@@ -331,6 +333,137 @@ def list_state_backups(parent_dir: Path, limit: int = 100) -> Dict[str, object]:
             "returned": len(backups),
             "truncated": total > len(backups),
         },
+    }
+
+
+def normalize_backup_retention_policy(policy: object) -> Dict[str, object]:
+    """Validate and canonicalize the deliberately narrow backup policy."""
+
+    if not isinstance(policy, dict) or set(policy) != {"schema_version", "retention"}:
+        raise ValueError(
+            "backup retention policy must contain only schema_version and retention"
+        )
+    if policy.get("schema_version") != BACKUP_RETENTION_POLICY_SCHEMA_VERSION:
+        raise ValueError(
+            "backup retention policy schema_version must be "
+            f"{BACKUP_RETENTION_POLICY_SCHEMA_VERSION}"
+        )
+    retention = policy.get("retention")
+    if not isinstance(retention, dict) or set(retention) != {
+        "expire_before",
+        "minimum_keep",
+    }:
+        raise ValueError("backup retention policy retention section has an invalid shape")
+    minimum_keep = retention.get("minimum_keep")
+    if (
+        isinstance(minimum_keep, bool)
+        or not isinstance(minimum_keep, int)
+        or not 1 <= minimum_keep <= MAX_BACKUP_LIST_ITEMS
+    ):
+        raise ValueError(
+            "backup retention minimum_keep must be an integer from 1 through "
+            f"{MAX_BACKUP_LIST_ITEMS}"
+        )
+    return {
+        "schema_version": BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
+        "retention": {
+            "expire_before": _aware_timestamp(
+                retention.get("expire_before"), "backup retention expire_before"
+            ),
+            "minimum_keep": minimum_keep,
+        },
+    }
+
+
+def build_backup_retention_plan(
+    parent_dir: Path,
+    policy: object,
+    limit: int = MAX_BACKUP_LIST_ITEMS,
+) -> Dict[str, object]:
+    """Return a bounded, read-only plan for expiring old valid backups."""
+
+    _validate_backup_list_limit(limit)
+    normalized = normalize_backup_retention_policy(policy)
+    inventory = list_state_backups(parent_dir, limit=limit)
+    base = {
+        "schema_version": BACKUP_RETENTION_PLAN_SCHEMA_VERSION,
+        "storage": "filesystem",
+        "policy_sha256": _policy_checksum(normalized),
+        "expire_before": normalized["retention"]["expire_before"],
+        "minimum_keep": normalized["retention"]["minimum_keep"],
+        "inventory": inventory["window"],
+        "candidates": [],
+        "preserved": [],
+    }
+    if inventory["window"]["truncated"]:
+        return {
+            **base,
+            "status": "blocked",
+            "blocking_reasons": ["inventory_truncated"],
+            "summary": {
+                "valid_backups": None,
+                "invalid_backups": None,
+                "eligible_backups": None,
+                "eligible_bytes": None,
+                "preserved_backups": None,
+                "preserved_bytes": None,
+            },
+        }
+
+    expire_before = str(normalized["retention"]["expire_before"])
+    minimum_keep = int(normalized["retention"]["minimum_keep"])
+    valid = [item for item in inventory["backups"] if item["status"] == "valid"]
+    valid_newest_first = sorted(
+        valid,
+        key=lambda item: (
+            _aware_timestamp(item["created_at"], "backup created_at"),
+            str(item["name"]),
+        ),
+        reverse=True,
+    )
+    protected_names = {str(item["name"]) for item in valid_newest_first[:minimum_keep]}
+    candidates = []
+    preserved = []
+    for item in sorted(
+        inventory["backups"],
+        key=lambda value: (str(value["created_at"]), str(value["name"])),
+    ):
+        name = str(item["name"])
+        entry = {
+            "name": name,
+            "status": str(item["status"]),
+            "created_at": str(item["created_at"]),
+            "total_bytes": int(item["total_bytes"]),
+        }
+        if item["status"] != "valid":
+            entry["reason"] = "invalid_backup"
+            preserved.append(entry)
+            continue
+        created_at = _aware_timestamp(item["created_at"], "backup created_at")
+        if name in protected_names:
+            entry["reason"] = "minimum_keep"
+            preserved.append(entry)
+        elif created_at < expire_before:
+            entry["reason"] = "expired_beyond_minimum_keep"
+            candidates.append(entry)
+        else:
+            entry["reason"] = "newer_than_expire_before"
+            preserved.append(entry)
+
+    return {
+        **base,
+        "status": "ready",
+        "blocking_reasons": [],
+        "summary": {
+            "valid_backups": len(valid),
+            "invalid_backups": len(inventory["backups"]) - len(valid),
+            "eligible_backups": len(candidates),
+            "eligible_bytes": sum(item["total_bytes"] for item in candidates),
+            "preserved_backups": len(preserved),
+            "preserved_bytes": sum(item["total_bytes"] for item in preserved),
+        },
+        "candidates": candidates,
+        "preserved": preserved,
     }
 
 
@@ -900,6 +1033,16 @@ def _file_checksum(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _policy_checksum(policy: Dict[str, object]) -> str:
+    payload = json.dumps(
+        policy,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _json_checksum(value: object) -> str:

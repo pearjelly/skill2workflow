@@ -25,6 +25,7 @@ class ChangelogContractTests(TestCase):
             "secure service bootstrap",
             "installed controlled quickstart",
             "descriptor-bound connector credential reads",
+            "backup expiration planning",
         ):
             self.assertIn(capability, changelog)
 

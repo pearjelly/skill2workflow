@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from .backup import (
+    build_backup_retention_plan,
     create_state_backup,
     list_state_backups,
     restore_state_backup,
@@ -293,6 +294,19 @@ def main(argv=None) -> int:
         type=int,
         default=100,
         help="Return the newest backup summaries (1-1000; default 100)",
+    )
+
+    backup_retention_plan_cmd = subparsers.add_parser(
+        "backup-retention-plan",
+        help="Plan bounded local backup expiration without deleting backups",
+    )
+    backup_retention_plan_cmd.add_argument("policy", type=Path)
+    backup_retention_plan_cmd.add_argument("--parent-dir", type=Path, required=True)
+    backup_retention_plan_cmd.add_argument(
+        "--limit",
+        type=int,
+        default=1000,
+        help="Inspect up to 1000 backup sets; truncation blocks the plan",
     )
 
     restore_cmd = subparsers.add_parser(
@@ -882,6 +896,15 @@ def main(argv=None) -> int:
     if args.command == "backup-list":
         return _backup_action(
             lambda: list_state_backups(args.parent_dir, limit=args.limit)
+        )
+
+    if args.command == "backup-retention-plan":
+        return _backup_action(
+            lambda: build_backup_retention_plan(
+                args.parent_dir,
+                _load_json(args.policy),
+                limit=args.limit,
+            )
         )
 
     if args.command == "restore":

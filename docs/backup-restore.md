@@ -49,6 +49,37 @@ workflow contents, credentials, or manifest error details. The command
 is read-only and does not delete, upload, or rewrite backups. Its contract is
 [`schemas/state-backup-list-0.1.0.schema.json`](../schemas/state-backup-list-0.1.0.schema.json).
 
+Before any manual expiration, produce a read-only retention plan. The policy
+requires an explicit UTC cutoff and the minimum number of newest valid backups
+to keep:
+
+```json
+{
+  "schema_version": "skill2workflow-backup-retention-policy-0.1.0",
+  "retention": {
+    "expire_before": "2026-08-01T00:00:00Z",
+    "minimum_keep": 3
+  }
+}
+```
+
+```bash
+skill2workflow backup-retention-plan \
+  /etc/skill2workflow/backup-retention.json \
+  --parent-dir /var/backups/skill2workflow
+```
+
+The plan is `ready` only when the bounded inventory is complete. It marks a
+valid set as eligible only when it is strictly older than `expire_before` and
+outside the newest `minimum_keep` valid sets. Invalid sets are always
+preserved and do not satisfy the minimum. If the parent contains more than the
+fixed inventory limit, the plan is `blocked` with `inventory_truncated` and
+contains no deletion candidates. The output includes a policy digest, fixed
+counts/byte totals, set names, reasons, and no absolute paths or backup
+contents. This command never deletes, renames, uploads, or rewrites a backup.
+Its contracts are [`schemas/backup-retention-policy-0.1.0.schema.json`](../schemas/backup-retention-policy-0.1.0.schema.json)
+and [`schemas/backup-retention-plan-0.1.0.schema.json`](../schemas/backup-retention-plan-0.1.0.schema.json).
+
 From a source checkout, prefix each command with `PYTHONPATH=src python3 -m skill2workflow.cli`.
 
 Creation is staged in a sibling temporary directory and renamed only after validation succeeds. Failure removes the staging directory and never publishes a partial backup.

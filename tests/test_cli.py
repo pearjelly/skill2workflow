@@ -1271,6 +1271,75 @@ class CliTests(TestCase):
         self.assertEqual(inventory["window"]["max_items"], 1)
         self.assertEqual(inventory["backups"][0]["status"], "valid")
 
+    def test_backup_retention_plan_command_is_read_only_and_bounded(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            state_dir = root / "state"
+            backup_parent = root / "backups"
+            backup_dir = backup_parent / "backup-2026-08-14"
+            policy_path = root / "backup-retention.json"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            backup_parent.mkdir()
+            backup_parent.chmod(0o700)
+            policy_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": "skill2workflow-backup-retention-policy-0.1.0",
+                        "retention": {
+                            "expire_before": "2026-08-14T00:00:03Z",
+                            "minimum_keep": 1,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "publish",
+                            str(workflow_path),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                RecurringScheduleStore(state_dir)
+                self.assertEqual(
+                    main(
+                        [
+                            "backup",
+                            "--state-dir",
+                            str(state_dir),
+                            "--output-dir",
+                            str(backup_dir),
+                        ]
+                    ),
+                    0,
+                )
+            before = sorted(path.name for path in backup_parent.iterdir())
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "backup-retention-plan",
+                        str(policy_path),
+                        "--parent-dir",
+                        str(backup_parent),
+                    ]
+                )
+            after = sorted(path.name for path in backup_parent.iterdir())
+
+        plan = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(plan["status"], "ready")
+        self.assertEqual(plan["summary"]["eligible_backups"], 0)
+        self.assertEqual(before, after)
+
     def test_backup_command_normalizes_unexpected_storage_failure(self):
         stderr = StringIO()
         with patch(

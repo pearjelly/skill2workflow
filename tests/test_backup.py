@@ -13,12 +13,16 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from skill2workflow.backup import (
+    BACKUP_RETENTION_PLAN_SCHEMA_VERSION,
+    BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
     BACKUP_LIST_SCHEMA_VERSION,
     BACKUP_SCHEMA_VERSION,
     STATE_LAYOUT_VERSION,
+    build_backup_retention_plan,
     create_state_backup,
     inspect_state_backup_readiness,
     list_state_backups,
+    normalize_backup_retention_policy,
     restore_state_backup,
     verify_state_backup,
 )
@@ -417,6 +421,102 @@ class StateBackupTests(TestCase):
         self.assertEqual(result["backups"][0]["status"], "invalid")
         self.assertEqual(result["backups"][0]["name"], "broken")
 
+    def test_backup_retention_plan_preserves_minimum_and_invalid_sets(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            parent = root / "backups"
+            parent.mkdir()
+            parent.chmod(0o700)
+            _populate_state(state_dir)
+            for name, timestamp in (
+                ("backup_old", "2026-08-14T00:00:01+00:00"),
+                ("backup_middle", "2026-08-14T00:00:02+00:00"),
+                ("backup_recent", "2026-08-14T00:00:03+00:00"),
+                ("backup_new", "2026-08-14T00:00:04+00:00"),
+            ):
+                backup_dir = parent / name
+                create_state_backup(state_dir, backup_dir)
+                manifest_path = backup_dir / "manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["created_at"] = timestamp
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+            invalid = parent / "broken"
+            invalid.mkdir()
+            invalid.chmod(0o700)
+            (invalid / "manifest.json").write_text("{}", encoding="utf-8")
+            (invalid / "manifest.json").chmod(0o600)
+
+            result = build_backup_retention_plan(
+                parent,
+                {
+                    "schema_version": BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
+                    "retention": {
+                        "expire_before": "2026-08-14T00:00:03Z",
+                        "minimum_keep": 2,
+                    },
+                },
+            )
+
+        self.assertEqual(result["schema_version"], BACKUP_RETENTION_PLAN_SCHEMA_VERSION)
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["blocking_reasons"], [])
+        self.assertEqual(result["summary"]["valid_backups"], 4)
+        self.assertEqual(result["summary"]["invalid_backups"], 1)
+        self.assertEqual(result["summary"]["eligible_backups"], 2)
+        self.assertEqual(
+            [item["name"] for item in result["candidates"]],
+            ["backup_old", "backup_middle"],
+        )
+        preserved = {item["name"]: item["reason"] for item in result["preserved"]}
+        self.assertEqual(preserved["backup_recent"], "minimum_keep")
+        self.assertEqual(preserved["backup_new"], "minimum_keep")
+        self.assertEqual(preserved["broken"], "invalid_backup")
+
+    def test_backup_retention_plan_blocks_truncated_inventory_and_rejects_policy_shape(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            parent = root / "backups"
+            parent.mkdir()
+            parent.chmod(0o700)
+            _populate_state(state_dir)
+            for name in ("backup_old", "backup_new"):
+                create_state_backup(state_dir, parent / name)
+            policy = {
+                "schema_version": BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
+                "retention": {
+                    "expire_before": "2026-08-14T00:00:03Z",
+                    "minimum_keep": 1,
+                },
+            }
+            result = build_backup_retention_plan(parent, policy, limit=1)
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["blocking_reasons"], ["inventory_truncated"])
+            self.assertIsNone(result["summary"]["eligible_backups"])
+            self.assertEqual(result["candidates"], [])
+
+            for invalid_policy in (
+                {},
+                {
+                    "schema_version": BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
+                    "retention": {
+                        "expire_before": "2026-08-14T00:00:03Z",
+                        "minimum_keep": 0,
+                    },
+                },
+                {
+                    "schema_version": BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
+                    "retention": {
+                        "expire_before": "2026-08-14T00:00:03",
+                        "minimum_keep": 1,
+                    },
+                },
+            ):
+                with self.assertRaisesRegex(ValueError, "backup retention"):
+                    normalize_backup_retention_policy(invalid_policy)
+
 
 def _populate_state(state_dir: Path):
     control = LocalControlPlane(state_dir, storage="sqlite")
@@ -508,3 +608,4 @@ def _waiting_workflow():
             {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "rejected"},
         ],
     }
+    build_backup_retention_plan,

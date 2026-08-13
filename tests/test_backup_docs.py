@@ -64,6 +64,36 @@ class BackupDocumentationTests(TestCase):
         )
         self.assertNotIn("path", schema["$defs"]["backup"]["properties"])
 
+    def test_retention_policy_and_plan_schemas_match_fail_closed_contract(self):
+        policy = json.loads(
+            (ROOT / "schemas" / "backup-retention-policy-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        plan = json.loads(
+            (ROOT / "schemas" / "backup-retention-plan-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertEqual(
+            policy["properties"]["schema_version"]["const"],
+            "skill2workflow-backup-retention-policy-0.1.0",
+        )
+        self.assertEqual(
+            policy["properties"]["retention"]["properties"]["minimum_keep"]["maximum"],
+            1000,
+        )
+        self.assertEqual(
+            plan["properties"]["schema_version"]["const"],
+            "skill2workflow-backup-retention-plan-0.1.0",
+        )
+        self.assertEqual(
+            plan["properties"]["blocking_reasons"]["items"]["enum"],
+            ["inventory_truncated"],
+        )
+        self.assertNotIn("delete", plan["properties"])
+
     def test_operator_guide_defines_offline_security_and_recovery_drill(self):
         guide = (ROOT / "docs" / "backup-restore.md").read_text(encoding="utf-8")
 
@@ -84,6 +114,11 @@ class BackupDocumentationTests(TestCase):
             "absolute paths",
             "integrity status",
             "state-backup-list-0.1.0.schema.json",
+            "backup-retention-plan",
+            "minimum_keep",
+            "inventory_truncated",
+            "backup-retention-policy-0.1.0.schema.json",
+            "backup-retention-plan-0.1.0.schema.json",
         ):
             self.assertIn(text, guide)
 
@@ -106,10 +141,10 @@ class BackupDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-124 are complete", readme)
+        self.assertIn("Delivery Loops 1-125 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("docs/backup-restore.md", readme)
-        self.assertIn("- Completed delivery loops: 1-124", roadmap)
+        self.assertIn("- Completed delivery loops: 1-125", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 44: Verified Backup And Restore | Complete |", roadmap)
         self.assertIn("Production Baseline remains directional", roadmap)

@@ -48,6 +48,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "backup",
     "backup-verify",
     "backup-list",
+    "backup-retention-plan",
     "restore",
     "state-upgrade",
     "state-retention-apply",

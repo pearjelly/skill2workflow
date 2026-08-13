@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/backup-retention-plan-0.1.0.schema.json",
+  "title": "skill2workflow local backup retention plan 0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "storage",
+    "policy_sha256",
+    "expire_before",
+    "minimum_keep",
+    "inventory",
+    "blocking_reasons",
+    "summary",
+    "candidates",
+    "preserved"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-backup-retention-plan-0.1.0"
+    },
+    "status": {
+      "enum": ["ready", "blocked"]
+    },
+    "storage": {
+      "const": "filesystem"
+    },
+    "policy_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "expire_before": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "minimum_keep": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "inventory": {
+      "$ref": "#/$defs/window"
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "items": {
+        "enum": ["inventory_truncated"]
+      },
+      "maxItems": 1
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "candidates": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    },
+    "preserved": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_items", "returned", "truncated"],
+      "properties": {
+        "max_items": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "returned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valid_backups",
+        "invalid_backups",
+        "eligible_backups",
+        "eligible_bytes",
+        "preserved_backups",
+        "preserved_bytes"
+      ],
+      "properties": {
+        "valid_backups": {"type": ["integer", "null"], "minimum": 0},
+        "invalid_backups": {"type": ["integer", "null"], "minimum": 0},
+        "eligible_backups": {"type": ["integer", "null"], "minimum": 0},
+        "eligible_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "preserved_backups": {"type": ["integer", "null"], "minimum": 0},
+        "preserved_bytes": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "created_at", "total_bytes", "reason"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "status": {
+          "enum": ["valid", "invalid"]
+        },
+        "created_at": {
+          "type": "string"
+        },
+        "total_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reason": {
+          "enum": [
+            "invalid_backup",
+            "minimum_keep",
+            "expired_beyond_minimum_keep",
+            "newer_than_expire_before"
+          ]
+        }
+      }
+    }
+  }
+}
