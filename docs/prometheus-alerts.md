@@ -52,3 +52,9 @@ python3 scripts/observability_rules_smoke.py
 
 Prometheus itself remains the authority for parsing and evaluating the rule
 file; run its version-specific `promtool check rules` command during deployment.
+
+For a ready-made visual view over the same fixed metrics, import the
+[`grafana-dashboard.json`](../examples/observability/grafana-dashboard.json)
+starter dashboard. It is read-only and follows the same operator-managed
+datasource and access boundary; see [`grafana-dashboard.md`](grafana-dashboard.md)
+for the import and verification contract.

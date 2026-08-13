@@ -60,6 +60,7 @@ To reproduce the production-boundary CI drills locally:
 python3 scripts/security_boundary_smoke.py --work-dir /tmp/skill2workflow-security-ci
 python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-ci
 python3 scripts/observability_rules_smoke.py
+python3 scripts/observability_dashboard_smoke.py
 python3 scripts/service_boundary_smoke.py --work-dir /tmp/skill2workflow-service-boundary-ci
 ```
 

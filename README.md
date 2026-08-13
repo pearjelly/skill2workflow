@@ -144,6 +144,7 @@ explicit connector boundaries. It currently supports:
 - Require file-backed Bearer authentication for service business routes and resolve mounted connector credentials at execution time
 - Export authenticated low-cardinality Prometheus metrics and allowlisted operational NDJSON without workflow, run, request, or credential values
 - Ship a dependency-free Prometheus alert starter pack for readiness, lease, uncertain-dispatch, saturation, and server-error signals
+- Ship an importable, read-only Grafana dashboard over the same fixed metrics without hard-coded tenant or workflow values
 - Request authenticated, durable, idempotent cooperative cancellation without claiming that in-flight external requests were aborted
 - Fence process-lost executions as `interrupted` after lease takeover without replaying an unknown external side effect
 - Plan and publish verified retained SQLite copies that remove expired terminal run payloads while preserving waiting work and the source
@@ -715,7 +716,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-111 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-112 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1000,6 +1001,11 @@ for the fixed metrics surface. It stays operator-managed and dependency-free,
 uses only fixed low-cardinality labels, and never mutates workflow or service
 state.
 
+Loop 112 adds a [Grafana dashboard starter pack](docs/grafana-dashboard.md) over
+the same metrics. It is importable and read-only, contains no environment or
+business identifiers, and leaves datasource, access, and notification policy
+under operator control.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1043,6 +1049,7 @@ See:
 - `docs/examples.md`
 - `docs/observability.md`
 - [`docs/prometheus-alerts.md`](docs/prometheus-alerts.md)
+- [`docs/grafana-dashboard.md`](docs/grafana-dashboard.md)
 - `docs/pilot-playbook.md`
 - `docs/quickstart.md`
 - `docs/release-process.md`
