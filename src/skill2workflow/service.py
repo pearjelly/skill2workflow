@@ -358,6 +358,7 @@ class RuntimeService:
         with self._lifecycle_lock:
             if self._status in {"starting", "ready"}:
                 self._status = "draining"
+                self.scheduler.stop_dispatching()
                 self._log_lifecycle("draining")
 
     def admit_request(self, route: str) -> str:
@@ -483,6 +484,8 @@ class ServiceScheduleLoop:
         self._dispatch_thread = None
         self._heartbeat_thread = None
         self._last_error = ""
+        self._dispatch_gate_lock = threading.RLock()
+        self._dispatch_enabled = True
 
     def start(self) -> None:
         now = time.time()
@@ -512,13 +515,20 @@ class ServiceScheduleLoop:
         )
 
     def stop(self) -> None:
-        self._dispatch_stop.set()
+        self.stop_dispatching()
         if self._dispatch_thread:
             self._dispatch_thread.join()
         self._heartbeat_stop.set()
         if self._heartbeat_thread:
             self._heartbeat_thread.join()
         self.dispatcher.release()
+
+    def stop_dispatching(self) -> None:
+        """Prevent new recurring dispatches without waiting for an active one."""
+
+        with self._dispatch_gate_lock:
+            self._dispatch_enabled = False
+            self._dispatch_stop.set()
 
     def _heartbeat(self) -> None:
         while not self._heartbeat_stop.is_set():
@@ -542,6 +552,8 @@ class ServiceScheduleLoop:
 
     def _dispatch(self) -> None:
         while not self._dispatch_stop.is_set():
+            if not self._admit_dispatch():
+                return
             try:
                 now_epoch = time.time()
                 if self.dispatcher.has_lease(now_epoch=now_epoch):
@@ -554,6 +566,12 @@ class ServiceScheduleLoop:
             except Exception as error:
                 self._record_failure(error)
             self._dispatch_stop.wait(0.2)
+
+    def _admit_dispatch(self) -> bool:
+        """Atomically admit one new recurring dispatch before shutdown."""
+
+        with self._dispatch_gate_lock:
+            return self._dispatch_enabled
 
     def _record_failure(self, error: Exception) -> None:
         self._last_error = type(error).__name__

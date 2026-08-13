@@ -65,6 +65,11 @@ All SQLite scheduling paths share one global SQLite lease. The active service re
 
 Only the lease owner dispatches. The lease coordinates service processes that share one local SQLite filesystem; it is not a distributed lock for network filesystems or multiple independent databases. Do not run `schedule-run-due` concurrently with the service: the command respects the same lease and fails if another dispatcher owns it.
 
+During graceful service shutdown, the dispatcher closes its admission gate before
+the process releases the lease. A dispatch that already passed that gate may
+finish and record `completed`, `failed`, or `uncertain` evidence; no new
+scheduled trigger begins after `draining` is published.
+
 ## Operator Commands
 
 Add and inspect a recurring schedule using SQLite:

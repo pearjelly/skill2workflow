@@ -68,7 +68,7 @@ This contract does not provide forceful thread termination, provider-side task d
 
 ## Service Concurrency And Shutdown
 
-The service accepts requests on concurrent handler threads so a cancellation can be persisted while another request is executing. SQLite remains the durable serialization boundary. During graceful shutdown, readiness is withdrawn and no new business request is accepted; already accepted handlers are allowed to finish, and the process waits for them before closing.
+The service accepts requests on concurrent handler threads so a cancellation can be persisted while another request is executing. SQLite remains the durable serialization boundary. During graceful shutdown, readiness is withdrawn, no new business request or recurring scheduled trigger is admitted, and already accepted handlers or dispatches are allowed to finish before the process releases its lease.
 
 If the process stops after a request is persisted but before the executor reaches a safe point, Loop 49 takeover records the run as `interrupted`, applies the pending cancellation ledger entry, and fences stale writes. Operators must inspect the run and external provider outcome; neither cancellation nor interruption automatically retries or retracts the external operation.
 

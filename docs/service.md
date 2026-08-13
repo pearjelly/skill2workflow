@@ -46,11 +46,17 @@ Loop 106 adds an atomic shutdown admission boundary: mutating routes receive a
 bounded `503` with `Retry-After` after `draining` is published, while health,
 readiness, metrics, and read-only operator diagnostics remain available for
 investigation.
+Loop 107 closes the matching scheduler boundary: once `draining` is published,
+the recurring dispatcher admits no new scheduled trigger, while one dispatch
+already admitted may finish under the existing uncertain-outcome contract.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
 The HTTP control plane and recurring dispatcher share the scheduler lease owner.
-Graceful drain waits for in-flight HTTP handlers before releasing that lease. After
+Graceful drain withdraws both mutating HTTP admission and new recurring-dispatch
+admission, then waits for in-flight HTTP handlers before releasing that lease. A
+dispatch already admitted before draining may finish under the existing
+uncertain-outcome contract. After
 an ungraceful process loss, a replacement becomes ready only after lease expiry and
 marks foreign active execution tickets `interrupted`; it never automatically
 replays an external request with an unknown outcome.

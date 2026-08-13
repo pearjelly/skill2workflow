@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Closed the scheduler shutdown window: once `draining` begins, no new
+  recurring scheduled trigger is admitted, while an already admitted dispatch
+  retains the existing completion/uncertain-outcome semantics.
 - Added an atomic shutdown admission boundary: mutating routes now fail closed
   with a bounded retryable response after `draining`, while health, metrics,
   and read-only operator diagnostics remain available.

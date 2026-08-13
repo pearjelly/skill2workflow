@@ -240,6 +240,40 @@ class RuntimeServiceTests(TestCase):
         trigger_workflow.assert_not_called()
         self.assertFalse(thread.is_alive())
 
+    def test_shutdown_closes_scheduler_dispatch_gate_atomically(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(_service_config(Path(tmp)))
+            service._status = "ready"
+            scheduler = service.scheduler
+
+            class ShutdownDuringDispatchGate:
+                def __init__(self):
+                    self._lock = threading.RLock()
+                    self._triggered = False
+
+                def __enter__(self):
+                    self._lock.__enter__()
+                    if not self._triggered:
+                        self._triggered = True
+                        service.begin_shutdown()
+                    return self
+
+                def __exit__(self, exc_type, exc_value, traceback):
+                    return self._lock.__exit__(exc_type, exc_value, traceback)
+
+            scheduler._dispatch_gate_lock = ShutdownDuringDispatchGate()
+            with patch.object(scheduler.dispatcher, "dispatch_due") as dispatch_due:
+                self.assertFalse(scheduler._admit_dispatch())
+                thread = threading.Thread(target=scheduler._dispatch, daemon=True)
+                thread.start()
+                thread.join(timeout=2)
+
+            service._server.server_close()
+
+        self.assertEqual(service.status, "draining")
+        dispatch_due.assert_not_called()
+        self.assertFalse(thread.is_alive())
+
     def test_lifecycle_logger_failure_cannot_break_startup_or_shutdown(self):
         class FailingLifecycleLogger:
             def __init__(self):
