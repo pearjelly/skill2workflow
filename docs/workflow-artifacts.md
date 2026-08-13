@@ -38,10 +38,12 @@ is absent and its content still matches the attempted checksum. A concurrent
 publisher rechecks the artifact while holding that lock, so cleanup cannot
 leave a new registry row pointing at a removed file.
 
-The report is diagnostic. It does not delete historical artifacts, repair a
-registry, rewrite a checksum, or make JSON storage multi-process safe. Stop the
-service, preserve the private state, and follow the backup/restore or migration
-procedure before manually repairing any `attention` result.
+The report is diagnostic. It counts the complete issue set but retains only the
+fixed issue window, so issue memory does not grow with the number of failures.
+It does not delete historical artifacts, repair a registry, rewrite a checksum,
+or make JSON storage multi-process safe. Stop the service, preserve the private
+state, and follow the backup/restore or migration procedure before manually
+repairing any `attention` result.
 
 ## Evidence
 

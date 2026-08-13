@@ -280,13 +280,33 @@ class LocalControlPlane:
         records = list(self._load_index().values())
         return sorted(records, key=lambda record: (str(record["workflow_id"]), str(record["version"])))
 
-    def inspect_workflow_artifacts(self) -> Dict[str, object]:
-        """Return a bounded, value-free registry/artifact consistency report."""
+    def inspect_workflow_artifacts(
+        self, max_issues: int = MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES
+    ) -> Dict[str, object]:
+        """Return a value-free report with bounded retained issue records."""
+
+        _validate_artifact_issue_limit(max_issues)
 
         index = self._load_index()
         issues = []
         referenced = set()
         healthy = 0
+        issue_counts = {
+            kind: 0
+            for kind in (
+                "missing",
+                "unsafe_reference",
+                "unsafe_artifact",
+                "invalid_json",
+                "oversized",
+                "checksum_mismatch",
+                "orphaned",
+            )
+        }
+
+        def record_issue(issue: Dict[str, object]) -> None:
+            issue_counts[str(issue["kind"])] += 1
+            _retain_artifact_issue(issues, issue, max_issues)
 
         for key, record in sorted(index.items(), key=lambda item: str(item[0])):
             workflow_id = str(record.get("workflow_id", ""))
@@ -294,7 +314,7 @@ class LocalControlPlane:
             artifact_value = record.get("artifact")
             relative = _safe_artifact_reference(artifact_value)
             if relative is None:
-                issues.append(
+                record_issue(
                     _artifact_issue(
                         "unsafe_reference", "<invalid>", workflow_id, version
                     )
@@ -308,31 +328,18 @@ class LocalControlPlane:
                 str(record.get("checksum", "")),
             )
             if issue_kind:
-                issues.append(_artifact_issue(issue_kind, relative, workflow_id, version))
+                record_issue(_artifact_issue(issue_kind, relative, workflow_id, version))
             else:
                 healthy += 1
 
         filesystem = set(_iter_workflow_artifacts(self.workflows_dir, self.state_dir))
         for relative in sorted(filesystem - referenced):
-            issues.append(_artifact_issue("orphaned", relative))
+            record_issue(_artifact_issue("orphaned", relative))
 
         issues.sort(key=lambda issue: (str(issue["kind"]), str(issue["artifact"])))
 
-        issue_counts = {
-            kind: sum(1 for issue in issues if issue["kind"] == kind)
-            for kind in (
-                "missing",
-                "unsafe_reference",
-                "unsafe_artifact",
-                "invalid_json",
-                "oversized",
-                "checksum_mismatch",
-                "orphaned",
-            )
-        }
-        issue_count = len(issues)
-        truncated = issue_count > MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES
-        issues = issues[:MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES]
+        issue_count = sum(issue_counts.values())
+        truncated = issue_count > max_issues
         return {
             "schema_version": WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
             "status": "clean" if issue_count == 0 else "attention",
@@ -1393,6 +1400,42 @@ def _artifact_issue(kind: str, artifact: object, workflow_id: str = "", version:
         issue["workflow_id"] = workflow_id
         issue["version"] = version
     return issue
+
+
+def _validate_artifact_issue_limit(max_issues: object) -> None:
+    if (
+        isinstance(max_issues, bool)
+        or not isinstance(max_issues, int)
+        or max_issues <= 0
+        or max_issues > MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES
+    ):
+        raise ValueError("max_issues must be a positive bounded integer")
+
+
+def _retain_artifact_issue(
+    issues: List[Dict[str, object]],
+    issue: Dict[str, object],
+    max_issues: int,
+) -> None:
+    """Keep the lexicographically first issue window without full accumulation."""
+
+    if len(issues) < max_issues:
+        issues.append(issue)
+        return
+    candidate_key = (str(issue.get("kind", "")), str(issue.get("artifact", "")))
+    worst_index, worst_issue = max(
+        enumerate(issues),
+        key=lambda item: (
+            str(item[1].get("kind", "")),
+            str(item[1].get("artifact", "")),
+        ),
+    )
+    worst_key = (
+        str(worst_issue.get("kind", "")),
+        str(worst_issue.get("artifact", "")),
+    )
+    if candidate_key < worst_key:
+        issues[worst_index] = issue
 
 
 def _load_json(path: Path):

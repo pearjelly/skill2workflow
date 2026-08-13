@@ -739,7 +739,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-127 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-128 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1110,6 +1110,11 @@ Loop 127 adds bounded [local workflow inventory](docs/local-workflow-inventory.m
 `workflows --limit` reuses the redacted published-version contract with a
 newest window of up to 100 records; omitted flags preserve the complete-list
 compatibility path.
+
+Loop 128 bounds [workflow artifact diagnostics](docs/workflow-artifacts.md)
+internally: the scan keeps complete issue counts but retains only the fixed
+value-free issue window, so damaged state cannot make the diagnostic result
+grow with every failure.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

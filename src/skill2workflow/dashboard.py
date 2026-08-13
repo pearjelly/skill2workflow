@@ -417,7 +417,7 @@ def build_workflow_artifact_report_from_control(
         or max_issues > 256
     ):
         raise ValueError("max_issues must be a positive bounded integer")
-    report = control.inspect_workflow_artifacts()
+    report = control.inspect_workflow_artifacts(max_issues=max_issues)
     summary = dict(report.get("summary", {}))
     issues = list(report.get("issues", []))
     issue_count = int(summary.get("issue_count", len(issues)))

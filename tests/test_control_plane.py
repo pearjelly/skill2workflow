@@ -496,6 +496,33 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(len(report["issues"]), 256)
         self.assertNotIn("do-not-print", encoded)
 
+    def test_workflow_artifact_report_retains_only_requested_issue_window(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="json")
+            orphan_dir = state_dir / "workflows" / "orphan"
+            orphan_dir.mkdir(parents=True)
+            for index in range(20):
+                (orphan_dir / f"{index:03d}.json").write_text(
+                    json.dumps({"private": "must-not-be-returned"}), encoding="utf-8"
+                )
+
+            report = control.inspect_workflow_artifacts(max_issues=3)
+
+        self.assertEqual(report["summary"]["issue_count"], 20)
+        self.assertEqual(report["summary"]["orphaned"], 20)
+        self.assertTrue(report["summary"]["truncated"])
+        self.assertEqual(len(report["issues"]), 3)
+        self.assertEqual(
+            [issue["artifact"] for issue in report["issues"]],
+            [
+                "workflows/orphan/000.json",
+                "workflows/orphan/001.json",
+                "workflows/orphan/002.json",
+            ],
+        )
+        self.assertNotIn("must-not-be-returned", json.dumps(report))
+
     def test_workflow_artifact_report_redacts_unsafe_registry_path(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

@@ -43,4 +43,4 @@ class ServiceProbeDocumentationTests(TestCase):
         self.assertIn("service-wait", readme)
         self.assertIn("service-probe", service)
         self.assertIn("Loop 95: Deployment Service Probe", roadmap)
-        self.assertIn("Loops 44-127 complete", roadmap)
+        self.assertIn("Loops 44-128 complete", roadmap)

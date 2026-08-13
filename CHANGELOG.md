@@ -15,6 +15,8 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added bounded local published-workflow inventory through `workflows --limit`.
   The 1-100 redacted window reuses the workflow-inventory contract and omits
   workflow content while preserving complete-list compatibility.
+- Bounded workflow artifact diagnostics now retain only the fixed issue window
+  while preserving full issue counts and truncation status.
 - Added bounded read-only backup expiration planning through
   `backup-retention-plan`. An explicit cutoff and minimum-valid-backup floor
   produce candidates only from a complete inventory; truncation, invalid sets,

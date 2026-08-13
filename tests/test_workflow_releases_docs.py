@@ -26,6 +26,15 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("bounded local published-workflow inventory", changelog)
         self.assertIn('"--limit"', cli)
 
+    def test_artifact_diagnostic_window_is_documented(self):
+        guide = (ROOT / "docs" / "workflow-artifacts.md").read_text(
+            encoding="utf-8"
+        )
+        stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
+        self.assertIn("fixed issue window", guide)
+        self.assertIn("complete issue set", guide)
+        self.assertIn("1-256", stability)
+
     def test_review_contract_and_cas_boundary_are_published(self):
         guide = (ROOT / "docs" / "workflow-releases.md").read_text(encoding="utf-8")
         plan = (
