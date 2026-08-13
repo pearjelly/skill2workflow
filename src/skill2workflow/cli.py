@@ -32,6 +32,7 @@ from .service_client import (
     fetch_backup_readiness,
     fetch_retention_readiness,
     fetch_operational_readiness,
+    fetch_service_probe,
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_workflow_diff,
@@ -400,6 +401,12 @@ def main(argv=None) -> int:
     )
     service_operational_cmd.add_argument("--service-url", required=True)
     service_operational_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_probe_cmd = subparsers.add_parser(
+        "service-probe",
+        help="Probe service health and readiness for deployment automation",
+    )
+    service_probe_cmd.add_argument("--service-url", required=True)
 
     service_integrity_cmd = subparsers.add_parser(
         "service-audit-integrity",
@@ -941,6 +948,9 @@ def main(argv=None) -> int:
             )
         )
 
+    if args.command == "service-probe":
+        return _service_probe_action(args.service_url)
+
     if args.command == "service-audit-integrity":
         return _service_action(
             lambda: fetch_audit_integrity(
@@ -1162,6 +1172,16 @@ def _service_action(callback) -> int:
         return 1
     except OSError:
         print("service action failed", file=sys.stderr)
+        return 1
+
+
+def _service_probe_action(service_url: str) -> int:
+    try:
+        result = fetch_service_probe(service_url)
+        _print_json(result)
+        return {"ready": 0, "not_ready": 1, "unavailable": 2}[result["status"]]
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
         return 1
 
 

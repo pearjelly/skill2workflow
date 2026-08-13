@@ -417,6 +417,41 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_probe_command_prints_contract_and_maps_ready_exit_code(self):
+        stdout = StringIO()
+        expected = {
+            "schema_version": "skill2workflow-service-probe-0.1.0",
+            "status": "ready",
+            "health": {"status": "ok", "http_status": 200},
+            "readiness": {"status": "ready", "http_status": 200},
+        }
+        with patch("skill2workflow.cli.fetch_service_probe", return_value=expected) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    ["service-probe", "--service-url", "https://service.example"]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example")
+
+    def test_service_probe_command_maps_not_ready_exit_code(self):
+        stdout = StringIO()
+        expected = {
+            "schema_version": "skill2workflow-service-probe-0.1.0",
+            "status": "not_ready",
+            "health": {"status": "ok", "http_status": 200},
+            "readiness": {"status": "not_ready", "http_status": 503},
+        }
+        with patch("skill2workflow.cli.fetch_service_probe", return_value=expected):
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    ["service-probe", "--service-url", "https://service.example"]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+
     def test_service_audit_integrity_command_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

@@ -58,6 +58,9 @@ MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RETENTION_READINESS_REQUEST_BYTES = 64 * 1024
 MAX_RETENTION_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
+SERVICE_PROBE_SCHEMA_VERSION = "skill2workflow-service-probe-0.1.0"
+MAX_SERVICE_PROBE_RESPONSE_BYTES = 8 * 1024
+SERVICE_PROBE_TIMEOUT_SECONDS = 5
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_TRIGGER_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
@@ -84,6 +87,106 @@ class ServiceActionError(ValueError):
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, request, fp, code, msg, headers, newurl):
         return None
+
+
+def fetch_service_probe(service_url: str) -> Dict[str, object]:
+    """Probe health and readiness without credentials or response disclosure."""
+
+    health = _fetch_probe_endpoint(
+        service_url,
+        "/healthz",
+        expected_status=200,
+        expected_payload={"service": "skill2workflow", "status": "ok"},
+        ready_status="ok",
+    )
+    readiness = _fetch_probe_endpoint(
+        service_url,
+        "/readyz",
+        expected_status=200,
+        expected_payload={
+            "service": "skill2workflow",
+            "status": "ready",
+            "storage": "sqlite",
+        },
+        ready_status="ready",
+        not_ready_status="not_ready",
+    )
+    if health["status"] == "ok" and readiness["status"] == "ready":
+        status = "ready"
+    elif health["status"] == "ok" and readiness["status"] == "not_ready":
+        status = "not_ready"
+    else:
+        status = "unavailable"
+    payload = {
+        "schema_version": SERVICE_PROBE_SCHEMA_VERSION,
+        "status": status,
+        "health": health,
+        "readiness": readiness,
+    }
+    _validate_service_probe(payload)
+    return payload
+
+
+def _fetch_probe_endpoint(
+    service_url: str,
+    path: str,
+    *,
+    expected_status: int,
+    expected_payload: Dict[str, object],
+    ready_status: str,
+    not_ready_status: str = "",
+) -> Dict[str, object]:
+    endpoint = service_endpoint(service_url, path)
+    request = urllib.request.Request(
+        endpoint,
+        headers={"Accept": "application/json"},
+        method="GET",
+    )
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        _NoRedirect,
+    )
+    status_code = 0
+    payload = None
+    try:
+        with opener.open(request, timeout=SERVICE_PROBE_TIMEOUT_SECONDS) as response:
+            status_code = int(response.status)
+            if _safe_json_response_headers(
+                response,
+                max_response_bytes=MAX_SERVICE_PROBE_RESPONSE_BYTES,
+            ):
+                payload = _decode_response(
+                    response,
+                    max_response_bytes=MAX_SERVICE_PROBE_RESPONSE_BYTES,
+                )
+    except urllib.error.HTTPError as error:
+        status_code = int(error.code)
+        try:
+            if _safe_json_response_headers(
+                error,
+                max_response_bytes=MAX_SERVICE_PROBE_RESPONSE_BYTES,
+            ):
+                payload = _decode_response(
+                    error,
+                    max_response_bytes=MAX_SERVICE_PROBE_RESPONSE_BYTES,
+                )
+        except ServiceActionError:
+            payload = None
+        finally:
+            error.close()
+    except ServiceActionError:
+        return {"status": "unavailable", "http_status": status_code}
+    except (OSError, urllib.error.URLError, TimeoutError):
+        return {"status": "unavailable", "http_status": 0}
+    if status_code == expected_status and payload == expected_payload:
+        return {"status": ready_status, "http_status": status_code}
+    if (
+        not_ready_status
+        and status_code == 503
+        and payload == {"service": "skill2workflow", "status": "not_ready"}
+    ):
+        return {"status": not_ready_status, "http_status": status_code}
+    return {"status": "unavailable", "http_status": status_code}
 
 
 def post_run_resume(
@@ -1120,6 +1223,45 @@ def _validate_retention_readiness(payload: Dict[str, object]) -> None:
         if any(value is not None for value in values):
             raise ServiceActionError()
     elif any(not _is_non_negative_integer(value) for value in values):
+        raise ServiceActionError()
+
+
+def _validate_service_probe(payload: Dict[str, object]) -> None:
+    """Reject probe results outside the fixed deployment-probe contract."""
+
+    if set(payload) != {"schema_version", "status", "health", "readiness"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != SERVICE_PROBE_SCHEMA_VERSION:
+        raise ServiceActionError()
+    health = payload.get("health")
+    readiness = payload.get("readiness")
+    for value, allowed in (
+        (health, {"ok", "unavailable"}),
+        (readiness, {"ready", "not_ready", "unavailable"}),
+    ):
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"status", "http_status"}
+            or value.get("status") not in allowed
+            or not isinstance(value.get("http_status"), int)
+            or isinstance(value.get("http_status"), bool)
+            or not 0 <= value.get("http_status") <= 599
+        ):
+            raise ServiceActionError()
+    expected = (
+        "ready"
+        if health["status"] == "ok" and readiness["status"] == "ready"
+        else "not_ready"
+        if health["status"] == "ok" and readiness["status"] == "not_ready"
+        else "unavailable"
+    )
+    if payload.get("status") != expected:
+        raise ServiceActionError()
+    if health["status"] == "ok" and health["http_status"] != 200:
+        raise ServiceActionError()
+    if readiness["status"] == "ready" and readiness["http_status"] != 200:
+        raise ServiceActionError()
+    if readiness["status"] == "not_ready" and readiness["http_status"] != 503:
         raise ServiceActionError()
 
 

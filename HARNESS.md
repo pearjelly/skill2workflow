@@ -242,6 +242,12 @@ skill2workflow service-support-bundle \
   --output /var/lib/skill2workflow/support-bundle.json
 ```
 
+For an unauthenticated live cutover gate, use the bounded service probe:
+
+```bash
+skill2workflow service-probe --service-url https://service.example
+```
+
 The local `service-token-rotate` command replaces the owner-only ingress token
 atomically without printing it or restarting the service. See
 [`docs/service-token-rotation.md`](docs/service-token-rotation.md) for the

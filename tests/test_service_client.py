@@ -15,6 +15,7 @@ from skill2workflow.service_client import (
     MAX_BACKUP_READINESS_RESPONSE_BYTES,
     MAX_RETENTION_READINESS_RESPONSE_BYTES,
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
+    SERVICE_PROBE_SCHEMA_VERSION,
     MAX_AUDIT_INTEGRITY_RESPONSE_BYTES,
     MAX_RUNTIME_INFO_RESPONSE_BYTES,
     MAX_REMOTE_TRIGGER_REQUEST_BYTES,
@@ -32,6 +33,7 @@ from skill2workflow.service_client import (
     fetch_backup_readiness,
     fetch_retention_readiness,
     fetch_operational_readiness,
+    fetch_service_probe,
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_support_bundle,
@@ -49,6 +51,109 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_service_probe_returns_fixed_ready_contract_without_credentials(self):
+        observed = []
+        responses = {
+            "/healthz": (200, {"service": "skill2workflow", "status": "ok"}),
+            "/readyz": (
+                200,
+                {"service": "skill2workflow", "status": "ready", "storage": "sqlite"},
+            ),
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append(
+                    {"path": self.path, "authorization": self.headers.get("Authorization")}
+                )
+                status_code, payload = responses[self.path]
+                _send_json(self, status_code, payload)
+
+            def log_message(self, *_args):
+                return
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(
+            target=lambda: [server.handle_request() for _ in range(2)], daemon=True
+        )
+        thread.start()
+        report = fetch_service_probe(f"http://127.0.0.1:{server.server_port}")
+        thread.join(timeout=2)
+        server.server_close()
+
+        self.assertEqual(
+            report,
+            {
+                "schema_version": SERVICE_PROBE_SCHEMA_VERSION,
+                "status": "ready",
+                "health": {"status": "ok", "http_status": 200},
+                "readiness": {"status": "ready", "http_status": 200},
+            },
+        )
+        self.assertEqual([item["path"] for item in observed], ["/healthz", "/readyz"])
+        self.assertTrue(all(item["authorization"] is None for item in observed))
+        self.assertFalse(thread.is_alive())
+
+    def test_service_probe_distinguishes_not_ready_from_unavailable(self):
+        responses = {
+            "/healthz": (200, {"service": "skill2workflow", "status": "ok"}),
+            "/readyz": (503, {"service": "skill2workflow", "status": "not_ready"}),
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                status_code, payload = responses[self.path]
+                _send_json(self, status_code, payload)
+
+            def log_message(self, *_args):
+                return
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(
+            target=lambda: [server.handle_request() for _ in range(2)], daemon=True
+        )
+        thread.start()
+        report = fetch_service_probe(f"http://127.0.0.1:{server.server_port}")
+        thread.join(timeout=2)
+        server.server_close()
+
+        self.assertEqual(report["status"], "not_ready")
+        self.assertEqual(report["health"], {"status": "ok", "http_status": 200})
+        self.assertEqual(
+            report["readiness"], {"status": "not_ready", "http_status": 503}
+        )
+
+    def test_service_probe_rejects_redirects_and_does_not_disclose_body(self):
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(302)
+                self.send_header("Location", "https://example.invalid/secret")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *_args):
+                return
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(
+            target=lambda: [server.handle_request() for _ in range(2)], daemon=True
+        )
+        thread.start()
+        report = fetch_service_probe(f"http://127.0.0.1:{server.server_port}")
+        thread.join(timeout=2)
+        server.server_close()
+
+        self.assertEqual(report["status"], "unavailable")
+        self.assertEqual(report["health"], {"status": "unavailable", "http_status": 302})
+        self.assertEqual(
+            report["readiness"], {"status": "unavailable", "http_status": 302}
+        )
+        self.assertNotIn("example.invalid", json.dumps(report))
+
+    def test_service_probe_rejects_unsafe_origin_before_network(self):
+        with self.assertRaisesRegex(ValueError, "unambiguous HTTPS"):
+            fetch_service_probe("http://service.example")
+
     def test_service_workflow_inventory_uses_fixed_redacted_contract(self):
         observed = {}
         payload = {

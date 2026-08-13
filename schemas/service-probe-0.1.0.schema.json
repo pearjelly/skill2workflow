@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/service-probe-0.1.0.json",
+  "title": "skill2workflow deployment service probe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "health", "readiness"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-service-probe-0.1.0"
+    },
+    "status": {
+      "enum": ["ready", "not_ready", "unavailable"]
+    },
+    "health": {
+      "$ref": "#/$defs/health"
+    },
+    "readiness": {
+      "$ref": "#/$defs/readiness"
+    }
+  },
+  "$defs": {
+    "http_status": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 599
+    },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "http_status"],
+      "properties": {
+        "status": {
+          "enum": ["ok", "unavailable"]
+        },
+        "http_status": {
+          "$ref": "#/$defs/http_status"
+        }
+      }
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "http_status"],
+      "properties": {
+        "status": {
+          "enum": ["ready", "not_ready", "unavailable"]
+        },
+        "http_status": {
+          "$ref": "#/$defs/http_status"
+        }
+      }
+    }
+  }
+}

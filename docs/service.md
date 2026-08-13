@@ -15,6 +15,9 @@ The installed `service-retention-readiness` client wraps the exact policy
 envelope and fixed response contract.
 Loop 93 adds the aggregate [`remote-operational-readiness.md`](remote-operational-readiness.md)
 report and its installed `service-operational-readiness` client.
+Loop 95 adds the unauthenticated, read-only [`service-probe.md`](service-probe.md)
+client for deployment cutovers; it composes the existing `/healthz` and
+`/readyz` endpoints without adding a route or exposing response bodies.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
@@ -90,6 +93,16 @@ It checks the fixed configuration, authentication, credential-directory,
 state, and loopback-bind boundaries without starting the service or modifying
 the workspace. A passing Doctor is a preflight signal; `GET /readyz` remains
 the authoritative live signal after the process owns its scheduler lease.
+
+For a live deployment gate, use the fixed, unauthenticated service probe:
+
+```bash
+skill2workflow service-probe --service-url https://service.example
+```
+
+Require exit code `0` (`status: "ready"`) before routing application traffic.
+See [`service-probe.md`](service-probe.md) for the contract and the distinct
+`not_ready` versus `unavailable` exit states.
 
 From a source checkout, the equivalent command is:
 
