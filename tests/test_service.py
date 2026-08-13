@@ -1532,6 +1532,32 @@ class RuntimeServiceTests(TestCase):
         self.assertIn("skill2workflow_scheduler_lease_owned 0", metrics)
         self.assertFalse(thread.is_alive())
 
+    def test_metrics_rejects_request_body_before_rendering(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            service = RuntimeService(_service_config(root))
+            host, port = service.server_address
+            thread = threading.Thread(target=service._server.handle_request, daemon=True)
+            thread.start()
+
+            with patch.object(
+                service.telemetry,
+                "render",
+                wraps=service.telemetry.render,
+            ) as render:
+                status, payload = _get_raw_get(
+                    f"http://{host}:{port}/metrics",
+                    token=AUTH_TOKEN,
+                    body=b"{}",
+                )
+            thread.join(timeout=2)
+            service._server.server_close()
+
+        self.assertEqual(status, 400)
+        self.assertEqual(payload, {"error": "metrics request must not include a body"})
+        render.assert_not_called()
+        self.assertFalse(thread.is_alive())
+
     def test_unexpected_scheduler_failure_releases_lease_for_standby(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"

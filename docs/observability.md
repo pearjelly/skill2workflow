@@ -13,6 +13,11 @@ GET /metrics
 Authorization: Bearer <single-team-token>
 ```
 
+The request is a zero-body read: a non-zero `Content-Length`, duplicate or
+invalid length, or `Transfer-Encoding` header is rejected with the shared
+bounded `400`/`413` request contract before telemetry is rendered. This keeps
+scraper failures from leaving unread bytes at the service boundary.
+
 An absent, malformed, or invalid token returns `401` and `WWW-Authenticate: Bearer`. An unavailable token provider returns `503`. Metrics authentication attempts do not create persisted workflow audit events, avoiding scrape-driven audit growth. The in-memory HTTP counter still records the fixed route and response class.
 
 Unlike workflow triggers, authenticated metrics remain available while `/readyz` reports `503`. This lets an operator diagnose a starting, draining, or standby process. The exported `skill2workflow_service_ready` and `skill2workflow_scheduler_lease_owned` gauges show that state directly. A SQLite read failure returns a compact `503 metrics unavailable` response without storage details.

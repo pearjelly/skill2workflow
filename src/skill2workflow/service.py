@@ -698,6 +698,17 @@ def _handler_for(service: RuntimeService):
                     headers={"WWW-Authenticate": "Bearer"} if status_code == 401 else None,
                 )
                 return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "metrics request must not include a body"},
+                )
+                return
             readiness_status, _ = service.readiness()
             try:
                 lease_owned = service.scheduler.dispatcher.has_lease(now_epoch=time.time())

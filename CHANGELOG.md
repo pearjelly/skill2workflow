@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Hardened the authenticated `/metrics` read surface with the shared zero-body
+  request contract: malformed, transfer-encoded, oversized, and non-empty
+  scraper bodies are rejected before telemetry rendering.
 - Corrected run-audit consistency projections for waiting and interrupted
   runs: lifecycle events are no longer counted twice, so healthy paused or
   recovered runs no longer raise false operator attention.
