@@ -169,6 +169,41 @@ class StorageTests(TestCase):
                     with self.assertRaisesRegex(ValueError, "run list limit"):
                         store.list_bounded(limit)
 
+    def test_sqlite_bounded_run_reads_use_compact_summary_projection(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = SqliteRunStore(state_dir)
+            store.save(
+                {
+                    "run_id": "run_compact_summary",
+                    "workflow_id": "workflow_storage",
+                    "workflow_version": "1.0.0",
+                    "status": "completed",
+                    "current_node": "end",
+                    "context": {"large": "payload"},
+                    "node_results": {"start": {"status": "completed"}},
+                    "events": [
+                        {"type": "run_started", "timestamp": "2026-08-14T00:00:00Z"},
+                        {"type": "run_completed", "timestamp": "2026-08-14T00:00:01Z"},
+                    ],
+                }
+            )
+            with store._connection() as connection:
+                connection.execute(
+                    "update runs set state_json = ? where run_id = ?",
+                    ("not-json", "run_compact_summary"),
+                )
+
+            bounded = store.list_bounded(1)[0]
+            window = store.snapshot_window(1)["items"][0]
+            page = store.run_page(1)["items"][0]
+
+        for summary in (bounded, window, page):
+            self.assertEqual(summary["run_id"], "run_compact_summary")
+            self.assertEqual(summary["event_count"], 2)
+            self.assertEqual(summary["node_result_count"], 1)
+            self.assertNotIn("context", summary)
+
     def test_audit_tail_limit_filters_before_bounding_for_json_and_sqlite(self):
         events = [
             {

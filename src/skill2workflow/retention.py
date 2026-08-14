@@ -350,6 +350,18 @@ def _purge_retained_copy(
                 (*run_statuses, cutoff),
             )
             deleted_executions = int(cursor.rowcount)
+        if _table_exists(connection, "run_summaries"):
+            connection.execute(
+                f"""
+                delete from run_summaries
+                where run_id in (
+                    select run_id from runs
+                    where status in ({placeholders})
+                      and julianday(updated_at) < julianday(?)
+                )
+                """,
+                (*run_statuses, cutoff),
+            )
         cursor = connection.execute(
             f"""
             delete from run_events

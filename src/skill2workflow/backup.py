@@ -99,6 +99,16 @@ _OPTIONAL_COLUMNS = {
             "claimed_at",
             "updated_at",
         },
+        "run_summaries": {
+            "run_id",
+            "workflow_id",
+            "workflow_version",
+            "status",
+            "current_node",
+            "event_count",
+            "node_result_count",
+            "updated_at",
+        },
     }
 }
 _MANIFEST_KEYS = {

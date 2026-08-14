@@ -417,6 +417,11 @@ class LocalControlPlane:
             summaries = self.executor.list_runs(limit=MAX_RUN_AUDIT_REPORT_RUNS)
         run_ids = [str(summary.get("run_id", "")) for summary in summaries]
         audit_by_run = self.store.audit_event_type_counts(run_ids)
+        event_counts_by_run = None
+        try:
+            event_counts_by_run = self.executor.run_event_type_counts(run_ids)
+        except (AttributeError, ValueError):
+            event_counts_by_run = None
 
         reports = []
         attention_runs = 0
@@ -425,8 +430,14 @@ class LocalControlPlane:
         unexpected_events = 0
         for summary in summaries:
             current_run_id = str(summary.get("run_id", ""))
-            state = self.executor.get_run(current_run_id)
-            expected = _expected_run_audit_counts(state)
+            if event_counts_by_run is None:
+                state = self.executor.get_run(current_run_id)
+                expected = _expected_run_audit_counts(state)
+            else:
+                expected = _expected_run_audit_counts_from_summary(
+                    summary,
+                    event_counts_by_run.get(current_run_id, {}),
+                )
             observed = Counter(audit_by_run.get(current_run_id, {}))
             missing = _counter_differences(expected, observed)
             duplicate = _counter_differences(observed, expected)
@@ -1567,27 +1578,39 @@ def _promote_runtime_event(event_type: str) -> bool:
 def _expected_run_audit_counts(state: RunState) -> Counter:
     """Derive the bounded audit projection expected from one durable run state."""
 
-    expected = Counter({"run_started": 1})
+    event_counts = Counter()
     events = state.get("events", [])
     if isinstance(events, list):
         for event in events:
             if not isinstance(event, dict):
                 continue
-            event_type = str(event.get("type", ""))
-            if _promote_runtime_event(event_type):
-                expected[event_type] += 1
-            elif event_type == "human_gate_resumed":
-                expected["run_resumed"] += 1
-            elif event_type == "human_gate_waiting":
-                expected["run_waiting"] += 1
-            elif event_type in {
-                "run_cancel_requested",
-                "run_cancelled",
-                "run_interrupted",
-            }:
-                expected[event_type] += 1
+            event_counts[str(event.get("type", "event"))] += 1
+    return _expected_run_audit_counts_from_summary(state, event_counts)
 
-    status = str(state.get("status", ""))
+
+def _expected_run_audit_counts_from_summary(
+    summary: RunState, event_counts: Dict[str, int]
+) -> Counter:
+    """Derive expected audit counts from compact run metadata and event counts."""
+
+    expected = Counter({"run_started": 1})
+    for event_type, count in event_counts.items():
+        normalized_type = str(event_type)
+        count = max(0, int(count))
+        if _promote_runtime_event(normalized_type):
+            expected[normalized_type] += count
+        elif normalized_type == "human_gate_resumed":
+            expected["run_resumed"] += count
+        elif normalized_type == "human_gate_waiting":
+            expected["run_waiting"] += count
+        elif normalized_type in {
+            "run_cancel_requested",
+            "run_cancelled",
+            "run_interrupted",
+        }:
+            expected[normalized_type] += count
+
+    status = str(summary.get("status", ""))
     if status == "cancel_requested":
         expected["run_cancel_requested"] = max(
             1, expected.get("run_cancel_requested", 0)

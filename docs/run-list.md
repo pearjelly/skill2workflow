@@ -21,10 +21,12 @@ skill2workflow runs \
 
 `--limit` accepts `1` through `1000` and returns the same compact run-summary
 array as the unbounded command. SQLite orders the window by durable update time
-and run ID; JSON uses the newest durable event timestamp (with a filesystem fallback
-for legacy states without timestamps). The read is storage-bounded and
-does not mutate runs, append audit events, or change retention. The complete
-path remains available when the flag is omitted.
+and run ID and reads a compact summary/event projection without parsing complete
+run state documents containing workflow, input, or node-result data; JSON uses
+the newest durable event timestamp (with a filesystem fallback for legacy states
+without timestamps). The read is storage-bounded and does not mutate runs,
+append audit events, or change retention. The complete path remains available
+when the flag is omitted.
 
 The equivalent `control-runs --limit N` form uses the same bound for published
 workflow runs.

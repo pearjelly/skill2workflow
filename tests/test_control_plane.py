@@ -476,6 +476,24 @@ class ControlPlaneTests(TestCase):
         listed.assert_called_once_with(limit=256)
         self.assertEqual(report["summary"]["checked_runs"], 1)
 
+    def test_run_audit_global_projection_does_not_load_full_sqlite_run_state(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.3.1"))
+            control.run_published_workflow("workflow_control", "1.3.1")
+            with closing(sqlite3.connect(state_dir / "runs.sqlite3")) as connection:
+                connection.execute(
+                    "update runs set state_json = ?",
+                    ("not-json",),
+                )
+                connection.commit()
+
+            report = control.inspect_run_audit()
+
+        self.assertEqual(report["status"], "clean")
+        self.assertEqual(report["summary"]["checked_runs"], 1)
+
     def test_run_audit_consistency_target_reads_one_run_without_listing_all_runs(self):
         with TemporaryDirectory() as tmp:
             control = LocalControlPlane(Path(tmp), storage="sqlite")

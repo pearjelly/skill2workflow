@@ -94,6 +94,9 @@ class JsonRunStore:
             raise FileNotFoundError(f"run not found: {run_id}")
         return json.loads(path.read_text(encoding="utf-8"))
 
+    def get_run_summary(self, run_id: str) -> RunState:
+        return _summarize_run_document(self.load(run_id))
+
     def count(self) -> int:
         """Count persisted run documents without loading their contents."""
 
@@ -101,6 +104,24 @@ class JsonRunStore:
 
     def list(self) -> List[RunState]:
         return [json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.runs_dir.glob("*.json"))]
+
+    def run_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
+        selected = {str(run_id) for run_id in run_ids if str(run_id)}
+        counts = {}
+        if not selected:
+            return counts
+        for state in self.list():
+            run_id = str(state.get("run_id", ""))
+            if run_id not in selected:
+                continue
+            counter = Counter()
+            events = state.get("events", [])
+            if isinstance(events, list):
+                for event in events:
+                    if isinstance(event, dict):
+                        counter[str(event.get("type", "event"))] += 1
+            counts[run_id] = dict(counter)
+        return counts
 
     def list_bounded(self, limit: int) -> List[RunState]:
         """Read only the newest bounded run summaries' source states."""
@@ -456,11 +477,48 @@ class SqliteRunStore:
             raise FileNotFoundError(f"run not found: {run_id}")
         return json.loads(str(row[0]))
 
+    def get_run_summary(self, run_id: str) -> RunState:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                select run_id, workflow_id, workflow_version, status, current_node,
+                       event_count, node_result_count
+                from run_summaries where run_id = ?
+                """,
+                (str(run_id),),
+            ).fetchone()
+        if row is None:
+            raise FileNotFoundError(f"run not found: {run_id}")
+        return _run_summary_from_row(row)
+
     def count(self) -> int:
         """Count persisted run rows without loading their state documents."""
 
         with self._connection() as connection:
             return int(connection.execute("select count(*) from runs").fetchone()[0])
+
+    def run_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
+        """Count compact event rows for selected runs without loading state JSON."""
+
+        selected = [str(run_id) for run_id in run_ids if str(run_id)]
+        if not selected:
+            return {}
+        placeholders = ",".join("?" for _ in selected)
+        with self._connection() as connection:
+            rows = connection.execute(
+                f"""
+                select run_id, event_type, count(*)
+                from run_events
+                where run_id in ({placeholders})
+                group by run_id, event_type
+                order by run_id, event_type
+                """,
+                selected,
+            ).fetchall()
+        counts = {}
+        for run_id, event_type, count in rows:
+            counts.setdefault(str(run_id), {})[str(event_type)] = int(count)
+        return counts
 
     def list(self) -> List[RunState]:
         with self._connection() as connection:
@@ -474,13 +532,18 @@ class SqliteRunStore:
         with self._connection() as connection:
             rows = connection.execute(
                 """
-                select state_json from runs
-                order by updated_at desc, run_id desc
+                select run_summaries.run_id, run_summaries.workflow_id,
+                       run_summaries.workflow_version, run_summaries.status,
+                       run_summaries.current_node, run_summaries.event_count,
+                       run_summaries.node_result_count
+                from run_summaries
+                join runs using (run_id)
+                order by runs.updated_at desc, run_summaries.run_id desc
                 limit ?
                 """,
                 (limit,),
             ).fetchall()
-        return [json.loads(str(row[0])) for row in reversed(rows)]
+        return [_run_summary_from_row(row) for row in reversed(rows)]
 
     def snapshot_window(self, limit: int) -> Dict[str, object]:
         """Read recent run state plus aggregate counts without loading all rows."""
@@ -489,12 +552,17 @@ class SqliteRunStore:
         with self._connection() as connection:
             total = int(connection.execute("select count(*) from runs").fetchone()[0])
             status_rows = connection.execute(
-                "select status, count(*) from runs group by status order by status"
+                "select status, count(*) from run_summaries group by status order by status"
             ).fetchall()
             rows = connection.execute(
                 """
-                select state_json from runs
-                order by updated_at desc, run_id desc
+                select run_summaries.run_id, run_summaries.workflow_id,
+                       run_summaries.workflow_version, run_summaries.status,
+                       run_summaries.current_node, run_summaries.event_count,
+                       run_summaries.node_result_count
+                from run_summaries
+                join runs using (run_id)
+                order by runs.updated_at desc, run_summaries.run_id desc
                 limit ?
                 """,
                 (limit,),
@@ -504,7 +572,7 @@ class SqliteRunStore:
             "status_counts": {
                 str(status): int(count) for status, count in status_rows
             },
-            "items": [json.loads(str(row[0])) for row in reversed(rows)],
+            "items": [_run_summary_from_row(row) for row in reversed(rows)],
         }
 
     def run_page(
@@ -526,15 +594,18 @@ class SqliteRunStore:
         filter_clauses = []
         filter_values = []
         if status:
-            filter_clauses.append("status = ?")
+            filter_clauses.append("run_summaries.status = ?")
             filter_values.append(str(status))
         if workflow_id:
-            filter_clauses.append("workflow_id = ?")
+            filter_clauses.append("run_summaries.workflow_id = ?")
             filter_values.append(str(workflow_id))
         clauses = list(filter_clauses)
         values = list(filter_values)
         if before_updated_at:
-            clauses.append("(updated_at < ? or (updated_at = ? and run_id < ?))")
+            clauses.append(
+                "(runs.updated_at < ? or "
+                "(runs.updated_at = ? and run_summaries.run_id < ?))"
+            )
             values.extend([before_updated_at, before_updated_at, before_run_id])
         filter_where = (
             " where " + " and ".join(filter_clauses) if filter_clauses else ""
@@ -543,18 +614,21 @@ class SqliteRunStore:
         with self._connection() as connection:
             total = int(
                 connection.execute(
-                    f"select count(*) from runs{filter_where}", filter_values
+                    f"select count(*) from run_summaries{filter_where}", filter_values
                 ).fetchone()[0]
             )
             status_rows = connection.execute(
-                f"select status, count(*) from runs{filter_where} group by status order by status",
+                f"select status, count(*) from run_summaries{filter_where} group by status order by status",
                 filter_values,
             ).fetchall()
             rows = connection.execute(
                 f"""
-                select run_id, updated_at, state_json
-                from runs{where}
-                order by updated_at desc, run_id desc
+                select run_summaries.run_id, runs.updated_at,
+                       run_summaries.workflow_id, run_summaries.workflow_version,
+                       run_summaries.status, run_summaries.current_node,
+                       run_summaries.event_count, run_summaries.node_result_count
+                from run_summaries join runs using (run_id){where}
+                order by runs.updated_at desc, run_summaries.run_id desc
                 limit ?
                 """,
                 values + [limit + 1],
@@ -570,7 +644,7 @@ class SqliteRunStore:
         return {
             "total": total,
             "status_counts": {str(status): int(count) for status, count in status_rows},
-            "items": [json.loads(str(row[2])) for row in reversed(page_rows)],
+            "items": [_run_summary_from_page_row(row) for row in reversed(page_rows)],
             "has_more": has_more,
             "next_cursor": next_cursor,
         }
@@ -748,6 +822,46 @@ class SqliteRunStore:
                 )
                 """
             )
+            connection.execute(
+                """
+                create table if not exists run_summaries (
+                    run_id text primary key,
+                    workflow_id text not null,
+                    workflow_version text not null,
+                    status text not null,
+                    current_node text not null,
+                    event_count integer not null,
+                    node_result_count integer not null,
+                    updated_at text not null,
+                    foreign key (run_id) references runs(run_id) on delete cascade
+                )
+                """
+            )
+            connection.execute(
+                "delete from run_summaries where run_id not in (select run_id from runs)"
+            )
+            summary_count = int(
+                connection.execute("select count(*) from run_summaries").fetchone()[0]
+            )
+            run_count = int(connection.execute("select count(*) from runs").fetchone()[0])
+            if summary_count < run_count:
+                rows = connection.execute(
+                    """
+                    select runs.run_id, runs.state_json
+                    from runs left join run_summaries
+                      on run_summaries.run_id = runs.run_id
+                    where run_summaries.run_id is null
+                    order by runs.run_id
+                    """
+                )
+                for run_id, raw_state in rows:
+                    try:
+                        state = json.loads(str(raw_state))
+                    except (TypeError, ValueError, json.JSONDecodeError) as error:
+                        raise ValueError("SQLite run state is not valid JSON") from error
+                    if not isinstance(state, dict):
+                        raise ValueError("SQLite run state must be an object")
+                    _upsert_sqlite_summary(connection, state)
 
     def _connection(self):
         return _sqlite_connection(self.db_path)
@@ -2202,6 +2316,7 @@ def _upsert_sqlite_state(connection, state: RunState) -> None:
             payload,
         ),
     )
+    _upsert_sqlite_summary(connection, state)
     connection.execute("delete from run_events where run_id = ?", (state["run_id"],))
     connection.executemany(
         """
@@ -2226,6 +2341,78 @@ def _upsert_sqlite_state(connection, state: RunState) -> None:
 
 def _save_sqlite_state(connection, state: RunState) -> None:
     _upsert_sqlite_state(connection, state)
+
+
+def _upsert_sqlite_summary(connection, state: RunState) -> None:
+    """Maintain the compact projection used by bounded operator reads."""
+
+    events = state.get("events", [])
+    if not isinstance(events, list):
+        events = []
+    node_results = state.get("node_results", {})
+    if not isinstance(node_results, dict):
+        node_results = {}
+    connection.execute(
+        """
+        insert into run_summaries (
+            run_id, workflow_id, workflow_version, status, current_node,
+            event_count, node_result_count, updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        on conflict(run_id) do update set
+            workflow_id = excluded.workflow_id,
+            workflow_version = excluded.workflow_version,
+            status = excluded.status,
+            current_node = excluded.current_node,
+            event_count = excluded.event_count,
+            node_result_count = excluded.node_result_count,
+            updated_at = excluded.updated_at
+        """,
+        (
+            state["run_id"],
+            state.get("workflow_id", "workflow"),
+            state.get("workflow_version", "0.1.0"),
+            state.get("status", "created"),
+            state.get("current_node", ""),
+            len(events),
+            len(node_results),
+        ),
+    )
+
+
+def _run_summary_from_row(row) -> RunState:
+    return {
+        "run_id": str(row[0]),
+        "workflow_id": str(row[1]),
+        "workflow_version": str(row[2]),
+        "status": str(row[3]),
+        "current_node": str(row[4]),
+        "event_count": max(0, int(row[5])),
+        "node_result_count": max(0, int(row[6])),
+    }
+
+
+def _run_summary_from_page_row(row) -> RunState:
+    return {
+        "run_id": str(row[0]),
+        "workflow_id": str(row[2]),
+        "workflow_version": str(row[3]),
+        "status": str(row[4]),
+        "current_node": str(row[5]),
+        "event_count": max(0, int(row[6])),
+        "node_result_count": max(0, int(row[7])),
+    }
+
+
+def _summarize_run_document(state: RunState) -> RunState:
+    return {
+        "run_id": state["run_id"],
+        "workflow_id": state["workflow_id"],
+        "workflow_version": state["workflow_version"],
+        "status": state["status"],
+        "current_node": state["current_node"],
+        "event_count": len(state.get("events", [])),
+        "node_result_count": len(state.get("node_results", {})),
+    }
 
 
 def _utc_now() -> str:

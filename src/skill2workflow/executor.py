@@ -198,7 +198,18 @@ class LocalExecutor:
     def get_run_summary(self, run_id: str) -> RunState:
         """Read and redact one run summary without enumerating other runs."""
 
+        reader = getattr(self.store, "get_run_summary", None)
+        if callable(reader):
+            return reader(run_id)
         return _summarize_run(self._load(run_id))
+
+    def run_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
+        """Count persisted event rows for selected runs without loading states."""
+
+        counter = getattr(self.store, "run_event_type_counts", None)
+        if not callable(counter):
+            raise ValueError("run event counts are unavailable")
+        return counter(run_ids)
 
     def count_runs(self) -> int:
         """Count durable runs without loading their state documents."""
@@ -1020,6 +1031,16 @@ def _connector_audit_event_fields(summary: object) -> Dict[str, object]:
 
 
 def _summarize_run(state: RunState) -> RunState:
+    if "events" not in state and "event_count" in state:
+        return {
+            "run_id": state["run_id"],
+            "workflow_id": state["workflow_id"],
+            "workflow_version": state["workflow_version"],
+            "status": state["status"],
+            "current_node": state["current_node"],
+            "event_count": max(0, int(state.get("event_count", 0))),
+            "node_result_count": max(0, int(state.get("node_result_count", 0))),
+        }
     return {
         "run_id": state["run_id"],
         "workflow_id": state["workflow_id"],
