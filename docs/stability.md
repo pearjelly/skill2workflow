@@ -75,6 +75,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Authenticated `POST /runs/{run_id}/resume`, exact boolean decision body, waiting-only conflict behavior, and durable human-gate branch semantics documented in `docs/human-approval.md`
 - Protected `service-resume` and `service-cancel` CLI commands, token-file authentication, fixed origin validation, and bounded response handling documented in `docs/human-approval.md`
 - Authenticated `GET /runs/{run_id}`, redacted run-detail schema `skill2workflow-run-detail-0.1.0`, and protected `service-show` CLI documented in `docs/run-detail.md`
+- Run-detail projection reads at most the fixed 50-event audit tail at the storage boundary; response shape, total run-state event count, and redaction semantics remain unchanged
 - Authenticated `GET /runs`, redacted run-list schema `skill2workflow-run-list-0.1.0`, and protected `service-runs` CLI documented in `docs/run-list.md`
 - Authenticated `GET /api/v1/runs`, filtered cursor-paged run-list schema `skill2workflow-run-list-0.2.0`, and protected `service-run-page` CLI documented in `docs/run-list.md`; the 0.1.0 `/runs` tail contract remains unchanged
 - Authenticated `GET /api/v1/support-bundle`, redacted support-bundle schema `skill2workflow-support-bundle-0.1.0`, and protected `service-support-bundle` CLI documented in `docs/support-bundle.md`

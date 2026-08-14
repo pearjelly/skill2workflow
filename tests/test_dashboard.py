@@ -15,6 +15,7 @@ from skill2workflow.dashboard import (
     build_workflow_artifact_report_from_control,
     build_workflow_inventory_from_control,
     build_run_detail,
+    build_run_detail_from_control,
     build_run_list,
     build_run_page_from_control,
     build_support_bundle_from_control,
@@ -349,6 +350,26 @@ class DashboardTests(TestCase):
         ):
             self.assertNotIn(private_value, serialized)
         self.assertIn("has_error", projected["run"]["node_overlays"]["start"])
+
+    def test_run_detail_reads_only_the_bounded_audit_tail(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            run = control.run_published_workflow("workflow_dashboard", "1.0.0")
+            original = control.store.list_audit_events
+
+            def bounded_audit_list(*args, **kwargs):
+                if kwargs.get("limit") is None:
+                    raise AssertionError("run detail loaded the full audit history")
+                return original(*args, **kwargs)
+
+            with patch.object(
+                control.store, "list_audit_events", side_effect=bounded_audit_list
+            ):
+                projected = build_run_detail_from_control(control, run["run_id"])
+
+        self.assertEqual(projected["window"]["max_events"], 50)
 
     def test_run_list_is_bounded_and_redacted(self):
         with TemporaryDirectory() as tmp:

@@ -709,7 +709,13 @@ def build_run_detail_from_control(
     events = state.get("events", [])
     if not isinstance(events, list):
         events = []
-    audit_events = control.list_audit_events(run_id=str(run_id))
+    # Keep the source read bounded as well as the response.  The overlay only
+    # exposes the same fixed event tail, so loading the complete per-run audit
+    # history would add cost without adding operator-visible information.
+    audit_events = control.list_audit_events(
+        run_id=str(run_id),
+        limit=max_events,
+    )
     workflow = state.get("workflow", {})
     node_ids = [
         node.get("id")

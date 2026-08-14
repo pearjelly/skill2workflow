@@ -237,6 +237,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Added bounded runtime observability through authenticated Prometheus metrics and allowlisted operational NDJSON.
 - Added durable cooperative cancellation and interrupted-run recovery with execution tickets, stale-writer fencing, and no automatic replay of unknown external effects.
 - Bounded interrupted-run audit reconciliation in the long-running SQLite service to fixed 100-row cursor pages with lease renewal between full pages; direct complete-batch recovery and no-replay semantics remain compatible.
+- Run-detail projections now apply their fixed 50-event audit tail at the storage query boundary, avoiding full per-run audit-history loads without changing the redacted response contract.
 - Added a secure service bootstrap and an installed controlled quickstart that reaches a durable human approval gate without a source checkout.
 - Added a read-only `service-doctor` command with fixed secret-free diagnostics for configuration, authentication, credential directories, SQLite state, and loopback binding.
 - Added descriptor-bound connector credential reads with private-directory and file permissions, no-follow identity checks, a 64 KiB limit, and execution-time atomic rotation.

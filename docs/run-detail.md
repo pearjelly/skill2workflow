@@ -13,7 +13,10 @@ The response is versioned as
 [`schemas/run-detail-0.1.0.schema.json`](../schemas/run-detail-0.1.0.schema.json).
 It contains the run identity and status, a compact per-node operational
 overlay, and at most the latest 50 allowlisted run events. The `window` object
-states the total event count, returned count, and truncation status.
+states the total event count, returned count, and truncation status. The
+storage query applies the same 50-event tail before projection, so a run with
+long retry or connector history does not require loading its complete control
+audit history merely to serve this fixed detail view.
 
 This is an operator read surface, not a state export. It never returns the
 workflow DSL, trigger context or input values, node-result payloads, connector
