@@ -144,7 +144,8 @@ For SQLite recurring schedules, the bounded inventory reads a transactional
 It does not parse complete definitions or trigger input for every historical
 schedule. The projection is created and backfilled when an older scheduler
 database is opened; complete `list`/`get` and dispatch execution paths retain
-their existing full-definition behavior.
+their existing full-definition behavior. The authenticated service inventory
+route and the local bounded CLI both use this projection.
 
 Pause and resume future dispatch:
 

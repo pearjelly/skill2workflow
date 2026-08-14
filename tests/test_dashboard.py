@@ -451,6 +451,26 @@ class DashboardTests(TestCase):
         self.assertNotIn("private-schedule-input", serialized)
         self.assertNotIn("idempotency_key_prefix", serialized)
 
+    def test_recurring_schedule_projection_uses_compact_store_summary(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = RecurringScheduleStore(state_dir)
+            store.add(
+                _recurring_schedule_definition(
+                    "schedule_compact", enabled=True, input_value="private-schedule-input"
+                )
+            )
+            with store._connection() as connection:
+                connection.execute(
+                    "update recurring_schedules set definition_json = ? where schedule_id = ?",
+                    ("not-json", "schedule_compact"),
+                )
+
+            projected = build_recurring_schedule_list_from_store(store, max_items=1)
+
+        self.assertEqual(projected["summary"]["total"], 1)
+        self.assertEqual(projected["schedules"][0]["schedule_id"], "schedule_compact")
+
     def test_recurring_dispatch_list_is_bounded_and_excludes_lease_or_input_values(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

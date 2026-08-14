@@ -3281,11 +3281,12 @@ Bounded recurring-schedule inventory reads summary columns and status counts
 without parsing trigger input; complete `list`/`get` and dispatch execution
 paths remain unchanged.
 
-**Evidence:** The storage regression corrupts a persisted full definition after
-the summary is written and proves bounded inventory still returns the fixed
-redacted metadata. Existing dispatch, enable/disable, backup, restore, and
-restart tests prove the projection is maintained across state transitions and
-older scheduler databases are backfilled on open.
+**Evidence:** The storage and dashboard regressions corrupt a persisted full
+definition after the summary is written and prove both local and authenticated
+service inventory still return the fixed redacted metadata. Existing dispatch,
+enable/disable, backup, restore, and restart tests prove the projection is
+maintained across state transitions and older scheduler databases are
+backfilled on open.
 
 **Safety boundary:** The projection is derived in the same SQLite transaction
 as definition writes and is optional for backup-schema compatibility. It does

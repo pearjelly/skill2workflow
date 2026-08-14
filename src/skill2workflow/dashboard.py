@@ -268,7 +268,16 @@ def build_recurring_schedule_list_from_store(
         or max_items > MAX_RECURRING_SCHEDULE_LIST_ITEMS
     ):
         raise ValueError("max_items must be a positive bounded integer")
-    if hasattr(schedule_store, "list_bounded"):
+    compact_store = hasattr(schedule_store, "list_compact_bounded")
+    if compact_store:
+        bounded = schedule_store.list_compact_bounded(max_items)
+        selected = bounded["items"]
+        total = int(bounded["total"])
+        status_counts = {"active": 0, "disabled": 0, "other": 0}
+        for status, count in bounded["status_counts"].items():
+            bucket = status if status in {"active", "disabled"} else "other"
+            status_counts[bucket] += int(count)
+    elif hasattr(schedule_store, "list_bounded"):
         bounded = schedule_store.list_bounded(max_items)
         selected = bounded["items"]
         total = int(bounded["total"])
@@ -288,6 +297,34 @@ def build_recurring_schedule_list_from_store(
     projected = []
     for schedule in selected:
         if not isinstance(schedule, dict):
+            continue
+        if compact_store:
+            status = _safe_string(schedule.get("status", ""))
+            normalized_status = status if status in {"active", "disabled"} else "other"
+            projected.append(
+                {
+                    "schedule_id": _safe_string(schedule.get("schedule_id", "")),
+                    "workflow_id": _safe_string(schedule.get("workflow_id", "")),
+                    "workflow_version": _safe_string(schedule.get("workflow_version", "")),
+                    "status": normalized_status,
+                    "enabled": bool(schedule.get("enabled", False)),
+                    "starts_at": _safe_string(schedule.get("starts_at", "")),
+                    "next_run_at": _safe_string(schedule.get("next_run_at", "")),
+                    "interval_seconds": _safe_non_negative_int(
+                        schedule.get("interval_seconds", 0)
+                    ),
+                    "missed_run_policy": _safe_string(
+                        schedule.get("missed_run_policy", "")
+                    ),
+                    "last_scheduled_for": _safe_string(
+                        schedule.get("last_scheduled_for", "")
+                    ),
+                    "last_run_id": _safe_string(schedule.get("last_run_id", "")),
+                    "last_trigger_id": _safe_string(
+                        schedule.get("last_trigger_id", "")
+                    ),
+                }
+            )
             continue
         meta = schedule.get("schedule")
         if not isinstance(meta, dict):
