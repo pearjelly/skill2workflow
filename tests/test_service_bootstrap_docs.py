@@ -28,14 +28,14 @@ class ServiceBootstrapDocumentationTests(TestCase):
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-        self.assertIn("- Completed delivery loops: 1-145", roadmap)
+        self.assertIn("- Completed delivery loops: 1-146", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 145 is complete with compact SQLite run summaries",
+            "- Active loop: None; Loop 146 is complete with compact SQLite recurring-schedule summaries",
             roadmap,
         )
         self.assertIn("| Loop 51: Secure Service Bootstrap | Complete |", roadmap)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-145 are complete", readme)
+        self.assertIn("Delivery Loops 1-146 are complete", readme)
         self.assertIn("secure service bootstrap", readme)
         self.assertIn("scripts/service_bootstrap_smoke.py", harness)
         self.assertIn("Secure service bootstrap", agents)

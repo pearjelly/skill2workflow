@@ -96,7 +96,7 @@ The backup contains only:
 
 - `control.sqlite3`: published version registry and compact audit events;
 - `runs.sqlite3`: durable run state, run events, and the additive cancellation request ledger when present;
-- `scheduler.sqlite3`: recurring definitions and dispatch records;
+- `scheduler.sqlite3`: recurring definitions, compact schedule summaries, and dispatch records;
 - the exact `workflows/**/*.json` artifacts referenced by `control.sqlite3`;
 - `manifest.json` using [`schemas/state-backup-manifest-0.1.0.schema.json`](../schemas/state-backup-manifest-0.1.0.schema.json).
 

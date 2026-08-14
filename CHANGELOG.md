@@ -239,6 +239,7 @@ release; Roadmap loop completion alone does not publish a new version.
 - Bounded interrupted-run audit reconciliation in the long-running SQLite service to fixed 100-row cursor pages with lease renewal between full pages; direct complete-batch recovery and no-replay semantics remain compatible.
 - Run-detail projections now apply their fixed 50-event audit tail at the storage query boundary, avoiding full per-run audit-history loads without changing the redacted response contract.
 - SQLite bounded run discovery, cursor paging, snapshots, and global audit consistency now read compact run-summary/event projections instead of parsing complete run state documents; explicit detail and compatibility reads remain unchanged.
+- SQLite bounded recurring-schedule inventory now reads a compact schedule-summary projection instead of parsing complete definitions that may contain large trigger inputs; full schedule and dispatch compatibility paths remain unchanged.
 - Added a secure service bootstrap and an installed controlled quickstart that reaches a durable human approval gate without a source checkout.
 - Added a read-only `service-doctor` command with fixed secret-free diagnostics for configuration, authentication, credential directories, SQLite state, and loopback binding.
 - Added descriptor-bound connector credential reads with private-directory and file permissions, no-follow identity checks, a 64 KiB limit, and execution-time atomic rotation.

@@ -139,6 +139,13 @@ the flag is omitted. Their schemas are
 [`local-schedule-list-0.1.0.schema.json`](../schemas/local-schedule-list-0.1.0.schema.json)
 and [`local-schedule-dispatch-list-0.1.0.schema.json`](../schemas/local-schedule-dispatch-list-0.1.0.schema.json).
 
+For SQLite recurring schedules, the bounded inventory reads a transactional
+`recurring_schedule_summaries` projection containing only scheduling metadata.
+It does not parse complete definitions or trigger input for every historical
+schedule. The projection is created and backfilled when an older scheduler
+database is opened; complete `list`/`get` and dispatch execution paths retain
+their existing full-definition behavior.
+
 Pause and resume future dispatch:
 
 ```bash

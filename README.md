@@ -741,7 +741,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-145 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-146 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1199,6 +1199,11 @@ Loop 145 adds a compact SQLite run-summary projection for bounded discovery,
 pagination, snapshots, and audit consistency. Operator reads no longer parse
 complete run state documents containing workflow, input, and node-result data;
 full run retrieval remains available only through the explicit detail path.
+
+Loop 146 adds a compact SQLite recurring-schedule projection for bounded
+schedule inventory. Operator reads no longer parse complete schedule documents
+containing trigger input; full schedule retrieval remains available through the
+explicit schedule/detail and dispatch paths.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

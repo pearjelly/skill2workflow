@@ -91,6 +91,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Offline `control-snapshot --max-items` accepts a bounded 1-1000 window for JSON and SQLite state, preserves aggregate totals, and leaves live snapshots at their fixed 100-item bound
 - Local `runs --limit` and `control-runs --limit` accept a bounded 1-1000 newest-summary window for JSON and SQLite state; omitting the flag retains the complete-list compatibility path
 - SQLite bounded run discovery, cursor pages, offline snapshot windows, and global audit consistency read compact summary/event projections instead of parsing complete run state documents; explicit run detail and complete local state reads remain unchanged
+- SQLite bounded recurring-schedule inventory reads compact schedule metadata instead of parsing complete definitions or trigger inputs; explicit schedule retrieval and dispatch paths remain unchanged
 - SQLite service readiness checks registry readability with a count query rather than materializing every published workflow; explicit workflow inventory/list APIs retain their complete-list compatibility behavior
 - SQLite stable-alias trigger resolution uses a direct version lookup plus a selected-workflow cursor rather than loading the global registry; exact-version precedence, ambiguity rejection, and replay pinning remain unchanged
 - Authenticated Prometheus text metric names, fixed label vocabularies, live HTTP/scheduler pressure gauges, and operational event schema `skill2workflow-operational-event-0.1.0` documented in `docs/observability.md`

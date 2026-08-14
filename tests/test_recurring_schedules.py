@@ -193,6 +193,43 @@ class RecurringSchedulePersistenceTests(TestCase):
         self.assertEqual(len(inventory["items"]), 1)
         self.assertEqual(inventory["items"][0]["schedule"]["id"], "schedule_second")
 
+    def test_sqlite_compact_schedule_inventory_uses_summary_projection(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = RecurringScheduleStore(state_dir)
+            store.add(_recurring_definition())
+            with closing(sqlite3.connect(state_dir / "scheduler.sqlite3")) as raw:
+                with raw:
+                    raw.execute(
+                        "update recurring_schedules set definition_json = ? where schedule_id = ?",
+                        ("not-json", "schedule_hourly_report"),
+                    )
+
+            inventory = store.list_compact_bounded(1)
+
+        self.assertEqual(inventory["total"], 1)
+        self.assertEqual(
+            inventory["status_counts"],
+            {"active": 1, "pending": 0, "completed": 0, "disabled": 0, "other": 0},
+        )
+        self.assertEqual(inventory["items"][0]["schedule_id"], "schedule_hourly_report")
+        self.assertEqual(inventory["items"][0]["workflow_id"], "workflow_recurring")
+
+    def test_sqlite_schedule_summary_projection_backfills_legacy_scheduler_state(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = RecurringScheduleStore(state_dir)
+            store.add(_recurring_definition())
+            with closing(sqlite3.connect(state_dir / "scheduler.sqlite3")) as raw:
+                with raw:
+                    raw.execute("drop table recurring_schedule_summaries")
+
+            reloaded = RecurringScheduleStore(state_dir)
+            inventory = reloaded.list_compact_bounded(1)
+
+        self.assertEqual(inventory["total"], 1)
+        self.assertEqual(inventory["items"][0]["schedule_id"], "schedule_hourly_report")
+
     def test_sqlite_store_streams_bounded_dispatch_inventory_and_filters(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

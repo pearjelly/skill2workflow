@@ -443,6 +443,29 @@ def _compact_schedule(schedule: Schedule, kind: str):
     return compact, (last_activity_at, compact["schedule_id"])
 
 
+def _compact_recurring_summary(row) -> Dict[str, object]:
+    """Convert one durable recurring summary row to the public compact shape."""
+
+    return {
+        "kind": "recurring",
+        "schedule_id": str(row[0]),
+        "workflow_id": str(row[1]),
+        "workflow_version": str(row[2]),
+        "status": str(row[3]),
+        "enabled": bool(row[4]),
+        "run_at": "",
+        "starts_at": str(row[5]),
+        "next_run_at": str(row[6]),
+        "interval_seconds": max(0, int(row[7])),
+        "missed_run_policy": str(row[8]),
+        "last_activity_at": str(row[9]),
+        "last_run_at": "",
+        "last_scheduled_for": str(row[10]),
+        "last_run_id": str(row[11]),
+        "last_trigger_id": str(row[12]),
+    }
+
+
 def _compact_dispatch(record: object) -> Dict[str, object]:
     if not isinstance(record, dict):
         raise ValueError("schedule dispatch record must be an object")
@@ -551,6 +574,7 @@ class RecurringScheduleStore:
                 )
             except sqlite3.IntegrityError as error:
                 raise ValueError(f"recurring schedule already exists: {schedule_id}") from error
+            _upsert_recurring_schedule_summary(connection, normalized)
         return normalized
 
     def get(self, schedule_id: str) -> Schedule:
@@ -595,28 +619,33 @@ class RecurringScheduleStore:
         }
 
     def list_compact_bounded(self, max_items: int) -> Dict[str, object]:
-        """Stream recurring definitions into a bounded value-free projection."""
+        """Read a bounded value-free projection without parsing trigger input."""
 
         _validate_local_window(max_items, "schedule list limit")
-        selected = []
-        total = 0
         status_counts = _empty_schedule_status_counts()
         with self._connection() as connection:
-            rows = connection.execute(
-                "select definition_json from recurring_schedules order by schedule_id"
+            total = int(
+                connection.execute("select count(*) from recurring_schedule_summaries").fetchone()[0]
             )
-            for row in rows:
-                schedule = _load_recurring_definition(row[0])
-                total += 1
-                compact, sort_key = _compact_schedule(schedule, "recurring")
-                status_counts[_schedule_status_bucket(compact["status"])] += 1
-                item = (sort_key, compact["schedule_id"], "recurring", compact)
-                if len(selected) < max_items:
-                    heapq.heappush(selected, item)
-                elif item[:3] > selected[0][:3]:
-                    heapq.heapreplace(selected, item)
+            rows = connection.execute(
+                "select status, count(*) from recurring_schedule_summaries group by status"
+            ).fetchall()
+            for status, count in rows:
+                status_counts[_schedule_status_bucket(status)] += int(count)
+            recent = connection.execute(
+                """
+                select schedule_id, workflow_id, workflow_version, status, enabled,
+                       starts_at, next_run_at, interval_seconds, missed_run_policy,
+                       last_activity_at, last_scheduled_for, last_run_id, last_trigger_id
+                from recurring_schedule_summaries
+                order by last_activity_at desc, schedule_id desc
+                limit ?
+                """,
+                (max_items,),
+            ).fetchall()
+        selected = [_compact_recurring_summary(row) for row in reversed(recent)]
         return {
-            "items": [item[3] for item in sorted(selected, key=lambda value: value[:3])],
+            "items": selected,
             "total": total,
             "status_counts": status_counts,
         }
@@ -654,6 +683,7 @@ class RecurringScheduleStore:
                     "update recurring_schedules set definition_json = ?, updated_at = ? where schedule_id = ?",
                     (_json_text(definition), _utc_now(), str(schedule_id)),
                 )
+                _upsert_recurring_schedule_summary(connection, definition)
         return definition, changed
 
     def list_dispatches(self, schedule_id: str = "") -> List[Dict[str, object]]:
@@ -729,6 +759,61 @@ class RecurringScheduleStore:
                 )
                 """
             )
+            connection.execute(
+                """
+                create table if not exists recurring_schedule_summaries (
+                    schedule_id text primary key,
+                    workflow_id text not null,
+                    workflow_version text not null,
+                    status text not null,
+                    enabled integer not null,
+                    starts_at text not null,
+                    next_run_at text not null,
+                    interval_seconds integer not null,
+                    missed_run_policy text not null,
+                    last_activity_at text not null,
+                    last_scheduled_for text not null,
+                    last_run_id text not null,
+                    last_trigger_id text not null,
+                    updated_at text not null,
+                    foreign key (schedule_id) references recurring_schedules(schedule_id) on delete cascade
+                )
+                """
+            )
+            connection.execute(
+                """
+                create index if not exists recurring_schedule_summaries_activity_idx
+                on recurring_schedule_summaries (last_activity_at, schedule_id)
+                """
+            )
+            connection.execute(
+                "delete from recurring_schedule_summaries where schedule_id not in (select schedule_id from recurring_schedules)"
+            )
+            summary_count = int(
+                connection.execute(
+                    "select count(*) from recurring_schedule_summaries"
+                ).fetchone()[0]
+            )
+            schedule_count = int(
+                connection.execute("select count(*) from recurring_schedules").fetchone()[0]
+            )
+            if summary_count < schedule_count:
+                rows = connection.execute(
+                    """
+                    select recurring_schedules.schedule_id, recurring_schedules.definition_json
+                    from recurring_schedules
+                    left join recurring_schedule_summaries
+                      on recurring_schedule_summaries.schedule_id = recurring_schedules.schedule_id
+                    where recurring_schedule_summaries.schedule_id is null
+                    order by recurring_schedules.schedule_id
+                    """
+                )
+                for schedule_id, raw_definition in rows:
+                    try:
+                        definition = _load_recurring_definition(raw_definition)
+                    except (TypeError, ValueError, json.JSONDecodeError) as error:
+                        raise ValueError("SQLite recurring schedule is not valid JSON") from error
+                    _upsert_recurring_schedule_summary(connection, definition)
             connection.execute(
                 """
                 create table if not exists schedule_dispatches (
@@ -904,6 +989,7 @@ class RecurringScheduleDispatcher:
                     "update recurring_schedules set definition_json = ?, updated_at = ? where schedule_id = ?",
                     (_json_text(definition), _utc_now(), str(schedule_id)),
                 )
+                _upsert_recurring_schedule_summary(connection, definition)
                 claimed.append(record)
                 if max_items is not None and len(claimed) >= max_items:
                     break
@@ -1019,6 +1105,7 @@ class RecurringScheduleDispatcher:
                     "update recurring_schedules set definition_json = ?, updated_at = ? where schedule_id = ?",
                     (_json_text(definition), _utc_now(), str(claim["schedule_id"])),
                 )
+                _upsert_recurring_schedule_summary(connection, definition)
 
     def _owns_lease(self, connection, now_epoch: float) -> bool:
         row = connection.execute(
@@ -1186,6 +1273,56 @@ def _dispatch_id(schedule_id: str, scheduled_for: str) -> str:
 
 def _json_text(value: object) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _upsert_recurring_schedule_summary(connection, definition: Schedule) -> None:
+    """Maintain the compact recurring projection in the same transaction as its definition."""
+
+    meta = definition["schedule"]
+    last_scheduled_for = str(meta.get("last_scheduled_for", ""))
+    last_activity_at = last_scheduled_for or str(meta.get("next_run_at", "")) or str(
+        meta.get("starts_at", "")
+    )
+    connection.execute(
+        """
+        insert into recurring_schedule_summaries (
+            schedule_id, workflow_id, workflow_version, status, enabled,
+            starts_at, next_run_at, interval_seconds, missed_run_policy,
+            last_activity_at, last_scheduled_for, last_run_id, last_trigger_id,
+            updated_at
+        ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        on conflict(schedule_id) do update set
+            workflow_id = excluded.workflow_id,
+            workflow_version = excluded.workflow_version,
+            status = excluded.status,
+            enabled = excluded.enabled,
+            starts_at = excluded.starts_at,
+            next_run_at = excluded.next_run_at,
+            interval_seconds = excluded.interval_seconds,
+            missed_run_policy = excluded.missed_run_policy,
+            last_activity_at = excluded.last_activity_at,
+            last_scheduled_for = excluded.last_scheduled_for,
+            last_run_id = excluded.last_run_id,
+            last_trigger_id = excluded.last_trigger_id,
+            updated_at = excluded.updated_at
+        """,
+        (
+            str(meta["id"]),
+            str(meta["workflow_id"]),
+            str(meta["version"]),
+            str(meta["status"]),
+            1 if bool(meta["enabled"]) else 0,
+            str(meta["starts_at"]),
+            str(meta["next_run_at"]),
+            int(meta["interval_seconds"]),
+            str(meta["missed_run_policy"]),
+            last_activity_at,
+            last_scheduled_for,
+            str(meta.get("last_run_id", "")),
+            str(meta.get("last_trigger_id", "")),
+            _utc_now(),
+        ),
+    )
 
 
 def _utc_now() -> str:

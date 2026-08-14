@@ -109,7 +109,25 @@ _OPTIONAL_COLUMNS = {
             "node_result_count",
             "updated_at",
         },
-    }
+    },
+    "scheduler.sqlite3": {
+        "recurring_schedule_summaries": {
+            "schedule_id",
+            "workflow_id",
+            "workflow_version",
+            "status",
+            "enabled",
+            "starts_at",
+            "next_run_at",
+            "interval_seconds",
+            "missed_run_policy",
+            "last_activity_at",
+            "last_scheduled_for",
+            "last_run_id",
+            "last_trigger_id",
+            "updated_at",
+        },
+    },
 }
 _MANIFEST_KEYS = {
     "schema_version",
@@ -578,6 +596,27 @@ def _initialize_empty_scheduler_database(path: Path) -> None:
                 lease_name text primary key,
                 owner_id text not null,
                 expires_at real not null
+            )
+            """
+        )
+        connection.execute(
+            """
+            create table recurring_schedule_summaries (
+                schedule_id text primary key,
+                workflow_id text not null,
+                workflow_version text not null,
+                status text not null,
+                enabled integer not null,
+                starts_at text not null,
+                next_run_at text not null,
+                interval_seconds integer not null,
+                missed_run_policy text not null,
+                last_activity_at text not null,
+                last_scheduled_for text not null,
+                last_run_id text not null,
+                last_trigger_id text not null,
+                updated_at text not null,
+                foreign key (schedule_id) references recurring_schedules(schedule_id) on delete cascade
             )
             """
         )

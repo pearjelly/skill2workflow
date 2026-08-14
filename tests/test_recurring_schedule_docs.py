@@ -50,6 +50,8 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("claim-expiry", guide)
         self.assertIn("SQLite cursor", guide)
         self.assertIn("unbounded source read", guide)
+        self.assertIn("recurring_schedule_summaries", guide)
+        self.assertIn("does not parse complete definitions", guide)
 
     def test_bounded_local_schedule_schemas_fix_the_redacted_window_contract(self):
         schedule_schema = json.loads(
@@ -93,7 +95,9 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-145 are complete", readme)
+        self.assertIn("Delivery Loops 1-146 are complete", readme)
+        self.assertIn("Loop 146 adds a compact SQLite recurring-schedule projection", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
+        self.assertIn("### Loop 146: Compact SQLite Recurring-Schedule Projections", roadmap)
         self.assertIn("| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete |", roadmap)
