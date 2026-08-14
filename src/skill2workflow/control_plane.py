@@ -23,7 +23,7 @@ from .executor import (
     RunState,
 )
 from .input_schema import InputSchemaValidationError, validate_trigger_input
-from .storage import create_control_store
+from .storage import MAX_INTERRUPTED_RECOVERY_BATCH, create_control_store
 from .triggers import (
     TriggerIdempotencyError,
     normalize_trigger_request,
@@ -830,8 +830,36 @@ class LocalControlPlane:
         """Repair missing control-plane evidence for interrupted states."""
 
         repaired = 0
-        for state in self.executor.iter_interrupted_runs():
+        after_run_id = ""
+        while True:
+            batch_repaired, processed, next_run_id = (
+                self.reconcile_interrupted_run_audits_batch(
+                    MAX_INTERRUPTED_RECOVERY_BATCH,
+                    after_run_id=after_run_id,
+                )
+            )
+            repaired += batch_repaired
+            if processed < MAX_INTERRUPTED_RECOVERY_BATCH:
+                break
+            if not next_run_id or next_run_id == after_run_id:
+                break
+            after_run_id = next_run_id
+        return repaired
+
+    def reconcile_interrupted_run_audits_batch(
+        self, max_items: int, after_run_id: str = ""
+    ) -> Tuple[int, int, str]:
+        """Repair one bounded cursor page of interrupted-run audit evidence."""
+
+        _validate_interrupted_reconciliation_limit(max_items)
+        repaired_events = []
+        processed = 0
+        next_run_id = str(after_run_id or "")
+        for state in self.executor.iter_interrupted_runs(after_run_id=next_run_id):
+            processed += 1
             run_id = str(state.get("run_id", ""))
+            if run_id:
+                next_run_id = run_id
             interruption = next(
                 (
                     event
@@ -842,15 +870,13 @@ class LocalControlPlane:
                 None,
             )
             if (
-                not run_id
-                or not interruption
-                or self.store.audit_event_type_exists_for_run(
+                run_id
+                and interruption
+                and not self.store.audit_event_type_exists_for_run(
                     run_id, "run_interrupted"
                 )
             ):
-                continue
-            self._append_audit_batch(
-                [
+                repaired_events.append(
                     {
                         "type": "run_interrupted",
                         "run_id": run_id,
@@ -863,10 +889,11 @@ class LocalControlPlane:
                         "timestamp": str(interruption.get("timestamp", ""))
                         or _now(),
                     }
-                ]
-            )
-            repaired += 1
-        return repaired
+                )
+            if processed >= max_items:
+                break
+        self._append_missing_audit_events(repaired_events)
+        return len(repaired_events), processed, next_run_id
 
     def expire_workflow_deadlines(
         self, now: str = None, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS
@@ -1467,6 +1494,18 @@ def _validate_artifact_issue_limit(max_issues: object) -> None:
         or max_issues > MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES
     ):
         raise ValueError("max_issues must be a positive bounded integer")
+
+
+def _validate_interrupted_reconciliation_limit(max_items: object) -> None:
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or not 1 <= max_items <= MAX_INTERRUPTED_RECOVERY_BATCH
+    ):
+        raise ValueError(
+            "interrupted reconciliation limit must be an integer from 1 through "
+            f"{MAX_INTERRUPTED_RECOVERY_BATCH}"
+        )
 
 
 def _retain_artifact_issue(

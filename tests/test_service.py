@@ -349,7 +349,9 @@ class RuntimeServiceTests(TestCase):
                 "recover_interrupted_runs_batch",
                 return_value=([], 0),
             ) as interrupted, patch.object(
-                scheduler.dispatcher.control_plane, "reconcile_interrupted_run_audits"
+                scheduler.dispatcher.control_plane,
+                "reconcile_interrupted_run_audits_batch",
+                return_value=(0, 0, ""),
             ) as reconcile, patch.object(
                 scheduler.dispatcher.control_plane, "expire_workflow_deadlines"
             ) as expire:
@@ -357,7 +359,7 @@ class RuntimeServiceTests(TestCase):
 
         recover.assert_called_once_with(now_epoch=123.0, max_items=100)
         interrupted.assert_called_once_with(max_items=100)
-        reconcile.assert_called_once_with()
+        reconcile.assert_called_once_with(max_items=100, after_run_id="")
         expire.assert_called_once()
 
     def test_scheduler_lease_recovery_renews_between_full_stale_claim_batches(self):
@@ -374,7 +376,9 @@ class RuntimeServiceTests(TestCase):
                 "recover_interrupted_runs_batch",
                 return_value=([], 0),
             ), patch.object(
-                scheduler.dispatcher.control_plane, "reconcile_interrupted_run_audits"
+                scheduler.dispatcher.control_plane,
+                "reconcile_interrupted_run_audits_batch",
+                return_value=(0, 0, ""),
             ), patch.object(
                 scheduler.dispatcher.control_plane, "expire_workflow_deadlines"
             ):
@@ -399,7 +403,9 @@ class RuntimeServiceTests(TestCase):
             ) as recover, patch.object(
                 scheduler.dispatcher, "renew", return_value=True
             ) as renew, patch.object(
-                scheduler.dispatcher.control_plane, "reconcile_interrupted_run_audits"
+                scheduler.dispatcher.control_plane,
+                "reconcile_interrupted_run_audits_batch",
+                return_value=(0, 0, ""),
             ), patch.object(
                 scheduler.dispatcher.control_plane, "expire_workflow_deadlines"
             ):
@@ -409,6 +415,36 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(
             [call.kwargs["max_items"] for call in recover.call_args_list],
             [100, 100],
+        )
+        renew.assert_called_once()
+
+    def test_scheduler_lease_recovery_renews_between_full_interrupted_audit_batches(self):
+        with TemporaryDirectory() as tmp:
+            scheduler = ServiceScheduleLoop(Path(tmp))
+            with patch.object(
+                scheduler.dispatcher, "recover_stale_claims", return_value=0
+            ), patch.object(
+                scheduler.dispatcher.control_plane,
+                "recover_interrupted_runs_batch",
+                return_value=([], 0),
+            ), patch.object(
+                scheduler.dispatcher.control_plane,
+                "reconcile_interrupted_run_audits_batch",
+                side_effect=[(0, 100, "run_a"), (0, 2, "run_b")],
+            ) as reconcile, patch.object(
+                scheduler.dispatcher, "renew", return_value=True
+            ) as renew, patch.object(
+                scheduler.dispatcher.control_plane, "expire_workflow_deadlines"
+            ):
+                scheduler._recover_after_acquire(123.0)
+
+        self.assertEqual(reconcile.call_count, 2)
+        self.assertEqual(
+            [call.kwargs for call in reconcile.call_args_list],
+            [
+                {"max_items": 100, "after_run_id": ""},
+                {"max_items": 100, "after_run_id": "run_a"},
+            ],
         )
         renew.assert_called_once()
 

@@ -160,14 +160,18 @@ class JsonRunStore:
     ) -> Tuple[List[RunState], int]:
         raise ValueError("interrupted run recovery requires sqlite storage")
 
-    def iter_interrupted_runs(self):
-        """Stream interrupted run states for recovery reconciliation."""
+    def iter_interrupted_runs(self, after_run_id: str = ""):
+        """Stream interrupted run states in stable, cursor-friendly order."""
 
         for path in sorted(self.runs_dir.glob("*.json")):
             if not path.is_file():
                 continue
             state = json.loads(path.read_text(encoding="utf-8"))
-            if str(state.get("status", "")) == "interrupted":
+            run_id = str(state.get("run_id", ""))
+            if (
+                str(state.get("status", "")) == "interrupted"
+                and (not after_run_id or run_id > str(after_run_id))
+            ):
                 yield state
 
     def expire_waiting_workflow_deadlines(
@@ -437,11 +441,11 @@ class SqliteRunStore:
                     break
         return recovered, processed
 
-    def iter_interrupted_runs(self):
-        """Stream interrupted run states without materializing the run table."""
+    def iter_interrupted_runs(self, after_run_id: str = ""):
+        """Stream interrupted run states with an optional stable cursor."""
 
         with self._connection() as connection:
-            rows = _iter_interrupted_run_rows(connection)
+            rows = _iter_interrupted_run_rows(connection, after_run_id=after_run_id)
             for (raw_state,) in rows:
                 yield json.loads(str(raw_state))
 
@@ -2036,15 +2040,25 @@ def _iter_foreign_active_execution_rows(connection, current_owner: str):
     )
 
 
-def _iter_interrupted_run_rows(connection):
-    """Return a cursor for interrupted run states in stable recovery order."""
+def _iter_interrupted_run_rows(connection, after_run_id: str = ""):
+    """Return a cursor for interrupted states in stable cursor order."""
 
+    if after_run_id:
+        return connection.execute(
+            """
+            select state_json
+            from runs
+            where status = 'interrupted' and run_id > ?
+            order by run_id
+            """,
+            (str(after_run_id),),
+        )
     return connection.execute(
         """
         select state_json
         from runs
         where status = 'interrupted'
-        order by updated_at, run_id
+        order by run_id
         """
     )
 

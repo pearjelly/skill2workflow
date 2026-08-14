@@ -221,10 +221,10 @@ class LocalExecutor:
             self.execution_owner, max_items=max_items
         )
 
-    def iter_interrupted_runs(self):
-        """Stream interrupted run states for control-plane reconciliation."""
+    def iter_interrupted_runs(self, after_run_id: str = ""):
+        """Stream interrupted run states for cursor-bounded reconciliation."""
 
-        return self.store.iter_interrupted_runs()
+        return self.store.iter_interrupted_runs(after_run_id=after_run_id)
 
     def expire_workflow_deadlines(
         self, now: str = None, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS

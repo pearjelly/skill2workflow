@@ -41,9 +41,16 @@ returned recovered-state list and takeover semantics remain compatible.
 
 After takeover, control-plane audit reconciliation streams the durable
 `interrupted` run states and checks each `(run_id, run_interrupted)` projection
-with a bounded existence query. It does not reload the complete run table or
-audit history during service startup, so an old interrupted-run backlog cannot
-turn recovery into an unbounded diagnostic read.
+with a bounded existence query. The long-running service scans and repairs
+those projections in the same fixed 100-row cursor batches, renewing the
+scheduler lease between full pages. It does not reload the complete run table
+or audit history during service startup, so an old interrupted-run backlog
+cannot turn recovery into an unbounded diagnostic read or lease-held repair.
+
+The direct control-plane recovery method retains its complete-batch behavior
+for local compatibility. The service path uses the cursor form, and the
+cursor is an internal `run_id` continuation only; it is not exposed as a
+remote API or an operator-controlled audit filter.
 
 The executor rechecks the ticket before every node and connector attempt and
 persists `connector_started` before transport. If takeover occurs between two

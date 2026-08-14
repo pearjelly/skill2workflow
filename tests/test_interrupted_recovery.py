@@ -168,6 +168,46 @@ class InterruptedRunRecoveryTests(TestCase):
         self.assertEqual(empty_processed, 0)
         self.assertEqual([state["status"] for state in states], ["interrupted", "interrupted"])
 
+    def test_interrupted_audit_reconciliation_accepts_a_bounded_cursor_batch(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            store = SqliteRunStore(state_dir)
+            for index in range(2):
+                store.save(
+                    {
+                        "run_id": f"run_reconcile_{index}",
+                        "workflow_id": "workflow_reconcile",
+                        "workflow_version": "0.1.0",
+                        "status": "interrupted",
+                        "current_node": "start",
+                        "context": {},
+                        "node_results": {},
+                        "events": [
+                            {
+                                "type": "run_interrupted",
+                                "node_id": "start",
+                                "timestamp": f"2026-08-14T00:00:0{index}Z",
+                            }
+                        ],
+                        "workflow": {},
+                    }
+                )
+            control = LocalControlPlane(state_dir, storage="sqlite")
+
+            first = control.reconcile_interrupted_run_audits_batch(1)
+            second = control.reconcile_interrupted_run_audits_batch(
+                1, after_run_id=first[2]
+            )
+            empty = control.reconcile_interrupted_run_audits_batch(
+                1, after_run_id=second[2]
+            )
+            events = control.list_audit_events(event_type="run_interrupted")
+
+        self.assertEqual(first, (1, 1, "run_reconcile_0"))
+        self.assertEqual(second, (1, 1, "run_reconcile_1"))
+        self.assertEqual(empty, (0, 0, "run_reconcile_1"))
+        self.assertEqual(len(events), 2)
+
     def test_recovery_reconciliation_does_not_enumerate_full_runs_or_audit(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp) / "state"

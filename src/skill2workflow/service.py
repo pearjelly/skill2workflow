@@ -636,7 +636,23 @@ class ServiceScheduleLoop:
                 raise SchedulerLeaseError(
                     "scheduler lease was lost during interrupted-run recovery"
                 )
-        self.dispatcher.control_plane.reconcile_interrupted_run_audits()
+        after_run_id = ""
+        while True:
+            _repaired, processed, next_run_id = (
+                self.dispatcher.control_plane.reconcile_interrupted_run_audits_batch(
+                    max_items=MAX_SERVICE_SCHEDULER_BATCH,
+                    after_run_id=after_run_id,
+                )
+            )
+            if processed < MAX_SERVICE_SCHEDULER_BATCH:
+                break
+            if not next_run_id or next_run_id == after_run_id:
+                break
+            if not self.dispatcher.renew(now_epoch=time.time()):
+                raise SchedulerLeaseError(
+                    "scheduler lease was lost during interrupted-run audit reconciliation"
+                )
+            after_run_id = next_run_id
         self._sweep_workflow_deadlines(now_epoch, force=True)
 
 

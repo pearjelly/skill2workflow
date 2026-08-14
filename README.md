@@ -741,7 +741,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-142 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-143 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1186,6 +1186,10 @@ backlog from becoming one unbounded lease-held write.
 Loop 142 applies the same fixed batch and lease-renewal boundary to interrupted
 run takeover, keeping process-loss recovery writes bounded before audit repair
 and recurring dispatch resume.
+
+Loop 143 applies that boundary to interrupted-run audit reconciliation, using a
+cursor-bounded 100-row repair page and lease renewal between full pages so a
+large crash backlog cannot monopolize startup recovery.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
