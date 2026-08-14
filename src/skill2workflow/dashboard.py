@@ -742,33 +742,62 @@ def build_run_detail_from_control(
         or max_events > MAX_RUN_DETAIL_EVENTS
     ):
         raise ValueError("max_events must be a positive bounded integer")
-    state = control.get_run(str(run_id))
-    events = state.get("events", [])
-    if not isinstance(events, list):
-        events = []
-    # Keep the source read bounded as well as the response.  The overlay only
-    # exposes the same fixed event tail, so loading the complete per-run audit
-    # history would add cost without adding operator-visible information.
-    audit_events = control.list_audit_events(
-        run_id=str(run_id),
-        limit=max_events,
-    )
-    workflow = state.get("workflow", {})
-    node_ids = [
-        node.get("id")
-        for node in _items(workflow, "nodes")
-        if isinstance(node, dict) and isinstance(node.get("id"), str) and node.get("id")
-    ]
-    current_node = _safe_string(state.get("current_node", ""))
-    if current_node and current_node not in node_ids:
-        node_ids.append(current_node)
-    overlays = run_overlay_for_nodes(node_ids, state, audit_events)
-    safe_overlays = {
-        node_id: _safe_run_overlay(overlay)
-        for node_id, overlay in overlays.items()
-    }
+    compact_reader = getattr(control.executor, "get_run_detail_projection", None)
+    compact_state = compact_reader(str(run_id), max_events) if callable(compact_reader) else None
+    if isinstance(compact_state, dict):
+        state = compact_state
+        events = state.get("events", [])
+        if not isinstance(events, list):
+            events = []
+        total_event_count = _safe_non_negative_int(state.get("event_count", len(events)))
+        audit_events = control.list_audit_events(
+            run_id=str(run_id),
+            limit=max_events,
+        )
+        node_ids = [
+            str(node_id)
+            for node_id in state.get("node_ids", [])
+            if isinstance(node_id, str) and node_id
+        ]
+        current_node = _safe_string(state.get("current_node", ""))
+        if current_node and current_node not in node_ids:
+            node_ids.append(current_node)
+        compact_overlays = state.get("node_overlays", {})
+        if not isinstance(compact_overlays, dict):
+            raise ValueError("SQLite run detail projection is invalid")
+        safe_overlays = _safe_compact_run_overlays(
+            node_ids, compact_overlays, audit_events, current_node, state
+        )
+    else:
+        state = control.get_run(str(run_id))
+        events = state.get("events", [])
+        if not isinstance(events, list):
+            events = []
+        # Keep the source read bounded as well as the response.  The overlay
+        # only exposes the same fixed event tail, so loading the complete
+        # per-run audit history would add cost without adding operator-visible
+        # information.
+        audit_events = control.list_audit_events(
+            run_id=str(run_id),
+            limit=max_events,
+        )
+        workflow = state.get("workflow", {})
+        node_ids = [
+            node.get("id")
+            for node in _items(workflow, "nodes")
+            if isinstance(node, dict) and isinstance(node.get("id"), str) and node.get("id")
+        ]
+        current_node = _safe_string(state.get("current_node", ""))
+        if current_node and current_node not in node_ids:
+            node_ids.append(current_node)
+        overlays = run_overlay_for_nodes(node_ids, state, audit_events)
+        safe_overlays = {
+            node_id: _safe_run_overlay(overlay)
+            for node_id, overlay in overlays.items()
+        }
+        total_event_count = len(events)
     returned_events = events[-max_events:]
-    start_index = len(events) - len(returned_events)
+    start_index = max(0, total_event_count - len(returned_events))
     safe_events = [
         _safe_run_event(event, sequence=start_index + index + 1)
         for index, event in enumerate(returned_events)
@@ -782,11 +811,15 @@ def build_run_detail_from_control(
             "workflow_version": _safe_string(state.get("workflow_version", "")),
             "status": _safe_string(state.get("status", "")),
             "current_node": current_node,
-            "event_count": len(events),
+            "event_count": total_event_count,
             "node_result_count": _safe_non_negative_int(
-                len(state.get("node_results", {}))
-                if isinstance(state.get("node_results", {}), dict)
-                else 0
+                state.get("node_result_count", 0)
+                if "node_result_count" in state
+                else (
+                    len(state.get("node_results", {}))
+                    if isinstance(state.get("node_results", {}), dict)
+                    else 0
+                )
             ),
             "node_overlays": safe_overlays,
             "created_at": _safe_string(state.get("created_at", "")),
@@ -795,9 +828,9 @@ def build_run_detail_from_control(
         "events": safe_events,
         "window": {
             "max_events": max_events,
-            "total": len(events),
+            "total": total_event_count,
             "returned": len(safe_events),
-            "truncated": len(safe_events) < len(events),
+            "truncated": len(safe_events) < total_event_count,
         },
     }
 
@@ -837,8 +870,42 @@ def _safe_run_overlay(overlay: Dict[str, object]) -> Dict[str, object]:
     """Keep operational overlay fields while replacing raw errors with a flag."""
 
     safe = {field: overlay.get(field) for field in _RUN_OVERLAY_FIELDS}
-    safe["has_error"] = bool(overlay.get("error"))
+    safe["has_error"] = bool(overlay.get("error")) or bool(overlay.get("has_error"))
     return safe
+
+
+def _safe_compact_run_overlays(
+    node_ids: List[str],
+    compact_overlays: Dict[str, object],
+    audit_events: List[Dict[str, object]],
+    current_node: str,
+    state: Dict[str, object],
+) -> Dict[str, Dict[str, object]]:
+    """Add bounded audit counts to the persisted value-free node projection."""
+
+    audit_counts: Dict[str, int] = {}
+    for event in audit_events:
+        if not isinstance(event, dict):
+            continue
+        node_id = _safe_string(event.get("node_id", ""))
+        if node_id:
+            audit_counts[node_id] = audit_counts.get(node_id, 0) + 1
+    projected: Dict[str, Dict[str, object]] = {}
+    for node_id in node_ids:
+        overlay = compact_overlays.get(node_id)
+        if not isinstance(overlay, dict):
+            overlay = {
+                "node_id": node_id,
+                "status": _safe_string(state.get("status", ""))
+                if current_node == node_id
+                else "not_started",
+                "current": current_node == node_id,
+            }
+        else:
+            overlay = dict(overlay)
+        overlay["audit_event_count"] = audit_counts.get(node_id, 0)
+        projected[node_id] = _safe_run_overlay(overlay)
+    return projected
 
 
 def _safe_run_event(event: Dict[str, object], sequence: int) -> Dict[str, object]:

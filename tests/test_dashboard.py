@@ -371,6 +371,26 @@ class DashboardTests(TestCase):
 
         self.assertEqual(projected["window"]["max_events"], 50)
 
+    def test_sqlite_run_detail_uses_compact_projection_without_state_json(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            run = control.run_published_workflow("workflow_dashboard", "1.0.0")
+            expected_event_count = len(control.get_run(run["run_id"])["events"])
+            with control.executor.store._connection() as connection:
+                connection.execute(
+                    "update runs set state_json = ? where run_id = ?",
+                    ("not-json", run["run_id"]),
+                )
+
+            projected = build_run_detail(state_dir, run["run_id"], storage="sqlite")
+
+        self.assertEqual(projected["run"]["run_id"], run["run_id"])
+        self.assertEqual(projected["run"]["status"], "completed")
+        self.assertEqual(projected["window"]["total"], expected_event_count)
+        self.assertIn("start", projected["run"]["node_overlays"])
+
     def test_run_list_is_bounded_and_redacted(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

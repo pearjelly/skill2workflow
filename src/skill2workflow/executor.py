@@ -203,6 +203,16 @@ class LocalExecutor:
             return reader(run_id)
         return _summarize_run(self._load(run_id))
 
+    def get_run_detail_projection(
+        self, run_id: str, max_events: int
+    ) -> RunState:
+        """Read a compact SQLite detail source without loading full state."""
+
+        reader = getattr(self.store, "get_run_detail_projection", None)
+        if callable(reader):
+            return reader(run_id, max_events)
+        return None
+
     def run_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
         """Count persisted event rows for selected runs without loading states."""
 

@@ -16,7 +16,11 @@ overlay, and at most the latest 50 allowlisted run events. The `window` object
 states the total event count, returned count, and truncation status. The
 storage query applies the same 50-event tail before projection, so a run with
 long retry or connector history does not require loading its complete control
-audit history merely to serve this fixed detail view.
+audit history merely to serve this fixed detail view. With SQLite, the detail
+source also comes from the transactional run-summary/node-overlay projection
+and the bounded `run_events` tail; the complete `state_json` document is not
+parsed for this remote read. JSON storage and explicit local state retrieval
+retain their compatibility behavior.
 
 This is an operator read surface, not a state export. It never returns the
 workflow DSL, trigger context or input values, node-result payloads, connector
@@ -59,6 +63,7 @@ collections out of a routine operator handoff.
 
 ```bash
 PYTHONPATH=src python3 -m unittest \
+  tests.test_dashboard.DashboardTests.test_sqlite_run_detail_uses_compact_projection_without_state_json \
   tests.test_dashboard.DashboardTests.test_run_detail_is_bounded_and_redacts_context_results_and_errors \
   tests.test_service.RuntimeServiceTests.test_run_detail_is_authenticated_redacted_bounded_and_read_only \
   tests.test_service_client.ServiceClientTests.test_run_detail_uses_authenticated_get_and_validates_redacted_contract \

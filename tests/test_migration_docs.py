@@ -51,10 +51,10 @@ class MigrationDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-146 are complete", readme)
+        self.assertIn("Delivery Loops 1-147 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("docs/upgrade-migration.md", readme)
-        self.assertIn("- Completed delivery loops: 1-146", roadmap)
+        self.assertIn("- Completed delivery loops: 1-147", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 45: State Upgrade And Migration | Complete |", roadmap)
         self.assertIn("Production Baseline remains directional", roadmap)

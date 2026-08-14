@@ -491,6 +491,73 @@ class SqliteRunStore:
             raise FileNotFoundError(f"run not found: {run_id}")
         return _run_summary_from_row(row)
 
+    def get_run_detail_projection(self, run_id: str, max_events: int) -> RunState:
+        """Read the bounded redacted-detail source without loading state_json.
+
+        The complete run document can contain trigger input, workflow DSL,
+        connector output, and an arbitrarily long event history.  The detail
+        endpoint only needs the compact summary projection, the node overlay
+        projection, and a bounded event tail, so keep those reads separate.
+        """
+
+        _validate_audit_event_limit(max_events)
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                select run_id, workflow_id, workflow_version, status,
+                       current_node, event_count, node_result_count,
+                       detail_projection_json
+                from run_summaries
+                where run_id = ?
+                """,
+                (str(run_id),),
+            ).fetchone()
+            if row is None:
+                raise FileNotFoundError(f"run not found: {run_id}")
+            event_rows = connection.execute(
+                """
+                select payload_json
+                from run_events
+                where run_id = ?
+                order by sequence desc
+                limit ?
+                """,
+                (str(run_id), max_events),
+            ).fetchall()
+
+        try:
+            projection = json.loads(str(row[7]))
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            raise ValueError("SQLite run detail projection is not valid JSON") from error
+        if not isinstance(projection, dict):
+            raise ValueError("SQLite run detail projection must be an object")
+        node_ids = projection.get("node_ids", [])
+        node_overlays = projection.get("node_overlays", {})
+        if not isinstance(node_ids, list) or not isinstance(node_overlays, dict):
+            raise ValueError("SQLite run detail projection is invalid")
+        events = []
+        for (payload_json,) in reversed(event_rows):
+            try:
+                event = json.loads(str(payload_json))
+            except (TypeError, ValueError, json.JSONDecodeError) as error:
+                raise ValueError("SQLite run event is not valid JSON") from error
+            if isinstance(event, dict):
+                events.append(event)
+        return {
+            "run_id": str(row[0]),
+            "workflow_id": str(row[1]),
+            "workflow_version": str(row[2]),
+            "status": str(row[3]),
+            "current_node": str(row[4]),
+            "event_count": max(0, int(row[5])),
+            "node_result_count": max(0, int(row[6])),
+            "events": events,
+            "node_ids": [str(node_id) for node_id in node_ids],
+            "node_overlays": node_overlays,
+            "created_at": "",
+            "updated_at": "",
+        }
+
     def count(self) -> int:
         """Count persisted run rows without loading their state documents."""
 
@@ -833,10 +900,21 @@ class SqliteRunStore:
                     event_count integer not null,
                     node_result_count integer not null,
                     updated_at text not null,
+                    detail_projection_json text not null default '',
                     foreign key (run_id) references runs(run_id) on delete cascade
                 )
                 """
             )
+            summary_columns = {
+                str(row[1])
+                for row in connection.execute(
+                    'pragma table_info("run_summaries")'
+                ).fetchall()
+            }
+            if "detail_projection_json" not in summary_columns:
+                connection.execute(
+                    "alter table run_summaries add column detail_projection_json text not null default ''"
+                )
             connection.execute(
                 "delete from run_summaries where run_id not in (select run_id from runs)"
             )
@@ -862,6 +940,22 @@ class SqliteRunStore:
                     if not isinstance(state, dict):
                         raise ValueError("SQLite run state must be an object")
                     _upsert_sqlite_summary(connection, state)
+            projection_rows = connection.execute(
+                """
+                select runs.run_id, runs.state_json
+                from runs join run_summaries using (run_id)
+                where run_summaries.detail_projection_json = ''
+                order by runs.run_id
+                """
+            )
+            for run_id, raw_state in projection_rows:
+                try:
+                    state = json.loads(str(raw_state))
+                except (TypeError, ValueError, json.JSONDecodeError) as error:
+                    raise ValueError("SQLite run state is not valid JSON") from error
+                if not isinstance(state, dict):
+                    raise ValueError("SQLite run state must be an object")
+                _upsert_sqlite_summary(connection, state)
 
     def _connection(self):
         return _sqlite_connection(self.db_path)
@@ -2352,12 +2446,54 @@ def _upsert_sqlite_summary(connection, state: RunState) -> None:
     node_results = state.get("node_results", {})
     if not isinstance(node_results, dict):
         node_results = {}
+    workflow = state.get("workflow", {})
+    nodes = workflow.get("nodes", []) if isinstance(workflow, dict) else []
+    node_ids = [
+        str(node.get("id"))
+        for node in nodes
+        if isinstance(node, dict) and node.get("id")
+    ]
+    # Reuse the visualizer's established overlay semantics while persisting
+    # only the allowlisted, value-free fields needed by run detail.  Importing
+    # lazily keeps storage's low-level module boundary intact.
+    from .visualizer import run_overlay_for_nodes
+
+    overlays = run_overlay_for_nodes(node_ids, state, [])
+    compact_overlays = {}
+    for node_id, overlay in overlays.items():
+        compact_overlays[str(node_id)] = {
+            key: overlay.get(key)
+            for key in (
+                "node_id",
+                "status",
+                "current",
+                "event_count",
+                "latest_event_type",
+                "result_status",
+                "attempts",
+                "max_attempts",
+                "backoff_ms",
+                "retry_count",
+                "recovered",
+                "connector_id",
+                "connector_kind",
+                "connector_status",
+                "audit_event_count",
+            )
+        }
+        compact_overlays[str(node_id)]["has_error"] = bool(overlay.get("error"))
+    detail_projection = json.dumps(
+        {"node_ids": node_ids, "node_overlays": compact_overlays},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     connection.execute(
         """
         insert into run_summaries (
             run_id, workflow_id, workflow_version, status, current_node,
-            event_count, node_result_count, updated_at
-        ) values (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            event_count, node_result_count, updated_at, detail_projection_json
+        ) values (?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
         on conflict(run_id) do update set
             workflow_id = excluded.workflow_id,
             workflow_version = excluded.workflow_version,
@@ -2365,6 +2501,7 @@ def _upsert_sqlite_summary(connection, state: RunState) -> None:
             current_node = excluded.current_node,
             event_count = excluded.event_count,
             node_result_count = excluded.node_result_count,
+            detail_projection_json = excluded.detail_projection_json,
             updated_at = excluded.updated_at
         """,
         (
@@ -2375,6 +2512,7 @@ def _upsert_sqlite_summary(connection, state: RunState) -> None:
             state.get("current_node", ""),
             len(events),
             len(node_results),
+            detail_projection,
         ),
     )
 

@@ -108,6 +108,7 @@ _OPTIONAL_COLUMNS = {
             "event_count",
             "node_result_count",
             "updated_at",
+            "detail_projection_json",
         },
     },
     "scheduler.sqlite3": {
@@ -940,6 +941,15 @@ def _require_tables(connection, name: str) -> None:
             str(row[1])
             for row in connection.execute(f'pragma table_info("{table}")').fetchall()
         }
+        if (
+            name == "runs.sqlite3"
+            and table == "run_summaries"
+            and columns == required_columns - {"detail_projection_json"}
+        ):
+            # A pre-detail-projection backup is still a valid optional
+            # summary layout; opening it with the current runtime upgrades the
+            # projection in place before serving detail reads.
+            continue
         if columns != required_columns:
             raise ValueError(f"SQLite table has an incompatible layout: {name}:{table}")
     if name == "runs.sqlite3" and "run_executions" in names:
