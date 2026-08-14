@@ -624,7 +624,19 @@ class ServiceScheduleLoop:
                 break
             if not self.dispatcher.renew(now_epoch=time.time()):
                 raise SchedulerLeaseError("scheduler lease was lost during stale-claim recovery")
-        self.dispatcher.control_plane.recover_interrupted_runs()
+        while True:
+            _recovered, processed = (
+                self.dispatcher.control_plane.recover_interrupted_runs_batch(
+                    max_items=MAX_SERVICE_SCHEDULER_BATCH
+                )
+            )
+            if processed < MAX_SERVICE_SCHEDULER_BATCH:
+                break
+            if not self.dispatcher.renew(now_epoch=time.time()):
+                raise SchedulerLeaseError(
+                    "scheduler lease was lost during interrupted-run recovery"
+                )
+        self.dispatcher.control_plane.reconcile_interrupted_run_audits()
         self._sweep_workflow_deadlines(now_epoch, force=True)
 
 

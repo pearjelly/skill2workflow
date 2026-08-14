@@ -13,6 +13,7 @@ from unittest import TestCase
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.service import RuntimeService, ServiceScheduleLoop
+from skill2workflow.storage import SqliteRunStore
 from skill2workflow.telemetry import RuntimeTelemetry
 
 
@@ -127,6 +128,45 @@ class InterruptedRunRecoveryTests(TestCase):
         self.assertNotIn("owner_id", interruption_audit[0])
         self.assertIn("execution ownership was fenced", str(outcome["error"]))
         self.assertEqual(runtime.calls, 1)
+
+    def test_interrupted_takeover_accepts_a_bounded_write_batch(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            store = SqliteRunStore(state_dir)
+            for index in range(2):
+                store.start_execution(
+                    {
+                        "run_id": f"run_batch_{index}",
+                        "workflow_id": "workflow_batch",
+                        "workflow_version": "0.1.0",
+                        "status": "running",
+                        "current_node": "start",
+                        "context": {},
+                        "node_results": {},
+                        "events": [],
+                        "workflow": {},
+                    },
+                    "service-owner-a",
+                    f"execution_batch_{index}",
+                )
+            takeover = LocalControlPlane(
+                state_dir,
+                storage="sqlite",
+                execution_owner="service-owner-b",
+            )
+
+            first, first_processed = takeover.executor.recover_interrupted_runs_batch(1)
+            second, second_processed = takeover.executor.recover_interrupted_runs_batch(1)
+            empty, empty_processed = takeover.executor.recover_interrupted_runs_batch(1)
+            states = [takeover.get_run(f"run_batch_{index}") for index in range(2)]
+
+        self.assertEqual(len(first), 1)
+        self.assertEqual(first_processed, 1)
+        self.assertEqual(len(second), 1)
+        self.assertEqual(second_processed, 1)
+        self.assertEqual(empty, [])
+        self.assertEqual(empty_processed, 0)
+        self.assertEqual([state["status"] for state in states], ["interrupted", "interrupted"])
 
     def test_recovery_reconciliation_does_not_enumerate_full_runs_or_audit(self):
         with TemporaryDirectory() as tmp:
@@ -472,14 +512,14 @@ class InterruptedRunRecoveryTests(TestCase):
             second = ServiceScheduleLoop(state_dir)
             recovered = threading.Event()
             calls = []
-            original = second.dispatcher.control_plane.recover_interrupted_runs
+            original = second.dispatcher.control_plane.recover_interrupted_runs_batch
 
-            def record_recovery():
+            def record_recovery(*, max_items):
                 calls.append("recovered")
                 recovered.set()
-                return original()
+                return original(max_items=max_items)
 
-            second.dispatcher.control_plane.recover_interrupted_runs = record_recovery
+            second.dispatcher.control_plane.recover_interrupted_runs_batch = record_recovery
             first.start()
             second.start()
             try:

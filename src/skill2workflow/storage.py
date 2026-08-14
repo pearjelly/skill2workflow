@@ -11,7 +11,7 @@ from collections import Counter, deque
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from .state_layout import ensure_current_state_layout
 
@@ -25,6 +25,7 @@ AUDIT_INTEGRITY_SCHEMA_VERSION = "skill2workflow-audit-integrity-0.1.0"
 AUDIT_INTEGRITY_ALGORITHM = "sha256-chain-v1"
 MAX_AUDIT_LIST_ITEMS = 1000
 MAX_RUN_LIST_ITEMS = 1000
+MAX_INTERRUPTED_RECOVERY_BATCH = 100
 _AUDIT_GENESIS_DIGEST = ""
 _LEGACY_AUDIT_COLUMNS = {
     "sequence",
@@ -151,7 +152,12 @@ class JsonRunStore:
     ) -> None:
         return
 
-    def recover_interrupted(self, current_owner: str) -> List[RunState]:
+    def recover_interrupted(self, current_owner: str, max_items: int = None) -> List[RunState]:
+        raise ValueError("interrupted run recovery requires sqlite storage")
+
+    def recover_interrupted_batch(
+        self, current_owner: str, max_items: int
+    ) -> Tuple[List[RunState], int]:
         raise ValueError("interrupted run recovery requires sqlite storage")
 
     def iter_interrupted_runs(self):
@@ -384,13 +390,25 @@ class SqliteRunStore:
         if row is None:
             raise ExecutionFencedError("execution ownership was fenced")
 
-    def recover_interrupted(self, current_owner: str) -> List[RunState]:
+    def recover_interrupted(self, current_owner: str, max_items: int = None) -> List[RunState]:
+        recovered, _processed = self.recover_interrupted_batch(
+            current_owner, max_items=max_items
+        )
+        return recovered
+
+    def recover_interrupted_batch(
+        self, current_owner: str, max_items: int = None
+    ) -> Tuple[List[RunState], int]:
         owner = _required_execution_value(current_owner, "owner")
+        if max_items is not None:
+            _validate_interrupted_recovery_limit(max_items)
         recovered: List[RunState] = []
+        processed = 0
         with self._connection() as connection:
             connection.execute("begin immediate")
             rows = _iter_foreign_active_execution_rows(connection, owner)
             for run_id, raw_state in rows:
+                processed += 1
                 state = json.loads(str(raw_state))
                 if str(state.get("status", "")) not in {"created", "running"}:
                     connection.execute(
@@ -415,7 +433,9 @@ class SqliteRunStore:
                     (_utc_now(), str(run_id)),
                 )
                 recovered.append(interrupted)
-        return recovered
+                if max_items is not None and processed >= max_items:
+                    break
+        return recovered, processed
 
     def iter_interrupted_runs(self):
         """Stream interrupted run states without materializing the run table."""
@@ -2039,6 +2059,18 @@ def _required_execution_value(value: str, field: str) -> str:
 def _validate_sweep_limit(limit: int) -> None:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 256:
         raise ValueError("workflow deadline sweep limit must be an integer from 1 through 256")
+
+
+def _validate_interrupted_recovery_limit(limit: int) -> None:
+    if (
+        isinstance(limit, bool)
+        or not isinstance(limit, int)
+        or not 1 <= limit <= MAX_INTERRUPTED_RECOVERY_BATCH
+    ):
+        raise ValueError(
+            "interrupted recovery limit must be an integer from 1 through "
+            f"{MAX_INTERRUPTED_RECOVERY_BATCH}"
+        )
 
 
 def _validate_page_limit(limit: int) -> None:

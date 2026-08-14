@@ -7,7 +7,7 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Tuple
 
 from .connectors import ConnectorExecutionError, ConnectorRuntime, connector_ref
 from .storage import create_run_store
@@ -205,10 +205,21 @@ class LocalExecutor:
 
         return self.store.count()
 
-    def recover_interrupted_runs(self) -> List[RunState]:
+    def recover_interrupted_runs(self, max_items: int = None) -> List[RunState]:
         if not self.execution_owner:
             raise ValueError("interrupted run recovery requires an execution owner")
-        return self.store.recover_interrupted(self.execution_owner)
+        return self.store.recover_interrupted(
+            self.execution_owner, max_items=max_items
+        )
+
+    def recover_interrupted_runs_batch(
+        self, max_items: int
+    ) -> Tuple[List[RunState], int]:
+        if not self.execution_owner:
+            raise ValueError("interrupted run recovery requires an execution owner")
+        return self.store.recover_interrupted_batch(
+            self.execution_owner, max_items=max_items
+        )
 
     def iter_interrupted_runs(self):
         """Stream interrupted run states for control-plane reconciliation."""

@@ -100,7 +100,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Control snapshot `skill2workflow-control-snapshot-0.1.0`, `schemas/control-snapshot-0.1.0.schema.json`, authenticated `GET /api/v1/control-snapshot`, and live `window` semantics documented in `docs/live-control-snapshot.md`
 - Retention policies `skill2workflow-retention-policy-0.1.0`, `skill2workflow-retention-policy-0.2.0`, and `skill2workflow-retention-policy-0.3.0`, aggregate plan/apply summaries, and protected state semantics documented in `docs/data-retention.md`
 - Additive SQLite `run_executions` ownership tickets, terminal `interrupted` run state, and no-replay recovery semantics documented in `docs/interrupted-recovery.md`
-- Interrupted-run takeover streams foreign active-execution rows through the existing SQLite recovery transaction; fencing, returned recovered states, and no-replay semantics remain unchanged
+- Long-running SQLite service interrupted-run takeover fences foreign active executions in fixed 100-row transactions and renews the lease between full batches; fencing, audit reconciliation, returned recovered states, and no-replay semantics remain unchanged
 - Interrupted-run audit reconciliation streams interrupted states and checks one `(run_id,event_type)` projection at a time; startup recovery no longer enumerates the complete run table or audit history
 - File-backed single-team Bearer and execution-time directory credential contracts documented in `docs/security-boundary.md`
 - Durable recurring schedule input contract `skill2workflow-schedule-0.2.0` and its published JSON Schema

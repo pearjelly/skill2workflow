@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from pathlib import PurePosixPath
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from .connectors import default_connectors
 from .compiler import validate_workflow
@@ -816,6 +816,20 @@ class LocalControlPlane:
         """Fence abandoned service executions and expose their unknown outcome."""
 
         recovered = self.executor.recover_interrupted_runs()
+        self.reconcile_interrupted_run_audits()
+        return len(recovered)
+
+    def recover_interrupted_runs_batch(
+        self, max_items: int
+    ) -> Tuple[List[RunState], int]:
+        """Fence at most one bounded batch without replaying audit repair."""
+
+        return self.executor.recover_interrupted_runs_batch(max_items)
+
+    def reconcile_interrupted_run_audits(self) -> int:
+        """Repair missing control-plane evidence for interrupted states."""
+
+        repaired = 0
         for state in self.executor.iter_interrupted_runs():
             run_id = str(state.get("run_id", ""))
             interruption = next(
@@ -851,7 +865,8 @@ class LocalControlPlane:
                     }
                 ]
             )
-        return len(recovered)
+            repaired += 1
+        return repaired
 
     def expire_workflow_deadlines(
         self, now: str = None, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS

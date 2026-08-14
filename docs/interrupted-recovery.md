@@ -26,16 +26,18 @@ holds an active execution ticket only while it is executing. Entering `waiting`,
 `completed`, `failed`, or `cancelled` releases the ticket. Resuming a waiting run
 claims a new ticket.
 
-Takeover changes every foreign active ticket and its run state in one transaction.
-The ticket then provides fencing: a delayed write from the old process is rejected
-and cannot replace `interrupted` with a stale success or failure snapshot. Owner
+Takeover changes every foreign active ticket and its run state before dispatch can
+resume. The long-running service applies this mutation in fixed 100-row SQLite
+transactions and renews the scheduler lease between full batches. The ticket
+then provides fencing: a delayed write from the old process is rejected and
+cannot replace `interrupted` with a stale success or failure snapshot. Owner
 identities and ticket values are not copied into run JSON, audit events, metrics,
 or the control snapshot.
 
-Foreign active-execution rows are read through the SQLite cursor inside that same
-transaction and converted one at a time. Recovery therefore avoids materializing
-the full execution ledger before fencing runs; the returned recovered-state list
-and takeover semantics remain compatible.
+Foreign active-execution rows are read through the SQLite cursor and converted one
+at a time. Recovery therefore avoids materializing the full execution ledger or
+holding one unbounded lease-held write transaction before fencing runs; the
+returned recovered-state list and takeover semantics remain compatible.
 
 After takeover, control-plane audit reconciliation streams the durable
 `interrupted` run states and checks each `(run_id, run_interrupted)` projection
