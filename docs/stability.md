@@ -66,6 +66,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   device/inode-bound read and write contract documented in
   [`json-run-state-boundary.md`](json-run-state-boundary.md); the JSON state
   shape and SQLite service requirement remain unchanged
+- The local JSON control-plane index uses the fixed 8 MiB regular-file/
+  no-follow, device/inode-bound read and write contract documented in
+  [`json-control-index-boundary.md`](json-control-index-boundary.md); registry
+  shape and the JSON-to-SQLite import path remain compatible
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
 - Built-in HTTP connector request/response payloads are bounded to 1 MiB with fixed overflow and invalid-UTF-8 failures, as documented in `docs/connectors.md`

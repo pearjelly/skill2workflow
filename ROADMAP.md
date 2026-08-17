@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-170
+- Completed delivery loops: 1-171
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 170 is complete with bounded local JSON run-state reads
+- Active loop: None; Loop 171 is complete with bounded local JSON control index reads
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-170 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-171 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 170; the detailed
+The follow-on production hardening continues through Loop 171; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4048,9 +4048,35 @@ fencing, and read-growth rejection. The contract is documented in
 change SQLite projections, encryption, multi-process locking, service storage
 requirements, remote state, or the JSON/SQLite run-state shape.
 
+### Loop 171: Bounded Local JSON Control Index Reads
+
+**Status:** Complete.
+
+**Prior basis:** The dependency-light JSON run-state backend now had a fixed
+file boundary, but the control-plane `workflows/index.json` registry still
+used unbounded `Path.read_text()` during local operations and during the
+one-time JSON-to-SQLite import. A large, linked, or replaced registry could
+therefore consume unbounded memory before control-plane validation.
+
+**Outcome:** JSON control-index serialization is capped at 8 MiB. Save, load,
+and JSON-to-SQLite import use the same fixed local file boundary as run state:
+regular non-symlink files, no-follow descriptors, device/inode binding, a
+one-byte-over-bound read window, and post-read path identity/size checks.
+Registry records and SQLite projections remain compatible.
+
+**Evidence:** Storage regression coverage proves oversized-write rejection,
+pre-open oversized-read rejection, symlink rejection, path-replacement
+fencing, and read-growth rejection. The contract is documented in
+[`docs/json-control-index-boundary.md`](docs/json-control-index-boundary.md).
+
+**Safety boundary:** This protects the local JSON control index only. It does
+not change workflow artifact payload limits, audit-line retention, SQLite
+registry semantics, encryption, multi-process locking, or multi-tenant
+behavior.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 170 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 171 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4186,6 +4212,7 @@ This rolling queue is ordered. Loop 170 is complete and there is no active deliv
 | Loop 168: Bounded Local Credential-File Reads | Complete | Keep local CLI credential maps from bypassing the secret-input boundary through unbounded or path-raced reads | Fixed 2 MiB read window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and credential-file boundary documentation |
 | Loop 169: Bounded SKILL.md Authoring Inputs | Complete | Keep parse/compile authoring sources from bypassing the input boundary through unbounded or path-raced reads | Fixed 2 MiB read window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and SKILL.md input boundary documentation |
 | Loop 170: Bounded Local JSON Run-State Reads | Complete | Keep dependency-light JSON run-state load and recovery from bypassing the local input boundary through unbounded or path-raced reads | Fixed 8 MiB read/write window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and JSON run-state boundary documentation |
+| Loop 171: Bounded Local JSON Control Index Reads | Complete | Keep the dependency-light JSON control registry and its SQLite import from bypassing the local input boundary through unbounded or path-raced reads | Fixed 8 MiB read/write window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and JSON control-index boundary documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

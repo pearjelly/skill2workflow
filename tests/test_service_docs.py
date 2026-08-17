@@ -127,6 +127,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-170 are complete", readme)
+        self.assertIn("Delivery Loops 1-171 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

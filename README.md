@@ -114,6 +114,8 @@ explicit connector boundaries. It currently supports:
 - Persist run state as JSON or opt-in SQLite
 - Bound local JSON run-state files to 8 MiB with descriptor identity and
   growth-race checks while preserving the JSON storage contract
+- Bound the local JSON control-plane index to 8 MiB with the same descriptor
+  identity and growth-race checks while preserving registry compatibility
 - List run summaries with an optional bounded `runs --limit` / `control-runs --limit` window and inspect full run logs
 - Inspect a bounded tail of filtered local audit events with `audit --limit`
 - Store queryable run event rows when SQLite storage is enabled
@@ -760,7 +762,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-170 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-171 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1361,6 +1363,12 @@ growth-race recheck. The JSON storage contract remains compatible; the
 self-hosted service continues to require SQLite. See
 [`docs/json-run-state-boundary.md`](docs/json-run-state-boundary.md).
 
+Loop 171 hardens the dependency-light JSON control-plane index: the
+`workflows/index.json` registry is capped at 8 MiB and read through a
+regular-file/no-follow descriptor bound to one device/inode with a growth-race
+recheck. The JSON registry shape and SQLite service requirement remain
+unchanged. See [`docs/json-control-index-boundary.md`](docs/json-control-index-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1372,6 +1380,7 @@ See:
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 - `ROADMAP.md`
 - `docs/cli-input-boundary.md`
+- `docs/json-control-index-boundary.md`
 - `docs/json-run-state-boundary.md`
 - `docs/service-config-boundary.md`
 - `docs/credential-file-boundary.md`

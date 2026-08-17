@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded the local JSON control-plane `workflows/index.json` to 8 MiB with
+  regular-file, no-follow, descriptor identity, and growth/replacement-race
+  checks across save, load, and JSON-to-SQLite import. Registry shape and
+  SQLite service storage remain unchanged.
+
 - Bounded local JSON run-state serialization and reads to 8 MiB with
   regular-file, no-follow, descriptor identity, and growth/replacement-race
   checks across save, load, listing, and interrupted-run recovery. SQLite

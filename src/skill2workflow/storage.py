@@ -28,6 +28,7 @@ MAX_AUDIT_LIST_ITEMS = 1000
 MAX_RUN_LIST_ITEMS = 1000
 MAX_INTERRUPTED_RECOVERY_BATCH = 100
 MAX_JSON_RUN_STATE_BYTES = 8 * 1024 * 1024
+MAX_JSON_CONTROL_INDEX_BYTES = 8 * 1024 * 1024
 _JSON_RUN_STATE_READ_CHUNK_BYTES = 64 * 1024
 _AUDIT_GENESIS_DIGEST = ""
 _LEGACY_AUDIT_COLUMNS = {
@@ -985,9 +986,10 @@ class JsonControlStore:
         self.state_dir.mkdir(parents=True, exist_ok=True)
 
     def load_index(self) -> Dict[str, WorkflowRecord]:
-        if not self.index_path.exists():
+        try:
+            index = _read_json_control_index(self.index_path)
+        except FileNotFoundError:
             return {}
-        index = json.loads(self.index_path.read_text(encoding="utf-8"))
         if not isinstance(index, dict):
             raise ValueError("workflow index must be an object")
         return index
@@ -1000,7 +1002,7 @@ class JsonControlStore:
         return index[key]
 
     def save_index(self, index: Dict[str, WorkflowRecord]) -> None:
-        self.index_path.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.index_path.write_bytes(_encode_json_control_index(index))
 
     def count_workflow_records(self) -> int:
         """Count JSON registry records while preserving the complete-list API."""
@@ -1911,7 +1913,7 @@ class SqliteControlStore:
 
     def _import_json_state(self) -> None:
         if self.index_path.exists() and not self.load_index():
-            index = json.loads(self.index_path.read_text(encoding="utf-8"))
+            index = _read_json_control_index(self.index_path)
             if isinstance(index, dict):
                 self.save_index(index)
 
@@ -2358,30 +2360,26 @@ def _validate_sweep_limit(limit: int) -> None:
         raise ValueError("workflow deadline sweep limit must be an integer from 1 through 256")
 
 
-def _encode_json_run_state(state: RunState) -> bytes:
-    """Serialize one JSON run state without exceeding the local file bound."""
+def _encode_bounded_json_document(value: object, max_bytes: int, label: str) -> bytes:
+    """Serialize one local JSON document without exceeding its fixed bound."""
 
-    raw = json.dumps(state, ensure_ascii=False, indent=2).encode("utf-8")
-    if len(raw) > MAX_JSON_RUN_STATE_BYTES:
-        raise ValueError(
-            f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
-        )
+    raw = json.dumps(value, ensure_ascii=False, indent=2).encode("utf-8")
+    if len(raw) > max_bytes:
+        raise ValueError(f"{label} exceeds {max_bytes} bytes")
     return raw
 
 
-def _read_json_run_state(path: Path) -> RunState:
-    """Read one JSON run state through a bounded, identity-bound descriptor."""
+def _read_bounded_json_document(path: Path, max_bytes: int, label: str):
+    """Read one local JSON document through an identity-bound descriptor."""
 
     try:
         before = path.lstat()
     except OSError:
         raise
     if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
-        raise ValueError("JSON run state must be a regular non-symlink file")
-    if before.st_size > MAX_JSON_RUN_STATE_BYTES:
-        raise ValueError(
-            f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
-        )
+        raise ValueError(f"{label} must be a regular non-symlink file")
+    if before.st_size > max_bytes:
+        raise ValueError(f"{label} exceeds {max_bytes} bytes")
 
     flags = os.O_RDONLY
     if hasattr(os, "O_NOFOLLOW"):
@@ -2394,14 +2392,12 @@ def _read_json_run_state(path: Path) -> RunState:
             or opened.st_dev != before.st_dev
             or opened.st_ino != before.st_ino
         ):
-            raise ValueError("JSON run state changed while being read")
-        if opened.st_size > MAX_JSON_RUN_STATE_BYTES:
-            raise ValueError(
-                f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
-            )
+            raise ValueError(f"{label} changed while being read")
+        if opened.st_size > max_bytes:
+            raise ValueError(f"{label} exceeds {max_bytes} bytes")
 
         chunks = []
-        remaining = MAX_JSON_RUN_STATE_BYTES + 1
+        remaining = max_bytes + 1
         while remaining:
             chunk = os.read(
                 descriptor,
@@ -2412,20 +2408,48 @@ def _read_json_run_state(path: Path) -> RunState:
             chunks.append(chunk)
             remaining -= len(chunk)
         raw = b"".join(chunks)
-        if len(raw) > MAX_JSON_RUN_STATE_BYTES:
-            raise ValueError(
-                f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
-            )
+        if len(raw) > max_bytes:
+            raise ValueError(f"{label} exceeds {max_bytes} bytes")
         after = path.lstat()
         if after.st_dev != before.st_dev or after.st_ino != before.st_ino:
-            raise ValueError("JSON run state changed while being read")
-        if after.st_size > MAX_JSON_RUN_STATE_BYTES:
-            raise ValueError(
-                f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
-            )
+            raise ValueError(f"{label} changed while being read")
+        if after.st_size > max_bytes:
+            raise ValueError(f"{label} exceeds {max_bytes} bytes")
     finally:
         os.close(descriptor)
     return json.loads(raw.decode("utf-8"))
+
+
+def _encode_json_run_state(state: RunState) -> bytes:
+    """Serialize one JSON run state without exceeding the local file bound."""
+
+    return _encode_bounded_json_document(
+        state, MAX_JSON_RUN_STATE_BYTES, "JSON run state"
+    )
+
+
+def _read_json_run_state(path: Path) -> RunState:
+    """Read one JSON run state through a bounded, identity-bound descriptor."""
+
+    return _read_bounded_json_document(
+        path, MAX_JSON_RUN_STATE_BYTES, "JSON run state"
+    )
+
+
+def _encode_json_control_index(index: Dict[str, WorkflowRecord]) -> bytes:
+    """Serialize the JSON workflow index within its fixed local bound."""
+
+    return _encode_bounded_json_document(
+        index, MAX_JSON_CONTROL_INDEX_BYTES, "workflow index"
+    )
+
+
+def _read_json_control_index(path: Path):
+    """Read the JSON workflow index through the bounded file contract."""
+
+    return _read_bounded_json_document(
+        path, MAX_JSON_CONTROL_INDEX_BYTES, "workflow index"
+    )
 
 
 def _validate_interrupted_recovery_limit(limit: int) -> None:
