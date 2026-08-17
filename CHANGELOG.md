@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded complete SQLite run-state documents to 8 MiB on durable writes and
+  full-state reads, including interrupted recovery, cancellation, deadline
+  expiry, and startup summary repair. The SQLite service state shape and
+  compact operator projections remain compatible; see
+  `docs/sqlite-run-state-boundary.md`.
+
 - Bounded the normalized result envelope returned by explicitly loaded
   external connectors to 1 MiB and required a strict standard-JSON
   round-trip before the result enters durable run state. Existing built-in

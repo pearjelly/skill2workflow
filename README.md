@@ -766,7 +766,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-173 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-174 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1386,6 +1386,12 @@ within a fixed 1 MiB envelope before entering durable run state. Existing
 built-in HTTP payload limits, connector IDs, and dry-run behavior remain
 unchanged. See
 [`docs/external-connector-result-boundary.md`](docs/external-connector-result-boundary.md).
+
+Loop 174 hardens the recommended SQLite production path: complete durable run
+state is capped at 8 MiB on save and checked before every full-state decode
+used by load, recovery, cancellation, deadline expiry, and startup repair.
+Bounded summary projections remain unchanged. See
+[`docs/sqlite-run-state-boundary.md`](docs/sqlite-run-state-boundary.md).
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-173
+- Completed delivery loops: 1-174
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 173 is complete with bounded external connector result envelopes
+- Active loop: None; Loop 174 is complete with bounded SQLite run-state documents
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-173 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-174 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 173; the detailed
+The follow-on production hardening continues through Loop 174; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4130,9 +4130,35 @@ It does not sandbox imported Python, bound provider-specific outbound I/O,
 interrupt a provider request, redact business values, add package
 installation, or claim exactly-once external effects.
 
+### Loop 174: Bounded SQLite Run-State Documents
+
+**Status:** Complete.
+
+**Prior basis:** The dependency-light JSON run-state backend already enforced
+an 8 MiB document boundary, while the recommended SQLite service backend could
+write and decode an arbitrarily large complete `state_json` document. That
+left workflow definitions, trigger context, accumulated events, and connector
+results without one predictable production persistence ceiling.
+
+**Outcome:** SQLite run-state inserts and updates now serialize the complete
+document within a fixed 8 MiB UTF-8 bound. Full-state load, complete listing,
+cancellation, deadline expiry, interrupted-run recovery, and startup summary
+repair validate that bound before JSON decoding. Existing compact summary and
+cursor-page projections remain read-only and avoid loading the full document
+when they do not need it.
+
+**Evidence:** Storage regression tests prove oversized write rejection and
+oversized read rejection. The fixed contract is documented in
+[`docs/sqlite-run-state-boundary.md`](docs/sqlite-run-state-boundary.md), and
+the stability guide records the SQLite/JSON compatibility boundary.
+
+**Safety boundary:** This caps the complete SQLite run-state document only. It
+does not split or encrypt state, cap individual event rows separately, change
+the Workflow DSL, or claim rollback or exactly-once provider effects.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 173 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 174 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4271,6 +4297,7 @@ This rolling queue is ordered. Loop 173 is complete and there is no active deliv
 | Loop 171: Bounded Local JSON Control Index Reads | Complete | Keep the dependency-light JSON control registry and its SQLite import from bypassing the local input boundary through unbounded or path-raced reads | Fixed 8 MiB read/write window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and JSON control-index boundary documentation |
 | Loop 172: Bounded Published Workflow Artifact Reads | Complete | Keep immutable Workflow artifacts from bypassing the local input boundary before checksum verification or backup validation | Fixed 2 MiB publication/read window, shared descriptor-bound reader, pre-open/growth/path-race regression coverage, backup evidence, and published-artifact read-boundary documentation |
 | Loop 173: Bounded External Connector Result Envelopes | Complete | Keep explicitly loaded external connector results from bypassing the durable executor boundary through oversized or non-JSON handoffs | Fixed 1 MiB strict-JSON normalized result envelope, rejection before durable state, connector regression coverage, and external-connector result-boundary documentation |
+| Loop 174: Bounded SQLite Run-State Documents | Complete | Keep the recommended SQLite production backend from bypassing the complete run-state persistence boundary through oversized or malformed documents | Fixed 8 MiB UTF-8 state bound on writes and full-state decodes, recovery/cancellation/startup coverage, and SQLite run-state boundary documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

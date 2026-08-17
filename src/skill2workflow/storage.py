@@ -29,6 +29,10 @@ MAX_AUDIT_LIST_ITEMS = 1000
 MAX_RUN_LIST_ITEMS = 1000
 MAX_INTERRUPTED_RECOVERY_BATCH = 100
 MAX_JSON_RUN_STATE_BYTES = 8 * 1024 * 1024
+# Keep the SQLite run document on the same fixed persistence boundary as the
+# dependency-light JSON backend.  SQLite is the production path, so it must
+# not become an unbounded escape hatch for workflow/context/result state.
+MAX_SQLITE_RUN_STATE_BYTES = MAX_JSON_RUN_STATE_BYTES
 MAX_JSON_CONTROL_INDEX_BYTES = 8 * 1024 * 1024
 _JSON_RUN_STATE_READ_CHUNK_BYTES = 64 * 1024
 _AUDIT_GENESIS_DIGEST = ""
@@ -440,7 +444,7 @@ class SqliteRunStore:
             rows = _iter_foreign_active_execution_rows(connection, owner)
             for run_id, raw_state in rows:
                 processed += 1
-                state = json.loads(str(raw_state))
+                state = _decode_sqlite_run_state(raw_state)
                 if str(state.get("status", "")) not in {"created", "running"}:
                     connection.execute(
                         "update run_executions set status = 'released', updated_at = ? where run_id = ?",
@@ -474,14 +478,14 @@ class SqliteRunStore:
         with self._connection() as connection:
             rows = _iter_interrupted_run_rows(connection, after_run_id=after_run_id)
             for (raw_state,) in rows:
-                yield json.loads(str(raw_state))
+                yield _decode_sqlite_run_state(raw_state)
 
     def load(self, run_id: str) -> RunState:
         with self._connection() as connection:
             row = connection.execute("select state_json from runs where run_id = ?", (run_id,)).fetchone()
         if row is None:
             raise FileNotFoundError(f"run not found: {run_id}")
-        return json.loads(str(row[0]))
+        return _decode_sqlite_run_state(row[0])
 
     def get_run_summary(self, run_id: str) -> RunState:
         with self._connection() as connection:
@@ -596,7 +600,7 @@ class SqliteRunStore:
     def list(self) -> List[RunState]:
         with self._connection() as connection:
             rows = connection.execute("select state_json from runs order by run_id").fetchall()
-        return [json.loads(str(row[0])) for row in rows]
+        return [_decode_sqlite_run_state(row[0]) for row in rows]
 
     def list_bounded(self, limit: int) -> List[RunState]:
         """Read only the newest bounded run states without loading the full table."""
@@ -750,7 +754,7 @@ class SqliteRunStore:
                 ).fetchone()
                 if cancellation and str(cancellation[0]) == "requested":
                     continue
-                state = json.loads(str(raw_state))
+                state = _decode_sqlite_run_state(raw_state)
                 updated = _expire_waiting_workflow_state(state, now)
                 if updated is None:
                     continue
@@ -777,7 +781,7 @@ class SqliteRunStore:
         return [
             state
             for (raw_state,) in rows
-            if (state := json.loads(str(raw_state))).get("error_code")
+            if (state := _decode_sqlite_run_state(raw_state)).get("error_code")
             == "workflow_timeout"
         ]
 
@@ -789,7 +793,7 @@ class SqliteRunStore:
             ).fetchone()
             if row is None:
                 raise FileNotFoundError(f"run not found: {run_id}")
-            state = json.loads(str(row[0]))
+            state = _decode_sqlite_run_state(row[0])
             status = str(state.get("status", ""))
             existing = connection.execute(
                 "select status from run_cancellations where run_id = ?", (run_id,)
@@ -939,12 +943,7 @@ class SqliteRunStore:
                     """
                 )
                 for run_id, raw_state in rows:
-                    try:
-                        state = json.loads(str(raw_state))
-                    except (TypeError, ValueError, json.JSONDecodeError) as error:
-                        raise ValueError("SQLite run state is not valid JSON") from error
-                    if not isinstance(state, dict):
-                        raise ValueError("SQLite run state must be an object")
+                    state = _decode_sqlite_run_state(raw_state)
                     _upsert_sqlite_summary(connection, state)
             projection_rows = connection.execute(
                 """
@@ -955,12 +954,7 @@ class SqliteRunStore:
                 """
             )
             for run_id, raw_state in projection_rows:
-                try:
-                    state = json.loads(str(raw_state))
-                except (TypeError, ValueError, json.JSONDecodeError) as error:
-                    raise ValueError("SQLite run state is not valid JSON") from error
-                if not isinstance(state, dict):
-                    raise ValueError("SQLite run state must be an object")
+                state = _decode_sqlite_run_state(raw_state)
                 _upsert_sqlite_summary(connection, state)
 
     def _connection(self):
@@ -2370,6 +2364,46 @@ def _encode_bounded_json_document(value: object, max_bytes: int, label: str) -> 
     return raw
 
 
+def _encode_sqlite_run_state(state: RunState) -> str:
+    """Serialize one SQLite run state within the durable document boundary."""
+
+    try:
+        raw = json.dumps(state, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+        RecursionError,
+        UnicodeError,
+    ) as error:
+        raise ValueError("SQLite run state is not JSON serializable") from error
+    if len(raw) > MAX_SQLITE_RUN_STATE_BYTES:
+        raise ValueError(
+            f"SQLite run state exceeds {MAX_SQLITE_RUN_STATE_BYTES} bytes"
+        )
+    return raw.decode("utf-8")
+
+
+def _decode_sqlite_run_state(raw_state: object) -> RunState:
+    """Decode one SQLite run state only after checking its UTF-8 byte bound."""
+
+    try:
+        encoded = str(raw_state).encode("utf-8")
+    except UnicodeError as error:
+        raise ValueError("SQLite run state is not valid UTF-8") from error
+    if len(encoded) > MAX_SQLITE_RUN_STATE_BYTES:
+        raise ValueError(
+            f"SQLite run state exceeds {MAX_SQLITE_RUN_STATE_BYTES} bytes"
+        )
+    try:
+        state = json.loads(encoded.decode("utf-8"))
+    except (TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("SQLite run state is not valid JSON") from error
+    if not isinstance(state, dict):
+        raise ValueError("SQLite run state must be an object")
+    return state
+
+
 def _read_bounded_json_document(path: Path, max_bytes: int, label: str):
     """Read one local JSON document through an identity-bound descriptor."""
 
@@ -2553,7 +2587,7 @@ def _parse_storage_timestamp(value: object) -> datetime:
 
 
 def _upsert_sqlite_state(connection, state: RunState) -> None:
-    payload = json.dumps(state, ensure_ascii=False, sort_keys=True)
+    payload = _encode_sqlite_run_state(state)
     events = state.get("events", [])
     if not isinstance(events, list):
         events = []

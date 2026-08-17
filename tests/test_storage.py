@@ -12,6 +12,7 @@ from skill2workflow.storage import (
     JsonRunStore,
     MAX_JSON_CONTROL_INDEX_BYTES,
     MAX_JSON_RUN_STATE_BYTES,
+    MAX_SQLITE_RUN_STATE_BYTES,
     SqliteControlStore,
     SqliteRunStore,
     _iter_foreign_active_execution_rows,
@@ -104,6 +105,69 @@ class StorageTests(TestCase):
                     f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes",
                 ):
                     store.load("run_growth")
+
+    def test_sqlite_run_state_save_rejects_oversized_payload(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteRunStore(Path(tmp) / "sqlite")
+            with self.assertRaisesRegex(
+                ValueError,
+                f"SQLite run state exceeds {MAX_SQLITE_RUN_STATE_BYTES} bytes",
+            ):
+                store.save(
+                    {
+                        "run_id": "run_oversized_sqlite_state",
+                        "payload": "x" * MAX_SQLITE_RUN_STATE_BYTES,
+                    }
+                )
+            self.assertEqual(store.count(), 0)
+
+    def test_sqlite_run_state_load_rejects_oversized_document(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteRunStore(Path(tmp) / "sqlite")
+            store.save(
+                {
+                    "run_id": "run_oversized_sqlite_load",
+                    "status": "completed",
+                    "events": [],
+                }
+            )
+            with store._connection() as connection:
+                connection.execute(
+                    "update runs set state_json = ? where run_id = ?",
+                    ("x" * (MAX_SQLITE_RUN_STATE_BYTES + 1), "run_oversized_sqlite_load"),
+                )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                f"SQLite run state exceeds {MAX_SQLITE_RUN_STATE_BYTES} bytes",
+            ):
+                store.load("run_oversized_sqlite_load")
+
+    def test_sqlite_run_state_load_rejects_malformed_or_non_object_document(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteRunStore(Path(tmp) / "sqlite")
+            store.save(
+                {
+                    "run_id": "run_malformed_sqlite_state",
+                    "status": "completed",
+                    "events": [],
+                }
+            )
+            with store._connection() as connection:
+                connection.execute(
+                    "update runs set state_json = ? where run_id = ?",
+                    ("not-json", "run_malformed_sqlite_state"),
+                )
+            with self.assertRaisesRegex(ValueError, "SQLite run state is not valid JSON"):
+                store.load("run_malformed_sqlite_state")
+
+            with store._connection() as connection:
+                connection.execute(
+                    "update runs set state_json = ? where run_id = ?",
+                    ("[]", "run_malformed_sqlite_state"),
+                )
+            with self.assertRaisesRegex(ValueError, "SQLite run state must be an object"):
+                store.load("run_malformed_sqlite_state")
 
     def test_json_control_index_save_rejects_oversized_payload(self):
         with TemporaryDirectory() as tmp:
