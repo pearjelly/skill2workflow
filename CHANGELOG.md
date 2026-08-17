@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a dependency-free SPDX 2.3 release artifact SBOM for qualified wheels.
+  Package smoke writes a value-free member inventory bound to the wheel archive
+  SHA-256, and a dedicated CI artifact gate verifies the qualification and
+  repository secret hygiene.
 - Added a dedicated CI recovery and state-safety gate that runs isolated
   backup/restore, migration, retention, cancellation, interrupted-recovery,
   scheduling, and service-Doctor drills on Python 3.14, with matching local

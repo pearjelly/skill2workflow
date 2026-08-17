@@ -66,3 +66,17 @@ jobs:
       - run: python scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-ci
       - run: python scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-recurring-scheduler-ci
       - run: python scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-doctor-ci
+
+  artifact-gates:
+    name: release artifact gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - run: python scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-artifact-ci
+      - run: python scripts/secret_hygiene.py --repository-root .

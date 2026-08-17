@@ -17,6 +17,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Published workflow artifact immutability
 - Published artifact checksum verification before read, promotion, trigger, or execution, documented in [`published-artifact-integrity.md`](published-artifact-integrity.md)
 - Release manifest schema `skill2workflow-release-artifact-manifest-0.1.0`, including archive/member SHA-256 hashes, fixed package metadata, and rejection of private/state wheel content, documented in [`release-artifact-manifest.md`](release-artifact-manifest.md)
+- Release SBOM schema `skill2workflow-release-sbom-0.1.0`, using SPDX JSON 2.3 with one checksum entry per qualified wheel member and a package-to-file relationship set, documented in [`release-artifact-sbom.md`](release-artifact-sbom.md)
 - Control-plane workflow version aliases and the `promote`/trigger resolution contract documented in `docs/triggers.md`
 - Reviewable published workflow diffs and the optional compare-and-swap promotion precondition documented in [`workflow-releases.md`](workflow-releases.md)
 - SQLite promotion transactionally couples the compare-and-swap check, alias mutation, and promotion audit append; JSON remains local-evaluation storage without cross-process coordination

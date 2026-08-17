@@ -167,6 +167,14 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["service_doctor_status"])
         self.assertTrue(result["systemd_unit_status"])
         self.assertTrue(result["live_snapshot_status"])
+        self.assertTrue(result["release_manifest_status"])
+        self.assertTrue(result["release_sbom_status"])
+        self.assertEqual(
+            result["release_sbom_file_count"], result["release_manifest_file_count"]
+        )
+        self.assertEqual(
+            result["release_sbom_wheel_sha256"], result["release_artifact_sha256"]
+        )
         systemd_commands = [
             command
             for command, _cwd in commands

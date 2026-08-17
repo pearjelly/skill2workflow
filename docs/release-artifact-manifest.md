@@ -49,7 +49,9 @@ A user can hash the downloaded wheel with any standard SHA-256 tool and compare
 it to `artifact.sha256`, then inspect or independently hash the listed members.
 The manifest is integrity evidence, not a digital signature, trusted key
 attestation, SBOM, reproducible-build proof, or package-registry publication.
-Those require a separately authorized release and supply-chain process.
+The separately generated SPDX inventory is documented in
+[`release-artifact-sbom.md`](release-artifact-sbom.md); signing, provenance,
+and registry publication still require their own release process.
 
 The focused repository checks are:
 

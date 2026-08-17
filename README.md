@@ -329,8 +329,9 @@ python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 
 This builds a wheel, installs it into a separate virtual environment, and runs
 the installed CLI outside the repository with source-import paths disabled.
-It also writes a value-free `release-artifact-manifest.json` containing the
-archive and member hashes. It is the release-artifact check; the editable
+It also writes value-free `release-artifact-manifest.json` and
+`release-artifact-sbom.json` companions containing archive/member hashes and an
+SPDX 2.3 package inventory. It is the release-artifact check; the editable
 install below remains a development convenience only.
 
 Run the committed-fixture secret hygiene check:
@@ -741,7 +742,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-148 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-149 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1216,6 +1217,12 @@ gets isolated backup/restore, migration, retention, cancellation,
 interrupted-recovery, scheduling, and service-Doctor evidence on Python 3.14,
 in addition to the existing cross-version unit and production-boundary checks.
 
+Loop 149 adds a dependency-free [SPDX release artifact SBOM](docs/release-artifact-sbom.md)
+to the wheel qualification path. The SBOM inventories every accepted wheel
+member with SHA-256 checksums, binds to the archive digest, and runs in a
+dedicated CI artifact gate. It is public supply-chain inventory, not signing,
+reproducible-build proof, or registry publication.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1261,6 +1268,7 @@ See:
 - [`docs/prometheus-alerts.md`](docs/prometheus-alerts.md)
 - [`docs/grafana-dashboard.md`](docs/grafana-dashboard.md)
 - [`docs/release-artifact-manifest.md`](docs/release-artifact-manifest.md)
+- [`docs/release-artifact-sbom.md`](docs/release-artifact-sbom.md)
 - `docs/pilot-playbook.md`
 - `docs/quickstart.md`
 - `docs/release-process.md`

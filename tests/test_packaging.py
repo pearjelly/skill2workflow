@@ -100,6 +100,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn('"systemd_unit_status": systemd_unit_status', text)
         self.assertIn('"release_manifest_status": True', text)
         self.assertIn("release_manifest", text)
+        self.assertIn('"release_sbom_status": True', text)
+        self.assertIn("release_sbom", text)
 
     def test_release_docs_define_isolated_wheel_qualification(self):
         root = Path(__file__).resolve().parents[1]
@@ -112,6 +114,7 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("scripts/package_smoke.py", release_process)
         self.assertIn("systemd-unit", release_process)
         self.assertIn("release-artifact-manifest", release_process)
+        self.assertIn("release-artifact-sbom", release_process)
         self.assertIn("wheel", harness)
         self.assertNotIn("verifies editable install", harness)
 
@@ -134,14 +137,15 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("Changelog", guide)
         self.assertIn("Security", guide)
         self.assertIn("release-artifact-manifest.md", guide)
+        self.assertIn("release-artifact-sbom.md", guide)
         self.assertIn("member SHA-256 hashes", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
-        self.assertIn("- Completed delivery loops: 1-148", roadmap)
+        self.assertIn("- Completed delivery loops: 1-149", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 148 is complete with recovery and state-safety CI gates",
+            "- Active loop: None; Loop 149 is complete with SPDX release artifact SBOM evidence",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-148 are complete", readme)
+        self.assertIn("Delivery Loops 1-149 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)

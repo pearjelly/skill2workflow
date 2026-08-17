@@ -61,6 +61,19 @@ class ContinuousIntegrationContractTests(TestCase):
         self.assertIn("recurring_scheduler_smoke.py", workflow)
         self.assertIn("service_doctor_smoke.py", workflow)
 
+    def test_ci_runs_release_artifact_gates(self):
+        workflow = (
+            Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("artifact-gates:", workflow)
+        self.assertIn("name: release artifact gates", workflow)
+        self.assertIn(
+            "package_smoke.py --work-dir /tmp/skill2workflow-package-artifact-ci",
+            workflow,
+        )
+        self.assertIn("secret_hygiene.py --repository-root .", workflow)
+
     def test_contributor_and_release_docs_reproduce_production_boundary_drills(self):
         root = Path(__file__).resolve().parents[1]
         contributing = (root / "CONTRIBUTING.md").read_text(encoding="utf-8")

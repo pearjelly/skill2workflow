@@ -62,6 +62,13 @@ manifest status. The manifest is a public, value-free integrity companion; see
 [`release-artifact-manifest.md`](release-artifact-manifest.md) for the schema
 and independent verification sequence.
 
+The same qualified wheel is passed through `scripts/release_sbom.py`. The
+qualification writes `release-artifact-sbom.json` with an SPDX 2.3 package,
+one SHA-256 entry per wheel member, and `CONTAINS` relationships. Its document
+comment binds the SBOM to the archive SHA-256, and the generator inherits the
+manifest's fail-closed private-content and zero-runtime-dependency boundary;
+see [`release-artifact-sbom.md`](release-artifact-sbom.md).
+
 Before installation, the qualification opens the wheel itself. It requires
 the byte-for-byte official Apache-2.0 license under the single `dist-info`
 directory, pinned by SHA-256, verifies the name, version, license expression,
@@ -94,7 +101,7 @@ unchanged until a separately approved release is prepared.
 ## Boundary
 
 This qualification does not upload a package, create a tag, publish a GitHub
-Release, sign an artifact, generate an SBOM, prove reproducible byte-for-byte
-builds, or certify every supported operating system and Python version. The
-manifest is not a signature or SBOM; those remain separate release and
-supply-chain decisions.
+Release, sign an artifact, prove reproducible byte-for-byte builds, or certify
+every supported operating system and Python version. The manifest and SPDX SBOM
+are public integrity/inventory companions, not signatures, trusted key
+attestations, or registry publication.

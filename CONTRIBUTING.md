@@ -53,8 +53,10 @@ console script outside the checkout with source-import paths disabled:
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 ```
 
-The same run emits `release-artifact-manifest.json`, a public value-free
-archive/member hash manifest for release review.
+The same run emits `release-artifact-manifest.json` and
+`release-artifact-sbom.json`, public value-free archive/member integrity and
+SPDX inventory companions for release review. The dedicated CI artifact gate
+repeats this package qualification on Python 3.14.
 
 On Linux, run the systemd smoke with `--systemd-analyze-verify` to exercise the
 host parser against the generated unit. This check never installs, enables, or

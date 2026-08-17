@@ -57,9 +57,16 @@ git diff --check
 ```
 
 The package smoke output includes the generated
-`release-artifact-manifest.json`; attach or publish that companion file with a
-release when users need an independently verifiable wheel hash and member
-inventory. See [`release-artifact-manifest.md`](release-artifact-manifest.md).
+`release-artifact-manifest.json` and `release-artifact-sbom.json`; attach or
+publish both companion files with a release when users need an independently
+verifiable wheel hash, member inventory, and SPDX package inventory. See
+[`release-artifact-manifest.md`](release-artifact-manifest.md) and
+[`release-artifact-sbom.md`](release-artifact-sbom.md).
+
+The CI `artifact-gates` job repeats the isolated package qualification and
+repository secret-hygiene scan on Python 3.14. A release PR must keep this job
+green; the generated SBOM remains value-free and is not a signing or registry
+publication step.
 
 The CI `operational-gates` job also runs the state-safety and recovery drills
 on Python 3.14: backup/restore, state upgrade, retention, cancellation,

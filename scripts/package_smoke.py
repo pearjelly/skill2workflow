@@ -21,8 +21,10 @@ from typing import Dict, List
 
 try:
     from release_manifest import build_release_manifest, write_release_manifest
+    from release_sbom import build_release_sbom, write_release_sbom
 except ImportError:  # pragma: no cover - exercised when imported as scripts.package_smoke
     from scripts.release_manifest import build_release_manifest, write_release_manifest
+    from scripts.release_sbom import build_release_sbom, write_release_sbom
 
 
 DEFAULT_WORK_DIR = Path("/tmp/skill2workflow-package-smoke")
@@ -142,6 +144,9 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     release_manifest = build_release_manifest(wheel)
     release_manifest_path = work_dir / "release-artifact-manifest.json"
     write_release_manifest(release_manifest_path, release_manifest)
+    release_sbom = build_release_sbom(wheel)
+    release_sbom_path = work_dir / "release-artifact-sbom.json"
+    write_release_sbom(release_sbom_path, release_sbom)
     install = _run(
         [
             str(python_bin),
@@ -323,6 +328,9 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "release_manifest_status": True,
         "release_manifest_file_count": len(release_manifest["files"]),
         "release_artifact_sha256": release_manifest["artifact"]["sha256"],
+        "release_sbom_status": True,
+        "release_sbom_file_count": len(release_sbom["files"]),
+        "release_sbom_wheel_sha256": _sbom_wheel_sha256(release_sbom),
         **wheel_contents,
         "tooling_command": tooling.splitlines()[-1] if tooling.splitlines() else "",
         "build_command": build.splitlines()[-1] if build.splitlines() else "",
@@ -366,6 +374,14 @@ def _run(command: List[str], cwd: Path) -> str:
             )
         )
     return completed.stdout
+
+
+def _sbom_wheel_sha256(sbom: Dict[str, object]) -> str:
+    comment = str(sbom.get("documentComment", ""))
+    prefix = "skill2workflow-release-sbom-0.1.0; wheel-sha256="
+    if not comment.startswith(prefix):
+        raise RuntimeError("release SBOM document comment is malformed")
+    return comment[len(prefix) :]
 
 
 def _qualify_live_snapshot(
