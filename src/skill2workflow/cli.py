@@ -50,6 +50,7 @@ from .service_client import (
     fetch_support_bundle,
     post_recurring_schedule_state,
     post_recurring_schedule_create,
+    put_recurring_schedule_update,
     post_run_cancel,
     post_run_resume,
     post_workflow_release,
@@ -584,6 +585,20 @@ def main(argv=None) -> int:
     service_schedule_create_cmd.add_argument("schedule", type=Path)
     service_schedule_create_cmd.add_argument("--service-url", required=True)
     service_schedule_create_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_schedule_update_cmd = subparsers.add_parser(
+        "service-recurring-schedule-update",
+        help="Update one recurring schedule without resetting dispatch progress",
+    )
+    service_schedule_update_cmd.add_argument("schedule_id")
+    service_schedule_update_cmd.add_argument("schedule", type=Path)
+    service_schedule_update_cmd.add_argument(
+        "--expected-next-run-at",
+        required=True,
+        help="Last observed next_run_at; prevents stale updates from overwriting progress",
+    )
+    service_schedule_update_cmd.add_argument("--service-url", required=True)
+    service_schedule_update_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_support_cmd = subparsers.add_parser(
         "service-support-bundle",
@@ -1207,6 +1222,17 @@ def main(argv=None) -> int:
                 args.service_url,
                 args.auth_token_file,
                 _load_json(args.schedule),
+            )
+        )
+
+    if args.command == "service-recurring-schedule-update":
+        return _service_action(
+            lambda: put_recurring_schedule_update(
+                args.service_url,
+                args.auth_token_file,
+                args.schedule_id,
+                _load_json(args.schedule),
+                expected_next_run_at=args.expected_next_run_at,
             )
         )
 

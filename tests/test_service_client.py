@@ -26,6 +26,7 @@ from skill2workflow.service_client import (
     ServiceActionError,
     post_recurring_schedule_state,
     post_recurring_schedule_create,
+    put_recurring_schedule_update,
     post_run_cancel,
     post_run_resume,
     fetch_run_detail,
@@ -58,6 +59,91 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_recurring_schedule_update_uses_authenticated_put_and_validates_redacted_contract(self):
+        observed = {}
+        definition = _recurring_definition()
+        definition["schedule"].update(
+            {
+                "workflow_id": "workflow_recurring_v2",
+                "version": "2.0.0",
+                "interval_seconds": 120,
+            }
+        )
+        definition["trigger"]["input"] = {"report": "updated"}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_PUT(self):
+                observed["path"] = self.path
+                observed["method"] = self.command
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(
+                    self,
+                    200,
+                    {
+                        "schema_version": "skill2workflow-recurring-schedule-update-0.1.0",
+                        "schedule_id": "schedule_hourly_report",
+                        "workflow_id": "workflow_recurring_v2",
+                        "workflow_version": "2.0.0",
+                        "status": "active",
+                        "enabled": True,
+                        "starts_at": "2026-08-11T00:00:00+00:00",
+                        "next_run_at": "2026-08-11T00:01:00+00:00",
+                        "interval_seconds": 120,
+                        "missed_run_policy": "latest",
+                        "changed": True,
+                    },
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            result = put_recurring_schedule_update(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "schedule_hourly_report",
+                definition,
+                expected_next_run_at="2026-08-11T00:00:00+00:00",
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(observed["method"], "PUT")
+        self.assertEqual(observed["path"], "/api/v1/recurring-schedules/schedule_hourly_report")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(
+            observed["body"],
+            {
+                "schedule": definition,
+                "expected_next_run_at": "2026-08-11T00:00:00+00:00",
+            },
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_schedule_update_rejects_missing_precondition_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaises(ValueError):
+                put_recurring_schedule_update(
+                    "https://service.example",
+                    token_file,
+                    "schedule_hourly_report",
+                    _recurring_definition(),
+                    expected_next_run_at="",
+                )
+
     def test_recurring_schedule_create_uses_authenticated_post_and_redacted_contract(self):
         observed = {}
         definition = _recurring_definition()

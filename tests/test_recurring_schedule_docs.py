@@ -52,6 +52,8 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("unbounded source read", guide)
         self.assertIn("recurring_schedule_summaries", guide)
         self.assertIn("does not parse complete definitions", guide)
+        self.assertIn("PUT /api/v1/recurring-schedules/{schedule_id}", guide)
+        self.assertIn("compare-and-swap token", guide)
 
     def test_bounded_local_schedule_schemas_fix_the_redacted_window_contract(self):
         schedule_schema = json.loads(
@@ -95,7 +97,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-154 are complete", readme)
+        self.assertIn("Delivery Loops 1-155 are complete", readme)
         self.assertIn("Loop 146 adds a compact SQLite recurring-schedule projection", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
@@ -120,4 +122,21 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("trigger input", create_guide)
         self.assertIn("changed definition", create_guide)
         self.assertIn("### Loop 154: Protected Remote Recurring-Schedule Creation", roadmap)
+        self.assertIn("### Loop 155: Protected Remote Recurring-Schedule Updates", roadmap)
+        update_schema = json.loads(
+            (ROOT / "schemas" / "recurring-schedule-update-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        update_guide = (ROOT / "docs" / "remote-schedule-update.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(
+            update_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-recurring-schedule-update-0.1.0",
+        )
+        self.assertFalse(update_schema["additionalProperties"])
+        self.assertIn("PUT /api/v1/recurring-schedules/{schedule_id}", update_guide)
+        self.assertIn("expected_next_run_at", update_guide)
+        self.assertIn("preserve durable dispatch progress", update_guide)
         self.assertIn("| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete |", roadmap)

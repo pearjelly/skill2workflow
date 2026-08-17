@@ -1005,6 +1005,7 @@ class LocalControlPlane:
             "run_detail",
             "recurring_schedule_create",
             "recurring_schedule_action",
+            "recurring_schedule_update",
             "workflow_release",
             "workflow_promotion",
             "workflow_deprecation",
@@ -1072,6 +1073,31 @@ class LocalControlPlane:
                 "type": "recurring_schedule_created",
                 "schedule_id": normalized_id,
                 "created": created,
+                "timestamp": _now(),
+            }
+        )
+
+    def record_recurring_schedule_definition_updated(
+        self,
+        schedule_id: str,
+        changed: bool,
+    ) -> None:
+        """Persist value-free evidence for a remote definition update."""
+
+        normalized_id = str(schedule_id)
+        if (
+            not normalized_id
+            or len(normalized_id) > 128
+            or any(not (char.isalnum() or char in {"-", "_", "."}) for char in normalized_id)
+        ):
+            raise ValueError("schedule_id must be a safe schedule identifier")
+        if not isinstance(changed, bool):
+            raise ValueError("schedule update state must be boolean")
+        self._append_audit(
+            {
+                "type": "recurring_schedule_definition_updated",
+                "schedule_id": normalized_id,
+                "changed": changed,
                 "timestamp": _now(),
             }
         )

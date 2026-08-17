@@ -26,6 +26,7 @@ WORKFLOW_INVENTORY_SCHEMA_VERSION = "skill2workflow-workflow-inventory-0.1.0"
 RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list-0.1.0"
 RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION = "skill2workflow-recurring-schedule-action-0.1.0"
 RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-create-0.1.0"
+RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-update-0.1.0"
 RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
@@ -37,6 +38,7 @@ MAX_AUDIT_EVENT_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES = 16 * 1024
+MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES = 16 * 1024
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
 MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES = 64
 MAX_WORKFLOW_INVENTORY_ITEMS = 100
@@ -68,6 +70,35 @@ def build_recurring_schedule_create_response(
         "interval_seconds": int(schedule.get("interval_seconds", 0)),
         "missed_run_policy": str(schedule.get("missed_run_policy", "")),
         "created": created,
+    }
+
+
+def build_recurring_schedule_update_response(
+    definition: Dict[str, object],
+    *,
+    changed: bool,
+) -> Dict[str, object]:
+    """Project one schedule definition update without returning trigger data."""
+
+    if not isinstance(definition, dict) or not isinstance(
+        definition.get("schedule"), dict
+    ):
+        raise ValueError("recurring schedule definition must be normalized")
+    if not isinstance(changed, bool):
+        raise ValueError("recurring schedule update state must be boolean")
+    schedule = definition["schedule"]
+    return {
+        "schema_version": RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION,
+        "schedule_id": str(schedule.get("id", "")),
+        "workflow_id": str(schedule.get("workflow_id", "")),
+        "workflow_version": str(schedule.get("version", "")),
+        "status": str(schedule.get("status", "")),
+        "enabled": bool(schedule.get("enabled", False)),
+        "starts_at": str(schedule.get("starts_at", "")),
+        "next_run_at": str(schedule.get("next_run_at", "")),
+        "interval_seconds": int(schedule.get("interval_seconds", 0)),
+        "missed_run_policy": str(schedule.get("missed_run_policy", "")),
+        "changed": changed,
     }
 
 
@@ -634,7 +665,9 @@ def build_support_bundle_from_control(
     http_requests = dict(observability.get("http_requests", {}))
     http_requests.pop("audit_consistency", None)
     http_requests.pop("recurring_schedule_list", None)
+    http_requests.pop("recurring_schedule_create", None)
     http_requests.pop("recurring_schedule_action", None)
+    http_requests.pop("recurring_schedule_update", None)
     http_requests.pop("recurring_schedule_dispatch_list", None)
     http_requests.pop("workflow_artifact_report", None)
     http_requests.pop("backup_readiness", None)

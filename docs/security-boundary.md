@@ -65,7 +65,7 @@ SQLite audit records contain only:
 
 - `ingress_authenticated` or `ingress_authentication_denied`;
 - HTTP method;
-- normalized route class (`workflow_trigger`, `run_resume`, `run_cancel`, `run_list`, `run_page`, `audit_event_list`, `run_detail`, `audit_consistency`, `recurring_schedule_action`, `support_bundle`, or `unknown`);
+- normalized route class (`workflow_trigger`, `run_resume`, `run_cancel`, `run_list`, `run_page`, `audit_event_list`, `run_detail`, `audit_consistency`, `recurring_schedule_create`, `recurring_schedule_action`, `recurring_schedule_update`, `support_bundle`, or `unknown`);
 - timestamp;
 - a compact denial reason.
 

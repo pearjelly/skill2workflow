@@ -20,6 +20,8 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
     RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION,
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
+    RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION,
+    MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
     MAX_WORKFLOW_INVENTORY_ITEMS,
     WORKFLOW_INVENTORY_SCHEMA_VERSION,
@@ -64,6 +66,7 @@ MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_CREATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_RECURRING_SCHEDULE_UPDATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RETENTION_READINESS_REQUEST_BYTES = 64 * 1024
@@ -798,6 +801,53 @@ def post_recurring_schedule_create(
         max_response_bytes=MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     )
     _validate_recurring_schedule_create(payload, normalized)
+    return payload
+
+
+def put_recurring_schedule_update(
+    service_url: str,
+    token_file: Path,
+    schedule_id: str,
+    definition: Dict[str, object],
+    *,
+    expected_next_run_at: str,
+) -> Dict[str, object]:
+    """Update one recurring schedule while preserving dispatch progress."""
+
+    normalized_schedule_id = _validate_schedule_id(schedule_id)
+    if not isinstance(definition, dict):
+        raise ValueError("recurring schedule definition must be an object")
+    if not isinstance(expected_next_run_at, str) or not 1 <= len(expected_next_run_at) <= 64:
+        raise ValueError("expected_next_run_at must be a non-empty timestamp")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in expected_next_run_at):
+        raise ValueError("expected_next_run_at must be a non-empty timestamp")
+    normalized = normalize_recurring_schedule_definition(definition)
+    raw_schedule = definition.get("schedule")
+    if not isinstance(raw_schedule, dict) or "enabled" not in raw_schedule:
+        raise ValueError("recurring schedule update requires schedule.enabled")
+    if normalized["schedule"]["id"] != normalized_schedule_id:
+        raise ValueError("recurring schedule definition id does not match schedule_id")
+    body = json.dumps(
+        {
+            "schedule": definition,
+            "expected_next_run_at": expected_next_run_at,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if len(body) > MAX_RECURRING_SCHEDULE_UPDATE_REQUEST_BYTES:
+        raise ServiceActionError("service action body is too large", status_code=413)
+    payload = _request_json(
+        service_url,
+        token_file,
+        f"/api/v1/recurring-schedules/{normalized_schedule_id}",
+        method="PUT",
+        body=body,
+        conflict_message="recurring schedule update precondition failed",
+        not_found_message="recurring schedule not found",
+        max_response_bytes=MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_update(payload, normalized)
     return payload
 
 
@@ -1846,6 +1896,54 @@ def _validate_recurring_schedule_create(
             or payload.get("next_run_at") != schedule.get("next_run_at")
         ):
             raise ServiceActionError()
+
+
+def _validate_recurring_schedule_update(
+    payload: Dict[str, object],
+    definition: Dict[str, object],
+) -> None:
+    """Validate the fixed redacted recurring schedule update response."""
+
+    fields = {
+        "schema_version",
+        "schedule_id",
+        "workflow_id",
+        "workflow_version",
+        "status",
+        "enabled",
+        "starts_at",
+        "next_run_at",
+        "interval_seconds",
+        "missed_run_policy",
+        "changed",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION:
+        raise ServiceActionError()
+    schedule = definition.get("schedule")
+    if not isinstance(schedule, dict):
+        raise ServiceActionError()
+    for response_key, source_key in (
+        ("schedule_id", "id"),
+        ("workflow_id", "workflow_id"),
+        ("workflow_version", "version"),
+        ("starts_at", "starts_at"),
+        ("interval_seconds", "interval_seconds"),
+        ("missed_run_policy", "missed_run_policy"),
+    ):
+        if payload.get(response_key) != schedule.get(source_key):
+            raise ServiceActionError()
+    enabled = payload.get("enabled")
+    if (
+        payload.get("status") not in {"active", "disabled"}
+        or (enabled is not True and enabled is not False)
+        or (payload.get("status") == "active") != enabled
+        or not isinstance(payload.get("next_run_at"), str)
+        or not payload.get("next_run_at")
+        or not isinstance(payload.get("changed"), bool)
+    ):
+        raise ServiceActionError()
 
 
 def _validate_recurring_schedule_dispatch_list(

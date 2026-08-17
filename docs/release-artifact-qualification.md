@@ -39,8 +39,9 @@ The installed command set also includes the protected `service-resume`,
 `service-workflow-diff`, protected
 `service-workflow-deprecate`, protected
 `service-trigger`, protected
-`service-schedule-enable` and
-`service-schedule-disable`, and owner-only `service-support-bundle` operator
+`service-schedule-enable`, `service-schedule-disable`,
+`service-recurring-schedule-add`, `service-recurring-schedule-update`, and
+owner-only `service-support-bundle` operator
 clients.
 
 The installed command set also includes local `service-token-rotate`; package

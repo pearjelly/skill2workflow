@@ -981,6 +981,126 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("must-not-leak", json.dumps(audit, ensure_ascii=False))
         self.assertFalse(serve_thread.is_alive())
 
+    def test_recurring_schedule_update_is_authenticated_cas_preserving_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            service = RuntimeService(config)
+            definition = {
+                "schema_version": "skill2workflow-schedule-0.2.0",
+                "schedule": {
+                    "id": "schedule_remote_update",
+                    "workflow_id": "workflow_service",
+                    "version": "0.1.0",
+                    "starts_at": "2099-08-11T00:00:00Z",
+                    "interval_seconds": 60,
+                    "missed_run_policy": "latest",
+                    "enabled": True,
+                },
+                "trigger": {"input": {"private": "must-not-leak"}},
+            }
+            service.scheduler.dispatcher.store.add(definition)
+            dispatcher = service.scheduler.dispatcher
+            self.assertTrue(dispatcher.try_acquire(now_epoch=1000))
+            dispatcher.claim_due("2099-08-11T00:00:00Z", now_epoch=1001)
+            current = dispatcher.store.get("schedule_remote_update")
+            update = json.loads(json.dumps(definition))
+            update["schedule"].update(
+                {
+                    "workflow_id": "workflow_service_v2",
+                    "version": "2.0.0",
+                    "interval_seconds": 120,
+                    "enabled": True,
+                }
+            )
+            ready = threading.Event()
+            serve_thread = threading.Thread(
+                target=service.serve,
+                kwargs={"ready_callback": lambda _service: ready.set()},
+                daemon=True,
+            )
+            serve_thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = service.server_address
+            url = f"http://{host}:{port}/api/v1/recurring-schedules/schedule_remote_update"
+            denied_status, denied = _put_json(
+                url,
+                {
+                    "schedule": update,
+                    "expected_next_run_at": "2099-08-11T00:00:00+00:00",
+                },
+            )
+            invalid_status, invalid = _put_json(
+                url,
+                {"schedule": update},
+                token=AUTH_TOKEN,
+            )
+            updated_status, updated = _put_json(
+                url,
+                {
+                    "schedule": update,
+                    "expected_next_run_at": current["schedule"]["next_run_at"],
+                },
+                token=AUTH_TOKEN,
+            )
+            repeated_status, repeated = _put_json(
+                url,
+                {
+                    "schedule": update,
+                    "expected_next_run_at": updated["next_run_at"],
+                },
+                token=AUTH_TOKEN,
+            )
+            stale_status, stale = _put_json(
+                url,
+                {
+                    "schedule": dict(update, schedule=dict(update["schedule"], interval_seconds=300)),
+                    "expected_next_run_at": "2099-08-11T00:00:00+00:00",
+                },
+                token=AUTH_TOKEN,
+            )
+            service.begin_shutdown()
+            serve_thread.join(timeout=3)
+            stored = dispatcher.store.get("schedule_remote_update")
+            audit = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(invalid_status, 400)
+        self.assertEqual(
+            invalid,
+            {"error": "recurring schedule update body must contain schedule and expected_next_run_at"},
+        )
+        self.assertEqual(updated_status, 200)
+        self.assertTrue(updated["changed"])
+        self.assertEqual(updated["workflow_id"], "workflow_service_v2")
+        self.assertEqual(updated["workflow_version"], "2.0.0")
+        self.assertEqual(updated["next_run_at"], "2099-08-11T00:01:00+00:00")
+        self.assertEqual(repeated_status, 200)
+        self.assertFalse(repeated["changed"])
+        self.assertEqual(stale_status, 409)
+        self.assertEqual(stale, {"error": "recurring schedule update precondition failed"})
+        self.assertEqual(stored["schedule"]["interval_seconds"], 120)
+        self.assertEqual(stored["schedule"]["next_run_at"], "2099-08-11T00:01:00+00:00")
+        self.assertNotIn("must-not-leak", json.dumps(updated, ensure_ascii=False))
+        self.assertEqual(
+            [event["type"] for event in audit if event.get("route") == "recurring_schedule_update"],
+            [
+                "ingress_authentication_denied",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+            ],
+        )
+        updates = [
+            event for event in audit if event.get("type") == "recurring_schedule_definition_updated"
+        ]
+        self.assertEqual([event["changed"] for event in updates], [True, False])
+        self.assertNotIn("must-not-leak", json.dumps(audit, ensure_ascii=False))
+        self.assertFalse(serve_thread.is_alive())
+
     def test_recurring_schedule_dispatch_list_is_authenticated_bounded_and_redacted(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -3545,6 +3665,26 @@ def _post_json(url: str, payload, token=None):
         data=json.dumps(payload).encode("utf-8"),
         headers=headers,
         method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.loads(error.read().decode("utf-8"))
+        finally:
+            error.close()
+
+
+def _put_json(url: str, payload, token=None):
+    headers = {"Content-Type": "application/json"}
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="PUT",
     )
     try:
         with urllib.request.urlopen(request, timeout=2) as response:

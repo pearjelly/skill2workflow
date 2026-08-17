@@ -624,6 +624,8 @@ class DashboardTests(TestCase):
         self.assertEqual(bundle["run_list"]["summary"]["total"], 1)
         self.assertEqual(bundle["observability"]["service_status"], "ready")
         self.assertIn("support_bundle", bundle["observability"]["http_requests"])
+        self.assertNotIn("recurring_schedule_create", bundle["observability"]["http_requests"])
+        self.assertNotIn("recurring_schedule_update", bundle["observability"]["http_requests"])
         serialized = json.dumps(bundle, ensure_ascii=False)
         self.assertNotIn("private-bundle-input", serialized)
         self.assertNotIn("private-bundle-output", serialized)

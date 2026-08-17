@@ -23,8 +23,11 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("service_boundary_smoke.py", guide)
         self.assertIn("GET /api/v1/recurring-schedules", guide)
         self.assertIn("POST /api/v1/recurring-schedules", guide)
+        self.assertIn("PUT /api/v1/recurring-schedules/{schedule_id}", guide)
         self.assertIn("remote-schedule-create.md", guide)
+        self.assertIn("remote-schedule-update.md", guide)
         self.assertIn("service-recurring-schedule-add", guide)
+        self.assertIn("service-recurring-schedule-update", guide)
         self.assertIn("GET /api/v1/workflow-artifacts", guide)
         self.assertIn("GET /api/v1/backup-readiness", guide)
         self.assertIn("POST /api/v1/retention-readiness", guide)
@@ -83,6 +86,7 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("Loop 151 adds the bounded", guide)
         self.assertIn("Loop 153 adds a bounded", (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn("Loop 154 adds [protected remote recurring-schedule creation]", (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("Loop 155 adds [protected remote recurring-schedule updates]", (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn("service-soak-smoke.py", guide)
         self.assertIn("service-soak.md", guide)
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
@@ -95,6 +99,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-154 are complete", readme)
+        self.assertIn("Delivery Loops 1-155 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

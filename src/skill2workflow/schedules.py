@@ -599,6 +599,71 @@ class RecurringScheduleStore:
             _upsert_recurring_schedule_summary(connection, normalized)
         return normalized, True
 
+    def update_with_result(
+        self,
+        schedule_id: str,
+        definition: object,
+        *,
+        expected_next_run_at: str,
+    ) -> Tuple[Schedule, bool]:
+        """Update one definition without resetting durable dispatch progress.
+
+        The caller must provide the ``next_run_at`` value it last observed.
+        ``BEGIN IMMEDIATE`` serializes this compare-and-swap with scheduler
+        claims, so a stale operator cannot silently move a schedule backwards
+        or overwrite a concurrent update.  Runtime progress fields are always
+        copied from the persisted row; only author-controlled definition and
+        trigger fields are replaced.
+        """
+
+        normalized_id = str(schedule_id)
+        _safe_schedule_id(normalized_id)
+        if not isinstance(expected_next_run_at, str) or not expected_next_run_at:
+            raise ValueError("expected_next_run_at must be an ISO-8601 timestamp")
+        expected = _normalize_aware_timestamp(
+            expected_next_run_at,
+            "expected_next_run_at",
+        )
+        if not isinstance(definition, dict):
+            raise ValueError("recurring schedule definition must be a JSON object")
+        raw_schedule = definition.get("schedule")
+        if not isinstance(raw_schedule, dict) or "enabled" not in raw_schedule:
+            raise ValueError("recurring schedule update requires schedule.enabled")
+        normalized = normalize_recurring_schedule_definition(definition)
+        if str(normalized["schedule"]["id"]) != normalized_id:
+            raise ValueError("recurring schedule definition id does not match path")
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            row = connection.execute(
+                "select definition_json from recurring_schedules where schedule_id = ?",
+                (normalized_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"recurring schedule not found: {normalized_id}")
+            existing = _load_recurring_definition(row[0])
+            current_next_run_at = str(existing["schedule"]["next_run_at"])
+            if current_next_run_at != expected:
+                raise ValueError("recurring schedule update precondition failed")
+
+            effective = copy.deepcopy(normalized)
+            existing_schedule = existing["schedule"]
+            effective_schedule = effective["schedule"]
+            for state_key in (
+                "next_run_at",
+                "last_scheduled_for",
+                "last_run_id",
+                "last_trigger_id",
+            ):
+                effective_schedule[state_key] = existing_schedule[state_key]
+            changed = _json_text(existing) != _json_text(effective)
+            if changed:
+                connection.execute(
+                    "update recurring_schedules set definition_json = ?, updated_at = ? where schedule_id = ?",
+                    (_json_text(effective), _utc_now(), normalized_id),
+                )
+                _upsert_recurring_schedule_summary(connection, effective)
+        return effective, changed
+
     def get(self, schedule_id: str) -> Schedule:
         with self._connection() as connection:
             row = connection.execute(

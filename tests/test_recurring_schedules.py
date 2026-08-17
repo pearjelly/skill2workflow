@@ -81,6 +81,70 @@ class RecurringSchedulePersistenceTests(TestCase):
         self.assertFalse(replayed)
         self.assertEqual(first, repeated)
 
+    def test_update_with_result_preserves_progress_and_requires_next_run_precondition(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            store.add(_recurring_definition())
+            dispatcher = RecurringScheduleDispatcher(Path(tmp), owner_id="owner-a", lease_seconds=30)
+            self.assertTrue(dispatcher.try_acquire(now_epoch=1000))
+            dispatcher.claim_due("2026-08-11T00:00:00Z", now_epoch=1001)
+            current = store.get("schedule_hourly_report")
+            changed_definition = _recurring_definition(
+                extra_schedule={
+                    "enabled": True,
+                    "workflow_id": "workflow_recurring_v2",
+                    "version": "2.0.0",
+                    "interval_seconds": 120,
+                },
+                input_value={"report": "updated"},
+            )
+
+            updated, changed = store.update_with_result(
+                "schedule_hourly_report",
+                changed_definition,
+                expected_next_run_at=current["schedule"]["next_run_at"],
+            )
+            repeated, repeated_changed = store.update_with_result(
+                "schedule_hourly_report",
+                changed_definition,
+                expected_next_run_at=updated["schedule"]["next_run_at"],
+            )
+
+            with self.assertRaisesRegex(ValueError, "precondition failed"):
+                store.update_with_result(
+                    "schedule_hourly_report",
+                    _recurring_definition(extra_schedule={"enabled": False}),
+                    expected_next_run_at="2026-08-11T00:00:00+00:00",
+                )
+
+        self.assertTrue(changed)
+        self.assertFalse(repeated_changed)
+        self.assertEqual(updated, repeated)
+        self.assertEqual(updated["schedule"]["workflow_id"], "workflow_recurring_v2")
+        self.assertEqual(updated["schedule"]["version"], "2.0.0")
+        self.assertEqual(updated["schedule"]["interval_seconds"], 120)
+        self.assertEqual(updated["schedule"]["next_run_at"], "2026-08-11T00:01:00+00:00")
+        self.assertEqual(updated["schedule"]["last_scheduled_for"], "2026-08-11T00:00:00+00:00")
+
+    def test_update_with_result_rejects_path_definition_id_mismatch_and_missing_schedule(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            store.add(_recurring_definition())
+            with self.assertRaisesRegex(ValueError, "does not match"):
+                store.update_with_result(
+                    "schedule_other",
+                    _recurring_definition(extra_schedule={"enabled": True}),
+                    expected_next_run_at="2026-08-11T00:00:00+00:00",
+                )
+            with self.assertRaisesRegex(ValueError, "not found"):
+                store.update_with_result(
+                    "schedule_missing",
+                    _recurring_definition(
+                        extra_schedule={"id": "schedule_missing", "enabled": True}
+                    ),
+                    expected_next_run_at="2026-08-11T00:00:00+00:00",
+                )
+
     def test_set_enabled_with_result_is_idempotent_and_serialized(self):
         with TemporaryDirectory() as tmp:
             store = RecurringScheduleStore(Path(tmp))

@@ -244,6 +244,22 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("created: false", create_guide)
         self.assertIn("BEGIN IMMEDIATE", create_guide)
         self.assertIn("trigger input", create_guide)
+        update_guide = (ROOT / "docs" / "remote-schedule-update.md").read_text(
+            encoding="utf-8"
+        )
+        update_schema = json.loads(
+            (ROOT / "schemas" / "recurring-schedule-update-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn("PUT /api/v1/recurring-schedules/{schedule_id}", update_guide)
+        self.assertIn("expected_next_run_at", update_guide)
+        self.assertIn("compare-and-swap", update_guide)
+        self.assertEqual(
+            update_schema["$id"],
+            "https://skill2workflow.dev/schemas/recurring-schedule-update-0.1.0.schema.json",
+        )
+        self.assertFalse(update_schema["additionalProperties"])
         self.assertEqual(
             create_schema["$id"],
             "https://skill2workflow.dev/schemas/recurring-schedule-create-0.1.0.schema.json",
@@ -342,6 +358,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-audit-consistency"', cli)
         self.assertIn('"service-recurring-schedules"', cli)
         self.assertIn('"service-recurring-schedule-add"', cli)
+        self.assertIn('"service-recurring-schedule-update"', cli)
         self.assertIn('"service-recurring-dispatches"', cli)
         self.assertIn('"service-workflow-artifacts"', cli)
         self.assertIn('"service-backup-readiness"', cli)
@@ -359,6 +376,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-audit-consistency"', package_smoke)
         self.assertIn('"service-recurring-schedules"', package_smoke)
         self.assertIn('"service-recurring-schedule-add"', package_smoke)
+        self.assertIn('"service-recurring-schedule-update"', package_smoke)
         self.assertIn('"service-recurring-dispatches"', package_smoke)
         self.assertIn('"service-workflow-artifacts"', package_smoke)
         self.assertIn('"service-backup-readiness"', package_smoke)

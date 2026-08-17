@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added protected remote recurring-schedule updates through
+  `PUT /api/v1/recurring-schedules/{schedule_id}` and the installed
+  `service-recurring-schedule-update` CLI. The request carries the last
+  observed `next_run_at` compare-and-swap token, preserves durable dispatch
+  progress, rejects stale edits with a fixed `409`, and never returns trigger
+  input.
 - Added protected remote recurring-schedule creation through
   `POST /api/v1/recurring-schedules` and the installed
   `service-recurring-schedule-add` CLI. Identical retries are no-ops, changed

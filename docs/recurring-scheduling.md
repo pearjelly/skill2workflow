@@ -135,6 +135,13 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches \
   --schedule-id schedule_hourly_report --limit 100
 ```
 
+Remote operators can update an existing recurring definition through the
+authenticated `PUT /api/v1/recurring-schedules/{schedule_id}` route. The
+protected `service-recurring-schedule-update` command requires the last
+observed `next_run_at` value as a compare-and-swap token, so a concurrent
+dispatch produces a safe `409` instead of silently resetting progress. See
+[`remote-schedule-update.md`](remote-schedule-update.md).
+
 The optional local `--limit` windows accept `1` through `1000`. Bounded
 schedule output uses `skill2workflow-local-schedule-list-0.1.0` and omits
 trigger inputs; bounded dispatch output uses
