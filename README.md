@@ -766,7 +766,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-174 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-175 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1393,6 +1393,12 @@ used by load, recovery, cancellation, deadline expiry, and startup repair.
 Bounded summary projections remain unchanged. See
 [`docs/sqlite-run-state-boundary.md`](docs/sqlite-run-state-boundary.md).
 
+Loop 175 hardens both local control-plane audit stores: every JSONL line and
+SQLite `payload_json` event is a JSON object within a fixed 1 MiB UTF-8
+envelope, and batch writes validate before emitting any member. Bounded reads
+fail closed before decoding oversized or malformed payloads. See
+[`docs/audit-event-boundary.md`](docs/audit-event-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1408,6 +1414,7 @@ See:
 - `docs/published-artifact-read-boundary.md`
 - `docs/external-connector-result-boundary.md`
 - `docs/json-run-state-boundary.md`
+- `docs/audit-event-boundary.md`
 - `docs/service-config-boundary.md`
 - `docs/credential-file-boundary.md`
 - `docs/skill-input-boundary.md`

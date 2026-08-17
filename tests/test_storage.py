@@ -10,6 +10,7 @@ from unittest.mock import patch
 from skill2workflow.storage import (
     JsonControlStore,
     JsonRunStore,
+    MAX_AUDIT_EVENT_BYTES,
     MAX_JSON_CONTROL_INDEX_BYTES,
     MAX_JSON_RUN_STATE_BYTES,
     MAX_SQLITE_RUN_STATE_BYTES,
@@ -22,6 +23,70 @@ from skill2workflow.storage import (
 
 
 class StorageTests(TestCase):
+    def test_audit_event_writes_reject_oversized_payloads_before_commit(self):
+        event = {
+            "type": "connector_failed",
+            "workflow_id": "workflow_storage",
+            "payload": "x" * MAX_AUDIT_EVENT_BYTES,
+        }
+        with TemporaryDirectory() as tmp:
+            json_store = JsonControlStore(Path(tmp) / "json")
+            sqlite_store = SqliteControlStore(Path(tmp) / "sqlite")
+            for store in (json_store, sqlite_store):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"audit event exceeds {MAX_AUDIT_EVENT_BYTES} bytes",
+                ):
+                    store.append_audit(event)
+            self.assertFalse((Path(tmp) / "json" / "audit.log.jsonl").exists())
+            self.assertEqual(sqlite_store.list_audit_events(), [])
+
+    def test_audit_event_batch_validates_before_partial_write(self):
+        valid = {"type": "run_started", "run_id": "run_batch"}
+        oversized = {
+            "type": "connector_failed",
+            "payload": "x" * MAX_AUDIT_EVENT_BYTES,
+        }
+        with TemporaryDirectory() as tmp:
+            json_store = JsonControlStore(Path(tmp) / "json")
+            sqlite_store = SqliteControlStore(Path(tmp) / "sqlite")
+            for store in (json_store, sqlite_store):
+                with self.assertRaisesRegex(ValueError, "audit event exceeds"):
+                    store.append_audit_batch([valid, oversized])
+            self.assertEqual(json_store.list_audit_events(), [])
+            self.assertEqual(sqlite_store.list_audit_events(), [])
+
+    def test_json_audit_read_rejects_oversized_event_before_decode(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "json" / "audit.log.jsonl"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(
+                b'{"type":"oversized","payload":"'
+                + b"x" * MAX_AUDIT_EVENT_BYTES
+                + b'"}\n'
+            )
+            store = JsonControlStore(Path(tmp) / "json")
+            with self.assertRaisesRegex(
+                ValueError,
+                f"audit event exceeds {MAX_AUDIT_EVENT_BYTES} bytes",
+            ):
+                store.list_audit_events()
+
+    def test_sqlite_audit_read_rejects_oversized_event_before_decode(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "sqlite")
+            store.append_audit({"type": "run_started", "run_id": "run_read"})
+            with store._connection() as connection:
+                connection.execute(
+                    "update audit_events set payload_json = ? where sequence = 1",
+                    ("x" * (MAX_AUDIT_EVENT_BYTES + 1),),
+                )
+            with self.assertRaisesRegex(
+                ValueError,
+                f"audit event exceeds {MAX_AUDIT_EVENT_BYTES} bytes",
+            ):
+                store.list_audit_events()
+
     def test_json_run_state_save_rejects_oversized_payload(self):
         with TemporaryDirectory() as tmp:
             store = JsonRunStore(Path(tmp) / "json")

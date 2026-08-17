@@ -34,6 +34,9 @@ MAX_JSON_RUN_STATE_BYTES = 8 * 1024 * 1024
 # not become an unbounded escape hatch for workflow/context/result state.
 MAX_SQLITE_RUN_STATE_BYTES = MAX_JSON_RUN_STATE_BYTES
 MAX_JSON_CONTROL_INDEX_BYTES = 8 * 1024 * 1024
+# Audit events are compact metadata by contract. Keep both local backends on
+# one fixed UTF-8 envelope so JSONL and SQLite cannot become unbounded sinks.
+MAX_AUDIT_EVENT_BYTES = 1 * 1024 * 1024
 _JSON_RUN_STATE_READ_CHUNK_BYTES = 64 * 1024
 _AUDIT_GENESIS_DIGEST = ""
 _LEGACY_AUDIT_COLUMNS = {
@@ -1018,7 +1021,9 @@ class JsonControlStore:
         audit_total = 0
         if self.audit_path.exists():
             with self.audit_path.open("r", encoding="utf-8") as handle:
-                audit_total = sum(1 for line in handle if line.strip())
+                audit_total = sum(
+                    1 for line in _iter_bounded_audit_lines(handle) if line.strip()
+                )
         return {
             "workflow_total": len(records),
             "workflow_status_counts": dict(status_counts),
@@ -1036,7 +1041,7 @@ class JsonControlStore:
         if not isinstance(events, list):
             raise ValueError("audit events must be a list")
         payload = "".join(
-            json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n"
+            _encode_audit_event(event) + "\n"
             for event in events
         )
         self.audit_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1065,11 +1070,11 @@ class JsonControlStore:
             return []
         events = deque(maxlen=limit) if limit is not None else []
         with self.audit_path.open("r", encoding="utf-8") as handle:
-            lines = handle
+            lines = _iter_bounded_audit_lines(handle)
             for line in lines:
                 if not line.strip():
                     continue
-                event = json.loads(line)
+                event = _decode_audit_event(line)
                 if not _audit_event_matches(
                     event,
                     workflow_id=workflow_id,
@@ -1084,15 +1089,15 @@ class JsonControlStore:
     def audit_event_exists(self, event: AuditEvent) -> bool:
         """Return whether one canonical audit payload is already persisted."""
 
-        expected = json.dumps(event, ensure_ascii=False, sort_keys=True)
+        expected = _encode_audit_event(event)
         if not self.audit_path.exists():
             return False
         with self.audit_path.open("r", encoding="utf-8") as handle:
-            for line in handle:
+            for line in _iter_bounded_audit_lines(handle):
                 if not line.strip():
                     continue
                 try:
-                    candidate = json.loads(line)
+                    candidate = _decode_audit_event(line)
                 except (TypeError, ValueError, json.JSONDecodeError):
                     continue
                 if json.dumps(candidate, ensure_ascii=False, sort_keys=True) == expected:
@@ -1105,11 +1110,11 @@ class JsonControlStore:
         if not self.audit_path.exists():
             return False
         with self.audit_path.open("r", encoding="utf-8") as handle:
-            for line in handle:
+            for line in _iter_bounded_audit_lines(handle):
                 if not line.strip():
                     continue
                 try:
-                    candidate = json.loads(line)
+                    candidate = _decode_audit_event(line)
                 except (TypeError, ValueError, json.JSONDecodeError):
                     continue
                 if _audit_event_matches(
@@ -1128,10 +1133,10 @@ class JsonControlStore:
         if not selected or not self.audit_path.exists():
             return counts
         with self.audit_path.open("r", encoding="utf-8") as handle:
-            for line in handle:
+            for line in _iter_bounded_audit_lines(handle):
                 if not line.strip():
                     continue
-                event = json.loads(line)
+                event = _decode_audit_event(line)
                 if not isinstance(event, dict):
                     raise ValueError("audit event must be an object")
                 run_id = str(event.get("run_id", ""))
@@ -1547,7 +1552,7 @@ class SqliteControlStore:
         with self._connection() as connection:
             connection.execute("begin immediate")
             for event in events:
-                payload_json = json.dumps(event, ensure_ascii=False, sort_keys=True)
+                payload_json = _encode_audit_event(event)
                 exists = connection.execute(
                     "select 1 from audit_events where payload_json = ? limit 1",
                     (payload_json,),
@@ -1700,7 +1705,7 @@ class SqliteControlStore:
             parameters.append(limit)
         with self._connection() as connection:
             rows = connection.execute(query, parameters).fetchall()
-        events = [json.loads(str(row[0])) for row in rows]
+        events = [_decode_audit_event(row[0]) for row in rows]
         if limit is not None:
             events.reverse()
         return events
@@ -1759,7 +1764,9 @@ class SqliteControlStore:
         selected = rows[:max_items]
         events = []
         for sequence, payload_json in reversed(selected):
-            events.append({"sequence": int(sequence), "event": json.loads(str(payload_json))})
+            events.append(
+                {"sequence": int(sequence), "event": _decode_audit_event(payload_json)}
+            )
         next_cursor = int(selected[-1][0]) if has_more and selected else 0
         return {
             "total": total,
@@ -1771,7 +1778,7 @@ class SqliteControlStore:
     def audit_event_exists(self, event: AuditEvent) -> bool:
         """Return whether one canonical audit payload is already persisted."""
 
-        payload_json = json.dumps(event, ensure_ascii=False, sort_keys=True)
+        payload_json = _encode_audit_event(event)
         with self._connection() as connection:
             row = connection.execute(
                 "select 1 from audit_events where payload_json = ? limit 1",
@@ -1844,7 +1851,7 @@ class SqliteControlStore:
             ],
             "audit_total": audit_total,
             "audit_events": [
-                json.loads(str(row[0])) for row in reversed(audit_rows)
+                _decode_audit_event(row[0]) for row in reversed(audit_rows)
             ],
         }
 
@@ -1913,10 +1920,10 @@ class SqliteControlStore:
                 self.save_index(index)
 
         if self.audit_path.exists() and not self.list_audit_events():
-            for line in self.audit_path.read_text(encoding="utf-8").splitlines():
-                if line.strip():
-                    event = json.loads(line)
-                    if isinstance(event, dict):
+            with self.audit_path.open("r", encoding="utf-8") as handle:
+                for line in _iter_bounded_audit_lines(handle):
+                    if line.strip():
+                        event = _decode_audit_event(line)
                         self.append_audit(event)
 
     def _connection(self):
@@ -2035,7 +2042,7 @@ def _append_audit_connection(connection, event: AuditEvent) -> None:
     previous_digest = (
         str(previous_row[0]) if previous_row and previous_row[0] is not None else ""
     )
-    payload_json = json.dumps(event, ensure_ascii=False, sort_keys=True)
+    payload_json = _encode_audit_event(event)
     connection.execute(
         """
         insert into audit_events (
@@ -2094,7 +2101,7 @@ def _rebuild_audit_integrity_connection(connection) -> None:
     )
     for sequence, payload_json in rows:
         try:
-            payload = json.loads(str(payload_json))
+            payload = _decode_audit_event(payload_json)
         except (TypeError, ValueError, json.JSONDecodeError) as error:
             raise ValueError("audit event payload is invalid") from error
         if not isinstance(payload, dict):
@@ -2162,7 +2169,7 @@ def _verify_audit_integrity_connection(connection) -> Dict[str, object]:
                 reason="sequence_out_of_order",
             )
         try:
-            payload = json.loads(str(payload_json))
+            payload = _decode_audit_event(payload_json)
         except (TypeError, ValueError, json.JSONDecodeError):
             return _audit_integrity_result(
                 status="invalid",
@@ -2382,6 +2389,69 @@ def _encode_sqlite_run_state(state: RunState) -> str:
             f"SQLite run state exceeds {MAX_SQLITE_RUN_STATE_BYTES} bytes"
         )
     return raw.decode("utf-8")
+
+
+def _encode_audit_event(event: AuditEvent) -> str:
+    """Serialize one audit object within the shared UTF-8 event boundary."""
+
+    if not isinstance(event, dict):
+        raise ValueError("audit event must be an object")
+    try:
+        raw = json.dumps(event, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+        RecursionError,
+        UnicodeError,
+    ) as error:
+        raise ValueError("audit event is not JSON serializable") from error
+    if len(raw) > MAX_AUDIT_EVENT_BYTES:
+        raise ValueError(f"audit event exceeds {MAX_AUDIT_EVENT_BYTES} bytes")
+    return raw.decode("utf-8")
+
+
+def _iter_bounded_audit_lines(handle):
+    """Yield JSONL audit lines without allocating an oversized line."""
+
+    while True:
+        line = handle.readline(MAX_AUDIT_EVENT_BYTES + 2)
+        if not line:
+            return
+        # A writer emits one LF byte. Permit a legacy CRLF line only when the
+        # event payload itself still fits the shared bound.
+        if len(line) > MAX_AUDIT_EVENT_BYTES + 1:
+            if not (
+                len(line) == MAX_AUDIT_EVENT_BYTES + 2
+                and line.endswith("\r\n")
+            ):
+                raise ValueError(f"audit event exceeds {MAX_AUDIT_EVENT_BYTES} bytes")
+        elif len(line) == MAX_AUDIT_EVENT_BYTES + 1 and not line.endswith("\n"):
+            raise ValueError(f"audit event exceeds {MAX_AUDIT_EVENT_BYTES} bytes")
+        yield line
+
+
+def _decode_audit_event(raw_event: object) -> AuditEvent:
+    """Check one stored audit payload before JSON decoding it."""
+
+    try:
+        text = (
+            raw_event.decode("utf-8")
+            if isinstance(raw_event, bytes)
+            else str(raw_event)
+        ).rstrip("\r\n")
+        encoded = text.encode("utf-8")
+    except (TypeError, UnicodeError) as error:
+        raise ValueError("audit event is not valid UTF-8") from error
+    if len(encoded) > MAX_AUDIT_EVENT_BYTES:
+        raise ValueError(f"audit event exceeds {MAX_AUDIT_EVENT_BYTES} bytes")
+    try:
+        event = json.loads(text)
+    except (TypeError, ValueError, json.JSONDecodeError, UnicodeDecodeError) as error:
+        raise ValueError("audit event is not valid JSON") from error
+    if not isinstance(event, dict):
+        raise ValueError("audit event must be an object")
+    return event
 
 
 def _decode_sqlite_run_state(raw_state: object) -> RunState:

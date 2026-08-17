@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded local control-plane audit events to 1 MiB UTF-8 JSON-object
+  documents across JSONL and SQLite writes, bounded reads, and JSON-to-SQLite
+  import. Batch appends validate before emitting any member; event fields,
+  filters, and audit-chain semantics remain compatible. See
+  `docs/audit-event-boundary.md`.
+
 - Bounded complete SQLite run-state documents to 8 MiB on durable writes and
   full-state reads, including interrupted recovery, cancellation, deadline
   expiry, and startup summary repair. The SQLite service state shape and
