@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added value-free `bundle-diff` review for two verified Workflow DSL bundles,
+  reusing the published-version structural diff semantics without exposing
+  workflow values or executing either artifact.
+
 - Added explicit local `bundle-publish` handoff: a bundle is fully verified
   in memory before entering the normal immutable Workflow publication path.
   Publishing does not execute workflows, resolve credentials, or call

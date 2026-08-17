@@ -174,7 +174,7 @@ explicit connector boundaries. It currently supports:
 - Inspect compact, bounded published-workflow inventory without workflow content
 - Explain a workflow before execution with a bounded, side-effect-free, value-free plan using the fixed `skill2workflow-workflow-explanation-0.1.0` contract
 - Preflight trigger input and HTTP body mappings with a bounded, side-effect-free, value-free admission report using the fixed `skill2workflow-workflow-preflight-0.1.0` contract
-- Create, verify, and explicitly publish deterministic, secret-checked Workflow DSL bundles into a local control plane with the fixed `skill2workflow-workflow-bundle-0.1.0` manifest
+- Create, verify, structurally diff, and explicitly publish deterministic, secret-checked Workflow DSL bundles into a local control plane with fixed bundle contracts
 - Drain due schedule work in explicitly bounded side-effect batches
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
@@ -557,6 +557,9 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-create \
   --output /tmp/approval-flow.s2w
 PYTHONPATH=src python3 -m skill2workflow.cli bundle-verify \
   /tmp/approval-flow.s2w
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-diff \
+  /tmp/approval-flow-old.s2w \
+  /tmp/approval-flow-new.s2w
 PYTHONPATH=src python3 -m skill2workflow.cli bundle-publish \
   /tmp/approval-flow.s2w \
   --state-dir /tmp/skill2workflow-control \
@@ -818,7 +821,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-181 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-182 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1481,6 +1484,9 @@ secret hygiene without extraction or execution. Loop 181 adds the explicit
 `bundle-publish` handoff into the normal local immutable publication path;
 the bundle remains a sharing surface, not a second runtime authority or
 credential container.
+Loop 182 adds value-free [bundle structural diff review](docs/workflow-bundles.md):
+`bundle-diff` verifies both artifacts and reuses the published `workflow-diff`
+semantics before reporting only changed sections and node/edge IDs.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

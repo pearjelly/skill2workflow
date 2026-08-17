@@ -146,13 +146,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("release-artifact-sbom.md", guide)
         self.assertIn("member SHA-256 hashes", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
-        self.assertIn("- Completed delivery loops: 1-181", roadmap)
+        self.assertIn("- Completed delivery loops: 1-182", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 181 is complete with verified local Workflow DSL bundle publication",
+            "- Active loop: None; Loop 182 is complete with value-free Workflow DSL bundle diff review",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-181 are complete", readme)
+        self.assertIn("Delivery Loops 1-182 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

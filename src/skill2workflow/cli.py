@@ -16,6 +16,7 @@ from .backup import (
     verify_state_backup,
 )
 from .bundles import (
+    diff_workflow_bundles,
     create_workflow_bundle,
     load_verified_workflow_bundle,
     verify_workflow_bundle,
@@ -147,6 +148,13 @@ def _main(argv=None) -> int:
     bundle_publish_cmd.add_argument("bundle", type=Path)
     bundle_publish_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     bundle_publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+
+    bundle_diff_cmd = subparsers.add_parser(
+        "bundle-diff",
+        help="Compare two verified Workflow DSL bundles without printing values",
+    )
+    bundle_diff_cmd.add_argument("from_bundle", type=Path)
+    bundle_diff_cmd.add_argument("to_bundle", type=Path)
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
     visualize_cmd.add_argument("workflow", type=Path)
@@ -928,6 +936,10 @@ def _main(argv=None) -> int:
                 storage=args.storage,
             ).publish_workflow(workflow)
         )
+
+    if args.command == "bundle-diff":
+        _print_json(diff_workflow_bundles(args.from_bundle, args.to_bundle))
+        return 0
 
     if args.command == "visualize":
         workflow = _load_json(args.workflow)

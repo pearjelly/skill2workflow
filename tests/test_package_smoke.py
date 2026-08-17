@@ -173,6 +173,15 @@ class PackageSmokeTests(TestCase):
                             "status": "published",
                         }
                     )
+                if "bundle-diff" in command:
+                    return json.dumps(
+                        {
+                            "schema_version": "skill2workflow-workflow-bundle-diff-0.1.0",
+                            "workflow_id": "workflow_demo",
+                            "changed": False,
+                            "changes": {"sections": []},
+                        }
+                    )
                 return "ok\n"
 
             with patch("scripts.package_smoke.venv.EnvBuilder", FakeEnvBuilder), patch(
@@ -214,6 +223,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["private_artifacts_excluded"])
         self.assertTrue(result["bundle_status"])
         self.assertTrue(result["bundle_publish_status"])
+        self.assertTrue(result["bundle_diff_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])
         self.assertTrue(result["python_classifiers_valid"])

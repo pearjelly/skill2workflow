@@ -6,8 +6,10 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from skill2workflow.bundles import (
+    BUNDLE_DIFF_SCHEMA_VERSION,
     BUNDLE_SCHEMA_VERSION,
     create_workflow_bundle,
+    diff_workflow_bundles,
     load_verified_workflow_bundle,
     verify_workflow_bundle,
 )
@@ -101,6 +103,37 @@ class WorkflowBundleTests(TestCase):
             bundle.write_bytes(b"not a zip")
             with self.assertRaisesRegex(ValueError, "verification failed"):
                 load_verified_workflow_bundle(bundle)
+
+    def test_diff_uses_value_free_shared_structural_contract(self):
+        first_workflow = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        second_workflow = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        second_workflow["nodes"][0]["description"] = "private review text"
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = root / "first.s2w"
+            second = root / "second.s2w"
+            create_workflow_bundle(first_workflow, first)
+            create_workflow_bundle(second_workflow, second)
+            report = diff_workflow_bundles(first, second)
+
+        self.assertEqual(report["schema_version"], BUNDLE_DIFF_SCHEMA_VERSION)
+        self.assertTrue(report["changed"])
+        self.assertIn("nodes", report["changes"]["sections"])
+        self.assertIn("start", report["changes"]["nodes"]["changed"])
+        self.assertNotIn("private review text", json.dumps(report))
+
+    def test_diff_rejects_bundles_for_different_workflow_ids(self):
+        first_workflow = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        second_workflow = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        second_workflow["workflow"]["id"] = "workflow_other"
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            first = root / "first.s2w"
+            second = root / "second.s2w"
+            create_workflow_bundle(first_workflow, first)
+            create_workflow_bundle(second_workflow, second)
+            with self.assertRaisesRegex(ValueError, "IDs must match"):
+                diff_workflow_bundles(first, second)
 
     def test_verify_rejects_malformed_workflow_shape_without_traceback(self):
         manifest = {

@@ -14,11 +14,17 @@ class WorkflowBundleDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
+        diff_schema = json.loads(
+            (ROOT / "schemas" / "workflow-bundle-diff-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
 
         for phrase in (
             "bundle-create",
             "bundle-verify",
             "bundle-publish",
+            "bundle-diff",
             "deterministic ZIP",
             "never contains",
             "8 MiB",
@@ -31,6 +37,11 @@ class WorkflowBundleDocumentationTests(TestCase):
             "skill2workflow-workflow-bundle-0.1.0",
         )
         self.assertFalse(schema["additionalProperties"])
+        self.assertEqual(
+            diff_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-workflow-bundle-diff-0.1.0",
+        )
+        self.assertFalse(diff_schema["additionalProperties"])
 
     def test_docs_index_surfaces_the_product_entry_paths(self):
         index = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")

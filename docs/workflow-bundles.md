@@ -55,6 +55,21 @@ overwrites a different published artifact. A repeated identical publication
 is idempotent under the existing control-plane contract; a different document
 for the same workflow/version is rejected as an immutable-artifact conflict.
 
+Review two bundles before publication:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-diff \
+  /tmp/approval-flow-old.s2w \
+  /tmp/approval-flow-new.s2w
+```
+
+`bundle-diff` verifies both bundles before comparing them with the same
+value-free structural semantics as the published `workflow-diff` command. It
+reports only workflow identity, versions, digests, changed sections, and node
+or edge IDs. Titles, descriptions, connector requests, trigger inputs, and
+credentials never enter the report. Different workflow IDs fail closed rather
+than producing a misleading comparison.
+
 The successful report contains only workflow identity, status, byte counts,
 digests, member count, and fixed error fields. It does not echo workflow
 descriptions, trigger inputs, connector URLs, request bodies, credential
@@ -76,5 +91,7 @@ artifact.
 
 The manifest contract is versioned at
 [`schemas/workflow-bundle-0.1.0.schema.json`](../schemas/workflow-bundle-0.1.0.schema.json).
+The value-free diff contract is versioned at
+[`schemas/workflow-bundle-diff-0.1.0.schema.json`](../schemas/workflow-bundle-diff-0.1.0.schema.json).
 The capability is local-only in this loop; it does not add remote upload,
 marketplace discovery, hosted signing, or migration of published service state.

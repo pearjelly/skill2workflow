@@ -22,10 +22,12 @@ from typing import Dict, Optional, Tuple
 from .artifact_io import MAX_WORKFLOW_ARTIFACT_BYTES
 from .compiler import validate_workflow_structured
 from .secret_hygiene import scan_json_value
+from .workflow_diff import workflow_diff_changes
 
 
 BUNDLE_SCHEMA_VERSION = "skill2workflow-workflow-bundle-0.1.0"
 BUNDLE_VERIFICATION_SCHEMA_VERSION = "skill2workflow-workflow-bundle-verification-0.1.0"
+BUNDLE_DIFF_SCHEMA_VERSION = "skill2workflow-workflow-bundle-diff-0.1.0"
 MAX_BUNDLE_ARCHIVE_BYTES = 8 * 1024 * 1024
 MAX_BUNDLE_MEMBER_BYTES = MAX_WORKFLOW_ARTIFACT_BYTES
 MAX_BUNDLE_TOTAL_MEMBER_BYTES = 4 * 1024 * 1024
@@ -223,6 +225,44 @@ def load_verified_workflow_bundle(bundle: Path) -> Dict[str, object]:
     if workflow is None:
         raise ValueError("workflow bundle verification failed")
     return workflow
+
+
+def diff_workflow_bundles(from_bundle: Path, to_bundle: Path) -> Dict[str, object]:
+    """Compare two verified bundles using the published diff semantics.
+
+    Only workflow identity, versions, digests, changed sections, and item IDs
+    are returned.  The command is read-only and never publishes or executes a
+    workflow.
+    """
+
+    from_report = verify_workflow_bundle(from_bundle)
+    to_report = verify_workflow_bundle(to_bundle)
+    if not from_report.get("valid") or not to_report.get("valid"):
+        raise ValueError("workflow bundle verification failed")
+    from_workflow = load_verified_workflow_bundle(from_bundle)
+    to_workflow = load_verified_workflow_bundle(to_bundle)
+    from_meta = from_report.get("workflow") or {}
+    to_meta = to_report.get("workflow") or {}
+    workflow_id = str(from_meta.get("id") or "")
+    if not workflow_id or workflow_id != str(to_meta.get("id") or ""):
+        raise ValueError("workflow bundle IDs must match")
+    changes = workflow_diff_changes(from_workflow, to_workflow)
+    return {
+        "schema_version": BUNDLE_DIFF_SCHEMA_VERSION,
+        "workflow_id": workflow_id,
+        "from": {
+            "version": str(from_meta.get("version") or ""),
+            "status": str(from_meta.get("status") or ""),
+            "sha256": str(from_meta.get("sha256") or ""),
+        },
+        "to": {
+            "version": str(to_meta.get("version") or ""),
+            "status": str(to_meta.get("status") or ""),
+            "sha256": str(to_meta.get("sha256") or ""),
+        },
+        "changed": bool(changes["sections"]),
+        "changes": changes,
+    }
 
 
 def _inspect_bundle(raw: bytes, report: Dict[str, object]):

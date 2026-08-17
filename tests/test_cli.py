@@ -3550,6 +3550,37 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("immutable", stderr.getvalue())
 
+    def test_bundle_diff_is_read_only_and_value_free(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first_workflow = root / "first.json"
+            second_workflow = root / "second.json"
+            first_bundle = root / "first.s2w"
+            second_bundle = root / "second.s2w"
+            first = _approval_workflow()
+            second = _approval_workflow()
+            second["nodes"][0]["description"] = "private-value"
+            first_workflow.write_text(json.dumps(first), encoding="utf-8")
+            second_workflow.write_text(json.dumps(second), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["bundle-create", str(first_workflow), "--output", str(first_bundle)]),
+                    0,
+                )
+                self.assertEqual(
+                    main(["bundle-create", str(second_workflow), "--output", str(second_bundle)]),
+                    0,
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["bundle-diff", str(first_bundle), str(second_bundle)])
+
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(report["changed"])
+        self.assertNotIn("private-value", stdout.getvalue())
+        self.assertEqual(report["changes"]["nodes"]["changed"], ["start"])
+
     def test_bundle_verify_maps_invalid_artifact_to_nonzero_without_traceback(self):
         with TemporaryDirectory() as tmp:
             bundle_path = Path(tmp) / "invalid.s2w"

@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-181
+- Completed delivery loops: 1-182
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 181 is complete with verified local Workflow DSL bundle publication
+- Active loop: None; Loop 182 is complete with value-free Workflow DSL bundle diff review
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-181 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-182 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 181; the detailed
+The follow-on production hardening continues through Loop 182; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4380,9 +4380,43 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-publish \
   --storage sqlite
 ```
 
+### Loop 182: Value-Free Workflow Bundle Diff Review
+
+**Status:** Complete.
+
+**Prior basis:** Loop 181 made a verified bundle publishable locally, but
+reviewers still had to publish both versions before using the existing
+structural diff. That weakened the share → review → publish path and encouraged
+manual inspection of workflow values.
+
+**Outcome:** `bundle-diff` verifies both bundles, requires the same workflow
+identity, and reuses the shared structural diff helper used by published
+version review. The fixed `skill2workflow-workflow-bundle-diff-0.1.0` report
+contains only version/status/digest metadata, changed sections, and node/edge
+IDs. It is read-only and never extracts, publishes, executes, resolves
+credentials, or calls connectors.
+
+**Evidence:** [`docs/workflow-bundles.md`](docs/workflow-bundles.md) and
+[`schemas/workflow-bundle-diff-0.1.0.schema.json`](schemas/workflow-bundle-diff-0.1.0.schema.json)
+define the contract. Shared-helper coverage, bundle/CLI tests, mismatch and
+redaction regressions, installed command help, package smoke, full-suite
+validation, and release preflight prove the boundary.
+
+**Safety boundary:** This is a local review aid, not a semantic business-risk
+analyzer, approval controller, signature, remote upload path, or promotion
+mechanism. Operators still choose whether to publish and promote a version.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-diff \
+  /tmp/approval-flow-old.s2w \
+  /tmp/approval-flow-new.s2w
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 181 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 182 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4529,6 +4563,7 @@ This rolling queue is ordered. Loop 181 is complete and there is no active deliv
 | Loop 179: Side-Effect-Free Trigger Preflight | Complete | Let operators validate trigger input and HTTP body mappings before starting a real run without exposing values or invoking providers | Fixed value-free preflight schema, local/remote CLI, authenticated POST route, 1 MiB/64 KiB bounds, stable issue codes, redaction/read-only tests, package-smoke evidence, and operator documentation |
 | Loop 180: Portable Workflow DSL Bundles | Complete | Share one validated Workflow DSL artifact as a deterministic, secret-checked local bundle without packaging state or credentials | Fixed two-member ZIP manifest, digest verification, 8 MiB/2 MiB/4 MiB bounds, path/read safety, local CLI, tests, docs, and package evidence |
 | Loop 181: Verified Local Workflow Bundle Publication | Complete | Move a fully verified local bundle into the normal immutable publication path without extraction, execution, or credential access | In-memory verified loader, explicit local `bundle-publish`, JSON/SQLite publication coverage, conflict/idempotency evidence, installed CLI, tests, docs, and package evidence |
+| Loop 182: Value-Free Workflow Bundle Diff Review | Complete | Compare two verified bundles before publication without exposing workflow values or requiring control-plane state | Shared structural diff helper, fixed bundle-diff schema, identity mismatch guard, redaction/read-only tests, installed CLI, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
