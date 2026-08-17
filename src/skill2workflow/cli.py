@@ -576,6 +576,10 @@ def main(argv=None) -> int:
     ):
         service_schedule_state_cmd = subparsers.add_parser(command, help=help_text)
         service_schedule_state_cmd.add_argument("schedule_id")
+        service_schedule_state_cmd.add_argument(
+            "--expected-next-run-at",
+            help="Last observed next_run_at; rejects stale enable/disable requests",
+        )
         service_schedule_state_cmd.add_argument("--service-url", required=True)
         service_schedule_state_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
@@ -1221,12 +1225,16 @@ def main(argv=None) -> int:
         )
 
     if args.command in {"service-schedule-enable", "service-schedule-disable"}:
+        state_kwargs = {}
+        if args.expected_next_run_at is not None:
+            state_kwargs["expected_next_run_at"] = args.expected_next_run_at
         return _service_action(
             lambda: post_recurring_schedule_state(
                 args.service_url,
                 args.auth_token_file,
                 args.schedule_id,
                 enabled=args.command == "service-schedule-enable",
+                **state_kwargs,
             )
         )
 

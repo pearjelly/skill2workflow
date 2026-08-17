@@ -2014,6 +2014,48 @@ class ServiceClientTests(TestCase):
         )
         self.assertFalse(thread.is_alive())
 
+    def test_recurring_schedule_state_can_send_expected_next_run_at_cas_token(self):
+        observed = []
+        payload = {
+            "schema_version": "skill2workflow-recurring-schedule-action-0.1.0",
+            "schedule_id": "schedule_hourly_report",
+            "enabled": False,
+            "status": "disabled",
+            "changed": True,
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed.append(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            result = post_recurring_schedule_state(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "schedule_hourly_report",
+                enabled=False,
+                expected_next_run_at="2026-08-11T00:00:00Z",
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(result, payload)
+        self.assertEqual(
+            observed,
+            [{"expected_next_run_at": "2026-08-11T00:00:00Z"}],
+        )
+        self.assertFalse(thread.is_alive())
+
     def test_recurring_schedule_state_rejects_unsafe_identifier_and_contract_drift(self):
         with TemporaryDirectory() as tmp:
             token_file = Path(tmp) / "token"
@@ -2025,6 +2067,14 @@ class ServiceClientTests(TestCase):
                     token_file,
                     "../scheduler",
                     enabled=True,
+                )
+            with self.assertRaises(ValueError):
+                post_recurring_schedule_state(
+                    "http://127.0.0.1:1",
+                    token_file,
+                    "schedule_hourly_report",
+                    enabled=True,
+                    expected_next_run_at="\x00",
                 )
 
             class Handler(BaseHTTPRequestHandler):

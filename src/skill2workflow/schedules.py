@@ -13,7 +13,7 @@ from collections import deque
 from contextlib import closing, contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .control_plane import LocalControlPlane
 from .state_layout import ensure_current_state_layout
@@ -812,17 +812,33 @@ class RecurringScheduleStore:
         definition, _changed = self.set_enabled_with_result(schedule_id, enabled)
         return definition
 
-    def set_enabled_with_result(self, schedule_id: str, enabled: bool) -> Tuple[Schedule, bool]:
+    def set_enabled_with_result(
+        self,
+        schedule_id: str,
+        enabled: bool,
+        *,
+        expected_next_run_at: Optional[str] = None,
+    ) -> Tuple[Schedule, bool]:
         """Set one recurring schedule state and report whether it changed.
 
         The state transition remains serialized with dispatcher claims by the
         same ``BEGIN IMMEDIATE`` transaction used by :meth:`set_enabled`.
         ``changed`` lets a remote operator retry an idempotent action without
-        manufacturing a second state transition.
+        manufacturing a second state transition.  When ``expected_next_run_at``
+        is supplied, the same transaction also performs a compare-and-swap so
+        an operator cannot apply an intent based on an obsolete inventory read.
         """
 
         if not isinstance(enabled, bool):
             raise ValueError("schedule enabled state must be a boolean")
+        expected = None
+        if expected_next_run_at is not None:
+            if not isinstance(expected_next_run_at, str) or not expected_next_run_at:
+                raise ValueError("expected_next_run_at must be an ISO-8601 timestamp")
+            expected = _normalize_aware_timestamp(
+                expected_next_run_at,
+                "expected_next_run_at",
+            )
         with self._connection() as connection:
             connection.execute("begin immediate")
             row = connection.execute(
@@ -832,6 +848,10 @@ class RecurringScheduleStore:
             if row is None:
                 raise ValueError(f"recurring schedule not found: {schedule_id}")
             definition = _load_recurring_definition(row[0])
+            if expected is not None and str(
+                definition["schedule"]["next_run_at"]
+            ) != expected:
+                raise ValueError("recurring schedule action precondition failed")
             previous_enabled = bool(definition["schedule"].get("enabled", False))
             changed = previous_enabled != enabled
             if changed:

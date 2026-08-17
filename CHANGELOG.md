@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added optional compare-and-swap protection to the existing remote recurring
+  schedule enable/disable actions. Legacy empty-body callers remain supported;
+  protected CLI callers can bind the transition to the last observed
+  `next_run_at` and receive a fixed `409` on stale intent.
 - Added protected remote recurring-schedule retirement through
   `DELETE /api/v1/recurring-schedules/{schedule_id}` and the installed
   `service-recurring-schedule-delete` CLI. Deletion requires explicit

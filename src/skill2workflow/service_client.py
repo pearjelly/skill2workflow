@@ -765,19 +765,36 @@ def post_recurring_schedule_state(
     token_file: Path,
     schedule_id: str,
     enabled: bool,
+    *,
+    expected_next_run_at: Optional[str] = None,
 ) -> Dict[str, object]:
-    """Enable or disable one recurring schedule through the service boundary."""
+    """Enable or disable one recurring schedule through the service boundary.
+
+    The legacy empty-object request remains supported.  Supplying the last
+    observed ``next_run_at`` adds a compare-and-swap guard for operators that
+    need stale-inventory protection.
+    """
 
     if not isinstance(enabled, bool):
         raise ValueError("enabled must be a boolean")
     normalized_schedule_id = _validate_schedule_id(schedule_id)
     action = "enable" if enabled else "disable"
+    if expected_next_run_at is None:
+        body_payload = {}
+    else:
+        if (
+            not isinstance(expected_next_run_at, str)
+            or not 1 <= len(expected_next_run_at) <= 64
+            or any(ord(char) < 0x20 or ord(char) == 0x7F for char in expected_next_run_at)
+        ):
+            raise ValueError("expected_next_run_at must be a non-empty timestamp")
+        body_payload = {"expected_next_run_at": expected_next_run_at}
     payload = _post_json(
         service_url,
         token_file,
         f"/api/v1/recurring-schedules/{normalized_schedule_id}/{action}",
-        {},
-        conflict_message="recurring schedule action conflicts with current state",
+        body_payload,
+        conflict_message="recurring schedule action precondition failed",
         not_found_message="recurring schedule not found",
     )
     _validate_recurring_schedule_action(payload, normalized_schedule_id, enabled)

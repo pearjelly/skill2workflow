@@ -909,7 +909,7 @@ class RuntimeServiceTests(TestCase):
                         "id": "schedule_service_report",
                         "workflow_id": "workflow_service",
                         "version": "0.1.0",
-                        "starts_at": "2026-08-11T00:00:00Z",
+                        "starts_at": "2099-08-11T00:00:00Z",
                         "interval_seconds": 60,
                         "missed_run_policy": "latest",
                         "enabled": True,
@@ -935,9 +935,19 @@ class RuntimeServiceTests(TestCase):
                 {"unexpected": True},
                 token=AUTH_TOKEN,
             )
+            null_status, null_value = _post_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_service_report/disable",
+                {"expected_next_run_at": None},
+                token=AUTH_TOKEN,
+            )
+            stale_status, stale = _post_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_service_report/disable",
+                {"expected_next_run_at": "2099-08-11T00:01:00Z"},
+                token=AUTH_TOKEN,
+            )
             action_status, action = _post_json(
                 f"http://{host}:{port}/api/v1/recurring-schedules/schedule_service_report/disable",
-                {},
+                {"expected_next_run_at": "2099-08-11T00:00:00Z"},
                 token=AUTH_TOKEN,
             )
             repeat_status, repeated = _post_json(
@@ -957,6 +967,16 @@ class RuntimeServiceTests(TestCase):
             invalid,
             {"error": "recurring schedule action body must be an empty JSON object"},
         )
+        self.assertEqual(null_status, 400)
+        self.assertEqual(
+            null_value,
+            {"error": "expected_next_run_at must be a non-empty timestamp"},
+        )
+        self.assertEqual(stale_status, 409)
+        self.assertEqual(
+            stale,
+            {"error": "recurring schedule action precondition failed"},
+        )
         self.assertEqual(action_status, 200)
         self.assertEqual(action["schema_version"], "skill2workflow-recurring-schedule-action-0.1.0")
         self.assertEqual(action["schedule_id"], "schedule_service_report")
@@ -970,6 +990,8 @@ class RuntimeServiceTests(TestCase):
             [event["type"] for event in audit if event.get("route") == "recurring_schedule_action"],
             [
                 "ingress_authentication_denied",
+                "ingress_authenticated",
+                "ingress_authenticated",
                 "ingress_authenticated",
                 "ingress_authenticated",
                 "ingress_authenticated",

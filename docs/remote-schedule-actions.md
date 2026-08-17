@@ -8,13 +8,27 @@ service host shell.
 
 ## Contract
 
-Both endpoints require the service Bearer token and an exact empty JSON object
-(`{}`) body:
+Both endpoints require the service Bearer token. The legacy empty JSON object
+(`{}`) body remains supported:
 
 ```text
 POST /api/v1/recurring-schedules/{schedule_id}/disable
 POST /api/v1/recurring-schedules/{schedule_id}/enable
 ```
+
+For stale-inventory protection, an operator may instead send exactly one
+`expected_next_run_at` field:
+
+```json
+{"expected_next_run_at": "2026-08-11T01:00:00+00:00"}
+```
+
+The value is compared with the persisted schedule inside the same
+`BEGIN IMMEDIATE` transaction used by dispatcher claims. A mismatch returns
+HTTP `409` with `recurring schedule action precondition failed`; malformed or
+null values return `400`. Omitting the field retains the original idempotent
+action behavior for compatibility. A successful action still returns the
+same fixed response schema and never exposes trigger input.
 
 `schedule_id` is limited to 128 letters, numbers, `_`, `-`, and `.`. The
 service must be ready before a mutation is accepted. The response is the
@@ -64,6 +78,12 @@ PYTHONPATH=src python3 -m skill2workflow.cli service-schedule-disable \
 
 PYTHONPATH=src python3 -m skill2workflow.cli service-schedule-enable \
   schedule_hourly_report \
+  --service-url http://127.0.0.1:8080 \
+  --auth-token-file /path/to/ingress.token
+
+PYTHONPATH=src python3 -m skill2workflow.cli service-schedule-disable \
+  schedule_hourly_report \
+  --expected-next-run-at 2026-08-11T01:00:00+00:00 \
   --service-url http://127.0.0.1:8080 \
   --auth-token-file /path/to/ingress.token
 ```

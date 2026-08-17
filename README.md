@@ -755,7 +755,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-156 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-157 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -881,8 +881,9 @@ or allowing schedule mutation through the inventory route.
 Loop 79 adds [protected remote recurring-schedule actions](docs/remote-schedule-actions.md):
 the authenticated service and installed `service-schedule-enable`/
 `service-schedule-disable` clients let an operator pause or resume one schedule
-with an exact empty-body contract, dispatcher-safe SQLite serialization,
-idempotent retries, and bounded audit evidence.
+with a legacy empty-body contract or an optional `next_run_at` compare-and-swap,
+dispatcher-safe SQLite serialization, idempotent retries, and bounded audit
+evidence.
 
 Loop 80 adds [remote recurring-schedule dispatch diagnostics](docs/remote-schedule-dispatches.md):
 the authenticated service and installed `service-recurring-dispatches` client
@@ -1275,6 +1276,11 @@ the authenticated service and installed `service-recurring-schedule-delete`
 client require explicit confirmation, a disabled schedule, no active claim,
 and the last observed `next_run_at`; dispatch history remains available and a
 durable tombstone makes retries safe.
+
+Loop 157 hardens [remote recurring-schedule state actions](docs/remote-schedule-actions.md):
+the existing enable/disable routes still accept their legacy empty body, while
+operators can now supply the last observed `next_run_at` to reject stale
+requests atomically with dispatcher claims through the installed CLI.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

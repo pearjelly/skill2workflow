@@ -1511,15 +1511,34 @@ def _handler_for(service: RuntimeService):
                         "recurring schedule action body must be an empty JSON object"
                     )
                 payload = json.loads(body.decode("utf-8"))
-                if payload != {}:
+                if not isinstance(payload, dict) or set(payload) not in (
+                    set(),
+                    {"expected_next_run_at"},
+                ):
                     raise ValueError(
                         "recurring schedule action body must be an empty JSON object"
                     )
-                definition, changed = (
-                    service.scheduler.dispatcher.store.set_enabled_with_result(
-                        schedule_id,
-                        enabled,
+                has_expected_next_run_at = "expected_next_run_at" in payload
+                expected_next_run_at = payload.get("expected_next_run_at")
+                if has_expected_next_run_at and (
+                    not isinstance(expected_next_run_at, str)
+                    or not expected_next_run_at
+                    or len(expected_next_run_at) > 64
+                    or any(
+                        ord(char) < 0x20 or ord(char) == 0x7F
+                        for char in expected_next_run_at
                     )
+                ):
+                    raise ValueError(
+                        "expected_next_run_at must be a non-empty timestamp"
+                    )
+                state_kwargs = {}
+                if has_expected_next_run_at:
+                    state_kwargs["expected_next_run_at"] = expected_next_run_at
+                definition, changed = service.scheduler.dispatcher.store.set_enabled_with_result(
+                    schedule_id,
+                    enabled,
+                    **state_kwargs,
                 )
                 service.control_plane.record_recurring_schedule_change(
                     schedule_id,
@@ -1547,6 +1566,13 @@ def _handler_for(service: RuntimeService):
             except ValueError as error:
                 if "recurring schedule not found" in str(error):
                     self._send_json(404, {"error": "recurring schedule not found"})
+                elif "precondition failed" in str(error):
+                    self._send_json(
+                        409,
+                        {"error": "recurring schedule action precondition failed"},
+                    )
+                elif "expected_next_run_at" in str(error):
+                    self._send_json(400, {"error": str(error)})
                 elif "body must" in str(error):
                     self._send_json(400, {"error": str(error)})
                 else:

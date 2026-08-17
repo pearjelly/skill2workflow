@@ -243,6 +243,32 @@ class RecurringSchedulePersistenceTests(TestCase):
         self.assertEqual(repeated, disabled)
         self.assertEqual(second_updated_at, first_updated_at)
 
+    def test_set_enabled_with_result_can_reject_stale_cas_and_accept_current_token(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            store.add(_recurring_definition())
+            with self.assertRaisesRegex(ValueError, "precondition failed"):
+                store.set_enabled_with_result(
+                    "schedule_hourly_report",
+                    False,
+                    expected_next_run_at="2026-08-11T00:01:00Z",
+                )
+
+            disabled, changed = store.set_enabled_with_result(
+                "schedule_hourly_report",
+                False,
+                expected_next_run_at="2026-08-11T00:00:00Z",
+            )
+            repeated, repeated_changed = store.set_enabled_with_result(
+                "schedule_hourly_report",
+                False,
+                expected_next_run_at=disabled["schedule"]["next_run_at"],
+            )
+
+        self.assertTrue(changed)
+        self.assertFalse(repeated_changed)
+        self.assertEqual(repeated, disabled)
+
     def test_existing_schedule_cli_boundary_accepts_recurring_only_with_sqlite(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

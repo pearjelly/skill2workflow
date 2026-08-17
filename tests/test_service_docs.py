@@ -31,6 +31,8 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("service-recurring-schedule-update", guide)
         self.assertIn("remote-schedule-delete.md", guide)
         self.assertIn("service-recurring-schedule-delete", guide)
+        self.assertIn("Loop 157 hardens the existing enable/disable actions", guide)
+        self.assertIn("expected_next_run_at", guide)
         self.assertIn("GET /api/v1/workflow-artifacts", guide)
         self.assertIn("GET /api/v1/backup-readiness", guide)
         self.assertIn("POST /api/v1/retention-readiness", guide)
@@ -90,6 +92,7 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("Loop 153 adds a bounded", (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn("Loop 154 adds [protected remote recurring-schedule creation]", (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn("Loop 155 adds [protected remote recurring-schedule updates]", (ROOT / "README.md").read_text(encoding="utf-8"))
+        self.assertIn("Loop 157 hardens [remote recurring-schedule state actions]", (ROOT / "README.md").read_text(encoding="utf-8"))
         self.assertIn("service-soak-smoke.py", guide)
         self.assertIn("service-soak.md", guide)
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
@@ -102,6 +105,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-156 are complete", readme)
+        self.assertIn("Delivery Loops 1-157 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

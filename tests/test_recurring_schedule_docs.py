@@ -97,7 +97,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-156 are complete", readme)
+        self.assertIn("Delivery Loops 1-157 are complete", readme)
         self.assertIn("Loop 146 adds a compact SQLite recurring-schedule projection", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
@@ -124,6 +124,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("### Loop 154: Protected Remote Recurring-Schedule Creation", roadmap)
         self.assertIn("### Loop 155: Protected Remote Recurring-Schedule Updates", roadmap)
         self.assertIn("### Loop 156: Protected Remote Recurring-Schedule Retirement", roadmap)
+        self.assertIn("### Loop 157: CAS-Protected Remote Recurring-Schedule State Actions", roadmap)
         update_schema = json.loads(
             (ROOT / "schemas" / "recurring-schedule-update-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -156,4 +157,10 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("DELETE /api/v1/recurring-schedules/{schedule_id}", delete_guide)
         self.assertIn("tombstone", delete_guide)
         self.assertIn("active claim", delete_guide)
+        action_guide = (ROOT / "docs" / "remote-schedule-actions.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("expected_next_run_at", action_guide)
+        self.assertIn("precondition failed", action_guide)
+        self.assertIn("legacy empty JSON object", action_guide)
         self.assertIn("| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete |", roadmap)

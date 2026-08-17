@@ -902,6 +902,44 @@ class CliTests(TestCase):
             enabled=False,
         )
 
+    def test_service_schedule_state_command_accepts_expected_next_run_at(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-recurring-schedule-action-0.1.0",
+            "schedule_id": "schedule_hourly_report",
+            "enabled": True,
+            "status": "active",
+            "changed": True,
+        }
+        with patch(
+            "skill2workflow.cli.post_recurring_schedule_state",
+            return_value=expected,
+        ) as action:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-schedule-enable",
+                        "schedule_hourly_report",
+                        "--expected-next-run-at",
+                        "2026-08-11T00:00:00Z",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        action.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            "schedule_hourly_report",
+            enabled=True,
+            expected_next_run_at="2026-08-11T00:00:00Z",
+        )
+
     def test_service_recurring_schedule_add_command_prints_create_result(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

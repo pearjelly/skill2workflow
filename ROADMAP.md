@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-156
+- Completed delivery loops: 1-157
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 156 is complete with protected remote recurring-schedule retirement
+- Active loop: None; Loop 157 is complete with CAS-protected remote recurring-schedule state actions
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-156 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-157 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -3661,9 +3661,37 @@ It does not delete dispatch evidence, cancel an in-flight provider call,
 reclaim tombstones, delete one-shot schedules, publish workflows, or claim
 exactly-once provider effects.
 
+### Loop 157: CAS-Protected Remote Recurring-Schedule State Actions
+
+**Status:** Complete.
+
+**Prior basis:** Loop 79 made remote enable/disable actions authenticated and
+idempotent, while Loops 155-156 added compare-and-swap protection to complete
+definition edits and retirement. The state actions still accepted only an
+empty body, so an operator acting from an old inventory could overwrite a
+concurrent scheduler transition without an explicit stale-write check.
+
+**Outcome:** The existing `POST /api/v1/recurring-schedules/{schedule_id}/enable`
+and `/disable` routes retain their empty-object compatibility contract and now
+also accept exactly one `expected_next_run_at` field. When present, the token
+is compared inside the same `BEGIN IMMEDIATE` transaction as dispatcher claims;
+stale intent returns a fixed `409`. The installed state-action clients expose
+the token through `--expected-next-run-at`, while successful response and audit
+schemas remain unchanged.
+
+**Evidence:** [`docs/remote-schedule-actions.md`](docs/remote-schedule-actions.md)
+defines both request forms, compatibility, stale-write behavior, and the CLI.
+Storage, service, client, CLI, documentation, and full-suite tests cover
+legacy empty-body callers, current-token success, stale-token conflict, null
+token rejection, redaction, and serialized scheduler behavior.
+
+**Safety boundary:** This is a protected single-tenant state transition. It
+does not add bulk actions, RBAC, schedule recreation, trigger-input export,
+provider cancellation, distributed locking, or exactly-once execution.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 156 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 157 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -3785,6 +3813,7 @@ This rolling queue is ordered. Loop 156 is complete and there is no active deliv
 | Loop 154: Protected Remote Recurring-Schedule Creation | Complete | Let remote operators create or replay one durable recurring schedule without exposing trigger input or resetting progress | Exact wrapped POST and installed CLI, `BEGIN IMMEDIATE` replay/conflict protection, redacted response schema, authentication/readiness/lease/audit evidence, and documentation |
 | Loop 155: Protected Remote Recurring-Schedule Updates | Complete | Let remote operators change one recurring definition without resetting durable dispatch progress or overwriting a concurrent claim | Exact wrapped PUT with `next_run_at` CAS, installed CLI, redacted response schema, stale-write conflict, audit evidence, and documentation |
 | Loop 156: Protected Remote Recurring-Schedule Retirement | Complete | Let remote operators safely retire a disabled recurring schedule without losing dispatch evidence or deleting a reused ID | Exact confirmed DELETE with `next_run_at` CAS, disabled/no-claim guard, tombstone replay, retained dispatch history, redacted response schema, audit evidence, and documentation |
+| Loop 157: CAS-Protected Remote Recurring-Schedule State Actions | Complete | Let remote enable/disable operations reject stale inventory intent without breaking legacy callers | Optional `next_run_at` CAS body, serialized state mutation, fixed `409`, installed CLI flag, compatibility tests, and documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
