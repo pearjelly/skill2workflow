@@ -72,6 +72,14 @@ and status before replacing the summary JSON with the evidence view. A detail
 failure leaves the bounded run summary visible and never blocks the decision
 controls or exposes raw state.
 
+The live Runs view starts with the control snapshot's newest bounded window.
+When its `runs` window is truncated, **Load Older Runs** becomes available. Each
+explicit click fetches one fixed 100-item cursor page through
+`/api/v1/run-page`; the UI validates the `skill2workflow-run-list-0.2.0`
+contract, retains at most 500 rows in browser memory, and never accepts a
+user-authored service path or filter. Static, example, and file snapshots keep
+the control disabled.
+
 This live mode adds one explicit human-gate mutation only. It does not add TLS,
 public ingress, RBAC, workflow publication, cancellation, automatic retries,
 or provider reconciliation. Keep the UI on loopback or place it behind an

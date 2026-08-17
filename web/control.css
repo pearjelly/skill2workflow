@@ -81,6 +81,22 @@ input {
   color: var(--red);
 }
 
+.run-page-status {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.run-page-status.is-invalid {
+  color: var(--red);
+}
+
+.run-page-status.is-valid {
+  color: var(--green);
+}
+
 .snapshot-scope.is-bounded {
   background: var(--blue-soft);
   color: var(--blue);

@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded **Load Older Runs** control to the live control-plane UI.
+  It reuses the redacted cursor-paged run-list contract, deduplicates rows,
+  caps browser retention at 500 runs, and forwards no arbitrary service query.
+
 - Added bounded redacted live run-detail inspection to the control-plane UI.
   Selecting a live run fetches at most the existing 50-event/64 KiB projection
   through a fixed server-side proxy before an operator makes a human-gate

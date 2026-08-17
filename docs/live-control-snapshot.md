@@ -146,6 +146,14 @@ fetch fails. The detail route is read-only and uses the same server-side token
 boundary; it does not proxy arbitrary paths or return workflow inputs,
 connector output, credentials, or raw errors.
 
+The live Runs view can discover history beyond the snapshot tail through the
+explicit **Load Older Runs** control. It calls only the UI's fixed
+`GET /api/v1/run-page` route, which accepts either no query or one validated
+opaque cursor and always requests the service's 100-item
+`skill2workflow-run-list-0.2.0` page. The browser deduplicates rows and caps
+its retained live list at 500 items. No arbitrary status, workflow, path, or
+service query is forwarded from the browser.
+
 ## Verification
 
 Run the real-process drill:

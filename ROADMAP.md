@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-212
+- Completed delivery loops: 1-213
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 212 is complete with bounded live run-detail evidence
+- Active loop: None; Loop 213 is complete with bounded live run discovery
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-212 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-213 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5510,9 +5510,47 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 213: Bounded Live Run Discovery
+
+**Status:** Complete.
+
+**Prior basis:** Loop 212 made a selected run safe to inspect, but the live
+console still exposed only the newest 100-run snapshot window. Operators could
+see truncation counts yet had to leave the UI and use the CLI to find an older
+run before inspecting or deciding it.
+
+**Outcome:** A truncated live Runs view now enables **Load Older Runs**. Each
+explicit click reaches one fixed same-origin `/api/v1/run-page` proxy, which
+uses the existing redacted `skill2workflow-run-list-0.2.0` client with a
+100-item cursor page. The UI accepts only the returned opaque cursor,
+deduplicates rows, caps retained live rows at 500, and keeps static/example/
+file snapshots read-only. Existing run-detail and human-gate controls work on
+newly discovered rows without widening their contracts.
+
+**Evidence:** UI integration tests prove the fixed proxy path, upstream
+`max_items=100` request, server-side Authorization forwarding, and token
+non-disclosure. Control UI contract tests cover the explicit button, page
+schema/window validation, cursor path, 500-row client bound, and static
+boundary. Documentation and Roadmap evidence link the UI behavior to the
+existing service run-page schema; the full UI, package, reproducible-build,
+secret-hygiene, external-connector, and Production Baseline gates remain the
+release checks.
+
+**Safety boundary:** This is bounded, read-only run discovery. It does not
+accept arbitrary status/workflow filters, proxy arbitrary paths, export full
+state, store credentials, append audit events, or claim complete history after
+the fixed 500-row client cap. The service remains the source of truth for
+cursor ordering and redaction.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 212 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 213 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5691,6 +5729,7 @@ This rolling queue is ordered. Loop 212 is complete and there is no active deliv
 | Loop 210: Protected Live Support-Bundle Download | Complete | Let operators hand off one explicit redacted support artifact from the live console without exposing credentials or adding automatic upload | Fixed support-bundle proxy, 128 KiB response bound, attachment filename, UI/route tests, docs, and full gates |
 | Loop 211: Confirmation-Protected Live Human-Gate Action | Complete | Let operators approve or reject one selected waiting run from the live console without exposing credentials or adding arbitrary mutation proxying | Fixed waiting-run guard, confirmation-protected POST, server-side token forwarding, response refresh, UI/route tests, docs, and full gates |
 | Loop 212: Bounded Live Run-Detail Evidence | Complete | Let operators inspect the existing redacted event tail before a live human-gate decision without exposing credentials or raw state | Fixed run-detail proxy, 50-event/64 KiB bounds, schema/window validation, UI/route tests, docs, and full gates |
+| Loop 213: Bounded Live Run Discovery | Complete | Let operators find older runs from the live console without arbitrary queries or unbounded browser state | Fixed cursor-page proxy, 100-item pages, 500-row client cap, schema/window validation, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

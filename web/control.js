@@ -5,7 +5,10 @@
   const SUPPORT_BUNDLE_URL = "/api/v1/support-bundle";
   const LIVE_RESUME_PREFIX = "/api/v1/runs/";
   const LIVE_RUN_DETAIL_PREFIX = "/api/v1/runs/";
+  const LIVE_RUN_PAGE_URL = "/api/v1/run-page";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
+  const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
+  const LIVE_RUN_ROWS_MAX = 500;
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
   const AUTO_REFRESH_INTERVAL_MS = 10000;
   const state = {
@@ -23,6 +26,10 @@
     liveRunDetailId: "",
     liveRunDetailLoading: false,
     liveRunDetailError: false,
+    liveRunRows: null,
+    liveRunPageCursor: "",
+    liveRunPageHasMore: false,
+    liveRunPageLoading: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -43,6 +50,7 @@
     els.loadLive = document.getElementById("load-live");
     els.toggleRefresh = document.getElementById("toggle-refresh");
     els.downloadBundle = document.getElementById("download-bundle");
+    els.loadOlderRuns = document.getElementById("load-older-runs");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
@@ -50,6 +58,7 @@
     els.snapshotScopeTitle = document.getElementById("snapshot-scope-title");
     els.snapshotScopeDetail = document.getElementById("snapshot-scope-detail");
     els.serviceStatus = document.getElementById("service-status");
+    els.runPageStatus = document.getElementById("run-page-status");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -82,6 +91,7 @@
     els.loadLive.addEventListener("click", loadLiveSnapshot);
     els.toggleRefresh.addEventListener("click", toggleAutoRefresh);
     els.downloadBundle.addEventListener("click", downloadSupportBundle);
+    els.loadOlderRuns.addEventListener("click", loadOlderRuns);
     els.approveRun.addEventListener("click", function () {
       decideSelectedRun(true);
     });
@@ -203,6 +213,129 @@
     } catch (error) {
       setStatus("Unavailable", "is-invalid");
     }
+  }
+
+  async function loadOlderRuns() {
+    if (!isLiveSnapshot() || state.liveRunPageLoading || !state.liveRunPageHasMore) {
+      return;
+    }
+    state.liveRunPageLoading = true;
+    updateRunPageControls();
+    setRunPageStatus("Loading older runs…", "");
+    try {
+      const url = state.liveRunPageCursor
+        ? LIVE_RUN_PAGE_URL + "?cursor=" + encodeURIComponent(state.liveRunPageCursor)
+        : LIVE_RUN_PAGE_URL;
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("run page unavailable");
+      }
+      const page = await response.json();
+      if (!validateLiveRunPage(page)) {
+        throw new Error("run page unavailable");
+      }
+      state.liveRunRows = mergeLiveRunRows(state.liveRunRows || state.snapshot.runs, page.runs);
+      state.liveRunPageCursor = page.window.next_cursor || "";
+      state.liveRunPageHasMore = page.window.has_more;
+      renderTables();
+      setRunPageStatus(
+        String(state.liveRunRows.length) +
+          " live runs loaded" +
+          (state.liveRunPageHasMore ? "; more available." : "."),
+        "is-valid",
+      );
+    } catch (error) {
+      setRunPageStatus("Older runs unavailable; current rows are unchanged.", "is-invalid");
+    } finally {
+      state.liveRunPageLoading = false;
+      updateRunPageControls();
+    }
+  }
+
+  function mergeLiveRunRows(existing, additions) {
+    const rows = [];
+    const seen = Object.create(null);
+    (existing || []).concat(additions || []).forEach(function (run) {
+      if (!run || typeof run.run_id !== "string" || seen[run.run_id]) {
+        return;
+      }
+      seen[run.run_id] = true;
+      rows.push(run);
+    });
+    return rows.slice(0, LIVE_RUN_ROWS_MAX);
+  }
+
+  function validateLiveRunPage(page) {
+    const statuses = [
+      "created", "running", "waiting", "completed", "failed", "cancelled", "interrupted", "other",
+    ];
+    if (
+      !page ||
+      typeof page !== "object" ||
+      page.schema_version !== RUN_PAGE_SCHEMA ||
+      Object.keys(page).sort().join(",") !== "filters,runs,schema_version,summary,window" ||
+      !page.summary ||
+      typeof page.summary !== "object" ||
+      !page.filters ||
+      typeof page.filters !== "object" ||
+      !Array.isArray(page.runs) ||
+      page.runs.length > 100 ||
+      !page.window ||
+      typeof page.window !== "object" ||
+      page.window.max_items !== 100 ||
+      Object.keys(page.window).sort().join(",") !==
+        "has_more,max_items,next_cursor,returned,total" ||
+      !Number.isInteger(page.window.total) ||
+      page.window.total < 0 ||
+      page.window.returned !== page.runs.length ||
+      page.window.returned > page.window.total ||
+      typeof page.window.has_more !== "boolean" ||
+      page.window.has_more !== (page.window.returned < page.window.total) ||
+      (page.window.has_more && !isSafeCursor(page.window.next_cursor)) ||
+      (!page.window.has_more && page.window.next_cursor !== null)
+    ) {
+      return false;
+    }
+    if (
+      Object.keys(page.summary).sort().join(",") !== "status_counts,total" ||
+      Object.keys(page.filters).sort().join(",") !== "status,workflow_id" ||
+      page.filters.status !== "" ||
+      page.filters.workflow_id !== "" ||
+      !Number.isInteger(page.summary.total) ||
+      page.summary.total < 0 ||
+      !page.summary.status_counts ||
+      typeof page.summary.status_counts !== "object" ||
+      Object.keys(page.summary.status_counts).sort().join(",") !==
+        "cancelled,completed,created,failed,interrupted,other,running,waiting" ||
+      Object.values(page.summary.status_counts).some(function (value) {
+        return !Number.isInteger(value) || value < 0;
+      }) ||
+      Object.values(page.summary.status_counts).reduce(function (total, value) {
+        return total + value;
+      }, 0) !== page.summary.total ||
+      page.window.total !== page.summary.total
+    ) {
+      return false;
+    }
+    return page.runs.every(function (run) {
+      return (
+        run &&
+        typeof run === "object" &&
+        isSafeRunId(run.run_id) &&
+        typeof run.workflow_id === "string" &&
+        typeof run.workflow_version === "string" &&
+        statuses.indexOf(run.status) !== -1 &&
+        typeof run.current_node === "string" &&
+        Number.isInteger(run.event_count) &&
+        run.event_count >= 0 &&
+        Number.isInteger(run.node_result_count) &&
+        run.node_result_count >= 0
+      );
+    });
+  }
+
+  function isSafeCursor(cursor) {
+    return typeof cursor === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(cursor);
   }
 
   async function decideSelectedRun(approved) {
@@ -375,6 +508,8 @@
         stopAutoRefresh();
         els.toggleRefresh.disabled = true;
         els.downloadBundle.disabled = true;
+        els.loadOlderRuns.disabled = true;
+        setRunPageStatus("", "");
         setServiceStatus("Live service: static mode", "");
         renderDetail();
         return;
@@ -382,6 +517,7 @@
       state.liveModeConfigured = true;
       els.toggleRefresh.disabled = false;
       els.downloadBundle.disabled = false;
+      updateRunPageControls();
       if (!response.ok) {
         throw new Error("service probe unavailable");
       }
@@ -400,6 +536,7 @@
       state.liveModeConfigured = true;
       els.toggleRefresh.disabled = false;
       els.downloadBundle.disabled = false;
+      updateRunPageControls();
       setServiceStatus("Live service: unavailable", "is-invalid");
       renderDetail();
     }
@@ -448,6 +585,15 @@
     state.liveRunDetailId = "";
     state.liveRunDetailLoading = false;
     state.liveRunDetailError = false;
+    state.liveRunRows = null;
+    state.liveRunPageCursor = "";
+    state.liveRunPageHasMore = Boolean(
+      label === "Live Service Snapshot" &&
+      snapshot.window &&
+      snapshot.window.runs &&
+      snapshot.window.runs.truncated
+    );
+    state.liveRunPageLoading = false;
     if (label === "Live Service Snapshot") {
       state.lastLiveLoadedAt = new Date().toISOString();
       state.liveRefreshError = false;
@@ -472,7 +618,12 @@
       }
     }
     setStatus("Loaded", "is-valid");
+    setRunPageStatus(
+      state.liveRunPageHasMore ? "Older live runs available." : "",
+      "",
+    );
     render();
+    updateRunPageControls();
     if (state.selected.kind === "run" && label === "Live Service Snapshot") {
       loadLiveRunDetail(state.selected.value.run_id);
     }
@@ -485,6 +636,11 @@
     state.liveRunDetailId = "";
     state.liveRunDetailLoading = false;
     state.liveRunDetailError = false;
+    state.liveRunRows = null;
+    state.liveRunPageCursor = "";
+    state.liveRunPageHasMore = false;
+    state.liveRunPageLoading = false;
+    setRunPageStatus("", "");
     state.selected = {
       kind: "error",
       value: Object.assign({ label: label }, details || {}),
@@ -667,7 +823,7 @@
     );
     renderTable(
       els.runRows,
-      filterRows(snapshot.runs),
+      filterRows(state.liveRunRows || snapshot.runs),
       function (run) {
         return [
           linkCell(run.run_id || ""),
@@ -999,6 +1155,19 @@
   function setServiceStatus(text, className) {
     els.serviceStatus.textContent = text;
     els.serviceStatus.className = "service-status" + (className ? " " + className : "");
+  }
+
+  function setRunPageStatus(text, className) {
+    els.runPageStatus.textContent = text;
+    els.runPageStatus.className = "run-page-status" + (className ? " " + className : "");
+  }
+
+  function updateRunPageControls() {
+    const enabled = isLiveSnapshot() && state.liveRunPageHasMore;
+    els.loadOlderRuns.disabled = !enabled || state.liveRunPageLoading;
+    els.loadOlderRuns.textContent = state.liveRunPageLoading
+      ? "Loading Runs…"
+      : "Load Older Runs";
   }
 
   function emptySnapshot() {

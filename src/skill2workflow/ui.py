@@ -8,7 +8,7 @@ from functools import partial
 from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable, Optional
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
@@ -19,6 +19,7 @@ from .service_client import (
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     ServiceActionError,
     fetch_run_detail,
+    fetch_run_page,
     fetch_support_bundle,
     fetch_service_probe,
     post_run_resume,
@@ -39,6 +40,9 @@ _LIVE_RESUME_SUFFIX = "/resume"
 _LIVE_RESUME_MAX_REQUEST_BYTES = 128
 _LIVE_RUN_DETAIL_PREFIX = "/api/v1/runs/"
 _LIVE_RUN_DETAIL_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
+_LIVE_RUN_PAGE_PATH = "/api/v1/run-page"
+_LIVE_RUN_PAGE_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
+_LIVE_RUN_PAGE_MAX_ITEMS = 100
 
 
 def find_ui_root() -> Path:
@@ -101,6 +105,14 @@ def serve_ui(
 
         def do_GET(self):
             parsed = urlsplit(self.path)
+            if parsed.path == _LIVE_RUN_PAGE_PATH:
+                try:
+                    cursor = _parse_live_run_page_cursor(parsed.query)
+                except ValueError:
+                    self._write_json(404, {"error": "run page path is not available"})
+                    return
+                self._serve_live_run_page(cursor)
+                return
             if parsed.path.startswith(_LIVE_RUN_DETAIL_PREFIX):
                 run_id = parsed.path[len(_LIVE_RUN_DETAIL_PREFIX) :]
                 if parsed.query or not _is_safe_live_run_id(run_id):
@@ -255,6 +267,31 @@ def serve_ui(
                 return
             self._write_json(200, body, content_type="application/json")
 
+        def _serve_live_run_page(self, cursor):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "run page is not configured"})
+                return
+            try:
+                page = fetch_run_page(
+                    configured_service_url,
+                    token_file,
+                    max_items=_LIVE_RUN_PAGE_MAX_ITEMS,
+                    cursor=cursor,
+                )
+                body = json.dumps(
+                    page,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _LIVE_RUN_PAGE_MAX_RESPONSE_BYTES:
+                    raise ValueError("run page unavailable")
+            except Exception:
+                self._write_json(503, {"error": "run page unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
         def _serve_live_resume(self, run_id):
             configured_service_url = getattr(self.server, "live_service_url", None)
             token_file = getattr(self.server, "live_auth_token_file", None)
@@ -374,3 +411,24 @@ def _is_safe_live_run_id(value: str) -> bool:
         and 5 <= len(value) <= 128
         and all(char.isascii() and (char.isalnum() or char in {"_", "-"}) for char in value)
     )
+
+
+def _parse_live_run_page_cursor(query: str) -> str:
+    """Accept only one opaque cursor for the fixed live run-page proxy."""
+
+    if not query:
+        return ""
+    try:
+        values = parse_qs(query, keep_blank_values=True, strict_parsing=True)
+    except ValueError as error:
+        raise ValueError("run page query is invalid") from error
+    if set(values) != {"cursor"} or len(values["cursor"]) != 1:
+        raise ValueError("run page query is invalid")
+    cursor = values["cursor"][0]
+    if (
+        not cursor
+        or len(cursor) > 128
+        or any(char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" for char in cursor)
+    ):
+        raise ValueError("run page cursor is invalid")
+    return cursor

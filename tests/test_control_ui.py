@@ -50,11 +50,19 @@ class ControlUiContractTests(TestCase):
         self.assertIn("isLiveSnapshot", javascript)
         self.assertIn('id="run-detail-status"', html)
         self.assertIn("Redacted event tail loaded", javascript)
+        self.assertIn('id="load-older-runs"', html)
+        self.assertIn("Load Older Runs", html)
+        self.assertIn("/api/v1/run-page", javascript)
+        self.assertIn("loadOlderRuns", javascript)
+        self.assertIn("validateLiveRunPage", javascript)
+        self.assertIn("RUN_PAGE_SCHEMA", javascript)
+        self.assertIn("LIVE_RUN_ROWS_MAX = 500", javascript)
         self.assertIn(".snapshot-scope.is-bounded", css)
         self.assertIn(".snapshot-scope.is-truncated", css)
         self.assertIn(".service-status.is-valid", css)
         self.assertIn(".human-gate-actions", css)
         self.assertIn(".run-detail-status", css)
+        self.assertIn(".run-page-status", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):
         guide = (ROOT / "docs" / "live-control-snapshot.md").read_text(
