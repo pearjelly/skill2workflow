@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+from .artifact_io import read_workflow_artifact
 from .state_layout import ensure_current_state_layout
 
 
@@ -1982,7 +1983,7 @@ def _publish_artifact_matches(path: Path, checksum: str, *, root: Path) -> bool:
         details = value.lstat()
         if stat.S_ISLNK(details.st_mode) or not stat.S_ISREG(details.st_mode):
             return False
-        payload = json.loads(value.read_text(encoding="utf-8"))
+        payload = read_workflow_artifact(value)
     except (OSError, UnicodeDecodeError, TypeError, ValueError, json.JSONDecodeError):
         return False
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

@@ -116,6 +116,9 @@ explicit connector boundaries. It currently supports:
   growth-race checks while preserving the JSON storage contract
 - Bound the local JSON control-plane index to 8 MiB with the same descriptor
   identity and growth-race checks while preserving registry compatibility
+- Bound immutable Workflow artifact publication and reads to 2 MiB with
+  descriptor identity, no-follow, and growth-race checks across execution,
+  SQLite publication cleanup, and verified backup paths
 - List run summaries with an optional bounded `runs --limit` / `control-runs --limit` window and inspect full run logs
 - Inspect a bounded tail of filtered local audit events with `audit --limit`
 - Store queryable run event rows when SQLite storage is enabled
@@ -762,7 +765,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-171 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-172 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1369,6 +1372,13 @@ regular-file/no-follow descriptor bound to one device/inode with a growth-race
 recheck. The JSON registry shape and SQLite service requirement remain
 unchanged. See [`docs/json-control-index-boundary.md`](docs/json-control-index-boundary.md).
 
+Loop 172 hardens immutable Workflow artifact I/O: publication serialization and
+all control-plane, SQLite cleanup, and verified-backup artifact reads share a
+2 MiB UTF-8 bound with regular-file/no-follow descriptor identity and
+growth-race checks. Workflow DSL shape, canonical checksums, immutable version
+semantics, and backup/SQLite contracts remain unchanged. See
+[`docs/published-artifact-read-boundary.md`](docs/published-artifact-read-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1381,6 +1391,7 @@ See:
 - `ROADMAP.md`
 - `docs/cli-input-boundary.md`
 - `docs/json-control-index-boundary.md`
+- `docs/published-artifact-read-boundary.md`
 - `docs/json-run-state-boundary.md`
 - `docs/service-config-boundary.md`
 - `docs/credential-file-boundary.md`

@@ -14,6 +14,7 @@ from unittest.mock import patch
 from skill2workflow.connectors import ConnectorRuntime, ExternalConnector
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.credentials import StaticCredentialProvider
+from skill2workflow.artifact_io import MAX_WORKFLOW_ARTIFACT_BYTES
 from skill2workflow.triggers import TriggerIdempotencyError
 
 
@@ -803,6 +804,59 @@ class ControlPlaneTests(TestCase):
                 [event["type"] for event in control.list_audit_events()],
                 ["workflow_published"],
             )
+
+    def test_published_artifact_read_rejects_oversized_file_before_json_decode(self):
+        for storage in ("json", "sqlite"):
+            with self.subTest(storage=storage), TemporaryDirectory() as tmp:
+                state_dir = Path(tmp)
+                control = LocalControlPlane(state_dir, storage=storage)
+                record = control.publish_workflow(_workflow(version="1.0.0"))
+                artifact_path = state_dir / record["artifact"]
+                artifact_path.write_bytes(
+                    b" " * (MAX_WORKFLOW_ARTIFACT_BYTES + 1)
+                )
+
+                with self.assertRaisesRegex(
+                    ValueError, "published workflow artifact unavailable"
+                ):
+                    control.get_workflow("workflow_control", "1.0.0")
+
+    def test_published_artifact_read_rejects_symlinked_parent_directory(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            record = control.publish_workflow(_workflow(version="1.0.0"))
+            artifact_path = state_dir / record["artifact"]
+            original_dir = artifact_path.parent
+            outside_dir = state_dir.parent / f"outside-artifacts-{state_dir.name}"
+            outside_dir.mkdir()
+            (outside_dir / artifact_path.name).write_bytes(artifact_path.read_bytes())
+            artifact_path.unlink()
+            original_dir.rmdir()
+            original_dir.symlink_to(outside_dir, target_is_directory=True)
+
+            with self.assertRaisesRegex(
+                ValueError, "published workflow artifact unavailable"
+            ):
+                control.get_workflow("workflow_control", "1.0.0")
+
+    def test_publication_rejects_oversized_artifact_before_installation(self):
+        for storage in ("json", "sqlite"):
+            with self.subTest(storage=storage), TemporaryDirectory() as tmp:
+                state_dir = Path(tmp)
+                control = LocalControlPlane(state_dir, storage=storage)
+                workflow = _workflow(version="1.0.0")
+                workflow["workflow"]["description"] = "x" * MAX_WORKFLOW_ARTIFACT_BYTES
+
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"workflow artifact exceeds {MAX_WORKFLOW_ARTIFACT_BYTES} bytes",
+                ):
+                    control.publish_workflow(workflow)
+
+                self.assertFalse(
+                    (state_dir / "workflows" / "workflow_control" / "1.0.0.json").exists()
+                )
 
     def test_tampered_published_artifact_cannot_be_promoted(self):
         with TemporaryDirectory() as tmp:

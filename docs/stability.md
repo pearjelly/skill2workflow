@@ -16,6 +16,10 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Example workflow fixture validity under `examples/workflows/`
 - Published workflow artifact immutability
 - Published artifact checksum verification before read, promotion, trigger, or execution, documented in [`published-artifact-integrity.md`](published-artifact-integrity.md)
+- Published Workflow artifact publication and reads use a fixed 2 MiB UTF-8
+  envelope with regular-file/no-follow descriptor identity and growth-race
+  checks across control-plane execution, SQLite cleanup, and verified backup
+  paths, documented in [`published-artifact-read-boundary.md`](published-artifact-read-boundary.md)
 - Release manifest schema `skill2workflow-release-artifact-manifest-0.1.0`, including archive/member SHA-256 hashes, fixed package metadata, and rejection of private/state wheel content, documented in [`release-artifact-manifest.md`](release-artifact-manifest.md)
 - Release SBOM schema `skill2workflow-release-sbom-0.1.0`, using SPDX JSON 2.3 with one checksum entry per qualified wheel member and a package-to-file relationship set, documented in [`release-artifact-sbom.md`](release-artifact-sbom.md)
 - Reproducible release evidence schema `skill2workflow-reproducible-build-0.1.0`, recording two byte-identical fixed-epoch wheel builds for one checkout and toolchain, documented in [`reproducible-builds.md`](reproducible-builds.md)

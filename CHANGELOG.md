@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded immutable Workflow artifact publication and reads to 2 MiB with a
+  shared regular-file/no-follow descriptor contract, device/inode identity,
+  max-plus-one reads, and growth/replacement checks across control-plane
+  execution, SQLite cleanup, and verified backup paths. Workflow DSL shape,
+  checksums, and backup/SQLite contracts remain unchanged.
+
 - Bounded the local JSON control-plane `workflows/index.json` to 8 MiB with
   regular-file, no-follow, descriptor identity, and growth/replacement-race
   checks across save, load, and JSON-to-SQLite import. Registry shape and

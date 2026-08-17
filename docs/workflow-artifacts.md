@@ -4,6 +4,10 @@ Loop 74 adds a bounded, read-only check for the file and registry halves of
 published workflow versions. It is useful after a crash, an interrupted
 publication, a manual state copy, or a failed backup preflight.
 
+The diagnostic uses the same 2 MiB artifact envelope enforced by publication,
+execution, and verified backup paths. The descriptor-bound read contract is
+documented in [`published-artifact-read-boundary.md`](published-artifact-read-boundary.md).
+
 Run it against the self-hosted state directory:
 
 ```bash

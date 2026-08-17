@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Dict, List, Optional, Tuple
 
+from .artifact_io import MAX_WORKFLOW_ARTIFACT_BYTES, read_workflow_artifact
 from .state_layout import (
     CURRENT_STATE_LAYOUT_VERSION,
     LEGACY_STATE_LAYOUT_VERSION,
@@ -952,7 +953,7 @@ def _validate_workflow_artifact(
     _require_regular_no_symlink(source, "workflow artifact")
     _require_no_symlink_components(source_root, relative)
     try:
-        payload = json.loads(source.read_text(encoding="utf-8"))
+        payload = read_workflow_artifact(source)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ValueError("workflow artifact is not valid UTF-8 JSON") from error
     if _json_checksum(payload) != expected_checksum:
@@ -1109,6 +1110,10 @@ def _validate_file_entry(entry: object) -> PurePosixPath:
         )
     if type(entry.get("size_bytes")) is not int or entry["size_bytes"] < 0:
         raise ValueError("backup file size_bytes must be a non-negative integer")
+    if kind == "workflow_artifact" and entry["size_bytes"] > MAX_WORKFLOW_ARTIFACT_BYTES:
+        raise ValueError(
+            f"workflow artifact exceeds {MAX_WORKFLOW_ARTIFACT_BYTES} bytes"
+        )
     checksum = entry.get("sha256")
     if not isinstance(checksum, str) or len(checksum) != 64 or any(
         char not in "0123456789abcdef" for char in checksum
@@ -1144,7 +1149,7 @@ def _validate_runtime_state(
             path = root.joinpath(*PurePosixPath(relative_path).parts)
             _require_regular_no_symlink(path, "workflow artifact")
             try:
-                payload = json.loads(path.read_text(encoding="utf-8"))
+                payload = read_workflow_artifact(path)
             except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
                 raise ValueError("workflow artifact is not valid UTF-8 JSON") from error
             if _json_checksum(payload) != expected_checksum:

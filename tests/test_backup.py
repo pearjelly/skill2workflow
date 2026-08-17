@@ -33,6 +33,7 @@ from skill2workflow.backup import (
     restore_state_backup,
     verify_state_backup,
 )
+from skill2workflow.artifact_io import MAX_WORKFLOW_ARTIFACT_BYTES
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringScheduleStore
 
@@ -284,6 +285,19 @@ class StateBackupTests(TestCase):
 
             with self.assertRaisesRegex(ValueError, "workflow artifact checksum"):
                 verify_state_backup(backup_dir)
+
+    def test_backup_preflight_rejects_oversized_workflow_artifact_before_json_decode(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp) / "state"
+            _populate_state(state_dir)
+            artifact_path = state_dir / "workflows" / "workflow_backup" / "0.1.0.json"
+            artifact_path.write_bytes(b" " * (MAX_WORKFLOW_ARTIFACT_BYTES + 1))
+
+            with self.assertRaisesRegex(
+                ValueError,
+                f"workflow artifact exceeds {MAX_WORKFLOW_ARTIFACT_BYTES} bytes",
+            ):
+                inspect_state_backup_readiness(state_dir)
 
     def test_restore_rejects_existing_destination_and_unsafe_manifest_path(self):
         with TemporaryDirectory() as tmp:

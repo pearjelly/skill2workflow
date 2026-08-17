@@ -109,6 +109,11 @@ time a published artifact is read for inspection, promotion, trigger, or
 execution. A restored artifact with a missing or mismatched registry checksum
 is rejected rather than executed; see [`published-artifact-integrity.md`](published-artifact-integrity.md).
 
+Loop 172 also caps artifact publication and every backup/restore artifact read
+at 2 MiB through the shared regular-file/no-follow descriptor boundary. An
+oversized, replaced, linked, or growing artifact fails before JSON decoding;
+see [`published-artifact-read-boundary.md`](published-artifact-read-boundary.md).
+
 Scheduler lease rows are cleared in the snapshot. Durable dispatch claims are preserved; after restore, the scheduler applies its normal stale-claim `uncertain` recovery semantics. A recognized legacy `v0.1.0` source without `scheduler.sqlite3` is still backed up safely: the manifest sets `scheduler_database_synthesized: true` and the snapshot contains a new empty scheduler database while the source remains untouched.
 
 Service configuration, Bearer token files, mounted credential directories, unrelated state-directory files, local JSON schedules, and legacy JSON/JSONL state are not copied. In particular, credentials are not included. Back up and restore external secrets through the operator's secret manager, then rotate them according to policy.

@@ -17,6 +17,11 @@ from typing import Dict, List, Tuple
 
 from .connectors import default_connectors
 from .compiler import validate_workflow
+from .artifact_io import (
+    MAX_WORKFLOW_ARTIFACT_BYTES,
+    encode_workflow_artifact,
+    read_workflow_artifact,
+)
 from .executor import (
     MAX_WORKFLOW_DEADLINE_SWEEP_RUNS,
     LocalExecutor,
@@ -43,7 +48,6 @@ WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION = (
 )
 RUN_AUDIT_REPORT_SCHEMA_VERSION = "skill2workflow-run-audit-report-0.1.0"
 MAX_WORKFLOW_ARTIFACT_REPORT_ISSUES = 256
-MAX_WORKFLOW_ARTIFACT_BYTES = 2 * 1024 * 1024
 MAX_RUN_AUDIT_REPORT_RUNS = 256
 MAX_RUN_AUDIT_REPORT_TYPES = 64
 
@@ -521,7 +525,9 @@ class LocalControlPlane:
         record = self._workflow_record(workflow_id, version)
         artifact_path = self.state_dir / str(record.get("artifact", ""))
         try:
-            workflow = _load_json(artifact_path)
+            if _path_has_symlink_component(self.state_dir, artifact_path):
+                raise ValueError("published workflow artifact path is unsafe")
+            workflow = read_workflow_artifact(artifact_path)
         except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
             raise ValueError(
                 f"published workflow artifact unavailable: {workflow_id}@{version}"
@@ -1475,7 +1481,7 @@ def _ensure_immutable_artifact(
 ) -> bool:
     """Create one artifact without allowing a concurrent writer to replace it."""
 
-    payload = json.dumps(workflow, ensure_ascii=False, indent=2).encode("utf-8")
+    payload = encode_workflow_artifact(workflow)
 
     def verify_existing() -> None:
         if _path_has_symlink_component(root, path):
@@ -1483,7 +1489,7 @@ def _ensure_immutable_artifact(
                 f"published workflow artifact unavailable: {workflow_id}@{version}"
             )
         try:
-            existing = _load_json(path)
+            existing = read_workflow_artifact(path)
         except (OSError, TypeError, ValueError, json.JSONDecodeError) as error:
             raise ValueError(
                 f"published workflow artifact unavailable: {workflow_id}@{version}"
@@ -1566,7 +1572,7 @@ def _inspect_artifact_file(state_dir: Path, path: Path, checksum: str):
     if details.st_size > MAX_WORKFLOW_ARTIFACT_BYTES:
         return "oversized"
     try:
-        workflow = _load_json(path)
+        workflow = read_workflow_artifact(path)
     except (OSError, TypeError, ValueError, json.JSONDecodeError):
         return "invalid_json"
     if not checksum or _checksum(workflow) != checksum:
