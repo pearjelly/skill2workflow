@@ -51,12 +51,17 @@ console script outside the checkout with source-import paths disabled:
 
 ```bash
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-reproducible-build
 ```
 
 The same run emits `release-artifact-manifest.json` and
 `release-artifact-sbom.json`, public value-free archive/member integrity and
 SPDX inventory companions for release review. The dedicated CI artifact gate
 repeats this package qualification on Python 3.14.
+
+The reproducible-build command separately builds the wheel twice with a fixed
+epoch and writes `reproducible-build.json`; it proves equality for the current
+checkout and toolchain without signing or publishing the artifact.
 
 On Linux, run the systemd smoke with `--systemd-analyze-verify` to exercise the
 host parser against the generated unit. This check never installs, enables, or
@@ -251,6 +256,7 @@ Before opening a PR:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-reproducible-build
 python3 scripts/secret_hygiene.py examples/workflows
 python3 scripts/secret_hygiene.py --repository-root .
 git diff --check

@@ -334,6 +334,16 @@ It also writes value-free `release-artifact-manifest.json` and
 SPDX 2.3 package inventory. It is the release-artifact check; the editable
 install below remains a development convenience only.
 
+To prove that the current checkout produces the same release wheel under fixed
+inputs, run:
+
+```bash
+python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-reproducible-build
+```
+
+This writes `reproducible-build.json` after two byte-for-byte equal builds;
+the evidence is scoped to one checkout and toolchain and is not a signature.
+
 Run the committed-fixture secret hygiene check:
 
 ```bash
@@ -742,7 +752,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-149 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-150 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1222,6 +1232,12 @@ to the wheel qualification path. The SBOM inventories every accepted wheel
 member with SHA-256 checksums, binds to the archive digest, and runs in a
 dedicated CI artifact gate. It is public supply-chain inventory, not signing,
 reproducible-build proof, or registry publication.
+
+Loop 150 adds a dependency-free [fixed-epoch reproducibility proof](docs/reproducible-builds.md)
+to the release path. The proof builds the wheel twice, requires byte and
+manifest equality, writes public evidence, and runs in release preflight and
+the dedicated CI artifact gate. It is scoped to one checkout and toolchain;
+signing, independent builders, and registry publication remain separate.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

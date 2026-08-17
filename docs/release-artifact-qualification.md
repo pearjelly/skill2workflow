@@ -69,6 +69,12 @@ comment binds the SBOM to the archive SHA-256, and the generator inherits the
 manifest's fail-closed private-content and zero-runtime-dependency boundary;
 see [`release-artifact-sbom.md`](release-artifact-sbom.md).
 
+The release path also runs `scripts/reproducible_build.py`. It builds the
+checkout twice with a fixed `SOURCE_DATE_EPOCH`, compares the wheel bytes and
+release manifests, and writes `reproducible-build.json` as public evidence;
+see [`reproducible-builds.md`](reproducible-builds.md) for the exact inputs and
+review boundary.
+
 Before installation, the qualification opens the wheel itself. It requires
 the byte-for-byte official Apache-2.0 license under the single `dist-info`
 directory, pinned by SHA-256, verifies the name, version, license expression,
@@ -101,7 +107,8 @@ unchanged until a separately approved release is prepared.
 ## Boundary
 
 This qualification does not upload a package, create a tag, publish a GitHub
-Release, sign an artifact, prove reproducible byte-for-byte builds, or certify
-every supported operating system and Python version. The manifest and SPDX SBOM
-are public integrity/inventory companions, not signatures, trusted key
+Release, sign an artifact, attest a source commit, compare independent
+builders, or certify every supported operating system and Python version. The
+manifest, SPDX SBOM, and fixed-epoch reproducibility evidence are public
+integrity/inventory/review companions, not signatures, trusted key
 attestations, or registry publication.

@@ -208,9 +208,19 @@ class ReleasePreflightTests(TestCase):
         commands = {spec.name: list(spec.command) for spec in default_verification_commands(repo_root)}
 
         self.assertIn("package_wheel", commands)
+        self.assertIn("reproducible_wheel", commands)
         self.assertEqual(commands["package_wheel"][0], commands["unit_tests"][0])
         self.assertEqual(commands["package_wheel"][1:3], ["scripts/package_smoke.py", "--work-dir"])
         self.assertTrue(commands["package_wheel"][3].endswith("skill2workflow-release-package-smoke"))
+        self.assertEqual(
+            commands["reproducible_wheel"][1:3],
+            ["scripts/reproducible_build.py", "--work-dir"],
+        )
+        self.assertTrue(
+            commands["reproducible_wheel"][3].endswith(
+                "skill2workflow-release-reproducible-build"
+            )
+        )
 
 
 class FakeRunner:

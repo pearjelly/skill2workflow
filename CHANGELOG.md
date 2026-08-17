@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a dependency-free fixed-epoch reproducibility proof for release wheels.
+  The release path builds twice, requires byte and manifest equality, writes
+  value-free `reproducible-build.json` evidence, and repeats the proof in the
+  release preflight and CI artifact gate.
 - Added a dependency-free SPDX 2.3 release artifact SBOM for qualified wheels.
   Package smoke writes a value-free member inventory bound to the wheel archive
   SHA-256, and a dedicated CI artifact gate verifies the qualification and

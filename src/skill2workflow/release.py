@@ -117,6 +117,15 @@ def default_verification_commands(repo_root: Path) -> Sequence[CommandSpec]:
                 "/tmp/skill2workflow-release-package-smoke",
             ],
         ),
+        CommandSpec(
+            "reproducible_wheel",
+            [
+                sys.executable,
+                "scripts/reproducible_build.py",
+                "--work-dir",
+                "/tmp/skill2workflow-release-reproducible-build",
+            ],
+        ),
     ]
 
 

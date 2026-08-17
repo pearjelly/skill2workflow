@@ -72,6 +72,10 @@ class ContinuousIntegrationContractTests(TestCase):
             "package_smoke.py --work-dir /tmp/skill2workflow-package-artifact-ci",
             workflow,
         )
+        self.assertIn(
+            "reproducible_build.py --work-dir /tmp/skill2workflow-reproducible-build-ci",
+            workflow,
+        )
         self.assertIn("secret_hygiene.py --repository-root .", workflow)
 
     def test_contributor_and_release_docs_reproduce_production_boundary_drills(self):

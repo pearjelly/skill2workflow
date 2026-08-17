@@ -79,4 +79,5 @@ jobs:
         with:
           python-version: "3.14"
       - run: python scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-artifact-ci
+      - run: python scripts/reproducible_build.py --work-dir /tmp/skill2workflow-reproducible-build-ci
       - run: python scripts/secret_hygiene.py --repository-root .

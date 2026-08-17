@@ -53,6 +53,7 @@ PYTHONPATH=src python3 scripts/release_preflight.py --version <version> --notes 
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-release-package-smoke
+python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-release-reproducible-build
 git diff --check
 ```
 
@@ -63,10 +64,15 @@ verifiable wheel hash, member inventory, and SPDX package inventory. See
 [`release-artifact-manifest.md`](release-artifact-manifest.md) and
 [`release-artifact-sbom.md`](release-artifact-sbom.md).
 
-The CI `artifact-gates` job repeats the isolated package qualification and
-repository secret-hygiene scan on Python 3.14. A release PR must keep this job
-green; the generated SBOM remains value-free and is not a signing or registry
-publication step.
+The reproducibility command writes `reproducible-build.json` after two
+fixed-epoch wheel builds compare byte-for-byte. Review its schema and limits in
+[`reproducible-builds.md`](reproducible-builds.md); it is evidence for this
+checkout and toolchain, not an artifact signature or registry attestation.
+
+The CI `artifact-gates` job repeats the isolated package qualification, the
+fixed-epoch reproducibility proof, and repository secret-hygiene scan on
+Python 3.14. A release PR must keep this job green; the generated evidence
+files remain value-free and are not a signing or registry publication step.
 
 The CI `operational-gates` job also runs the state-safety and recovery drills
 on Python 3.14: backup/restore, state upgrade, retention, cancellation,
@@ -165,6 +171,7 @@ git pull --ff-only
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-release-package-smoke
+python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-release-reproducible-build
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/approval-flow.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json
 git tag -a v<version> -m "skill2workflow v<version>"

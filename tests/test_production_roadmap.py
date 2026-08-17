@@ -26,11 +26,11 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
-        self.assertIn("- Completed delivery loops: 1-149", roadmap)
-        self.assertIn("- Active loop: None; Loop 149 is complete with SPDX release artifact SBOM evidence", roadmap)
+        self.assertIn("- Completed delivery loops: 1-150", roadmap)
+        self.assertIn("- Active loop: None; Loop 150 is complete with reproducible release artifact evidence", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
-        self.assertIn("This rolling queue is ordered. Loop 149 is complete", roadmap)
+        self.assertIn("This rolling queue is ordered. Loop 150 is complete", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
         self.assertIn("**Status:** Achieved.", roadmap)
@@ -41,7 +41,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-149 complete, further loop numbers unassigned.",
+            "**Status:** Directional; Loops 44-150 complete, further loop numbers unassigned.",
             roadmap,
         )
 
@@ -119,6 +119,10 @@ class ProductionRoadmapTests(TestCase):
         )
         self.assertIn(
             "| Loop 149: Release Artifact SPDX SBOM | Complete |",
+            roadmap,
+        )
+        self.assertIn(
+            "| Loop 150: Reproducible Release Artifact Builds | Complete |",
             roadmap,
         )
         self.assertIn(
@@ -337,7 +341,7 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-149 are complete", readme)
+        self.assertIn("Delivery Loops 1-150 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)
