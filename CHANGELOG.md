@@ -17,6 +17,10 @@ release; Roadmap loop completion alone does not publish a new version.
   `http_proxy`, `https_proxy`, and `ALL_PROXY` settings are ignored so
   resolved credentials cannot be routed through an unreviewed process proxy.
 
+- Added bounded HTTP request metadata: 16,384-byte URLs, 32-byte ASCII
+  methods, and 64-entry/65,536-byte headers. Invalid metadata now fails with
+  the connector's normalized error contract before network access.
+
 - Added opt-in HTTP `response_mode: "metadata"` to discard raw response headers
   and bodies after bounded reading while preserving status and size metadata;
   `full` remains the backward-compatible default.

@@ -73,6 +73,12 @@ and opens the configured URL directly. This keeps proxy routing out of the
 implicit Workflow DSL execution contract; an explicit reviewed connector is
 required for proxy-based egress.
 
+Built-in HTTP request metadata has additive fixed bounds: URL length is capped
+at 16,384 UTF-8 bytes, methods at 32 ASCII token bytes, and headers at 64
+entries/65,536 UTF-8 bytes. Invalid URL, method, or header metadata fails
+before network access with the existing connector failure boundary; existing
+valid request behavior remains compatible.
+
 SQLite publication and deprecation likewise mutate one registry record and its
 audit row atomically. Concurrent publication of distinct immutable versions is
 additive; a same-version checksum mismatch remains an immutable-version error.

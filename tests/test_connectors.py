@@ -12,7 +12,10 @@ from unittest.mock import patch
 
 from skill2workflow.connectors import (
     CONNECTOR_MANIFEST_VERSION,
+    MAX_HTTP_HEADER_BYTES,
+    MAX_HTTP_HEADER_COUNT,
     MAX_HTTP_PAYLOAD_BYTES,
+    MAX_HTTP_URL_BYTES,
     MAX_EXTERNAL_CONNECTOR_RESULT_BYTES,
     ConnectorRuntime,
     ConnectorExecutionError,
@@ -439,6 +442,59 @@ class ConnectorTests(TestCase):
             with self.subTest(binding=binding):
                 with self.assertRaisesRegex(ConnectorExecutionError, pattern):
                     execute_connector({"id": "call_api", "type": "tool_call", "connector": binding})
+
+    def test_http_connector_normalizes_invalid_request_metadata_before_network_call(self):
+        cases = [
+            ({"headers": {"X-Bad": "ok\r\nInjected: yes"}}, "headers contain invalid characters"),
+            ({"url": "http://127.0.0.1:bad-port/not-called"}, "request.url is invalid"),
+            ({"method": "bad method"}, "request.method is invalid"),
+        ]
+
+        for overrides, pattern in cases:
+            request = {"url": "http://127.0.0.1:1/not-called"}
+            request.update(overrides)
+            with self.subTest(overrides=overrides):
+                with patch("skill2workflow.connectors._open_http_request") as opener:
+                    with self.assertRaisesRegex(ConnectorExecutionError, pattern):
+                        execute_connector(
+                            {
+                                "id": "call_api",
+                                "type": "tool_call",
+                                "connector": {"id": "http", "kind": "http", "request": request},
+                            }
+                        )
+                opener.assert_not_called()
+
+    def test_http_connector_rejects_oversized_request_metadata_before_network_call(self):
+        cases = [
+            (
+                {"url": "http://127.0.0.1:1/" + ("x" * MAX_HTTP_URL_BYTES)},
+                f"request URL exceeds {MAX_HTTP_URL_BYTES} bytes",
+            ),
+            (
+                {"headers": {f"X-{index}": "value" for index in range(MAX_HTTP_HEADER_COUNT + 1)}},
+                f"request headers exceed {MAX_HTTP_HEADER_COUNT} entries",
+            ),
+            (
+                {"headers": {"X-Large": "x" * MAX_HTTP_HEADER_BYTES}},
+                f"request headers exceed {MAX_HTTP_HEADER_BYTES} bytes",
+            ),
+        ]
+
+        for overrides, pattern in cases:
+            request = {"url": "http://127.0.0.1:1/not-called"}
+            request.update(overrides)
+            with self.subTest(pattern=pattern):
+                with patch("skill2workflow.connectors._open_http_request") as opener:
+                    with self.assertRaisesRegex(ConnectorExecutionError, pattern):
+                        execute_connector(
+                            {
+                                "id": "call_api",
+                                "type": "tool_call",
+                                "connector": {"id": "http", "kind": "http", "request": request},
+                            }
+                        )
+                opener.assert_not_called()
 
     def test_http_connector_rejects_non_json_body_before_network_call(self):
         with self.assertRaisesRegex(ConnectorExecutionError, "request.body must be JSON serializable"):

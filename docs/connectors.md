@@ -65,11 +65,26 @@ there is no implicit proxy route that can receive resolved credentials. A
 workflow that requires a proxy must use a separately reviewed connector with an
 explicit, documented proxy boundary.
 
+### HTTP Request Metadata Boundary
+
+Request metadata is bounded independently of the 1 MiB body boundary:
+
+- URL: at most `16,384` UTF-8 bytes, with a valid `http`/`https` host and
+  numeric port when present; embedded userinfo, NUL, and CR/LF are rejected.
+- Method: an ASCII HTTP token of at most `32` bytes.
+- Headers: at most `64` entries and `65,536` UTF-8 bytes in combined names and
+  values; empty names and NUL/CR/LF characters are rejected.
+
+Malformed or oversized metadata raises a fixed `ConnectorExecutionError`
+before network access. Static URL, method, and header failures are rejected
+before credential handles are resolved, and request-construction exceptions
+are normalized instead of escaping as raw `urllib`/`http.client` exceptions.
+
 ### HTTP Payload Boundary
 
 The built-in HTTP connector applies one fixed `1,048,576`-byte (`1 MiB`) bound
 to both directions. A serialized request body that exceeds the bound fails
-before `urlopen` is called. A successful or error response is read at most one
+before the network opener is called. A successful or error response is read at most one
 byte beyond the bound so an oversized body is rejected before it is returned
 or persisted in run state. Response bodies must be valid UTF-8; invalid bytes
 produce the fixed connector error `http connector response body must be valid

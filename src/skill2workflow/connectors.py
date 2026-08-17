@@ -23,6 +23,10 @@ ExternalConnectorPreflight = Callable[..., ConnectorResult]
 CONNECTOR_MANIFEST_VERSION = "skill2workflow-connector-0.1.0"
 CONNECTOR_EXECUTION_CONTRACT_VERSION = "skill2workflow-connector-execution-0.1.0"
 MAX_HTTP_PAYLOAD_BYTES = 1_048_576
+MAX_HTTP_URL_BYTES = 16_384
+MAX_HTTP_HEADER_COUNT = 64
+MAX_HTTP_HEADER_BYTES = 65_536
+MAX_HTTP_METHOD_BYTES = 32
 HTTP_RESPONSE_MODES = ("full", "metadata")
 # External connector code is explicitly loaded, but its normalized result still
 # crosses the durable executor boundary. Keep that handoff bounded independently
@@ -398,8 +402,11 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
     method = str(request_spec.get("method") or "GET").upper()
     response_mode = _http_response_mode(request_spec.get("response_mode"))
     headers = _string_map(request_spec.get("headers"))
-    _apply_http_credentials(binding.get("credentials", []), headers, credential_provider)
+    _validate_http_request_metadata(url, method, headers)
     url, body, mapping_summary = _mapped_http_request(request_spec, context)
+    _validate_http_request_metadata(url, method, headers)
+    _apply_http_credentials(binding.get("credentials", []), headers, credential_provider)
+    _validate_http_request_metadata(url, method, headers)
     data = None
     if body is not None:
         try:
@@ -412,10 +419,14 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
             )
         if not any(key.lower() == "content-type" for key in headers):
             headers["Content-Type"] = "application/json"
+    _validate_http_request_metadata(url, method, headers)
 
     timeout_ms = request_spec.get("timeout_ms", 5000)
     timeout = _timeout_seconds(timeout_ms)
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    except (TypeError, ValueError, UnicodeError) as error:
+        raise ConnectorExecutionError("http connector request metadata is invalid") from error
 
     try:
         with _open_http_request(request, timeout=timeout) as response:
@@ -466,6 +477,60 @@ def _http_response_mode(value: object) -> str:
     raise ConnectorExecutionError(
         "http connector request.response_mode must be full or metadata"
     )
+
+
+def _validate_http_request_metadata(url: str, method: str, headers: Dict[str, str]) -> None:
+    """Reject oversized or malformed request metadata before credential/network use."""
+
+    try:
+        url_bytes = url.encode("utf-8")
+    except UnicodeError as error:
+        raise ConnectorExecutionError("http connector request.url is invalid") from error
+    if len(url_bytes) > MAX_HTTP_URL_BYTES:
+        raise ConnectorExecutionError(
+            f"http connector request URL exceeds {MAX_HTTP_URL_BYTES} bytes"
+        )
+    if any(character in url for character in "\r\n\x00"):
+        raise ConnectorExecutionError("http connector request.url is invalid")
+    try:
+        parsed_url = urlsplit(url)
+        hostname = parsed_url.hostname
+        parsed_url.port
+    except ValueError as error:
+        raise ConnectorExecutionError("http connector request.url is invalid") from error
+    if parsed_url.scheme not in ("http", "https") or not parsed_url.netloc or not hostname:
+        raise ConnectorExecutionError("http connector request.url is invalid")
+    if parsed_url.username is not None or parsed_url.password is not None:
+        raise ConnectorExecutionError("http connector request.url must not contain userinfo")
+
+    try:
+        method_bytes = method.encode("ascii")
+    except UnicodeEncodeError as error:
+        raise ConnectorExecutionError("http connector request.method is invalid") from error
+    if not method_bytes or len(method_bytes) > MAX_HTTP_METHOD_BYTES or not _is_http_token(method):
+        raise ConnectorExecutionError("http connector request.method is invalid")
+
+    if len(headers) > MAX_HTTP_HEADER_COUNT:
+        raise ConnectorExecutionError(
+            f"http connector request headers exceed {MAX_HTTP_HEADER_COUNT} entries"
+        )
+    header_bytes = 0
+    for name, value in headers.items():
+        if not name or not _is_http_token(name) or any(character in value for character in "\r\n\x00"):
+            raise ConnectorExecutionError("http connector request headers contain invalid characters")
+        try:
+            header_bytes += len(name.encode("utf-8")) + len(value.encode("utf-8")) + 2
+        except UnicodeError as error:
+            raise ConnectorExecutionError("http connector request headers contain invalid characters") from error
+    if header_bytes > MAX_HTTP_HEADER_BYTES:
+        raise ConnectorExecutionError(
+            f"http connector request headers exceed {MAX_HTTP_HEADER_BYTES} bytes"
+        )
+
+
+def _is_http_token(value: str) -> bool:
+    separators = '()<>@,;:\\"/[]?={} \t'
+    return all(33 <= ord(character) <= 126 and character not in separators for character in value)
 
 
 def _http_response_output(response: object, status_code: int, payload: str, mode: str) -> Dict[str, object]:
