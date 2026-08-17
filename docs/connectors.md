@@ -378,7 +378,7 @@ The credential file has this shape:
 }
 ```
 
-The resolved value is used only for the outbound request. Connector results, run context, and audit events do not include the resolved credential value by default.
+The resolved value is used only for the outbound request. Connector results, run context, and audit events do not include the resolved credential value by default. The local JSON file is bounded to 2 MiB and rejects symlink, replacement, and growth races before parsing; see [`credential-file-boundary.md`](credential-file-boundary.md).
 
 ## Result Semantics
 

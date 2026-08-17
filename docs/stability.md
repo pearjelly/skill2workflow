@@ -68,6 +68,9 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Fresh SQLite state-layout markers are atomically published without replacing a concurrent marker; startup remains single-directory and non-distributed
 - Credential placeholder and fixture hygiene boundary documented in `docs/credential-boundary.md`
 - Local credential handle boundary documented in `docs/credential-boundary.md`
+- Local CLI JSON credential maps use the fixed 2 MiB regular-file/no-follow,
+  device/inode-bound read contract documented in `docs/credential-file-boundary.md`;
+  the existing `{"credentials": {...}}` shape remains compatible
 - Local trigger command and envelope documented in `docs/triggers.md`
 - Local trigger run-context shape documented in `docs/triggers.md`
 - Shared 1 MiB canonical UTF-8 JSON-object trigger-input limit and fixed oversize failure boundary documented in `docs/triggers.md`

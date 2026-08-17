@@ -8,6 +8,7 @@ from unittest.mock import patch
 from skill2workflow.credentials import (
     CredentialResolutionError,
     DirectoryCredentialProvider,
+    MAX_CREDENTIAL_FILE_BYTES,
     MAX_DIRECTORY_CREDENTIAL_BYTES,
     StaticCredentialProvider,
     load_credential_file,
@@ -141,6 +142,92 @@ class CredentialTests(TestCase):
             provider = load_credential_file(path)
 
         self.assertEqual(provider.resolve("demo_api_token"), "secret-token")
+
+    def test_load_credential_file_rejects_oversized_input_before_open(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "credentials.json"
+            path.write_bytes(b"{" + b"x" * MAX_CREDENTIAL_FILE_BYTES)
+
+            with patch("skill2workflow.credentials.os.open") as open_file:
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"credential file exceeds {MAX_CREDENTIAL_FILE_BYTES} bytes",
+                ):
+                    load_credential_file(path)
+            open_file.assert_not_called()
+
+    def test_load_credential_file_fails_closed_for_invalid_document_encoding_and_depth(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            invalid_utf8 = root / "invalid-utf8.json"
+            invalid_utf8.write_bytes(b"{\xff")
+            with self.assertRaisesRegex(ValueError, "credential file is unavailable"):
+                load_credential_file(invalid_utf8)
+
+            malformed = root / "malformed.json"
+            malformed.write_text("{not-json}", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "credential file is unavailable"):
+                load_credential_file(malformed)
+
+            deeply_nested = root / "deeply-nested.json"
+            deeply_nested.write_text("[" * 500000 + "]" * 500000, encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "credential file is unavailable"):
+                load_credential_file(deeply_nested)
+
+    def test_load_credential_file_rejects_symlink_and_path_replacement(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "credentials.json"
+            outside = root / "outside.json"
+            outside.write_text(
+                json.dumps({"credentials": {"demo_api_token": "outside-secret"}}),
+                encoding="utf-8",
+            )
+            path.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "regular non-symlink"):
+                load_credential_file(path)
+
+            path.unlink()
+            path.write_text(
+                json.dumps({"credentials": {"demo_api_token": "first-secret"}}),
+                encoding="utf-8",
+            )
+            replacement = root / "replacement.json"
+            replacement.write_text(
+                json.dumps({"credentials": {"demo_api_token": "replacement-secret"}}),
+                encoding="utf-8",
+            )
+            real_open = os.open
+            replaced = False
+
+            def replace_before_open(open_path, flags, *args, **kwargs):
+                nonlocal replaced
+                if Path(open_path) == path and not replaced:
+                    replaced = True
+                    replacement.replace(path)
+                return real_open(open_path, flags, *args, **kwargs)
+
+            with patch(
+                "skill2workflow.credentials.os.open",
+                side_effect=replace_before_open,
+            ):
+                with self.assertRaisesRegex(ValueError, "changed while being read"):
+                    load_credential_file(path)
+
+    def test_load_credential_file_rejects_read_growth_past_bound(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "credentials.json"
+            path.write_text("{}", encoding="utf-8")
+
+            with patch(
+                "skill2workflow.credentials.os.read",
+                return_value=b"x" * (MAX_CREDENTIAL_FILE_BYTES + 1),
+            ):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"credential file exceeds {MAX_CREDENTIAL_FILE_BYTES} bytes",
+                ):
+                    load_credential_file(path)
 
     def test_load_credential_file_rejects_invalid_credentials_shape(self):
         cases = [

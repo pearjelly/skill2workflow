@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded local JSON credential-file reads to 2 MiB with regular-file,
+  no-follow, descriptor identity, and growth/replacement-race checks. The
+  existing local credential shape and service directory-provider contract are
+  unchanged.
+
 - Hardened runtime service configuration loading with a fixed 64 KiB bound,
   regular-file and no-symlink checks, descriptor identity binding, and
   growth/replacement-race rejection for `service` and `service-doctor`.

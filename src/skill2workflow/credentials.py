@@ -11,6 +11,7 @@ from typing import Dict
 
 
 MAX_DIRECTORY_CREDENTIAL_BYTES = 64 * 1024
+MAX_CREDENTIAL_FILE_BYTES = 2 * 1024 * 1024
 
 
 class CredentialResolutionError(Exception):
@@ -133,13 +134,79 @@ def _read_directory_credential(directory: Path, handle: str) -> str:
 def load_credential_file(path: Path) -> StaticCredentialProvider:
     """Load local credentials from a JSON file."""
 
-    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    raw = _read_credential_file_payload(path)
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+        raise ValueError("credential file is unavailable") from error
     if not isinstance(payload, dict):
         raise ValueError("credential file must be a JSON object")
     credentials = payload.get("credentials", {})
     if not isinstance(credentials, dict):
         raise ValueError("credentials must be an object")
     return StaticCredentialProvider(credentials)
+
+
+def _read_credential_file_payload(path: Path) -> bytes:
+    """Read one bounded local credential map without following path races."""
+
+    credential_path = Path(path)
+    try:
+        before = credential_path.lstat()
+    except OSError as error:
+        raise ValueError("credential file is unavailable") from error
+    if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+        raise ValueError("credential file must be a regular non-symlink file")
+    if before.st_size > MAX_CREDENTIAL_FILE_BYTES:
+        raise ValueError(
+            f"credential file exceeds {MAX_CREDENTIAL_FILE_BYTES} bytes"
+        )
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(credential_path, flags)
+    except OSError as error:
+        raise ValueError("credential file is unavailable") from error
+    try:
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_dev != before.st_dev
+                or opened.st_ino != before.st_ino
+            ):
+                raise ValueError("credential file changed while being read")
+            if opened.st_size > MAX_CREDENTIAL_FILE_BYTES:
+                raise ValueError(
+                    f"credential file exceeds {MAX_CREDENTIAL_FILE_BYTES} bytes"
+                )
+            chunks = []
+            remaining = MAX_CREDENTIAL_FILE_BYTES + 1
+            while remaining:
+                chunk = os.read(descriptor, min(64 * 1024, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            raw = b"".join(chunks)
+            if len(raw) > MAX_CREDENTIAL_FILE_BYTES:
+                raise ValueError(
+                    f"credential file exceeds {MAX_CREDENTIAL_FILE_BYTES} bytes"
+                )
+            after = credential_path.lstat()
+            if after.st_dev != before.st_dev or after.st_ino != before.st_ino:
+                raise ValueError("credential file changed while being read")
+            if after.st_size > MAX_CREDENTIAL_FILE_BYTES:
+                raise ValueError(
+                    f"credential file exceeds {MAX_CREDENTIAL_FILE_BYTES} bytes"
+                )
+        except OSError as error:
+            raise ValueError("credential file is unavailable") from error
+    finally:
+        os.close(descriptor)
+    return raw
 
 
 def _validate_credentials(credentials: Dict[str, str]) -> Dict[str, str]:

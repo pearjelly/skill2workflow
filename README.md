@@ -119,6 +119,7 @@ explicit connector boundaries. It currently supports:
 - Execute minimal HTTP connector calls from connector-bound `tool_call` nodes
 - Bound built-in HTTP request and response payloads to 1 MiB with fixed overflow and invalid-UTF-8 failures
 - Resolve local credential handles for HTTP connector request headers without storing secret values in Workflow DSL or audit output
+- Bound local `--credential-file` JSON maps to 2 MiB with descriptor identity and growth-race checks without changing their shape
 - Cover HTTP connector success, failure, invalid request metadata, JSON body, headers, and timeout behavior with local tests
 - Honor connector-node `retry.max_attempts` and bounded `retry.backoff_ms`, recording retry/recovery events
 - Enforce optional per-node `timeout_ms` active execution deadlines with fixed `node_timeout` evidence and successor suppression
@@ -756,7 +757,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-167 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-168 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1339,6 +1340,11 @@ Loop 167 hardens the service startup configuration read: `service` and
 bind reads to one device/inode, and fail closed on growth or replacement races.
 See [`docs/service-config-boundary.md`](docs/service-config-boundary.md).
 
+Loop 168 hardens the local `--credential-file` path: credential maps are
+bounded to 2 MiB, read through a regular-file/no-follow descriptor bound to one
+device/inode, and rejected on symlink, replacement, or growth races. See
+[`docs/credential-file-boundary.md`](docs/credential-file-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1351,6 +1357,7 @@ See:
 - `ROADMAP.md`
 - `docs/cli-input-boundary.md`
 - `docs/service-config-boundary.md`
+- `docs/credential-file-boundary.md`
 - `docs/authoring.md`
 - `docs/backup-restore.md`
 - `docs/cancellation.md`
