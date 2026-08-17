@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded the normalized result envelope returned by explicitly loaded
+  external connectors to 1 MiB and required a strict standard-JSON
+  round-trip before the result enters durable run state. Existing built-in
+  HTTP payload limits and connector contracts remain unchanged; see
+  `docs/external-connector-result-boundary.md`.
+
 - Bounded immutable Workflow artifact publication and reads to 2 MiB with a
   shared regular-file/no-follow descriptor contract, device/inode identity,
   max-plus-one reads, and growth/replacement checks across control-plane

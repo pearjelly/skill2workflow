@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-172
+- Completed delivery loops: 1-173
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 172 is complete with bounded published Workflow artifact reads
+- Active loop: None; Loop 173 is complete with bounded external connector result envelopes
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-172 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-173 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 172; the detailed
+The follow-on production hardening continues through Loop 173; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4103,9 +4103,36 @@ remain unchanged. This does not split large workflows, cap unrelated
 configuration or audit documents, encrypt artifacts, or make JSON storage
 multi-process safe.
 
+### Loop 173: Bounded External Connector Result Envelopes
+
+**Status:** Complete.
+
+**Prior basis:** Built-in HTTP connectors already bounded request and response
+payloads, but explicitly loaded external connector fixtures could return an
+arbitrarily large or non-JSON `output`/metadata object. The executor would
+attach that object to durable run state before the storage backend had a chance
+to reject it.
+
+**Outcome:** The external connector handoff now serializes the complete
+normalized result as strict compact UTF-8 JSON and enforces a fixed 1 MiB
+envelope before the result crosses into durable state. The accepted result is
+round-tripped through standard JSON, rejecting custom Python objects and
+non-finite numbers. Existing connector IDs, normalized fields, built-in HTTP
+payloads, and dry-run behavior remain compatible.
+
+**Evidence:** Connector regression tests prove normal external execution,
+oversized result rejection, non-JSON rejection, and unchanged built-in HTTP
+payload behavior. The contract is documented in
+[`docs/external-connector-result-boundary.md`](docs/external-connector-result-boundary.md).
+
+**Safety boundary:** This bounds the normalized external result handoff only.
+It does not sandbox imported Python, bound provider-specific outbound I/O,
+interrupt a provider request, redact business values, add package
+installation, or claim exactly-once external effects.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 172 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 173 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4243,6 +4270,7 @@ This rolling queue is ordered. Loop 172 is complete and there is no active deliv
 | Loop 170: Bounded Local JSON Run-State Reads | Complete | Keep dependency-light JSON run-state load and recovery from bypassing the local input boundary through unbounded or path-raced reads | Fixed 8 MiB read/write window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and JSON run-state boundary documentation |
 | Loop 171: Bounded Local JSON Control Index Reads | Complete | Keep the dependency-light JSON control registry and its SQLite import from bypassing the local input boundary through unbounded or path-raced reads | Fixed 8 MiB read/write window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and JSON control-index boundary documentation |
 | Loop 172: Bounded Published Workflow Artifact Reads | Complete | Keep immutable Workflow artifacts from bypassing the local input boundary before checksum verification or backup validation | Fixed 2 MiB publication/read window, shared descriptor-bound reader, pre-open/growth/path-race regression coverage, backup evidence, and published-artifact read-boundary documentation |
+| Loop 173: Bounded External Connector Result Envelopes | Complete | Keep explicitly loaded external connector results from bypassing the durable executor boundary through oversized or non-JSON handoffs | Fixed 1 MiB strict-JSON normalized result envelope, rejection before durable state, connector regression coverage, and external-connector result-boundary documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

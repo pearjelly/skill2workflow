@@ -177,6 +177,7 @@ explicit connector boundaries. It currently supports:
 - List built-in connector manifests
 - Validate and inspect the minimum connector manifest contract for future extensions
 - Explicitly load one local external connector fixture through a narrow runtime registration path while keeping the default built-in registry stable
+- Bound the complete normalized result returned by an explicit external connector to a strict 1 MiB JSON envelope before durable persistence
 - Audit connector execution events through the control plane
 - Audit runtime policy events such as `node_retrying`, `node_recovered`, and `node_failed` through the control plane
 - Export a read-only control-plane snapshot with derived operator insights
@@ -765,7 +766,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-172 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-173 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1379,6 +1380,13 @@ growth-race checks. Workflow DSL shape, canonical checksums, immutable version
 semantics, and backup/SQLite contracts remain unchanged. See
 [`docs/published-artifact-read-boundary.md`](docs/published-artifact-read-boundary.md).
 
+Loop 173 hardens the explicit external-connector handoff: the complete
+normalized connector result must round-trip through standard JSON and remain
+within a fixed 1 MiB envelope before entering durable run state. Existing
+built-in HTTP payload limits, connector IDs, and dry-run behavior remain
+unchanged. See
+[`docs/external-connector-result-boundary.md`](docs/external-connector-result-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1392,6 +1400,7 @@ See:
 - `docs/cli-input-boundary.md`
 - `docs/json-control-index-boundary.md`
 - `docs/published-artifact-read-boundary.md`
+- `docs/external-connector-result-boundary.md`
 - `docs/json-run-state-boundary.md`
 - `docs/service-config-boundary.md`
 - `docs/credential-file-boundary.md`

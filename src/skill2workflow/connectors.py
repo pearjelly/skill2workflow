@@ -22,6 +22,10 @@ ExternalConnectorPreflight = Callable[..., ConnectorResult]
 CONNECTOR_MANIFEST_VERSION = "skill2workflow-connector-0.1.0"
 CONNECTOR_EXECUTION_CONTRACT_VERSION = "skill2workflow-connector-execution-0.1.0"
 MAX_HTTP_PAYLOAD_BYTES = 1_048_576
+# External connector code is explicitly loaded, but its normalized result still
+# crosses the durable executor boundary. Keep that handoff bounded independently
+# of whatever I/O policy the extension chose internally.
+MAX_EXTERNAL_CONNECTOR_RESULT_BYTES = 1_048_576
 
 
 DEFAULT_CONNECTORS: List[Dict[str, object]] = [
@@ -298,7 +302,30 @@ def _execute_external_connector(
     credentials = _normalize_credential_summary(result.get("credentials"))
     if credentials:
         normalized["credentials"] = credentials
-    return normalized
+    try:
+        encoded = json.dumps(
+            normalized,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError, RecursionError) as error:
+        raise ConnectorExecutionError(
+            "external connector result must be JSON serializable"
+        ) from error
+    if len(encoded) > MAX_EXTERNAL_CONNECTOR_RESULT_BYTES:
+        raise ConnectorExecutionError(
+            "external connector result exceeds "
+            f"{MAX_EXTERNAL_CONNECTOR_RESULT_BYTES} bytes"
+        )
+    # Round-trip through the standard JSON representation so arbitrary Python
+    # objects from an extension cannot remain attached to durable run state.
+    try:
+        return json.loads(encoded.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+        raise ConnectorExecutionError(
+            "external connector result must be JSON serializable"
+        ) from error
 
 
 def _normalize_credential_summary(summary: object) -> Dict[str, object]:

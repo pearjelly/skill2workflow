@@ -62,9 +62,10 @@ UTF-8`. Oversized bodies produce the fixed request/response errors and never
 return a partial payload. This is a memory and state-size boundary, not a
 content-redaction or provider-side cancellation guarantee.
 
-External connector packages own their own I/O limits; this built-in bound does
-not silently constrain code loaded through the explicit external-connector
-fixture boundary.
+External connector packages own their provider-specific I/O limits, but their
+normalized result still crosses the runtime's fixed 1 MiB persistence
+boundary. Non-JSON or oversized external results fail before they are attached
+to durable run state; see [`external-connector-result-boundary.md`](external-connector-result-boundary.md).
 
 If `body` is present and no case-insensitive `Content-Type` header is supplied, the connector adds `Content-Type: application/json`.
 
@@ -210,7 +211,7 @@ The smoke loads `examples/connectors/local_echo_connector.py`, publishes a local
 
 The Python helper `validate_connector_manifest(manifest)` checks the minimum manifest shape without importing or executing connector code. Use it for contract tests when connector registry metadata changes.
 
-External connector executors must return the same compact result shape as built-ins. They may include `credentials` and `input_mapping` summaries, but those summaries must contain handles, statuses, and input key names only. Resolved credential values and raw mapped business values must not be returned.
+External connector executors must return the same compact result shape as built-ins. The complete normalized result envelope is bounded to 1 MiB and must round-trip through standard JSON before it enters durable state. They may include `credentials` and `input_mapping` summaries, but those summaries must contain handles, statuses, and input key names only. Resolved credential values and raw mapped business values must not be returned.
 
 Published-run audit events promote compact connector metadata for inspection. For external fixtures this includes fields such as `credential_status`, `credential_handles`, `input_mapping_status`, and `input_mapping_keys`, not payload values.
 

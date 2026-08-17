@@ -12,6 +12,7 @@ from unittest.mock import patch
 from skill2workflow.connectors import (
     CONNECTOR_MANIFEST_VERSION,
     MAX_HTTP_PAYLOAD_BYTES,
+    MAX_EXTERNAL_CONNECTOR_RESULT_BYTES,
     ConnectorRuntime,
     ConnectorExecutionError,
     ExternalConnector,
@@ -97,6 +98,42 @@ class ConnectorTests(TestCase):
                 _local_echo_node(handle="missing_token"),
                 context={"input": {"customer_id": "customer_123"}},
             )
+
+    def test_external_connector_rejects_oversized_normalized_result(self):
+        fixture = _load_local_echo_fixture()
+
+        def execute(_binding, credential_provider=None, context=None):
+            return {
+                "status": "completed",
+                "connector": {"id": "local_echo", "kind": "local_echo"},
+                "output": {"payload": "x" * MAX_EXTERNAL_CONNECTOR_RESULT_BYTES},
+            }
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, execute)])
+
+        with self.assertRaisesRegex(
+            ConnectorExecutionError,
+            f"external connector result exceeds {MAX_EXTERNAL_CONNECTOR_RESULT_BYTES} bytes",
+        ):
+            runtime.execute_connector(_local_echo_node())
+
+    def test_external_connector_rejects_non_json_normalized_result(self):
+        fixture = _load_local_echo_fixture()
+
+        def execute(_binding, credential_provider=None, context=None):
+            return {
+                "status": "completed",
+                "connector": {"id": "local_echo", "kind": "local_echo"},
+                "output": {"not_json": object()},
+            }
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, execute)])
+
+        with self.assertRaisesRegex(
+            ConnectorExecutionError,
+            "external connector result must be JSON serializable",
+        ):
+            runtime.execute_connector(_local_echo_node())
 
     def test_http_connector_sends_method_headers_json_body_and_normalizes_response(self):
         server = _ConnectorTestServer()
