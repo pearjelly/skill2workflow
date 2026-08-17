@@ -95,9 +95,29 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-153 are complete", readme)
+        self.assertIn("Delivery Loops 1-154 are complete", readme)
         self.assertIn("Loop 146 adds a compact SQLite recurring-schedule projection", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("### Loop 146: Compact SQLite Recurring-Schedule Projections", roadmap)
+        create_schema = json.loads(
+            (ROOT / "schemas" / "recurring-schedule-create-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        create_guide = (ROOT / "docs" / "remote-schedule-create.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(
+            create_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-recurring-schedule-create-0.1.0",
+        )
+        self.assertFalse(create_schema["additionalProperties"])
+        self.assertIn("POST /api/v1/recurring-schedules", create_guide)
+        self.assertIn("created: false", create_guide)
+        self.assertIn("BEGIN IMMEDIATE", create_guide)
+        self.assertIn("16 KiB", create_guide)
+        self.assertIn("trigger input", create_guide)
+        self.assertIn("changed definition", create_guide)
+        self.assertIn("### Loop 154: Protected Remote Recurring-Schedule Creation", roadmap)
         self.assertIn("| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete |", roadmap)

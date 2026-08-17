@@ -65,6 +65,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-runs",
     "service-run-page",
     "service-recurring-schedules",
+    "service-recurring-schedule-add",
     "service-recurring-dispatches",
     "service-workflow-artifacts",
     "service-backup-readiness",

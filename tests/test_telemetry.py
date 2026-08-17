@@ -155,6 +155,7 @@ class RuntimeTelemetryTests(TestCase):
             'skill2workflow_http_requests_total{route="workflow_trigger",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="control_snapshot",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="recurring_schedule_list",status_class="2xx"} 0',
+            'skill2workflow_http_requests_total{route="recurring_schedule_create",status_class="2xx"} 0',
             'skill2workflow_http_requests_total{route="recurring_schedule_action",status_class="2xx"} 0',
             'skill2workflow_http_requests_total{route="recurring_schedule_dispatch_list",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_artifact_report",status_class="2xx"} 1',
@@ -219,7 +220,7 @@ class RuntimeTelemetryTests(TestCase):
             set(aggregate["http_requests"]),
             {
                 "health", "readiness", "metrics", "control_snapshot", "recurring_schedule_list",
-                "recurring_schedule_action", "recurring_schedule_dispatch_list",
+                "recurring_schedule_create", "recurring_schedule_action", "recurring_schedule_dispatch_list",
                 "workflow_artifact_report",
                 "backup_readiness",
                 "retention_readiness",

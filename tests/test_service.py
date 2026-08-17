@@ -803,6 +803,99 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(audit_count_after, audit_count_before)
         self.assertFalse(thread.is_alive())
 
+    def test_recurring_schedule_create_is_authenticated_idempotent_redacted_and_audited(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            service = RuntimeService(config)
+            definition = {
+                "schema_version": "skill2workflow-schedule-0.2.0",
+                "schedule": {
+                    "id": "schedule_remote_create",
+                    "workflow_id": "workflow_service",
+                    "version": "0.1.0",
+                    "starts_at": "2026-08-11T00:00:00Z",
+                    "interval_seconds": 60,
+                    "missed_run_policy": "latest",
+                    "enabled": True,
+                },
+                "trigger": {"input": {"private": "must-not-leak"}},
+            }
+            ready = threading.Event()
+            serve_thread = threading.Thread(
+                target=service.serve,
+                kwargs={"ready_callback": lambda _service: ready.set()},
+                daemon=True,
+            )
+            serve_thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = service.server_address
+            url = f"http://{host}:{port}/api/v1/recurring-schedules"
+            denied_status, denied = _post_json(url, {"schedule": definition})
+            invalid_status, invalid = _post_json(
+                url,
+                {"unexpected": definition},
+                token=AUTH_TOKEN,
+            )
+            created_status, created = _post_json(
+                url,
+                {"schedule": definition},
+                token=AUTH_TOKEN,
+            )
+            replay_status, replay = _post_json(
+                url,
+                {"schedule": definition},
+                token=AUTH_TOKEN,
+            )
+            changed = json.loads(json.dumps(definition))
+            changed["schedule"]["interval_seconds"] = 120
+            conflict_status, conflict = _post_json(
+                url,
+                {"schedule": changed},
+                token=AUTH_TOKEN,
+            )
+            service.begin_shutdown()
+            serve_thread.join(timeout=3)
+            stored = service.scheduler.dispatcher.store.get("schedule_remote_create")
+            audit = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(invalid_status, 400)
+        self.assertEqual(
+            invalid,
+            {"error": "recurring schedule create body must contain schedule"},
+        )
+        self.assertEqual(created_status, 200)
+        self.assertTrue(created["created"])
+        self.assertEqual(created["schedule_id"], "schedule_remote_create")
+        self.assertEqual(replay_status, 200)
+        self.assertFalse(replay["created"])
+        self.assertEqual(
+            {key: value for key, value in replay.items() if key != "created"},
+            {key: value for key, value in created.items() if key != "created"},
+        )
+        self.assertEqual(conflict_status, 409)
+        self.assertEqual(conflict, {"error": "recurring schedule already exists"})
+        self.assertEqual(stored["schedule"]["interval_seconds"], 60)
+        self.assertNotIn("must-not-leak", json.dumps(created, ensure_ascii=False))
+        self.assertEqual(
+            [event["type"] for event in audit if event.get("route") == "recurring_schedule_create"],
+            [
+                "ingress_authentication_denied",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+            ],
+        )
+        created_events = [
+            event for event in audit if event.get("type") == "recurring_schedule_created"
+        ]
+        self.assertEqual([event["created"] for event in created_events], [True, False])
+        self.assertFalse(serve_thread.is_alive())
+
     def test_recurring_schedule_action_is_authenticated_idempotent_and_audited(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

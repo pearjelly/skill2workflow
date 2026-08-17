@@ -29,6 +29,7 @@ _ROUTES = (
     "audit_integrity",
     "runtime_info",
     "recurring_schedule_list",
+    "recurring_schedule_create",
     "recurring_schedule_action",
     "recurring_schedule_dispatch_list",
     "audit_consistency",

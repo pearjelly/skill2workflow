@@ -25,6 +25,7 @@ from skill2workflow.service_client import (
     MAX_REMOTE_WORKFLOW_RELEASE_REQUEST_BYTES,
     ServiceActionError,
     post_recurring_schedule_state,
+    post_recurring_schedule_create,
     post_run_cancel,
     post_run_resume,
     fetch_run_detail,
@@ -57,6 +58,117 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_recurring_schedule_create_uses_authenticated_post_and_redacted_contract(self):
+        observed = {}
+        definition = _recurring_definition()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(
+                    self,
+                    200,
+                    {
+                        "schema_version": "skill2workflow-recurring-schedule-create-0.1.0",
+                        "schedule_id": "schedule_hourly_report",
+                        "workflow_id": "workflow_recurring",
+                        "workflow_version": "1.0.0",
+                        "status": "active",
+                        "enabled": True,
+                        "starts_at": "2026-08-11T00:00:00+00:00",
+                        "next_run_at": "2026-08-11T00:00:00+00:00",
+                        "interval_seconds": 60,
+                        "missed_run_policy": "latest",
+                        "created": True,
+                    },
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            result = post_recurring_schedule_create(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                definition,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertTrue(result["created"])
+        self.assertEqual(observed["path"], "/api/v1/recurring-schedules")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(observed["body"], {"schedule": definition})
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_schedule_create_rejects_invalid_definition_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaises(ValueError):
+                post_recurring_schedule_create(
+                    "https://service.example",
+                    token_file,
+                    {"schedule": "not-a-definition"},
+                )
+
+    def test_recurring_schedule_create_accepts_replay_with_advanced_progress(self):
+        definition = _recurring_definition()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.rfile.read(int(self.headers["Content-Length"]))
+                _send_json(
+                    self,
+                    200,
+                    {
+                        "schema_version": "skill2workflow-recurring-schedule-create-0.1.0",
+                        "schedule_id": "schedule_hourly_report",
+                        "workflow_id": "workflow_recurring",
+                        "workflow_version": "1.0.0",
+                        "status": "active",
+                        "enabled": True,
+                        "starts_at": "2026-08-11T00:00:00+00:00",
+                        "next_run_at": "2026-08-11T01:00:00+00:00",
+                        "interval_seconds": 60,
+                        "missed_run_policy": "latest",
+                        "created": False,
+                    },
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            result = post_recurring_schedule_create(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                definition,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(result["created"])
+        self.assertEqual(result["next_run_at"], "2026-08-11T01:00:00+00:00")
+        self.assertFalse(thread.is_alive())
+
     def test_audit_event_page_uses_authenticated_get_and_validates_contract(self):
         observed = []
 
@@ -2337,6 +2449,22 @@ def _workflow_document():
         "edges": [
             {"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}
         ],
+    }
+
+
+def _recurring_definition():
+    return {
+        "schema_version": "skill2workflow-schedule-0.2.0",
+        "schedule": {
+            "id": "schedule_hourly_report",
+            "workflow_id": "workflow_recurring",
+            "version": "1.0.0",
+            "starts_at": "2026-08-11T00:00:00Z",
+            "interval_seconds": 60,
+            "missed_run_policy": "latest",
+            "enabled": True,
+        },
+        "trigger": {"input": {"private": "private-input"}},
     }
 
 

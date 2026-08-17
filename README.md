@@ -154,6 +154,7 @@ explicit connector boundaries. It currently supports:
 - Plan and publish verified retained SQLite copies that remove expired terminal run payloads while preserving waiting work and the source
 - Trigger published workflow versions from deterministic one-shot local schedules
 - Dispatch durable recurring interval schedules with explicit missed-run and recovery semantics
+- Create or replay one protected recurring schedule remotely with conflict-safe retries and a redacted response
 - Inspect bounded, redacted recurring-schedule dispatch outcomes remotely, including uncertain recovery evidence
 - Inspect remote workflow artifact consistency without exposing workflow content or credentials
 - Create, verify, and atomically restore owner-only offline SQLite state backups
@@ -754,7 +755,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-153 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-154 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1257,6 +1258,12 @@ authenticated operators can page through a redacted SQLite audit projection
 with exact filters and opaque sequence cursors, without exporting workflow DSL,
 trigger context, connector metadata, credentials, or raw errors.
 
+Loop 154 adds [protected remote recurring-schedule creation](docs/remote-schedule-create.md):
+the authenticated service and installed `service-recurring-schedule-add` client
+create or replay one durable SQLite schedule with a fixed redacted response,
+dispatcher-safe serialization, changed-definition conflict protection, and no
+trigger-input disclosure.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1278,6 +1285,7 @@ See:
 - `docs/remote-audit-events.md`
 - `docs/remote-schedule-inventory.md`
 - `docs/remote-schedule-actions.md`
+- `docs/remote-schedule-create.md`
 - `docs/remote-schedule-dispatches.md`
 - `docs/remote-workflow-artifacts.md`
 - `docs/remote-backup-readiness.md`

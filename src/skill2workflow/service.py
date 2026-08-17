@@ -29,6 +29,8 @@ from .dashboard import (
     MAX_LIVE_SNAPSHOT_BYTES,
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
+    MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
+    build_recurring_schedule_create_response,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
     MAX_WORKFLOW_INVENTORY_ITEMS,
     MAX_RUN_DETAIL_EVENTS,
@@ -113,6 +115,7 @@ _MUTATING_REQUEST_ROUTES = frozenset(
         "workflow_promotion",
         "workflow_deprecation",
         "recurring_schedule_action",
+        "recurring_schedule_create",
         "run_resume",
         "run_cancel",
     }
@@ -771,6 +774,8 @@ def _handler_for(service: RuntimeService):
                         self._handle_workflow_diff(_workflow_diff_parts(path))
                     elif self.command == "GET" and path == "/api/v1/recurring-schedules":
                         self._handle_recurring_schedule_list()
+                    elif self.command == "POST" and path == "/api/v1/recurring-schedules":
+                        self._handle_recurring_schedule_create()
                     elif self.command == "POST" and _recurring_schedule_action(path):
                         schedule_id, action = _recurring_schedule_action(path)
                         self._handle_recurring_schedule_action(
@@ -1119,6 +1124,93 @@ def _handler_for(service: RuntimeService):
                 self._send_json(503, {"error": "audit event page unavailable"})
                 return
             self._send_json(200, payload)
+
+        def _handle_recurring_schedule_create(self):
+            """Create or replay one authenticated recurring schedule."""
+
+            readiness_status, _ = service.readiness()
+            if readiness_status != 200:
+                self._send_json(503, {"error": "service is not ready"})
+                return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                service.control_plane.record_ingress_authentication(
+                    False,
+                    self.command,
+                    "recurring_schedule_create",
+                    reason=reason,
+                )
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            service.control_plane.record_ingress_authentication(
+                True,
+                self.command,
+                "recurring_schedule_create",
+            )
+            try:
+                body = read_request_body(self)
+                if not body:
+                    raise ValueError("recurring schedule create body must contain schedule")
+                payload = json.loads(body.decode("utf-8"))
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != {"schedule"}
+                    or not isinstance(payload.get("schedule"), dict)
+                ):
+                    raise ValueError("recurring schedule create body must contain schedule")
+                definition, created = (
+                    service.scheduler.dispatcher.store.add_with_result(
+                        payload["schedule"]
+                    )
+                )
+                service.control_plane.record_recurring_schedule_created(
+                    str(definition["schedule"]["id"]),
+                    created,
+                )
+                response = build_recurring_schedule_create_response(
+                    definition,
+                    created=created,
+                )
+                encoded = json.dumps(response, ensure_ascii=False).encode("utf-8")
+                if len(encoded) > MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES:
+                    raise ValueError("recurring schedule create exceeds response limit")
+                self._send_json(200, response)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._send_json(
+                    400,
+                    {"error": "recurring schedule create body must be valid JSON"},
+                )
+            except ValueError as error:
+                message = str(error)
+                if "already exists" in message:
+                    self._send_json(
+                        409,
+                        {"error": "recurring schedule already exists"},
+                    )
+                elif "body must" in message:
+                    self._send_json(400, {"error": message})
+                else:
+                    self._send_json(
+                        400,
+                        {"error": "recurring schedule definition rejected"},
+                    )
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "recurring schedule create unavailable"})
 
         def _handle_recurring_schedule_list(self):
             """Serve a bounded, redacted recurring-schedule inventory."""
@@ -2253,6 +2345,8 @@ def _request_route(method: str, path: str) -> str:
         return "workflow_diff"
     if method == "GET" and path == "/api/v1/recurring-schedules":
         return "recurring_schedule_list"
+    if method == "POST" and path == "/api/v1/recurring-schedules":
+        return "recurring_schedule_create"
     if method == "GET" and _recurring_schedule_dispatch_list(path) is not None:
         return "recurring_schedule_dispatch_list"
     if method == "POST" and _recurring_schedule_action(path):

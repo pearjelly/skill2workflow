@@ -18,6 +18,8 @@ from .operational_readiness import OPERATIONAL_READINESS_SCHEMA_VERSION
 from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
+    RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION,
+    MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
     MAX_WORKFLOW_INVENTORY_ITEMS,
     WORKFLOW_INVENTORY_SCHEMA_VERSION,
@@ -50,6 +52,7 @@ from .service import (
 )
 from .storage import AUDIT_INTEGRITY_ALGORITHM, AUDIT_INTEGRITY_SCHEMA_VERSION
 from .triggers import normalize_trigger_request
+from .schedules import normalize_recurring_schedule_definition
 from .webhooks import MAX_REQUEST_BODY_BYTES
 
 
@@ -60,6 +63,7 @@ MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_RECURRING_SCHEDULE_CREATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RETENTION_READINESS_REQUEST_BYTES = 64 * 1024
@@ -771,6 +775,29 @@ def post_recurring_schedule_state(
         not_found_message="recurring schedule not found",
     )
     _validate_recurring_schedule_action(payload, normalized_schedule_id, enabled)
+    return payload
+
+
+def post_recurring_schedule_create(
+    service_url: str,
+    token_file: Path,
+    definition: Dict[str, object],
+) -> Dict[str, object]:
+    """Create or replay one recurring schedule through the service boundary."""
+
+    if not isinstance(definition, dict):
+        raise ValueError("recurring schedule definition must be an object")
+    normalized = normalize_recurring_schedule_definition(definition)
+    payload = _post_json(
+        service_url,
+        token_file,
+        "/api/v1/recurring-schedules",
+        {"schedule": definition},
+        conflict_message="recurring schedule already exists",
+        max_request_bytes=MAX_RECURRING_SCHEDULE_CREATE_REQUEST_BYTES,
+        max_response_bytes=MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_create(payload, normalized)
     return payload
 
 
@@ -1764,6 +1791,61 @@ def _validate_recurring_schedule_action(
         or not isinstance(payload.get("changed"), bool)
     ):
         raise ServiceActionError()
+
+
+def _validate_recurring_schedule_create(
+    payload: Dict[str, object],
+    definition: Dict[str, object],
+) -> None:
+    """Validate the fixed redacted recurring-schedule create response."""
+
+    fields = {
+        "schema_version",
+        "schedule_id",
+        "workflow_id",
+        "workflow_version",
+        "status",
+        "enabled",
+        "starts_at",
+        "next_run_at",
+        "interval_seconds",
+        "missed_run_policy",
+        "created",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION:
+        raise ServiceActionError()
+    schedule = definition.get("schedule")
+    if not isinstance(schedule, dict):
+        raise ServiceActionError()
+    for response_key, source_key in (
+        ("schedule_id", "id"),
+        ("workflow_id", "workflow_id"),
+        ("workflow_version", "version"),
+        ("starts_at", "starts_at"),
+        ("interval_seconds", "interval_seconds"),
+        ("missed_run_policy", "missed_run_policy"),
+    ):
+        if payload.get(response_key) != schedule.get(source_key):
+            raise ServiceActionError()
+    enabled = payload.get("enabled")
+    if (
+        payload.get("status") not in {"active", "disabled"}
+        or (enabled is not True and enabled is not False)
+        or (payload.get("status") == "active") != payload.get("enabled")
+        or not isinstance(payload.get("next_run_at"), str)
+        or not payload.get("next_run_at")
+        or not isinstance(payload.get("created"), bool)
+    ):
+        raise ServiceActionError()
+    if payload.get("created"):
+        if (
+            payload.get("status") != schedule.get("status")
+            or payload.get("enabled") is not schedule.get("enabled")
+            or payload.get("next_run_at") != schedule.get("next_run_at")
+        ):
+            raise ServiceActionError()
 
 
 def _validate_recurring_schedule_dispatch_list(

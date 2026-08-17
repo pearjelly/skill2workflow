@@ -114,6 +114,12 @@ Add and inspect a recurring schedule using SQLite:
 PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/hourly.json \
   --state-dir /var/lib/skill2workflow --storage sqlite
 
+# From an authenticated service boundary, use the same recurring definition:
+PYTHONPATH=src python3 -m skill2workflow.cli service-recurring-schedule-add \
+  /tmp/hourly.json \
+  --service-url http://127.0.0.1:8080 \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
 PYTHONPATH=src python3 -m skill2workflow.cli schedules \
   --state-dir /var/lib/skill2workflow --storage sqlite
 
@@ -166,6 +172,11 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due \
 ```
 
 The legacy `skill2workflow-schedule-0.1.0` format remains a local one-shot JSON schedule for evaluation and compatibility. The long-running service dispatches only the durable `0.2.0` SQLite contract.
+
+The remote create path is documented in
+[`remote-schedule-create.md`](remote-schedule-create.md). It is retry-safe for
+an identical definition, rejects a changed existing definition, and returns
+only scheduling metadata; it never echoes trigger input.
 
 ## Repeatable Evidence
 

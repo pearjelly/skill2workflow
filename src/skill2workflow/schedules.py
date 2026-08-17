@@ -564,18 +564,40 @@ class RecurringScheduleStore:
         self._initialize()
 
     def add(self, definition: object) -> Schedule:
+        normalized, created = self.add_with_result(definition)
+        if not created:
+            schedule_id = str(normalized["schedule"]["id"])
+            raise ValueError(f"recurring schedule already exists: {schedule_id}")
+        return normalized
+
+    def add_with_result(self, definition: object) -> Tuple[Schedule, bool]:
+        """Create one recurring schedule, or replay an identical definition.
+
+        The transaction is serialized with dispatcher claims.  An identical
+        retry is a no-op and returns the persisted definition; a changed
+        definition for an existing id is rejected so a retry can never reset
+        durable progress such as ``next_run_at``.
+        """
+
         normalized = normalize_recurring_schedule_definition(definition)
         schedule_id = str(normalized["schedule"]["id"])
         with self._connection() as connection:
-            try:
-                connection.execute(
-                    "insert into recurring_schedules (schedule_id, definition_json, updated_at) values (?, ?, ?)",
-                    (schedule_id, _json_text(normalized), _utc_now()),
-                )
-            except sqlite3.IntegrityError as error:
-                raise ValueError(f"recurring schedule already exists: {schedule_id}") from error
+            connection.execute("begin immediate")
+            row = connection.execute(
+                "select definition_json from recurring_schedules where schedule_id = ?",
+                (schedule_id,),
+            ).fetchone()
+            if row is not None:
+                existing = _load_recurring_definition(row[0])
+                if _json_text(existing) == _json_text(normalized):
+                    return existing, False
+                raise ValueError(f"recurring schedule already exists: {schedule_id}")
+            connection.execute(
+                "insert into recurring_schedules (schedule_id, definition_json, updated_at) values (?, ?, ?)",
+                (schedule_id, _json_text(normalized), _utc_now()),
+            )
             _upsert_recurring_schedule_summary(connection, normalized)
-        return normalized
+        return normalized, True
 
     def get(self, schedule_id: str) -> Schedule:
         with self._connection() as connection:

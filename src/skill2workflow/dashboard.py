@@ -25,6 +25,7 @@ SUPPORT_BUNDLE_SCHEMA_VERSION = "skill2workflow-support-bundle-0.1.0"
 WORKFLOW_INVENTORY_SCHEMA_VERSION = "skill2workflow-workflow-inventory-0.1.0"
 RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list-0.1.0"
 RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION = "skill2workflow-recurring-schedule-action-0.1.0"
+RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-create-0.1.0"
 RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
@@ -35,9 +36,39 @@ MAX_RUN_PAGE_ITEMS = 100
 MAX_AUDIT_EVENT_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
+MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES = 16 * 1024
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
 MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES = 64
 MAX_WORKFLOW_INVENTORY_ITEMS = 100
+
+
+def build_recurring_schedule_create_response(
+    definition: Dict[str, object],
+    *,
+    created: bool,
+) -> Dict[str, object]:
+    """Project one schedule mutation without returning trigger metadata."""
+
+    if not isinstance(definition, dict) or not isinstance(
+        definition.get("schedule"), dict
+    ):
+        raise ValueError("recurring schedule definition must be normalized")
+    schedule = definition["schedule"]
+    if not isinstance(created, bool):
+        raise ValueError("recurring schedule creation state must be boolean")
+    return {
+        "schema_version": RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION,
+        "schedule_id": str(schedule.get("id", "")),
+        "workflow_id": str(schedule.get("workflow_id", "")),
+        "workflow_version": str(schedule.get("version", "")),
+        "status": str(schedule.get("status", "")),
+        "enabled": bool(schedule.get("enabled", False)),
+        "starts_at": str(schedule.get("starts_at", "")),
+        "next_run_at": str(schedule.get("next_run_at", "")),
+        "interval_seconds": int(schedule.get("interval_seconds", 0)),
+        "missed_run_policy": str(schedule.get("missed_run_policy", "")),
+        "created": created,
+    }
 
 
 def build_control_snapshot(

@@ -902,6 +902,48 @@ class CliTests(TestCase):
             enabled=False,
         )
 
+    def test_service_recurring_schedule_add_command_prints_create_result(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        schedule_file = Path("/private/schedule.json")
+        definition = {
+            "schema_version": "skill2workflow-schedule-0.2.0",
+            "schedule": {"id": "schedule_remote", "workflow_id": "workflow", "version": "1.0.0"},
+            "trigger": {"input": {}},
+        }
+        expected = {
+            "schema_version": "skill2workflow-recurring-schedule-create-0.1.0",
+            "schedule_id": "schedule_remote",
+            "workflow_id": "workflow",
+            "workflow_version": "1.0.0",
+            "status": "active",
+            "enabled": True,
+            "starts_at": "2026-08-11T00:00:00+00:00",
+            "next_run_at": "2026-08-11T00:00:00+00:00",
+            "interval_seconds": 60,
+            "missed_run_policy": "latest",
+            "created": True,
+        }
+        with patch("skill2workflow.cli._load_json", return_value=definition), patch(
+            "skill2workflow.cli.post_recurring_schedule_create",
+            return_value=expected,
+        ) as create:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-recurring-schedule-add",
+                        str(schedule_file),
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        create.assert_called_once_with("https://service.example", token_file, definition)
+
     def test_service_audit_consistency_command_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

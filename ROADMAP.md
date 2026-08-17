@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-153
+- Completed delivery loops: 1-154
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 153 is complete with a bounded remote audit event tail
+- Active loop: None; Loop 154 is complete with protected remote recurring-schedule creation
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -3565,9 +3565,48 @@ single-tenant SQLite service. It does not provide audit export, tamper repair,
 full-text search, provider reconciliation, multi-tenant authorization, or a
 claim of complete historical observability beyond the paged rows.
 
+### Loop 154: Protected Remote Recurring-Schedule Creation
+
+**Status:** Complete.
+
+**Prior basis:** Remote operators could inventory and enable or disable durable
+recurring schedules, but creating one still required shell access. A remote
+creation path must not expose trigger input, reset an existing schedule's
+progress on retry, or turn a malformed request into an unbounded state write.
+
+**Outcome:** The authenticated `POST /api/v1/recurring-schedules` route and
+installed `service-recurring-schedule-add` client accept the exact
+`{"schedule": {...}}` wrapper and create one normalized SQLite recurring
+schedule. Identical retries are idempotent no-ops with `created: false`; a
+changed definition for an existing `schedule_id` returns a fixed conflict and
+cannot overwrite `next_run_at` or dispatch state. The response is the fixed
+`skill2workflow-recurring-schedule-create-0.1.0` redacted projection and never
+returns trigger input, source, or idempotency-prefix values.
+
+**Evidence:** `RecurringScheduleStore.add_with_result` uses one
+`BEGIN IMMEDIATE` transaction to serialize create/replay decisions and update
+the compact schedule summary. Service readiness, ingress authentication,
+lease admission, fixed request/response bounds, audit events, client
+validation, CLI help, schema, and documentation tests cover the boundary. The
+focused command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_recurring_schedules.RecurringSchedulePersistenceTests.test_add_with_result_replays_identical_definition_without_resetting_state \
+  tests.test_service.RuntimeServiceTests.test_recurring_schedule_create_is_authenticated_idempotent_redacted_and_audited \
+  tests.test_service_client.ServiceClientTests.test_recurring_schedule_create_uses_authenticated_post_and_redacted_contract \
+  tests.test_cli.CliTests.test_service_recurring_schedule_add_command_prints_create_result -v
+```
+
+**Safety boundary:** This is a protected single-tenant recurring-schedule
+creation boundary. It does not add schedule update/delete, one-shot trigger
+execution, workflow publication, provider exactly-once guarantees, hosted
+multi-tenant authorization, or a claim that trigger payloads are safe to
+return.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 153 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 154 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -3686,6 +3725,7 @@ This rolling queue is ordered. Loop 153 is complete and there is no active deliv
 | Loop 151: Bounded Service Soak And Cutover Evidence | Complete | Prove repeated real-process cutovers preserve idempotent trigger behavior and SQLite/audit continuity | Three-cycle service soak, replay/conflict checks, graceful shutdown, authenticated audit diagnostics, operational CI gate, tests, and documentation |
 | Loop 152: Production Baseline Evidence Bundle | Complete | Make the approved production-boundary evidence repeatable as one safe release-review artifact | Fixed 19-check bundle, isolated child workspaces, redacted summary schema, optional release-preflight flag, CI coverage, tests, and documentation |
 | Loop 153: Authenticated Redacted Audit Event Tail | Complete | Give remote operators bounded chronological audit diagnostics without exporting sensitive payloads | Fixed redacted schema, exact filters, opaque sequence cursors, SQLite source bounds, authenticated CLI/route, leakage/read-only evidence, and documentation |
+| Loop 154: Protected Remote Recurring-Schedule Creation | Complete | Let remote operators create or replay one durable recurring schedule without exposing trigger input or resetting progress | Exact wrapped POST and installed CLI, `BEGIN IMMEDIATE` replay/conflict protection, redacted response schema, authentication/readiness/lease/audit evidence, and documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

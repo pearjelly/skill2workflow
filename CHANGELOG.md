@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added protected remote recurring-schedule creation through
+  `POST /api/v1/recurring-schedules` and the installed
+  `service-recurring-schedule-add` CLI. Identical retries are no-ops, changed
+  definitions return a fixed conflict, SQLite creation serializes with
+  dispatcher claims, and the response never returns trigger input.
 - Added the authenticated, read-only `GET /api/v1/audit-events` route and
   `service-audit-events` CLI. The fixed redacted SQLite projection supports
   exact filters and opaque sequence cursors under a 100-item/64 KiB bound,

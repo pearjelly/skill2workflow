@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -78,7 +79,7 @@ class InputSchemaTests(TestCase):
                 )
 
             self.assertEqual(control.list_runs(), [])
-            with sqlite3.connect(state_dir / "control.sqlite3") as connection:
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection:
                 self.assertEqual(
                     connection.execute("select count(*) from trigger_idempotency").fetchone()[0],
                     0,

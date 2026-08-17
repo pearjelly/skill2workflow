@@ -49,6 +49,7 @@ from .service_client import (
     fetch_run_page,
     fetch_support_bundle,
     post_recurring_schedule_state,
+    post_recurring_schedule_create,
     post_run_cancel,
     post_run_resume,
     post_workflow_release,
@@ -575,6 +576,14 @@ def main(argv=None) -> int:
         service_schedule_state_cmd.add_argument("schedule_id")
         service_schedule_state_cmd.add_argument("--service-url", required=True)
         service_schedule_state_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_schedule_create_cmd = subparsers.add_parser(
+        "service-recurring-schedule-add",
+        help="Create or replay one recurring schedule through the authenticated service",
+    )
+    service_schedule_create_cmd.add_argument("schedule", type=Path)
+    service_schedule_create_cmd.add_argument("--service-url", required=True)
+    service_schedule_create_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_support_cmd = subparsers.add_parser(
         "service-support-bundle",
@@ -1189,6 +1198,15 @@ def main(argv=None) -> int:
                 args.auth_token_file,
                 args.schedule_id,
                 enabled=args.command == "service-schedule-enable",
+            )
+        )
+
+    if args.command == "service-recurring-schedule-add":
+        return _service_action(
+            lambda: post_recurring_schedule_create(
+                args.service_url,
+                args.auth_token_file,
+                _load_json(args.schedule),
             )
         )
 

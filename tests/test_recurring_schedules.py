@@ -67,6 +67,20 @@ class RecurringScheduleContractTests(TestCase):
 
 
 class RecurringSchedulePersistenceTests(TestCase):
+    def test_add_with_result_replays_identical_definition_without_resetting_state(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            first, created = store.add_with_result(_recurring_definition())
+            repeated, replayed = store.add_with_result(_recurring_definition())
+            store.set_enabled_with_result("schedule_hourly_report", False)
+
+            with self.assertRaisesRegex(ValueError, "already exists"):
+                store.add_with_result(_recurring_definition())
+
+        self.assertTrue(created)
+        self.assertFalse(replayed)
+        self.assertEqual(first, repeated)
+
     def test_set_enabled_with_result_is_idempotent_and_serialized(self):
         with TemporaryDirectory() as tmp:
             store = RecurringScheduleStore(Path(tmp))

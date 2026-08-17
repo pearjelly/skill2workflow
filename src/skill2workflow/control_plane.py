@@ -1003,6 +1003,7 @@ class LocalControlPlane:
             "run_list",
             "run_page",
             "run_detail",
+            "recurring_schedule_create",
             "recurring_schedule_action",
             "workflow_release",
             "workflow_promotion",
@@ -1046,6 +1047,31 @@ class LocalControlPlane:
                 "schedule_id": normalized_id,
                 "enabled": enabled,
                 "changed": changed,
+                "timestamp": _now(),
+            }
+        )
+
+    def record_recurring_schedule_created(
+        self,
+        schedule_id: str,
+        created: bool,
+    ) -> None:
+        """Persist bounded evidence for a remote schedule create or replay."""
+
+        normalized_id = str(schedule_id)
+        if (
+            not normalized_id
+            or len(normalized_id) > 128
+            or any(not (char.isalnum() or char in {"-", "_", "."}) for char in normalized_id)
+        ):
+            raise ValueError("schedule_id must be a safe schedule identifier")
+        if not isinstance(created, bool):
+            raise ValueError("schedule creation state must be boolean")
+        self._append_audit(
+            {
+                "type": "recurring_schedule_created",
+                "schedule_id": normalized_id,
+                "created": created,
                 "timestamp": _now(),
             }
         )
