@@ -116,6 +116,11 @@ draining, or unavailable service is distinguishable from static mode; that
 diagnostic route only calls `/healthz` and `/readyz` and returns the existing
 value-free probe schema.
 
+With live mode configured, the UI's explicit **Auto-refresh** control uses a
+fixed 10-second interval, skips hidden pages, and keeps the last valid snapshot
+visible when a refresh fails. Loading an example or file stops the timer; there
+is no background polling in static mode.
+
 ## Verification
 
 Run the real-process drill:

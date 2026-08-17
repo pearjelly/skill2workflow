@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added explicit fixed-interval live snapshot refresh to the installed control
+  console. The 10-second timer pauses while the page is hidden, stops when the
+  operator returns to static/file snapshots, and preserves the last valid view
+  across transient refresh failures.
+
 - Added a bounded service-readiness badge to the installed live control-plane
   UI. It composes the existing health/readiness probe contract through a fixed
   same-origin route and distinguishes static mode from a not-ready or

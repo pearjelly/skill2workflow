@@ -29,3 +29,4 @@ class InstalledUiDocumentationTests(TestCase):
         self.assertIn("Loop 206: Installed Static UI Launcher", roadmap)
         self.assertIn("Loop 207: Authenticated Live Control-Plane UI", roadmap)
         self.assertIn("Loop 208: Live Service Readiness Badge", roadmap)
+        self.assertIn("Loop 209: Bounded Live Snapshot Refresh", roadmap)

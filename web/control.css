@@ -172,6 +172,11 @@ input {
   color: var(--blue);
 }
 
+.toolbar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .toolbar input[type="search"] {
   width: 190px;
   padding: 0 10px;

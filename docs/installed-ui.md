@@ -44,6 +44,12 @@ same-origin `/api/v1/service-probe` route, which only composes the existing
 `/healthz` and `/readyz` endpoints. It is diagnostic only; the ingress token is
 used for the snapshot route and never sent to the browser.
 
+When live mode is configured, **Auto-refresh** can be enabled explicitly. It
+refreshes the live snapshot at the fixed 10-second interval, skips requests
+while the page is hidden, and preserves the last valid snapshot if a refresh
+fails. Switching back to the example or loading a file stops the timer. Static
+mode disables the control.
+
 The live mode does not add TLS, public ingress, RBAC, mutations, or provider
 reconciliation. Keep the UI on loopback or place it behind an operator-managed
 HTTPS boundary when serving a wider network.

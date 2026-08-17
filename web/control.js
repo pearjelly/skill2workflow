@@ -3,12 +3,19 @@
   const LIVE_SNAPSHOT_URL = "/api/v1/control-snapshot";
   const SERVICE_PROBE_URL = "/api/v1/service-probe";
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
+  const AUTO_REFRESH_INTERVAL_MS = 10000;
   const state = {
     snapshot: null,
     view: "operator",
     selected: null,
     filter: "",
     sourceLabel: "",
+    liveModeConfigured: false,
+    liveRefreshEnabled: false,
+    liveRefreshTimer: null,
+    liveLoading: false,
+    lastLiveLoadedAt: "",
+    liveRefreshError: false,
   };
 
   const els = {};
@@ -25,6 +32,7 @@
   function cacheElements() {
     els.loadExample = document.getElementById("load-example");
     els.loadLive = document.getElementById("load-live");
+    els.toggleRefresh = document.getElementById("toggle-refresh");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
@@ -57,6 +65,7 @@
   function bindEvents() {
     els.loadExample.addEventListener("click", loadExample);
     els.loadLive.addEventListener("click", loadLiveSnapshot);
+    els.toggleRefresh.addEventListener("click", toggleAutoRefresh);
     els.snapshotFile.addEventListener("change", loadSelectedFile);
     els.filterInput.addEventListener("input", function () {
       state.filter = els.filterInput.value.trim().toLowerCase();
@@ -67,9 +76,15 @@
         setView(tab.dataset.view);
       });
     });
+    document.addEventListener("visibilitychange", function () {
+      if (state.liveRefreshEnabled && document.visibilityState === "visible") {
+        loadLiveSnapshot({ background: true });
+      }
+    });
   }
 
   async function loadExample() {
+    stopAutoRefresh();
     setStatus("Loading", "");
     try {
       const response = await fetch(EXAMPLE_URL, { cache: "no-store" });
@@ -82,17 +97,64 @@
     }
   }
 
-  async function loadLiveSnapshot() {
-    setStatus("Loading", "");
+  async function loadLiveSnapshot(options) {
+    const background = Boolean(options && options.background);
+    if (state.liveLoading) {
+      return;
+    }
+    state.liveLoading = true;
+    setStatus(background ? "Refreshing" : "Loading", "");
     loadServiceProbe();
     try {
       const response = await fetch(LIVE_SNAPSHOT_URL, { cache: "no-store" });
+      if (response.status === 404) {
+        stopAutoRefresh();
+      }
       if (!response.ok) {
         throw new Error("live snapshot unavailable");
       }
       loadSnapshot(await response.json(), "Live Service Snapshot");
     } catch (error) {
-      rejectSnapshot("Live Service Snapshot", { error: "live snapshot unavailable" });
+      if (background && state.snapshot) {
+        state.liveRefreshError = true;
+        setStatus("Unavailable", "is-invalid");
+        renderSnapshotScope();
+      } else {
+        rejectSnapshot("Live Service Snapshot", { error: "live snapshot unavailable" });
+      }
+    } finally {
+      state.liveLoading = false;
+    }
+  }
+
+  function toggleAutoRefresh() {
+    if (!state.liveModeConfigured) {
+      return;
+    }
+    if (state.liveRefreshEnabled) {
+      stopAutoRefresh();
+      return;
+    }
+    state.liveRefreshEnabled = true;
+    els.toggleRefresh.setAttribute("aria-pressed", "true");
+    els.toggleRefresh.textContent = "Auto-refresh: On (10s)";
+    state.liveRefreshTimer = window.setInterval(function () {
+      if (document.visibilityState === "visible") {
+        loadLiveSnapshot({ background: true });
+      }
+    }, AUTO_REFRESH_INTERVAL_MS);
+    loadLiveSnapshot({ background: true });
+  }
+
+  function stopAutoRefresh() {
+    if (state.liveRefreshTimer !== null) {
+      window.clearInterval(state.liveRefreshTimer);
+      state.liveRefreshTimer = null;
+    }
+    state.liveRefreshEnabled = false;
+    if (els.toggleRefresh) {
+      els.toggleRefresh.setAttribute("aria-pressed", "false");
+      els.toggleRefresh.textContent = "Auto-refresh: Off";
     }
   }
 
@@ -101,9 +163,14 @@
     try {
       const response = await fetch(SERVICE_PROBE_URL, { cache: "no-store" });
       if (response.status === 404) {
+        state.liveModeConfigured = false;
+        stopAutoRefresh();
+        els.toggleRefresh.disabled = true;
         setServiceStatus("Live service: static mode", "");
         return;
       }
+      state.liveModeConfigured = true;
+      els.toggleRefresh.disabled = false;
       if (!response.ok) {
         throw new Error("service probe unavailable");
       }
@@ -118,6 +185,8 @@
       };
       setServiceStatus(labels[probe.status][0], labels[probe.status][1]);
     } catch (error) {
+      state.liveModeConfigured = true;
+      els.toggleRefresh.disabled = false;
       setServiceStatus("Live service: unavailable", "is-invalid");
     }
   }
@@ -136,6 +205,7 @@
   }
 
   async function loadSelectedFile(event) {
+    stopAutoRefresh();
     const file = event.target.files && event.target.files[0];
     if (!file) {
       return;
@@ -155,6 +225,13 @@
     }
     state.snapshot = snapshot;
     state.sourceLabel = label;
+    if (label === "Live Service Snapshot") {
+      state.lastLiveLoadedAt = new Date().toISOString();
+      state.liveRefreshError = false;
+    } else {
+      state.lastLiveLoadedAt = "";
+      state.liveRefreshError = false;
+    }
     state.selected = {
       kind: "snapshot",
       value: Object.assign(
@@ -282,7 +359,9 @@
     const windowState = state.snapshot.window;
     if (!windowState) {
       els.snapshotScopeTitle.textContent = "Complete offline snapshot";
-      els.snapshotScopeDetail.textContent = state.sourceLabel + " contains the full exported collections.";
+      els.snapshotScopeDetail.textContent = snapshotScopeDetail(
+        state.sourceLabel + " contains the full exported collections."
+      );
       return;
     }
     els.snapshotScope.classList.add("is-bounded");
@@ -297,9 +376,19 @@
       ? "1 collection is truncated"
       : truncated.length + " collections are truncated";
     els.snapshotScopeTitle.textContent = "Bounded snapshot";
-    els.snapshotScopeDetail.textContent = truncated.length
+    els.snapshotScopeDetail.textContent = snapshotScopeDetail(truncated.length
       ? truncationLabel + ": " + truncated.join(", ") + ". Totals remain visible in Summary."
-      : "All collections fit within the " + windowState.max_items + " item live window.";
+      : "All collections fit within the " + windowState.max_items + " item live window.");
+  }
+
+  function snapshotScopeDetail(detail) {
+    if (state.sourceLabel !== "Live Service Snapshot" || !state.lastLiveLoadedAt) {
+      return detail;
+    }
+    const updated = "Last updated " + formatDate(state.lastLiveLoadedAt) + ".";
+    return state.liveRefreshError
+      ? detail + " " + updated + " Last refresh failed; showing the previous snapshot."
+      : detail + " " + updated;
   }
 
   function renderSummary() {
