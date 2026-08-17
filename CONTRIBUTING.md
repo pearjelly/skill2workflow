@@ -29,9 +29,12 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 CI repeats the full release-relevant checks on Python 3.9 and 3.14, covering
 the supported floor and the current stable interpreter. Each matrix entry also
 runs the security-boundary, observability, and service restart-continuity
-smokes, so a green unit suite cannot hide a broken real-process boundary.
-Contributors may use any supported Python locally; compatibility-sensitive
-changes should be reviewed against both matrix endpoints.
+smokes, while a dedicated Python 3.14 job runs the backup, migration,
+retention, cancellation, crash-recovery, scheduling, and Doctor gates. A green
+unit suite therefore cannot hide a broken real-process or state-safety
+boundary. Contributors may use any supported Python locally;
+compatibility-sensitive changes should be reviewed against both matrix
+endpoints.
 
 Optionally install the checkout in editable mode to use the `skill2workflow` console script:
 
@@ -66,6 +69,23 @@ python3 scripts/observability_rules_smoke.py
 python3 scripts/observability_dashboard_smoke.py
 python3 scripts/service_boundary_smoke.py --work-dir /tmp/skill2workflow-service-boundary-ci
 ```
+
+The CI recovery and state-safety gate can be reproduced locally as one isolated
+sequence:
+
+```bash
+python3 scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-backup-ci
+python3 scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-state-upgrade-ci
+python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-retention-ci
+python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellation-ci
+python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-interrupted-ci
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-ci
+python3 scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-recurring-scheduler-ci
+python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-doctor-ci
+```
+
+Each command owns a fresh work directory; the gate never uses live providers,
+credentials, or a host service manager.
 
 Run a fresh-checkout CLI smoke:
 

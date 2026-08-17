@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a dedicated CI recovery and state-safety gate that runs isolated
+  backup/restore, migration, retention, cancellation, interrupted-recovery,
+  scheduling, and service-Doctor drills on Python 3.14, with matching local
+  reproduction commands for contributors and release operators.
 - Bounded the source reads for `audit-consistency`: global inspection counts
   durable runs and loads only the newest 256 summaries, while `--run-id` reads
   one run directly; the fixed report contract and diagnostic-only semantics are

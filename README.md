@@ -741,7 +741,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-147 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-148 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1210,6 +1210,11 @@ now use transactional node overlays, summary counts, and a bounded event tail
 instead of parsing complete run documents containing trigger input, workflow
 DSL, node results, and long event histories; complete local state retrieval
 remains available through its explicit compatibility path.
+
+Loop 148 adds a dedicated CI recovery and state-safety gate. Every change now
+gets isolated backup/restore, migration, retention, cancellation,
+interrupted-recovery, scheduling, and service-Doctor evidence on Python 3.14,
+in addition to the existing cross-version unit and production-boundary checks.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

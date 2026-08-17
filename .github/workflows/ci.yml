@@ -46,3 +46,23 @@ jobs:
         with:
           python-version: "3.14"
       - run: python scripts/systemd_service_smoke.py --work-dir /tmp/skill2workflow-systemd-service-ci --systemd-analyze-verify
+
+  operational-gates:
+    name: recovery and state-safety gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - run: python scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-backup-ci
+      - run: python scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-state-upgrade-ci
+      - run: python scripts/retention_smoke.py --work-dir /tmp/skill2workflow-retention-ci
+      - run: python scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellation-ci
+      - run: python scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-interrupted-ci
+      - run: python scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-ci
+      - run: python scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-recurring-scheduler-ci
+      - run: python scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-doctor-ci

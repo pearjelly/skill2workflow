@@ -46,6 +46,21 @@ class ContinuousIntegrationContractTests(TestCase):
         self.assertIn("systemd_service_smoke.py", workflow)
         self.assertIn("--systemd-analyze-verify", workflow)
 
+    def test_ci_runs_recovery_and_state_safety_gates(self):
+        workflow = (
+            Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("operational-gates:", workflow)
+        self.assertIn("backup_restore_smoke.py", workflow)
+        self.assertIn("state_upgrade_smoke.py", workflow)
+        self.assertIn("retention_smoke.py", workflow)
+        self.assertIn("cancellation_smoke.py", workflow)
+        self.assertIn("interrupted_recovery_smoke.py", workflow)
+        self.assertIn("schedule_smoke.py", workflow)
+        self.assertIn("recurring_scheduler_smoke.py", workflow)
+        self.assertIn("service_doctor_smoke.py", workflow)
+
     def test_contributor_and_release_docs_reproduce_production_boundary_drills(self):
         root = Path(__file__).resolve().parents[1]
         contributing = (root / "CONTRIBUTING.md").read_text(encoding="utf-8")
@@ -55,6 +70,24 @@ class ContinuousIntegrationContractTests(TestCase):
             "security_boundary_smoke.py",
             "observability_smoke.py",
             "service_boundary_smoke.py",
+        ):
+            self.assertIn(script, contributing)
+            self.assertIn(script, release)
+
+    def test_contributor_and_release_docs_reproduce_state_safety_gates(self):
+        root = Path(__file__).resolve().parents[1]
+        contributing = (root / "CONTRIBUTING.md").read_text(encoding="utf-8")
+        release = (root / "docs" / "release-process.md").read_text(encoding="utf-8")
+
+        for script in (
+            "backup_restore_smoke.py",
+            "state_upgrade_smoke.py",
+            "retention_smoke.py",
+            "cancellation_smoke.py",
+            "interrupted_recovery_smoke.py",
+            "schedule_smoke.py",
+            "recurring_scheduler_smoke.py",
+            "service_doctor_smoke.py",
         ):
             self.assertIn(script, contributing)
             self.assertIn(script, release)

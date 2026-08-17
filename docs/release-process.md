@@ -61,6 +61,26 @@ The package smoke output includes the generated
 release when users need an independently verifiable wheel hash and member
 inventory. See [`release-artifact-manifest.md`](release-artifact-manifest.md).
 
+The CI `operational-gates` job also runs the state-safety and recovery drills
+on Python 3.14: backup/restore, state upgrade, retention, cancellation,
+interrupted recovery, one-shot and recurring scheduling, and the service
+Doctor. Reproduce the same isolated sequence before a release PR:
+
+```bash
+python3 scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-release-backup-ci
+python3 scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-release-upgrade-ci
+python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-release-retention-ci
+python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-release-cancellation-ci
+python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-release-interrupted-ci
+python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-release-schedule-ci
+python3 scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-release-recurring-ci
+python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-release-doctor-ci
+```
+
+These are local deterministic drills, not a claim of hosted disaster recovery,
+exactly-once delivery, external-provider availability, or automatic service
+orchestration.
+
 If the preflight command already ran the unit suite, compile check, and isolated
 wheel qualification, it is acceptable to cite that output once instead of
 duplicating the logs. The package smoke must build a wheel and install that
