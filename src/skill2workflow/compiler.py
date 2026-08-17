@@ -153,6 +153,14 @@ def validate_workflow(workflow: Workflow) -> List[str]:
 def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
     """Return machine-readable validation errors for a Workflow DSL document."""
     errors: List[ValidationError] = []
+    if not isinstance(workflow, dict):
+        return [
+            _validation_error(
+                "workflow_not_object",
+                "workflow document must be a JSON object",
+                [],
+            )
+        ]
     if workflow.get("schema_version") != "0.1.0":
         errors.append(
             _validation_error(

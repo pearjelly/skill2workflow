@@ -70,7 +70,20 @@ from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 from .webhooks import serve_webhook_requests
 
 
+MAX_CLI_JSON_DOCUMENT_BYTES = 8 * 1024 * 1024
+
+
 def main(argv=None) -> int:
+    """Run the CLI and turn operator-input failures into stable exit codes."""
+
+    try:
+        return _main(argv)
+    except (OSError, UnicodeError, ValueError) as error:
+        print(str(error), file=sys.stderr)
+        return 1
+
+
+def _main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="skill2workflow")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1502,7 +1515,27 @@ def main(argv=None) -> int:
 
 
 def _load_json(path: Path):
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        if path.stat().st_size > MAX_CLI_JSON_DOCUMENT_BYTES:
+            raise ValueError(
+                f"JSON document exceeds {MAX_CLI_JSON_DOCUMENT_BYTES} bytes"
+            )
+        with path.open("rb") as handle:
+            raw = handle.read(MAX_CLI_JSON_DOCUMENT_BYTES + 1)
+    except OSError:
+        raise
+    if len(raw) > MAX_CLI_JSON_DOCUMENT_BYTES:
+        raise ValueError(
+            f"JSON document exceeds {MAX_CLI_JSON_DOCUMENT_BYTES} bytes"
+        )
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError("JSON document must be UTF-8") from error
+    try:
+        return json.loads(text)
+    except RecursionError as error:
+        raise ValueError("JSON document nesting is too deep") from error
 
 
 def _print_json(value) -> None:

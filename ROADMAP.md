@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-165
+- Completed delivery loops: 1-166
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 165 is complete with bounded one-shot schedule document reads
+- Active loop: None; Loop 166 is complete with bounded CLI JSON document inputs
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-165 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-166 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 164; the detailed
+The follow-on production hardening continues through Loop 166; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -3917,9 +3917,37 @@ change trigger input semantics, recurring schedule storage, workflow
 execution, provider effects, directory enumeration, or distributed
 scheduling.
 
+### Loop 166: Bounded CLI JSON Document Inputs
+
+**Status:** Complete.
+
+**Prior basis:** The runtime's service bodies, trigger inputs, credentials,
+and one-shot schedules had explicit read limits, but generic JSON files passed
+to the local CLI still used an unbounded `read_text` call. A malformed or
+hostile workflow, policy, LiteGraph, or run-state file could therefore consume
+unbounded memory before schema validation or the command's normal error path.
+
+**Outcome:** The shared CLI JSON loader now accepts at most 8 MiB of UTF-8
+bytes, checks the size before opening, reads at most one byte beyond the limit,
+and rechecks the window to catch file growth between those operations. The
+public `main` boundary converts uncaught operator-input `OSError`, decoding,
+and JSON/value failures into exit status `1` without a traceback. Existing
+domain-specific trigger, schedule, and service-body limits remain stricter.
+
+**Evidence:** CLI regression coverage proves an oversized workflow is rejected
+before validation, emits a fixed size error, and does not print a traceback.
+The focused CLI and documentation suites preserve all existing command and
+Workflow DSL compatibility contracts. The exact boundary is documented in
+[`docs/cli-input-boundary.md`](docs/cli-input-boundary.md).
+
+**Safety boundary:** This bounds generic local CLI JSON parsing only. It does
+not change Workflow DSL semantics, persistent state formats, service request
+framing, credential handling, or introduce remote upload, multi-tenancy, or
+arbitrary-size workflow execution.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 165 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 166 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4050,6 +4078,7 @@ This rolling queue is ordered. Loop 165 is complete and there is no active deliv
 | Loop 163: Bounded Remote Backup Retention Scanning | Complete | Keep over-budget retention preflights from traversing an unbounded backup parent before failing closed | Fixed `limit + 1` scan guard, lower-bound truncation semantics, regression coverage, and aligned backup/remote-retention documentation |
 | Loop 164: Lazy Bounded One-Shot Schedule Discovery | Complete | Keep bounded local due batches and compact schedule inventories from materializing every schedule-directory path | Lazy file enumeration, deterministic `(run_at, schedule.id)` selection, bounded full-definition retention, compatibility tests, and aligned trigger documentation |
 | Loop 165: Bounded One-Shot Schedule Document Reads | Complete | Keep local one-shot schedule parsing from allocating an unbounded JSON document | Fixed 2 MiB UTF-8 read window across save/read/list/compact/due paths, growth-race recheck, fail-closed regression coverage, and aligned scheduling documentation |
+| Loop 166: Bounded CLI JSON Document Inputs | Complete | Keep generic local CLI JSON parsing from allocating an unbounded operator file | Fixed 8 MiB UTF-8 window, growth-race recheck, stable no-traceback input failures, compatibility regression coverage, and CLI boundary documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

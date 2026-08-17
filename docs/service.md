@@ -125,6 +125,13 @@ bounded-read check for files that grow after `stat`. Oversized documents fail
 closed before JSON normalization; recurring SQLite schedule documents and the
 1 MiB trigger-input contract remain unchanged.
 
+Loop 166 adds the shared local CLI JSON input boundary documented in
+[`cli-input-boundary.md`](cli-input-boundary.md). Generic JSON operands are
+limited to 8 MiB of UTF-8 bytes, growth-raced reads fail closed, and uncaught
+operator-input failures return a stable non-zero exit without a traceback.
+This does not change the service's HTTP body limits or its authenticated
+single-tenant boundary.
+
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
 The HTTP control plane and recurring dispatcher share the scheduler lease owner.

@@ -2,13 +2,13 @@ import json
 import threading
 from contextlib import redirect_stderr, redirect_stdout
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
-from skill2workflow.cli import main
+from skill2workflow.cli import MAX_CLI_JSON_DOCUMENT_BYTES, main
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.state_layout import STATE_LAYOUT_MARKER
 from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
@@ -2167,6 +2167,64 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 1)
         self.assertIn("trigger input exceeds", stderr.getvalue())
         self.assertFalse(state_dir.exists())
+
+    def test_validate_command_rejects_oversized_json_without_traceback(self):
+        with TemporaryDirectory() as tmp:
+            workflow_path = Path(tmp) / "oversized-workflow.json"
+            workflow_path.write_text(
+                json.dumps({"payload": "x" * MAX_CLI_JSON_DOCUMENT_BYTES}),
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with patch("pathlib.Path.open") as open_file:
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    exit_code = main(["validate", str(workflow_path)])
+            open_file.assert_not_called()
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn(
+            f"JSON document exceeds {MAX_CLI_JSON_DOCUMENT_BYTES} bytes",
+            stderr.getvalue(),
+        )
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_validate_command_rejects_json_that_grows_after_size_check(self):
+        with TemporaryDirectory() as tmp:
+            workflow_path = Path(tmp) / "growing-workflow.json"
+            workflow_path.write_text("{}", encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+            growing_bytes = BytesIO(b"{}" + b"x" * MAX_CLI_JSON_DOCUMENT_BYTES)
+
+            with patch("pathlib.Path.open", return_value=growing_bytes):
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    exit_code = main(["validate", str(workflow_path)])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn(
+            f"JSON document exceeds {MAX_CLI_JSON_DOCUMENT_BYTES} bytes",
+            stderr.getvalue(),
+        )
+        self.assertNotIn("Traceback", stderr.getvalue())
+
+    def test_validate_command_rejects_non_object_json_without_traceback(self):
+        with TemporaryDirectory() as tmp:
+            workflow_path = Path(tmp) / "non-object-workflow.json"
+            workflow_path.write_text(json.dumps(["not", "a", "workflow"]), encoding="utf-8")
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(["validate", str(workflow_path)])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("workflow document must be a JSON object", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_schedule_commands_add_list_and_run_due(self):
         with TemporaryDirectory() as tmp:

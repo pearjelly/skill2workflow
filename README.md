@@ -756,7 +756,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-165 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-166 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1328,6 +1328,12 @@ oversized documents before JSON normalization, including a growth-race
 recheck. The existing 1 MiB trigger-input boundary and recurring SQLite
 contract remain unchanged.
 
+Loop 166 adds a fixed 8 MiB UTF-8 boundary for generic JSON files supplied to
+the local CLI. The loader checks size before reading, rechecks for growth, and
+returns a stable exit status without a traceback for operator-input failures.
+Trigger input, one-shot schedule, and service-body limits remain stricter where
+their contracts already require them. See [`docs/cli-input-boundary.md`](docs/cli-input-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1338,6 +1344,7 @@ See:
 - [`GOVERNANCE.md`](GOVERNANCE.md)
 - [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
 - `ROADMAP.md`
+- `docs/cli-input-boundary.md`
 - `docs/authoring.md`
 - `docs/backup-restore.md`
 - `docs/cancellation.md`

@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a shared 8 MiB UTF-8 boundary for generic JSON files supplied to the
+  local CLI. Reads check the size before opening and after a bounded read to
+  catch growth races; invalid operator inputs now return a stable non-zero
+  exit without a traceback. Trigger, one-shot schedule, and service-body
+  limits remain stricter where their existing contracts require them.
+
 - Bounded local one-shot schedule document reads to a fixed 2 MiB UTF-8
   envelope across save, lookup, listing, compact inventory, and due discovery.
   Oversized or growth-raced documents fail closed before normalization; the

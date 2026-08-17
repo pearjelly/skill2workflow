@@ -6,6 +6,25 @@ from skill2workflow.compiler import compile_ir_to_workflow, validate_workflow, v
 
 
 class CompilerTests(TestCase):
+    def test_validate_rejects_non_object_workflow_documents(self):
+        structured = validate_workflow_structured(["not", "a", "workflow"])
+
+        self.assertEqual(
+            structured,
+            [
+                {
+                    "code": "workflow_not_object",
+                    "message": "workflow document must be a JSON object",
+                    "path": [],
+                    "severity": "error",
+                }
+            ],
+        )
+        self.assertEqual(
+            validate_workflow(["not", "a", "workflow"]),
+            ["workflow document must be a JSON object"],
+        )
+
     def test_compile_ordered_steps_to_valid_workflow(self):
         ir = {
             "metadata": {"name": "approval-flow", "description": "Approval workflow"},
