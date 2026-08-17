@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added secret-free `operator_commands` argv arrays to the installed quickstart
+  result, plus the fixed `quickstart-result-0.1.0` schema, so wrappers can
+  inspect, approve, doctor, and start the generated workspace without manual
+  path reconstruction.
+
 - Added a standard installed-console `skill2workflow --version` identity
   check, with wheel qualification proving it matches distribution metadata.
 

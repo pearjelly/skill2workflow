@@ -41,6 +41,14 @@ class InstalledQuickstartTests(TestCase):
         self.assertEqual(result["run_status"], "waiting")
         self.assertEqual(result["workflow_id"], "workflow_controlled_quickstart")
         self.assertEqual(result["workflow_version"], "0.1.0")
+        self.assertEqual(
+            result["operator_commands"]["inspect_run"][:2],
+            ["skill2workflow", "control-run"],
+        )
+        self.assertEqual(
+            result["operator_commands"]["approve_run"][:2],
+            ["skill2workflow", "resume-published"],
+        )
         self.assertNotIn(secret, json.dumps(result))
         self.assertTrue(skill_exists)
         self.assertEqual(workflow["workflow"]["id"], result["workflow_id"])
@@ -96,6 +104,7 @@ class InstalledQuickstartTests(TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(stderr.getvalue(), "")
         self.assertEqual(result["status"], "ready_for_review")
+        self.assertIn("operator_commands", result)
         self.assertNotIn(secret, stdout.getvalue())
 
     def test_real_process_quickstart_smoke_proves_installed_user_journey(self):

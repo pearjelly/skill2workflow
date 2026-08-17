@@ -47,6 +47,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   total bounds, and secret-hygiene checks. Bundle verification is read-only
   and never extracts or executes the workflow, documented in
   [`workflow-bundles.md`](workflow-bundles.md)
+- Installed quickstart result `skill2workflow-quickstart-result-0.1.0` includes
+  value-free workspace metadata and fixed `operator_commands` argv arrays for
+  inspection, approval, Doctor, and service startup, documented in
+  [`quickstart.md`](quickstart.md)
 - Release manifest schema `skill2workflow-release-artifact-manifest-0.1.0`, including archive/member SHA-256 hashes, fixed package metadata, and rejection of private/state wheel content, documented in [`release-artifact-manifest.md`](release-artifact-manifest.md)
 - Release SBOM schema `skill2workflow-release-sbom-0.1.0`, using SPDX JSON 2.3 with one checksum entry per qualified wheel member and a package-to-file relationship set, documented in [`release-artifact-sbom.md`](release-artifact-sbom.md)
 - Reproducible release evidence schema `skill2workflow-reproducible-build-0.1.0`, recording two byte-identical fixed-epoch wheel builds for one checkout and toolchain, documented in [`reproducible-builds.md`](reproducible-builds.md)

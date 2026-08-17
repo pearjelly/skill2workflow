@@ -12,6 +12,8 @@ class InstalledQuickstartDocumentationTests(TestCase):
         self.assertIn("# Installed Controlled Quickstart", guide)
         self.assertIn("skill2workflow quickstart", guide)
         self.assertIn("ready_for_review", guide)
+        self.assertIn("operator_commands", guide)
+        self.assertIn("quickstart-result-0.1.0.schema.json", guide)
         self.assertIn("resume-published", guide)
         self.assertIn("skill2workflow service", guide)
         self.assertIn("human gate", guide)

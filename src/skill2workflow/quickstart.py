@@ -93,20 +93,55 @@ def initialize_quickstart_workspace(
         shutil.rmtree(workspace, ignore_errors=True)
         raise
 
+    run_id = str(run["run_id"])
+    state_dir = str(bootstrap["state_dir"])
+    config_file = str(bootstrap["config_file"])
     return {
         "schema_version": QUICKSTART_RESULT_SCHEMA_VERSION,
         "status": "ready_for_review",
         "root": str(workspace),
-        "config_file": str(bootstrap["config_file"]),
-        "state_dir": str(bootstrap["state_dir"]),
+        "config_file": config_file,
+        "state_dir": state_dir,
         "token_file": str(bootstrap["token_file"]),
         "credential_directory": str(bootstrap["credential_directory"]),
         "skill_file": str(skill_path),
         "workflow_file": str(workflow_path),
         "workflow_id": workflow_id,
         "workflow_version": workflow_version,
-        "run_id": str(run["run_id"]),
+        "run_id": run_id,
         "run_status": str(run["status"]),
+        "operator_commands": {
+            "inspect_run": [
+                "skill2workflow",
+                "control-run",
+                run_id,
+                "--state-dir",
+                state_dir,
+                "--storage",
+                "sqlite",
+            ],
+            "approve_run": [
+                "skill2workflow",
+                "resume-published",
+                run_id,
+                "--state-dir",
+                state_dir,
+                "--storage",
+                "sqlite",
+            ],
+            "service_doctor": [
+                "skill2workflow",
+                "service-doctor",
+                "--config",
+                config_file,
+            ],
+            "start_service": [
+                "skill2workflow",
+                "service",
+                "--config",
+                config_file,
+            ],
+        },
     }
 
 

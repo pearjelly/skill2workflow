@@ -66,6 +66,47 @@ def run_quickstart_smoke(
     ingress_file = Path(str(initialized["token_file"]))
     ingress = ingress_file.read_text(encoding="utf-8").strip()
     redacted = ingress not in raw_initialize
+    operator_commands = initialized.get("operator_commands", {})
+    expected_commands = {
+        "inspect_run": [
+            "skill2workflow",
+            "control-run",
+            str(initialized["run_id"]),
+            "--state-dir",
+            str(state_dir),
+            "--storage",
+            "sqlite",
+        ],
+        "approve_run": [
+            "skill2workflow",
+            "resume-published",
+            str(initialized["run_id"]),
+            "--state-dir",
+            str(state_dir),
+            "--storage",
+            "sqlite",
+        ],
+        "service_doctor": [
+            "skill2workflow",
+            "service-doctor",
+            "--config",
+            str(config_file),
+        ],
+        "start_service": [
+            "skill2workflow",
+            "service",
+            "--config",
+            str(config_file),
+        ],
+    }
+    commands_safe = (
+        isinstance(operator_commands, dict)
+        and all(
+            operator_commands.get(name) == command
+            for name, command in expected_commands.items()
+        )
+        and ingress not in json.dumps(operator_commands)
+    )
 
     waiting, _ = _run_json(
         [
@@ -141,6 +182,7 @@ def run_quickstart_smoke(
         "wheel_installed": package_result.get("install_mode") == "wheel",
         "source_imports_disabled": package_result.get("isolated_from_source") is True,
         "quickstart_initialized": initialized.get("status") == "ready_for_review",
+        "operator_commands_safe": commands_safe,
         "output_redacted": redacted,
         "skill_compiled_and_published": initialized.get("workflow_id")
         == "workflow_controlled_quickstart",

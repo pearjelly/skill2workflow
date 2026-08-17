@@ -20,7 +20,12 @@ skill2workflow quickstart \
 The compact JSON result has `status: "ready_for_review"`, `run_status:
 "waiting"`, workflow and run identifiers, and paths to the generated service
 configuration, example Skill, Workflow DSL, state, and secret files. It never
-contains the generated ingress value.
+contains the generated ingress value. It also includes four secret-free
+`operator_commands` argv arrays (`inspect_run`, `approve_run`,
+`service_doctor`, and `start_service`) so an installer or wrapper can continue
+the journey without reconstructing paths or shell-quoting user input. The
+result contract is defined by
+[`schemas/quickstart-result-0.1.0.schema.json`](../schemas/quickstart-result-0.1.0.schema.json).
 
 The workspace uses the owner-only layout documented in
 [`service-bootstrap.md`](service-bootstrap.md), plus:
@@ -39,6 +44,9 @@ workspace it created.
 ## Inspect And Approve
 
 Copy `run_id` and `state_dir` from the command result. Inspect the waiting run:
+
+The equivalent `operator_commands.inspect_run` array is already present in the
+JSON result; the expanded command below is shown for interactive shells.
 
 ```bash
 skill2workflow control-run <run_id> \

@@ -50,7 +50,10 @@ skill2workflow quickstart \
 The command generates an owner-only ingress secret without printing it, uses
 SQLite state, and returns the waiting `run_id`. Follow the
 [installed quickstart guide](docs/quickstart.md) to inspect and approve that
-run, start the authenticated service, and submit a second trigger.
+run, start the authenticated service, and submit a second trigger. Its JSON
+result also contains safe `operator_commands` argv arrays for those next
+steps, so integrations do not need to rebuild paths or interpolate shell
+input.
 
 ## Visual Overview
 

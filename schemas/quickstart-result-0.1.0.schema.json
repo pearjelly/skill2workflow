@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/quickstart-result-0.1.0.schema.json",
+  "title": "skill2workflow installed quickstart result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "root",
+    "config_file",
+    "state_dir",
+    "token_file",
+    "credential_directory",
+    "skill_file",
+    "workflow_file",
+    "workflow_id",
+    "workflow_version",
+    "run_id",
+    "run_status",
+    "operator_commands"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-quickstart-result-0.1.0"
+    },
+    "status": {
+      "const": "ready_for_review"
+    },
+    "root": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "config_file": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "state_dir": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "token_file": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "credential_directory": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "skill_file": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "workflow_file": {"type": "string", "minLength": 1, "maxLength": 4096},
+    "workflow_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+    },
+    "workflow_version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^\\S+$"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^run_[A-Za-z0-9_.-]+$"
+    },
+    "run_status": {"const": "waiting"},
+    "operator_commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inspect_run",
+        "approve_run",
+        "service_doctor",
+        "start_service"
+      ],
+      "properties": {
+        "inspect_run": {"$ref": "#/$defs/argv"},
+        "approve_run": {"$ref": "#/$defs/argv"},
+        "service_doctor": {"$ref": "#/$defs/argv"},
+        "start_service": {"$ref": "#/$defs/argv"}
+      }
+    }
+  },
+  "$defs": {
+    "argv": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 16,
+      "items": {"type": "string", "minLength": 1, "maxLength": 4096}
+    }
+  }
+}
