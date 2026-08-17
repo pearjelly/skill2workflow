@@ -17,6 +17,8 @@ class ExternalConnectorResultBoundaryDocsTests(TestCase):
             "ConnectorExecutionError",
             "durable run state",
             "external connector execution failed",
+            "external connector failed",
+            "direct runtime result",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("external-connector-result-boundary.md", connectors)

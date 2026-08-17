@@ -10,7 +10,12 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
-from skill2workflow.connectors import ConnectorRuntime, ExternalConnector
+from skill2workflow.connectors import (
+    EXTERNAL_CONNECTOR_DURABLE_FAILURE,
+    ConnectorExecutionError,
+    ConnectorRuntime,
+    ExternalConnector,
+)
 from skill2workflow.credentials import StaticCredentialProvider
 from skill2workflow.external_connectors import load_external_connector
 from skill2workflow.executor import LocalExecutor
@@ -516,9 +521,89 @@ class ExecutorTests(TestCase):
             state["node_results"]["call_api"],
             persisted["node_results"]["call_api"],
         ):
-            self.assertEqual(result["error"], "external connector execution failed")
+            self.assertEqual(result["error"], EXTERNAL_CONNECTOR_DURABLE_FAILURE)
         self.assertNotIn(private_marker, json.dumps(state, ensure_ascii=False))
         self.assertNotIn(private_marker, json.dumps(persisted, ensure_ascii=False))
+
+    def test_external_connector_error_text_is_sanitized_before_durable_persistence(self):
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "connectors"
+            / "local_echo_connector.py"
+        )
+        fixture = load_external_connector(fixture_path)
+        private_marker = "provider-response-detail-should-not-be-persisted"
+
+        def execute(_binding, credential_provider=None, context=None):
+            return {
+                "status": "failed",
+                "connector": {"id": "local_echo", "kind": "local_echo"},
+                "error": private_marker,
+                "output": {},
+            }
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.manifest, execute)])
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["nodes"][1]["connector"] = {
+            "id": "local_echo",
+            "kind": "local_echo",
+            "request": {},
+        }
+        workflow["nodes"][1]["retry"] = {"max_attempts": 1}
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(
+                Path(tmp), storage="sqlite", connector_runtime=runtime
+            ).run(workflow)
+            persisted = LocalExecutor(Path(tmp), storage="sqlite").get_run(
+                state["run_id"]
+            )
+
+        for snapshot in (state, persisted):
+            result = snapshot["node_results"]["call_api"]
+            self.assertEqual(result["error"], EXTERNAL_CONNECTOR_DURABLE_FAILURE)
+            self.assertEqual(result["last_error"], EXTERNAL_CONNECTOR_DURABLE_FAILURE)
+            self.assertNotIn(private_marker, json.dumps(snapshot, ensure_ascii=False))
+            for event in snapshot["events"]:
+                if event["type"] in {
+                    "connector_failed",
+                    "node_retrying",
+                    "node_failed",
+                }:
+                    self.assertEqual(event["error"], EXTERNAL_CONNECTOR_DURABLE_FAILURE)
+
+    def test_explicit_external_connector_error_text_is_sanitized_before_persistence(self):
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "connectors"
+            / "local_echo_connector.py"
+        )
+        fixture = load_external_connector(fixture_path)
+        private_marker = "explicit-provider-detail-should-not-be-persisted"
+
+        def execute(_binding, credential_provider=None, context=None):
+            raise ConnectorExecutionError(private_marker)
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.manifest, execute)])
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["nodes"][1]["connector"] = {
+            "id": "local_echo",
+            "kind": "local_echo",
+            "request": {},
+        }
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(
+                Path(tmp), storage="sqlite", connector_runtime=runtime
+            ).run(workflow)
+
+        self.assertEqual(
+            state["node_results"]["call_api"]["error"],
+            EXTERNAL_CONNECTOR_DURABLE_FAILURE,
+        )
+        self.assertNotIn(private_marker, json.dumps(state, ensure_ascii=False))
 
     def test_retry_policy_retries_failed_connector_and_records_recovery(self):
         server = _FlakyConnectorTestServer()

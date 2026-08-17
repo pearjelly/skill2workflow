@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-201
+- Completed delivery loops: 1-202
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 201 is complete with a discoverable service HTTP origin bootstrap option
+- Active loop: None; Loop 202 is complete with a durable external connector failure boundary
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-201 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-202 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5115,9 +5115,47 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_service_bootstrap.ServiceBootstrapTests.test_service_init_cli_accepts_repeated_http_allowed_origin_options -v
 ```
 
+### Loop 202: Durable External Connector Failure Boundary
+
+**Status:** Complete.
+
+**Prior basis:** Loop 199 normalized ordinary exceptions raised by external
+fixtures, but a connector that deliberately raised `ConnectorExecutionError`
+or returned a failed result could still place provider, URL, or response text
+in run state, retry events, and control-plane audit evidence. The direct
+connector API also needed to retain its existing immediate diagnostics.
+
+**Outcome:** The executor now recognizes non-built-in connector references at
+the durable boundary and replaces any failed error text with the fixed
+`external connector failed` message before writing node results or emitting
+connector-failure, retry, recovery, fallback, and audit projections. Direct
+`ConnectorRuntime` callers retain the existing explicit exception and returned
+error contract; built-in HTTP failure messages remain unchanged. The boundary
+does not redact business output values or claim to sandbox connector code.
+
+**Evidence:** Direct runtime tests prove returned external errors remain
+available to immediate callers. SQLite executor tests cover returned failures,
+explicit `ConnectorExecutionError`, retries, node results, and all relevant
+event projections; private provider markers are absent from both in-memory and
+reloaded state. External connector smoke, full suite, package, secret-hygiene,
+and Production Baseline gates remain green.
+
+**Safety boundary:** This is durable error-text redaction, not imported-Python
+sandboxing, provider cancellation, output-value redaction, compensation, or
+exactly-once external execution.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_external_connector_direct_failed_result_keeps_immediate_contract \
+  tests.test_executor.ExecutorTests.test_external_connector_error_text_is_sanitized_before_durable_persistence \
+  tests.test_executor.ExecutorTests.test_explicit_external_connector_error_text_is_sanitized_before_persistence -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 201 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 202 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5285,6 +5323,7 @@ This rolling queue is ordered. Loop 201 is complete and there is no active deliv
 | Loop 199: External Connector Exception Boundary | Complete | Keep unexpected explicitly loaded connector exceptions inside the normalized durable failure path | Fixed unexpected-exception message, direct and SQLite leakage regressions, result-boundary docs, and package evidence |
 | Loop 200: Service-Level HTTP Origin Upper Bound | Complete | Govern built-in HTTP destinations at the self-hosted service boundary, including recurring execution, without changing Workflow DSL compatibility | Versioned exact-origin service policy, direct/scheduled propagation, pre-credential/network suppression, schema/docs, and regression evidence |
 | Loop 201: Discoverable Service HTTP Origin Bootstrap | Complete | Make the service-level HTTP origin policy safe and discoverable during first-run initialization | Repeatable CLI options, canonical config output, pre-creation validation, operator docs, and bootstrap regression evidence |
+| Loop 202: Durable External Connector Failure Boundary | Complete | Keep provider-authored external connector failure text out of durable run and audit projections without breaking immediate callers | Fixed durable failure message, returned/raised/retry coverage, SQLite reload evidence, docs, and production gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

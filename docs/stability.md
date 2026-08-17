@@ -43,6 +43,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   recurring schedules; requests must satisfy both service and workflow lists,
   and omission preserves legacy behavior, as documented in
   [`service-config-boundary.md`](service-config-boundary.md)
+- External connector failures retain their direct runtime contract but use the
+  fixed `external connector failed` message in durable run state and
+  retry/audit projections, so connector-authored provider text does not cross
+  the executor persistence boundary
 - Built-in HTTP transport failures use fixed value-free messages (`http
   connector request failed`, `http connector timed out`, and the fixed JSON
   body serialization message); underlying URL, provider-transport, proxy,

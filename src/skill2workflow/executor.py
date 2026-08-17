@@ -9,7 +9,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple
 
-from .connectors import ConnectorExecutionError, ConnectorRuntime, connector_ref
+from .connectors import (
+    BUILTIN_CONNECTOR_IDS,
+    EXTERNAL_CONNECTOR_DURABLE_FAILURE,
+    ConnectorExecutionError,
+    ConnectorRuntime,
+    connector_ref,
+)
 from .storage import create_run_store
 
 
@@ -472,7 +478,7 @@ class LocalExecutor:
                 recovered = attempt > 1
                 break
 
-            last_error = str(connector_result.get("error") or "connector failed")
+            last_error = _durable_connector_failure(ref, connector_result.get("error"))
             self._event(
                 state,
                 "connector_failed",
@@ -552,7 +558,10 @@ class LocalExecutor:
         if last_error:
             node_result["last_error"] = last_error
         if connector_result.get("error"):
-            node_result["error"] = connector_result["error"]
+            node_result["error"] = _durable_connector_failure(
+                ref,
+                connector_result.get("error"),
+            )
         state["node_results"][current_id] = node_result
 
         if result_status == "completed":
@@ -874,6 +883,14 @@ class LocalExecutor:
     @staticmethod
     def _node_map(workflow: Dict[str, object]) -> Dict[str, Dict[str, object]]:
         return {node["id"]: node for node in workflow.get("nodes", [])}
+
+
+def _durable_connector_failure(ref: Dict[str, str], error: object) -> str:
+    """Return the value-safe error that may cross into durable run state."""
+
+    if ref.get("id") not in BUILTIN_CONNECTOR_IDS:
+        return EXTERNAL_CONNECTOR_DURABLE_FAILURE
+    return str(error or "connector failed")
 
 
 def _connector_context(state: RunState, node_id: str) -> Dict[str, object]:

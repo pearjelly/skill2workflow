@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a durable executor boundary for external connector failure text:
+  immediate connector callers retain their existing diagnostics, while failed
+  external results use the fixed `external connector failed` message in run
+  state, retries, and audit events.
+
 - Added repeatable `service-init --http-allowed-origin` options so operators
   can configure the service-wide built-in HTTP egress policy without hand
   editing generated JSON; initialization canonicalizes and validates origins

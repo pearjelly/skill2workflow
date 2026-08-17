@@ -12,6 +12,8 @@ from unittest.mock import patch
 
 from skill2workflow.connectors import (
     CONNECTOR_MANIFEST_VERSION,
+    EXTERNAL_CONNECTOR_DURABLE_FAILURE,
+    EXTERNAL_CONNECTOR_EXECUTION_FAILURE,
     MAX_HTTP_HEADER_BYTES,
     MAX_HTTP_HEADER_COUNT,
     MAX_HTTP_ALLOWED_ORIGINS,
@@ -152,10 +154,29 @@ class ConnectorTests(TestCase):
 
         with self.assertRaisesRegex(
             ConnectorExecutionError,
-            "^external connector execution failed$",
+            f"^{EXTERNAL_CONNECTOR_EXECUTION_FAILURE}$",
         ) as raised:
             runtime.execute_connector(_local_echo_node())
         self.assertNotIn(private_marker, str(raised.exception))
+
+    def test_external_connector_direct_failed_result_keeps_immediate_contract(self):
+        fixture = _load_local_echo_fixture()
+        private_marker = "provider-detail-visible-to-direct-caller"
+
+        def execute(_binding, credential_provider=None, context=None):
+            return {
+                "status": "failed",
+                "connector": {"id": "local_echo", "kind": "local_echo"},
+                "error": private_marker,
+                "output": {},
+            }
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, execute)])
+        result = runtime.execute_connector(_local_echo_node())
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"], private_marker)
+        self.assertNotEqual(EXTERNAL_CONNECTOR_DURABLE_FAILURE, result["error"])
 
     def test_http_connector_sends_method_headers_json_body_and_normalizes_response(self):
         server = _ConnectorTestServer()

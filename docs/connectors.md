@@ -134,8 +134,9 @@ normalized result still crosses the runtime's fixed 1 MiB persistence
 boundary. Non-JSON or oversized external results fail before they are attached
 to durable run state. An ordinary exception raised by a fixture is normalized
 to `external connector execution failed`; connector-authored
-`ConnectorExecutionError` messages remain part of the explicit fixture
-contract and must be compact and value-free. See
+`ConnectorExecutionError` messages and direct returned errors remain available
+to immediate runtime callers, but the executor stores failed external results
+and retry/audit error fields only as `external connector failed`. See
 [`external-connector-result-boundary.md`](external-connector-result-boundary.md).
 
 If `body` is present and no case-insensitive `Content-Type` header is supplied, the connector adds `Content-Type: application/json`.

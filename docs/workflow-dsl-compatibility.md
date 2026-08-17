@@ -92,6 +92,13 @@ credential resolution or network access. A request must satisfy both lists
 when both are present; external connector fixtures remain responsible for
 their own provider-specific egress policy.
 
+External connector failure text is also bounded at the executor persistence
+boundary: direct connector callers retain the existing immediate result
+contract, while failed non-built-in connector results use the fixed
+`external connector failed` message in durable run state and retry/audit
+events. This is additive runtime protection and does not change Workflow DSL
+`0.1.0` fields.
+
 Built-in HTTP transport failures use fixed, value-free connector messages:
 `http connector request failed` for non-timeout network failures and
 `http connector timed out` for timeouts. Request-body serialization failures

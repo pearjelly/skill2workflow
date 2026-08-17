@@ -34,6 +34,8 @@ HTTP_RESPONSE_MODES = ("full", "metadata")
 # crosses the durable executor boundary. Keep that handoff bounded independently
 # of whatever I/O policy the extension chose internally.
 MAX_EXTERNAL_CONNECTOR_RESULT_BYTES = 1_048_576
+EXTERNAL_CONNECTOR_EXECUTION_FAILURE = "external connector execution failed"
+EXTERNAL_CONNECTOR_DURABLE_FAILURE = "external connector failed"
 
 
 DEFAULT_CONNECTORS: List[Dict[str, object]] = [
@@ -113,6 +115,8 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
     },
 ]
 
+BUILTIN_CONNECTOR_IDS = frozenset(str(manifest["id"]) for manifest in DEFAULT_CONNECTORS)
+
 
 class ConnectorExecutionError(Exception):
     """Raised when a connector binding cannot be executed."""
@@ -173,8 +177,7 @@ class ConnectorRuntime:
         if not isinstance(execution_contract, dict) or execution_contract.get("mode") != "external":
             raise ValueError("external connector manifest must use execution_contract.mode external")
         connector_id = str(connector.manifest.get("id") or "")
-        built_in_ids = {str(manifest["id"]) for manifest in DEFAULT_CONNECTORS}
-        if connector_id in built_in_ids:
+        if connector_id in BUILTIN_CONNECTOR_IDS:
             raise ValueError(f"external connector id conflicts with built-in connector: {connector_id}")
         if not callable(connector.executor):
             raise ValueError("external connector executor must be callable")
@@ -340,7 +343,7 @@ def _execute_external_connector(
         # boundary below so provider/transport text cannot cross the runtime.
         raise
     except Exception as error:
-        raise ConnectorExecutionError("external connector execution failed") from error
+        raise ConnectorExecutionError(EXTERNAL_CONNECTOR_EXECUTION_FAILURE) from error
     if not isinstance(result, dict):
         raise ConnectorExecutionError("external connector executor must return an object")
 
