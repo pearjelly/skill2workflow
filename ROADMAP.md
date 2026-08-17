@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-197
+- Completed delivery loops: 1-198
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 197 is complete with declarative HTTP origin governance
+- Active loop: None; Loop 198 is complete with fixed HTTP transport error redaction
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-197 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-198 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -119,6 +119,10 @@ after reproducing raw `urllib` exceptions and unbounded request envelopes.
 
 Loop 197 adds optional exact-origin egress governance for built-in HTTP
 requests, enforced before credential resolution and network access.
+
+Loop 198 adds fixed, value-free built-in HTTP transport and request-body
+serialization failures so provider-transport, URL, proxy, socket, and
+mapped-value exception text cannot enter durable connector failure results.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4957,9 +4961,45 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_connectors.ConnectorTests.test_http_connector_enforces_exact_origin_allowlist_before_credentials -v
 ```
 
+### Loop 198: Fixed HTTP Transport Error Redaction
+
+**Status:** Complete.
+
+**Prior basis:** Loop 197 governed which exact HTTP origins a reviewed
+workflow could reach, but transport and request-body serialization exceptions
+still surfaced their underlying text through `ConnectorExecutionError`. That
+text can contain a provider URL, proxy/socket detail, or a representation of a
+mapped value before the executor persists the failed node result.
+
+**Outcome:** Built-in HTTP request-body serialization failures now use a fixed
+value-free message. Timeout failures use `http connector timed out`, while
+other `URLError` and raw socket/SSL failures use `http connector request
+failed`. The existing HTTP status-result contract, retry behavior, and network
+execution semantics are unchanged.
+
+**Evidence:** Focused tests inject timeout, `URLError`, and raw `OSError`
+failures containing a private marker and prove the fixed messages contain no
+underlying detail. Existing timeout, HTTP status, credential, redirect, proxy,
+origin-governance, full-suite, package, secret-hygiene, and Production
+Baseline checks remain green. The contract is documented in
+[`docs/connectors.md`](docs/connectors.md), compatibility, and stability
+boundaries.
+
+**Safety boundary:** This is connector failure-message redaction. It does not
+redact intentionally retained full HTTP response bodies, add provider error
+classification, cancel an already accepted remote request, or replace the
+external TLS/firewall boundary.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_http_connector_normalizes_transport_failures_without_leaking_details -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 197 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 198 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5123,6 +5163,7 @@ This rolling queue is ordered. Loop 197 is complete and there is no active deliv
 | Loop 195: Fixed HTTP Direct-Egress Boundary | Complete | Prevent ambient process proxy settings from rerouting credentialed HTTP requests | Empty proxy handler, real target-plus-proxy regression, unchanged direct HTTP contract tests, docs, and package evidence |
 | Loop 196: Bounded HTTP Request Metadata | Complete | Keep URL, method, and headers bounded and normalize malformed request failures before network access | Fixed URL/method/header bounds, injection and invalid-port rejection, raw-exception regression tests, docs, and package evidence |
 | Loop 197: Declarative HTTP Origin Governance | Complete | Let reviewed workflows restrict built-in HTTP egress to exact origins before credential resolution | Additive `allowed_origins` schema/compiler/runtime contract, no-network mismatch tests, LiteGraph write-back, docs, and package evidence |
+| Loop 198: Fixed HTTP Transport Error Redaction | Complete | Keep built-in HTTP transport and request-body failures value-free before durable connector persistence | Fixed timeout/network/serialization messages, injected leakage regressions, compatibility/docs updates, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

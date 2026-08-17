@@ -36,6 +36,12 @@ These surfaces should remain compatible during the `0.1.x` line:
 - `connector.request.allowed_origins` is an additive exact-origin egress
   allowlist; omission preserves legacy behavior, while configured entries are
   enforced before credential resolution and network access
+- Built-in HTTP transport failures use fixed value-free messages (`http
+  connector request failed`, `http connector timed out`, and the fixed JSON
+  body serialization message); underlying URL, provider-transport, proxy,
+  socket, and exception text is not persisted in connector failure results;
+  intentionally retained full response bodies remain governed by
+  `response_mode`
 - SQLite run-state documents use the same fixed 8 MiB UTF-8 persistence bound
   as the JSON backend across save, load, recovery, cancellation, deadline
   expiry, and startup summary repair, documented in

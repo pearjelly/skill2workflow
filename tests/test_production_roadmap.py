@@ -26,11 +26,11 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
-        self.assertIn("- Completed delivery loops: 1-197", roadmap)
-        self.assertIn("- Active loop: None; Loop 197 is complete with declarative HTTP origin governance", roadmap)
+        self.assertIn("- Completed delivery loops: 1-198", roadmap)
+        self.assertIn("- Active loop: None; Loop 198 is complete with fixed HTTP transport error redaction", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
-        self.assertIn("This rolling queue is ordered. Loop 197 is complete", roadmap)
+        self.assertIn("This rolling queue is ordered. Loop 198 is complete", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
         self.assertIn("**Status:** Achieved.", roadmap)
@@ -41,7 +41,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-197 complete, further loop numbers unassigned.",
+            "**Status:** Directional; Loops 44-198 complete, further loop numbers unassigned.",
             roadmap,
         )
 
@@ -275,6 +275,11 @@ class ProductionRoadmapTests(TestCase):
             roadmap,
         )
         self.assertIn("### Loop 197: Declarative HTTP Origin Governance", roadmap)
+        self.assertIn(
+            "| Loop 198: Fixed HTTP Transport Error Redaction | Complete |",
+            roadmap,
+        )
+        self.assertIn("### Loop 198: Fixed HTTP Transport Error Redaction", roadmap)
 
         self.assertIn(
             "SQLite is the minimum production persistence baseline for Self-hosted Beta. "
@@ -370,7 +375,7 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-197 are complete", readme)
+        self.assertIn("Delivery Loops 1-198 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)

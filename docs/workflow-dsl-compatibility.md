@@ -84,6 +84,14 @@ allowlist. Workflows that omit it retain legacy destination behavior; when
 present, the runtime requires the normalized request origin to match one of
 the declared entries before credential resolution or network access.
 
+Built-in HTTP transport failures use fixed, value-free connector messages:
+`http connector request failed` for non-timeout network failures and
+`http connector timed out` for timeouts. Request-body serialization failures
+use `http connector request.body must be JSON serializable`; underlying URL,
+provider-transport, proxy, socket, and exception text is not part of the
+durable failure contract. Intentionally retained full response bodies remain
+governed by `response_mode`.
+
 SQLite publication and deprecation likewise mutate one registry record and its
 audit row atomically. Concurrent publication of distinct immutable versions is
 additive; a same-version checksum mismatch remains an immutable-version error.

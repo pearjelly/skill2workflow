@@ -98,7 +98,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-197 are complete", readme)
+        self.assertIn("Delivery Loops 1-198 are complete", readme)
         self.assertIn("Loop 165 adds a fixed 2 MiB UTF-8 document bound", readme)
         self.assertIn("Loop 146 adds a compact SQLite recurring-schedule projection", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)

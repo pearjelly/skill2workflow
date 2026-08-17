@@ -517,7 +517,18 @@ HTTP 4xx and 5xx responses produce a failed connector result instead of raising:
 }
 ```
 
-Invalid request metadata, unsupported URL schemes, JSON body serialization failures, connection failures, and timeouts raise `ConnectorExecutionError`. The executor catches those errors, records a failed connector node result, emits `connector_failed` and `node_failed`, and follows the node's `on_failure` transition unless the node declares an explicit `on_fallback` path.
+Invalid request metadata, unsupported URL schemes, JSON body serialization
+failures, connection failures, and timeouts raise `ConnectorExecutionError`.
+The executor catches those errors, records a failed connector node result,
+emits `connector_failed` and `node_failed`, and follows the node's `on_failure`
+transition unless the node declares an explicit `on_fallback` path. Request
+body serialization failures use the fixed message
+`http connector request.body must be JSON serializable`; network failures use
+`http connector request failed`; and timeouts use `http connector timed out`.
+Underlying URL, provider-transport, proxy, socket, and exception text is never
+copied into the connector failure message or durable run state. An explicitly
+retained full HTTP response body remains governed by the existing response
+retention mode.
 
 ## Retry And Timeout Boundary
 

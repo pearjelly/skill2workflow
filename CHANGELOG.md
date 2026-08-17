@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Normalized built-in HTTP transport and request-body serialization failures
+  to fixed value-free messages, preventing URLs, provider-transport details,
+  proxy text, socket errors, and mapped-value representations from entering
+  durable connector failure results.
+
 - Added a fixed no-redirect boundary to the built-in HTTP connector. `3xx`
   responses now fail before any follow-up request, preventing credential
   headers from being replayed to another target; non-redirect behavior is

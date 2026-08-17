@@ -419,8 +419,18 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
     if body is not None:
         try:
             data = json.dumps(body, ensure_ascii=False).encode("utf-8")
-        except (TypeError, ValueError) as error:
-            raise ConnectorExecutionError(f"http connector request.body must be JSON serializable: {error}")
+        except (
+            TypeError,
+            ValueError,
+            OverflowError,
+            RecursionError,
+            UnicodeError,
+        ) as error:
+            # The exception text can include a repr of a mapped value.  Keep
+            # the durable connector failure fixed and value-free.
+            raise ConnectorExecutionError(
+                "http connector request.body must be JSON serializable"
+            ) from error
         if len(data) > MAX_HTTP_PAYLOAD_BYTES:
             raise ConnectorExecutionError(
                 f"http connector request body exceeds {MAX_HTTP_PAYLOAD_BYTES} bytes"
@@ -458,11 +468,16 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
                 "input_mapping": mapping_summary,
             }
     except (TimeoutError, socket.timeout) as error:
-        raise ConnectorExecutionError(f"http connector timed out: {error}")
+        # Do not persist provider/network exception text: it may contain the
+        # configured URL, proxy details, or other request-specific values.
+        raise ConnectorExecutionError("http connector timed out") from error
     except urllib.error.URLError as error:
         if isinstance(error.reason, (TimeoutError, socket.timeout)):
-            raise ConnectorExecutionError(f"http connector timed out: {error.reason}")
-        raise ConnectorExecutionError(str(error.reason))
+            raise ConnectorExecutionError("http connector timed out") from error
+        raise ConnectorExecutionError("http connector request failed") from error
+    except OSError as error:
+        # Some transports surface a raw socket/SSL error instead of URLError.
+        raise ConnectorExecutionError("http connector request failed") from error
 
 
 def _open_http_request(request: urllib.request.Request, timeout: float):

@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import threading
+import urllib.error
 from datetime import datetime, timedelta, timezone
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -457,6 +458,25 @@ class ExecutorTests(TestCase):
         self.assertNotIn("secret-token", json.dumps(state["node_results"]))
         self.assertNotIn("secret-token", json.dumps(state["events"]))
         self.assertNotIn("secret-token", json.dumps(state["context"]))
+
+    def test_http_transport_failure_persists_fixed_value_free_error(self):
+        private_marker = "private-provider-detail-should-not-leak"
+        workflow = _http_connector_workflow("https://provider.example/private")
+
+        with TemporaryDirectory() as tmp:
+            with patch(
+                "skill2workflow.connectors._open_http_request",
+                side_effect=urllib.error.URLError(private_marker),
+            ):
+                state = LocalExecutor(Path(tmp), storage="sqlite").run(workflow)
+            persisted = LocalExecutor(Path(tmp), storage="sqlite").get_run(
+                state["run_id"]
+            )
+
+        for result in (state["node_results"]["call_api"], persisted["node_results"]["call_api"]):
+            self.assertEqual(result["error"], "http connector request failed")
+        self.assertNotIn(private_marker, json.dumps(state, ensure_ascii=False))
+        self.assertNotIn(private_marker, json.dumps(persisted, ensure_ascii=False))
 
     def test_retry_policy_retries_failed_connector_and_records_recovery(self):
         server = _FlakyConnectorTestServer()

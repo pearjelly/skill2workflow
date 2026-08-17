@@ -62,10 +62,14 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("HTTP Request Metadata Boundary", connectors)
         self.assertIn("16,384", connectors)
         self.assertIn("allowed_origins", connectors)
+        self.assertIn("http connector request failed", connectors)
+        self.assertIn("http connector timed out", connectors)
+        self.assertIn("provider-transport", connectors)
         self.assertIn("rejects all `3xx` redirects", compatibility)
         self.assertIn("ignores ambient proxy environment variables", compatibility)
         self.assertIn("16,384 UTF-8 bytes", compatibility)
         self.assertIn("allowed_origins", compatibility)
+        self.assertIn("fixed, value-free connector messages", compatibility)
         self.assertIn("Built-in HTTP request and", compatibility)
         self.assertIn("UTF-8 response bodies are bounded to 1 MiB", compatibility)
         self.assertIn("response_mode` (`full` or `metadata`)", compatibility)
@@ -73,6 +77,7 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("rejects every `3xx` redirect", stability)
         self.assertIn("ignores ambient proxy environment variables", stability)
         self.assertIn("16,384-byte URL", stability)
+        self.assertIn("fixed value-free messages", stability)
 
 
 def _read(path: str) -> str:

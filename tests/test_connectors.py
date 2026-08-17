@@ -498,12 +498,30 @@ class ConnectorTests(TestCase):
                 opener.assert_not_called()
 
     def test_http_connector_rejects_non_json_body_before_network_call(self):
-        with self.assertRaisesRegex(ConnectorExecutionError, "request.body must be JSON serializable"):
+        with self.assertRaisesRegex(
+            ConnectorExecutionError,
+            "^http connector request.body must be JSON serializable$",
+        ):
             execute_connector(
                 _http_node(
                     "http://127.0.0.1:1/not-called",
                     method="POST",
                     body={"not_json": object()},
+                )
+            )
+
+        # An unpaired surrogate fails while encoding the JSON string, after
+        # json.dumps has already accepted the value.  It must use the same
+        # fixed message rather than exposing the encoding exception.
+        with self.assertRaisesRegex(
+            ConnectorExecutionError,
+            "^http connector request.body must be JSON serializable$",
+        ):
+            execute_connector(
+                _http_node(
+                    "http://127.0.0.1:1/not-called",
+                    method="POST",
+                    body={"private": "\ud800"},
                 )
             )
 
@@ -687,6 +705,21 @@ class ConnectorTests(TestCase):
     def test_http_connector_missing_credential_fails_before_network_call(self):
         with self.assertRaisesRegex(ConnectorExecutionError, "credential handle not found: missing_token"):
             execute_connector(_credential_http_node("http://127.0.0.1:1/not-called", handle="missing_token"))
+
+    def test_http_connector_normalizes_transport_failures_without_leaking_details(self):
+        private_marker = "private-target-detail-should-not-leak"
+        failures = [
+            (urllib.error.URLError(f"connection failed for {private_marker}"), "http connector request failed"),
+            (OSError(f"socket failed for {private_marker}"), "http connector request failed"),
+            (TimeoutError(f"timeout while contacting {private_marker}"), "http connector timed out"),
+            (urllib.error.URLError(TimeoutError(f"timeout while contacting {private_marker}")), "http connector timed out"),
+        ]
+        for failure, expected in failures:
+            with self.subTest(expected=expected, failure=type(failure).__name__):
+                with patch("skill2workflow.connectors._open_http_request", side_effect=failure):
+                    with self.assertRaisesRegex(ConnectorExecutionError, f"^{expected}$") as raised:
+                        execute_connector(_http_node("https://provider.example.test/private"))
+                self.assertNotIn(private_marker, str(raised.exception))
 
     def test_http_connector_timeout_becomes_connector_execution_error(self):
         server = _ConnectorTestServer()
