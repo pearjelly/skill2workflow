@@ -33,3 +33,4 @@ class InstalledUiDocumentationTests(TestCase):
         self.assertIn("Loop 208: Live Service Readiness Badge", roadmap)
         self.assertIn("Loop 209: Bounded Live Snapshot Refresh", roadmap)
         self.assertIn("Loop 210: Protected Live Support-Bundle Download", roadmap)
+        self.assertIn("Loop 211: Confirmation-Protected Live Human-Gate Action", roadmap)

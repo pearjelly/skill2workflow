@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a confirmation-protected human-gate action to the live control-plane
+  UI. Selecting a waiting run exposes fixed Approve/Reject controls that reuse
+  the authenticated resume contract without placing the ingress token in the
+  browser or adding arbitrary proxying.
+
 - Added a live-console **Download Support Bundle** action for the existing
   bounded, redacted support artifact. It uses a fixed read-only proxy and
   protected server-side token handling; the bundle is never uploaded

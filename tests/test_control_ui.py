@@ -36,9 +36,18 @@ class ControlUiContractTests(TestCase):
         self.assertIn("downloadSupportBundle", javascript)
         self.assertIn("skill2workflow-support-bundle.json", javascript)
         self.assertIn("Download Support Bundle", html)
+        self.assertIn('id="human-gate-actions"', html)
+        self.assertIn('id="approve-run"', html)
+        self.assertIn('id="reject-run"', html)
+        self.assertIn("decideSelectedRun", javascript)
+        self.assertIn("selectedWaitingRun", javascript)
+        self.assertIn("/api/v1/runs/", javascript)
+        self.assertIn('method: "POST"', javascript)
+        self.assertIn("window.confirm", javascript)
         self.assertIn(".snapshot-scope.is-bounded", css)
         self.assertIn(".snapshot-scope.is-truncated", css)
         self.assertIn(".service-status.is-valid", css)
+        self.assertIn(".human-gate-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):
         guide = (ROOT / "docs" / "live-control-snapshot.md").read_text(

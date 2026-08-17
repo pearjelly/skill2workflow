@@ -3,6 +3,7 @@
   const LIVE_SNAPSHOT_URL = "/api/v1/control-snapshot";
   const SERVICE_PROBE_URL = "/api/v1/service-probe";
   const SUPPORT_BUNDLE_URL = "/api/v1/support-bundle";
+  const LIVE_RESUME_PREFIX = "/api/v1/runs/";
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
   const AUTO_REFRESH_INTERVAL_MS = 10000;
   const state = {
@@ -15,6 +16,7 @@
     liveRefreshEnabled: false,
     liveRefreshTimer: null,
     liveLoading: false,
+    humanGateLoading: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -61,6 +63,10 @@
     els.versionRows = document.getElementById("version-rows");
     els.detailTitle = document.getElementById("detail-title");
     els.statusGrid = document.getElementById("status-grid");
+    els.humanGateActions = document.getElementById("human-gate-actions");
+    els.humanGateStatus = document.getElementById("human-gate-status");
+    els.approveRun = document.getElementById("approve-run");
+    els.rejectRun = document.getElementById("reject-run");
     els.detailJson = document.getElementById("detail-json");
   }
 
@@ -69,6 +75,12 @@
     els.loadLive.addEventListener("click", loadLiveSnapshot);
     els.toggleRefresh.addEventListener("click", toggleAutoRefresh);
     els.downloadBundle.addEventListener("click", downloadSupportBundle);
+    els.approveRun.addEventListener("click", function () {
+      decideSelectedRun(true);
+    });
+    els.rejectRun.addEventListener("click", function () {
+      decideSelectedRun(false);
+    });
     els.snapshotFile.addEventListener("change", loadSelectedFile);
     els.filterInput.addEventListener("input", function () {
       state.filter = els.filterInput.value.trim().toLowerCase();
@@ -186,6 +198,79 @@
     }
   }
 
+  async function decideSelectedRun(approved) {
+    const run = selectedWaitingRun();
+    if (!run || state.humanGateLoading) {
+      return;
+    }
+    const decision = approved ? "approve" : "reject";
+    if (
+      typeof window.confirm === "function" &&
+      !window.confirm(
+        (approved ? "Approve" : "Reject") +
+          " waiting run " +
+          run.run_id +
+          "? This records the human-gate decision and resumes the workflow.",
+      )
+    ) {
+      return;
+    }
+    state.humanGateLoading = true;
+    renderHumanGateActions();
+    setStatus("Submitting", "");
+    try {
+      const response = await fetch(
+        LIVE_RESUME_PREFIX + encodeURIComponent(run.run_id) + "/resume",
+        {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ approved: approved }),
+        },
+      );
+      if (!response.ok) {
+        throw new Error(decision + " unavailable");
+      }
+      const payload = await response.json();
+      if (
+        !payload ||
+        payload.run_id !== run.run_id ||
+        payload.approved !== approved ||
+        typeof payload.status !== "string" ||
+        !payload.status
+      ) {
+        throw new Error(decision + " unavailable");
+      }
+      setStatus(approved ? "Approved" : "Rejected", "is-valid");
+      await loadLiveSnapshot({ background: true });
+    } catch (error) {
+      setStatus("Unavailable", "is-invalid");
+    } finally {
+      state.humanGateLoading = false;
+      renderHumanGateActions();
+    }
+  }
+
+  function selectedWaitingRun() {
+    if (
+      !state.liveModeConfigured ||
+      !state.selected ||
+      state.selected.kind !== "run"
+    ) {
+      return null;
+    }
+    const run = state.selected.value;
+    if (
+      !run ||
+      run.status !== "waiting" ||
+      typeof run.run_id !== "string" ||
+      !/^run_[A-Za-z0-9_-]{1,123}$/.test(run.run_id)
+    ) {
+      return null;
+    }
+    return run;
+  }
+
   async function loadServiceProbe() {
     setServiceStatus("Live service: checking", "");
     try {
@@ -196,6 +281,7 @@
         els.toggleRefresh.disabled = true;
         els.downloadBundle.disabled = true;
         setServiceStatus("Live service: static mode", "");
+        renderHumanGateActions();
         return;
       }
       state.liveModeConfigured = true;
@@ -214,11 +300,13 @@
         unavailable: ["Live service: unavailable", "is-invalid"],
       };
       setServiceStatus(labels[probe.status][0], labels[probe.status][1]);
+      renderHumanGateActions();
     } catch (error) {
       state.liveModeConfigured = true;
       els.toggleRefresh.disabled = false;
       els.downloadBundle.disabled = false;
       setServiceStatus("Live service: unavailable", "is-invalid");
+      renderHumanGateActions();
     }
   }
 
@@ -645,6 +733,20 @@
     const selected = state.selected || { kind: "snapshot", value: {} };
     const value = selected.value || {};
     showDetail(titleForSelection(selected), value);
+    renderHumanGateActions();
+  }
+
+  function renderHumanGateActions() {
+    const run = selectedWaitingRun();
+    const visible = Boolean(run);
+    els.humanGateActions.hidden = !visible;
+    els.approveRun.disabled = !visible || state.humanGateLoading;
+    els.rejectRun.disabled = !visible || state.humanGateLoading;
+    if (visible) {
+      els.humanGateStatus.textContent = state.humanGateLoading
+        ? "Submitting the decision…"
+        : "This run is waiting for an explicit human decision.";
+    }
   }
 
   function showDetail(title, value) {

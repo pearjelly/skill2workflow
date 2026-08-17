@@ -21,7 +21,7 @@ resolve credentials, expose an ingress token, or mutate workflows. The
 control-plane page still accepts an exported snapshot file; by default it is
 not a live authenticated service console.
 
-For an explicit, read-only live view of one running service, configure both the
+For an explicit live view of one running service, configure both the
 service origin and its owner-only ingress token file:
 
 ```bash
@@ -56,9 +56,18 @@ existing bounded, redacted `skill2workflow-support-bundle-0.1.0` artifact. The
 route is read-only and uses the protected token file server-side; it does not
 upload the bundle or proxy arbitrary service paths.
 
-The live mode does not add TLS, public ingress, RBAC, mutations, or provider
-reconciliation. Keep the UI on loopback or place it behind an operator-managed
-HTTPS boundary when serving a wider network.
+When a live snapshot run is selected and its status is `waiting`, the detail
+panel exposes **Approve run** and **Reject run**. Each action requires an
+explicit browser confirmation and sends only the fixed boolean decision to the
+same-origin `/api/v1/runs/{run_id}/resume` route. The UI process forwards it
+with the protected token file, validates the fixed response, and refreshes the
+live snapshot; it never stores the token in browser state or proxies arbitrary
+paths. Static, example, and file snapshots never expose these controls.
+
+This live mode adds one explicit human-gate mutation only. It does not add TLS,
+public ingress, RBAC, workflow publication, cancellation, automatic retries,
+or provider reconciliation. Keep the UI on loopback or place it behind an
+operator-managed HTTPS boundary when serving a wider network.
 
 Use `--once` for a bounded packaging or smoke-test request. The command does
 not provide TLS, public ingress, authentication, or a reverse-proxy boundary;

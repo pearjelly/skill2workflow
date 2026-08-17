@@ -404,7 +404,7 @@ tbody tr.is-selected {
 
 .detail-panel {
   display: grid;
-  grid-template-rows: auto auto minmax(180px, 1fr);
+  grid-template-rows: auto auto auto minmax(180px, 1fr);
   gap: 12px;
   padding: 16px;
   overflow: hidden;
@@ -453,6 +453,58 @@ tbody tr.is-selected {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
   font-weight: 700;
+}
+
+.human-gate-actions {
+  padding: 12px;
+  border: 1px solid rgba(23, 105, 170, 0.28);
+  border-radius: 7px;
+  background: var(--blue-soft);
+}
+
+.human-gate-actions strong {
+  display: block;
+  font-size: 13px;
+}
+
+.human-gate-actions p {
+  margin: 5px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.human-gate-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.human-gate-buttons button {
+  min-height: 32px;
+  flex: 1;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.human-gate-buttons button:first-child {
+  border-color: rgba(8, 116, 67, 0.35);
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.human-gate-buttons button:last-child {
+  border-color: rgba(180, 35, 24, 0.35);
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.human-gate-buttons button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 #detail-json {

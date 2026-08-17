@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-210
+- Completed delivery loops: 1-211
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 210 is complete with a protected live support-bundle download
+- Active loop: None; Loop 211 is complete with a confirmation-protected live human-gate action
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-210 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-211 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5436,9 +5436,47 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 211: Confirmation-Protected Live Human-Gate Action
+
+**Status:** Complete.
+
+**Prior basis:** Loop 210 made incident handoff available from the live
+console, but an operator still had to leave the UI and invoke the installed
+CLI to approve or reject a waiting human gate. That split the evidence view
+from the controlled decision action and made the first-value journey harder
+to operate.
+
+**Outcome:** Selecting a `waiting` run in a configured live console now shows
+explicit **Approve run** and **Reject run** controls. Each action requires a
+browser confirmation and posts exactly one boolean decision through the fixed
+same-origin `/api/v1/runs/{run_id}/resume` route. The UI process accepts only a
+bounded JSON body and an ASCII `run_*` identifier, reuses the authenticated
+service client and server-side token, validates the fixed response, and
+refreshes the snapshot. Static, example, and file snapshots remain read-only.
+
+**Evidence:** UI integration tests prove the fixed path, exact request body,
+server-side Authorization forwarding, token non-disclosure, and response
+contract. Control UI contract tests cover the waiting-run guard, explicit
+confirmation, fixed POST path, and disabled/static boundary. Documentation
+and the installed package contract describe the operator boundary; the full
+UI, package, reproducible-build, secret-hygiene, external-connector, and
+Production Baseline gates remain the release checks.
+
+**Safety boundary:** This adds only the existing single-run human-gate resume
+decision. It does not expose browser credentials, accept arbitrary paths or
+run identifiers, publish workflows, cancel runs, retry effects, infer provider
+state, add RBAC/CORS/hosted TLS, or claim exactly-once execution. The UI stays
+loopback-only unless an operator supplies a private HTTPS boundary.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 210 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 211 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5615,6 +5653,7 @@ This rolling queue is ordered. Loop 210 is complete and there is no active deliv
 | Loop 208: Live Service Readiness Badge | Complete | Let operators distinguish static mode, a ready service, a not-ready standby/draining service, and an unavailable process in the installed UI | Fixed service-probe proxy, bounded readiness schema, status badge, UI tests, docs, and full gates |
 | Loop 209: Bounded Live Snapshot Refresh | Complete | Let operators explicitly monitor one configured live service without unbounded browser polling or losing the last valid snapshot on transient failures | Fixed 10-second timer, visibility pause, overlap guard, stale-data preservation, UI contract tests, docs, and full gates |
 | Loop 210: Protected Live Support-Bundle Download | Complete | Let operators hand off one explicit redacted support artifact from the live console without exposing credentials or adding automatic upload | Fixed support-bundle proxy, 128 KiB response bound, attachment filename, UI/route tests, docs, and full gates |
+| Loop 211: Confirmation-Protected Live Human-Gate Action | Complete | Let operators approve or reject one selected waiting run from the live console without exposing credentials or adding arbitrary mutation proxying | Fixed waiting-run guard, confirmation-protected POST, server-side token forwarding, response refresh, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

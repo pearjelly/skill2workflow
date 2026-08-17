@@ -64,7 +64,10 @@ skill2workflow ui --port 4173
 Open `http://127.0.0.1:4173/web/` or
 `http://127.0.0.1:4173/web/control.html`. The UI server is loopback-only and
 static; it does not read runtime state or credentials. See the [installed UI
-guide](docs/installed-ui.md).
+guide](docs/installed-ui.md). With an explicit service origin and protected
+token file, the same console can inspect bounded live state, download a
+redacted support bundle, and confirm one selected waiting human gate through a
+fixed, confirmation-protected action.
 
 ## Visual Overview
 
@@ -861,7 +864,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-210 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-211 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring

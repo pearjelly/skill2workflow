@@ -231,6 +231,14 @@
             <strong id="detail-title">Snapshot</strong>
           </div>
           <dl class="status-grid" id="status-grid"></dl>
+          <section id="human-gate-actions" class="human-gate-actions" hidden aria-live="polite">
+            <strong>Human gate</strong>
+            <p id="human-gate-status">Select a waiting live run to decide.</p>
+            <div class="human-gate-buttons">
+              <button id="approve-run" type="button">Approve run</button>
+              <button id="reject-run" type="button">Reject run</button>
+            </div>
+          </section>
           <pre id="detail-json">{}</pre>
         </aside>
       </section>

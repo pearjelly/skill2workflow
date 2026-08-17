@@ -127,6 +127,17 @@ The same live console can download the existing redacted support artifact with
 `no-store` response, and never sends the ingress token to the browser. It is an
 explicit operator download, not automatic support upload.
 
+When the live run table selects a run whose fixed status is `waiting`, the
+detail panel also offers **Approve run** and **Reject run**. The browser first
+requires an explicit confirmation, then sends exactly `{"approved":true}` or
+`{"approved":false}` to the UI's fixed same-origin
+`POST /api/v1/runs/{run_id}/resume` route. The UI validates an ASCII `run_*`
+identifier, accepts only the one-boolean body, forwards the existing protected
+service action with the server-side token, validates the response, and reloads
+the snapshot. `404` and `409` remain fixed not-found/not-waiting outcomes;
+other upstream failures are reduced to a value-free `503`. Static, example,
+and file snapshots never expose the controls.
+
 ## Verification
 
 Run the real-process drill:
@@ -143,9 +154,10 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-Loop 55 remains a single-team read surface. The Loop 207 UI proxy excludes
-browser credential storage, CORS, workflow publication, approval or
-cancellation controls, RBAC, pagination cursors, remote audit storage,
-multi-tenant filtering, and hosted TLS. Network exposure still requires the
+The live console remains a single-team operator boundary. The Loop 211 UI
+proxy adds only the existing human-gate resume decision; it excludes browser
+credential storage, CORS, workflow publication, cancellation, RBAC, pagination
+cursors, remote audit storage, multi-tenant filtering, automatic retries,
+provider reconciliation, and hosted TLS. Network exposure still requires the
 external TLS and private operator boundary documented in
 [security-boundary.md](security-boundary.md).

@@ -8,6 +8,7 @@ from functools import partial
 from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable, Optional
+from urllib.parse import urlsplit
 
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
@@ -15,8 +16,10 @@ from .service import read_service_bearer_token
 from .service_client import (
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
+    ServiceActionError,
     fetch_support_bundle,
     fetch_service_probe,
+    post_run_resume,
     service_endpoint,
 )
 
@@ -29,6 +32,9 @@ _SERVICE_PROBE_PATH = "/api/v1/service-probe"
 _SERVICE_PROBE_MAX_RESPONSE_BYTES = MAX_SERVICE_PROBE_RESPONSE_BYTES
 _SUPPORT_BUNDLE_PATH = "/api/v1/support-bundle"
 _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
+_LIVE_RESUME_PREFIX = "/api/v1/runs/"
+_LIVE_RESUME_SUFFIX = "/resume"
+_LIVE_RESUME_MAX_REQUEST_BYTES = 128
 
 
 def find_ui_root() -> Path:
@@ -119,6 +125,28 @@ def serve_ui(
                 return
             super().do_GET()
 
+        def do_POST(self):
+            parsed = urlsplit(self.path)
+            if parsed.path.startswith(_LIVE_RESUME_PREFIX):
+                if parsed.query or not parsed.path.endswith(_LIVE_RESUME_SUFFIX):
+                    self._write_json(
+                        404,
+                        {"error": "human gate decision path is not available"},
+                    )
+                    return
+                run_id = parsed.path[
+                    len(_LIVE_RESUME_PREFIX) : -len(_LIVE_RESUME_SUFFIX)
+                ]
+                if not _is_safe_live_run_id(run_id):
+                    self._write_json(
+                        404,
+                        {"error": "human gate decision path is not available"},
+                    )
+                    return
+                self._serve_live_resume(run_id)
+                return
+            self.send_error(404)
+
         def _serve_live_snapshot(self):
             configured_service_url = getattr(self.server, "live_service_url", None)
             token_file = getattr(self.server, "live_auth_token_file", None)
@@ -186,6 +214,79 @@ def serve_ui(
                 content_disposition='attachment; filename="skill2workflow-support-bundle.json"',
             )
 
+        def _serve_live_resume(self, run_id):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "human gate is not configured"})
+                return
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(
+                    400,
+                    {"error": "human gate decision body must contain approved boolean"},
+                )
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(
+                    400,
+                    {"error": "human gate decision body must contain approved boolean"},
+                )
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(
+                    400,
+                    {"error": "human gate decision body must contain approved boolean"},
+                )
+                return
+            if content_length > _LIVE_RESUME_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "human gate decision body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(
+                    400,
+                    {"error": "human gate decision body must contain approved boolean"},
+                )
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != {"approved"}
+                or not isinstance(payload.get("approved"), bool)
+            ):
+                self._write_json(
+                    400,
+                    {"error": "human gate decision body must contain approved boolean"},
+                )
+                return
+            try:
+                result = post_run_resume(
+                    configured_service_url,
+                    token_file,
+                    run_id,
+                    approved=payload["approved"],
+                )
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "run not found"})
+                elif error.status_code == 409:
+                    self._write_json(409, {"error": "run is not waiting"})
+                else:
+                    self._write_json(503, {"error": "human gate decision unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "human gate decision unavailable"})
+                return
+            self._write_json(200, result)
+
         def _write_json(
             self,
             status,
@@ -222,3 +323,13 @@ def serve_ui(
             server.serve_forever()
     finally:
         server.server_close()
+
+
+def _is_safe_live_run_id(value: str) -> bool:
+    """Accept only the ASCII run identifiers used by the fixed live route."""
+
+    return bool(
+        value.startswith("run_")
+        and 5 <= len(value) <= 128
+        and all(char.isascii() and (char.isalnum() or char in {"_", "-"}) for char in value)
+    )
