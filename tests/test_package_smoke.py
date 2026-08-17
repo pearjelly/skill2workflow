@@ -182,6 +182,14 @@ class PackageSmokeTests(TestCase):
                             "changes": {"sections": []},
                         }
                     )
+                if "bundle-preflight" in command:
+                    return json.dumps(
+                        {
+                            "schema_version": "skill2workflow-workflow-preflight-0.1.0",
+                            "ready": True,
+                            "safety": {"side_effect_free": True},
+                        }
+                    )
                 if "bundle-run" in command:
                     return json.dumps(
                         {
@@ -232,6 +240,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["bundle_status"])
         self.assertTrue(result["bundle_publish_status"])
         self.assertTrue(result["bundle_diff_status"])
+        self.assertTrue(result["bundle_preflight_status"])
         self.assertTrue(result["bundle_run_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])

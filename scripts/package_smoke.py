@@ -38,6 +38,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "bundle-verify",
     "bundle-publish",
     "bundle-diff",
+    "bundle-preflight",
     "bundle-run",
     "publish",
     "promote",
@@ -346,6 +347,16 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    bundle_preflight_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "bundle-preflight",
+                str(bundle_path),
+            ],
+            cwd=isolated_dir,
+        )
+    )
     bundle_run_result = json.loads(
         _run(
             [
@@ -366,6 +377,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or bundle_verify_result.get("valid") is not True
         or bundle_publish_result.get("status") != "published"
         or bundle_diff_result.get("changed") is not False
+        or bundle_preflight_result.get("ready") is not True
         or bundle_run_result.get("status") != "waiting"
         or not bundle_path.is_file()
     ):
@@ -426,6 +438,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "bundle_status": True,
         "bundle_publish_status": True,
         "bundle_diff_status": True,
+        "bundle_preflight_status": True,
         "bundle_run_status": True,
     }
 

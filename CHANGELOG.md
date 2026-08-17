@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `bundle-preflight` for value-free, side-effect-free admission checks on
+  verified bundles and optional trigger input; `bundle-run --input` reuses the
+  same check before creating state or resolving credentials.
+
 - Added `bundle-run`: verify a portable bundle before delegating to the normal
   local executor, with no publication, alias mutation, or second execution
   authority.

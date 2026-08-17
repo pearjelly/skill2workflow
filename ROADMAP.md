@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-183
+- Completed delivery loops: 1-184
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 183 is complete with verified local Workflow DSL execution
+- Active loop: None; Loop 184 is complete with verified Workflow DSL bundle input preflight
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-183 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-184 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 183; the detailed
+The follow-on production hardening continues through Loop 184; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4450,9 +4450,51 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
   --storage sqlite
 ```
 
+### Loop 184: Verified Workflow Bundle Input Preflight
+
+**Status:** Complete.
+
+**Prior basis:** Loop 183 made a received bundle executable without
+publication, but workflows with trigger input still required operators to
+extract the artifact or risk discovering a missing input mapping only after
+execution began.
+
+**Outcome:** `bundle-preflight` verifies a bundle in memory and reuses the
+side-effect-free trigger preflight contract for optional input schema and
+connector mappings. `bundle-run --input` runs that same admission check before
+creating run state or resolving credentials, then passes the bounded input to
+the existing executor context. A blocked report is value-free and exits
+non-zero; no connector, credential, or state side effect occurs.
+
+**Evidence:** [`docs/workflow-bundles.md`](docs/workflow-bundles.md) defines the
+portable input boundary. CLI tests cover ready and blocked preflight, value
+redaction, blocked-input pre-state rejection, contextual bundle execution,
+installed command help, package smoke, full-suite validation, and release
+preflight.
+
+**Safety boundary:** This is an admission hint and local execution convenience,
+not a second trigger/idempotency authority, provider reconciliation layer,
+sandbox, or secret store. Input values still enter local run state when an
+operator explicitly runs with `--input`; operators must not place credentials
+or secrets in trigger input.
+
+The repeatable evidence commands are:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-preflight \
+  /tmp/approval-flow.s2w \
+  --input /tmp/approval-flow-input.json \
+  --format text
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
+  /tmp/approval-flow.s2w \
+  --input /tmp/approval-flow-input.json \
+  --state-dir /tmp/skill2workflow-bundle-run \
+  --storage sqlite
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 183 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 184 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4601,6 +4643,7 @@ This rolling queue is ordered. Loop 183 is complete and there is no active deliv
 | Loop 181: Verified Local Workflow Bundle Publication | Complete | Move a fully verified local bundle into the normal immutable publication path without extraction, execution, or credential access | In-memory verified loader, explicit local `bundle-publish`, JSON/SQLite publication coverage, conflict/idempotency evidence, installed CLI, tests, docs, and package evidence |
 | Loop 182: Value-Free Workflow Bundle Diff Review | Complete | Compare two verified bundles before publication without exposing workflow values or requiring control-plane state | Shared structural diff helper, fixed bundle-diff schema, identity mismatch guard, redaction/read-only tests, installed CLI, docs, and package evidence |
 | Loop 183: Verified Local Workflow Bundle Execution | Complete | Run a verified bundle through the existing local executor without publication or a second execution authority | `bundle-run`, JSON/SQLite execution evidence, invalid-pre-state guard, normal credential/retry/timeout delegation, installed CLI, docs, and package evidence |
+| Loop 184: Verified Workflow Bundle Input Preflight | Complete | Check optional bundle trigger input and connector mappings without state or side effects, then reuse the admission result before bundle execution | `bundle-preflight`, value-free readiness report, blocked-input pre-state guard, `bundle-run --input`, installed CLI, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

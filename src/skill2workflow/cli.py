@@ -76,6 +76,7 @@ from .service_client import (
 )
 from .systemd_service import write_systemd_service_unit
 from .telemetry import OperationalEventLogger
+from .triggers import normalize_trigger_input
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 from .webhooks import serve_webhook_requests
 
@@ -156,6 +157,14 @@ def _main(argv=None) -> int:
     bundle_diff_cmd.add_argument("from_bundle", type=Path)
     bundle_diff_cmd.add_argument("to_bundle", type=Path)
 
+    bundle_preflight_cmd = subparsers.add_parser(
+        "bundle-preflight",
+        help="Verify a Workflow DSL bundle and check trigger input without side effects",
+    )
+    bundle_preflight_cmd.add_argument("bundle", type=Path)
+    bundle_preflight_cmd.add_argument("--input", type=Path)
+    bundle_preflight_cmd.add_argument("--format", choices=["json", "text"], default="json")
+
     bundle_run_cmd = subparsers.add_parser(
         "bundle-run",
         help="Verify a Workflow DSL bundle, then run it through the local executor",
@@ -163,6 +172,7 @@ def _main(argv=None) -> int:
     bundle_run_cmd.add_argument("bundle", type=Path)
     bundle_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     bundle_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    bundle_run_cmd.add_argument("--input", type=Path)
     bundle_run_cmd.add_argument("--credential-file", type=Path)
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
@@ -950,14 +960,40 @@ def _main(argv=None) -> int:
         _print_json(diff_workflow_bundles(args.from_bundle, args.to_bundle))
         return 0
 
+    if args.command == "bundle-preflight":
+        workflow = load_verified_workflow_bundle(args.bundle)
+        input_value = _load_bundle_input(args.input)
+        report = build_workflow_preflight(
+            workflow,
+            input_value=input_value,
+            input_present=args.input is not None,
+        )
+        if args.format == "text":
+            print(render_workflow_preflight_text(report), end="")
+        else:
+            _print_json(report)
+        return 0 if report["ready"] else 1
+
     if args.command == "bundle-run":
         workflow = load_verified_workflow_bundle(args.bundle)
+        input_value = _load_bundle_input(args.input)
+        context = None
+        if args.input is not None:
+            preflight = build_workflow_preflight(
+                workflow,
+                input_value=input_value,
+                input_present=True,
+            )
+            if not preflight["ready"]:
+                _print_json(preflight)
+                return 1
+            context = {"input": input_value}
         _print_json(
             LocalExecutor(
                 args.state_dir,
                 storage=args.storage,
                 credential_provider=_credential_provider(args),
-            ).run(workflow)
+            ).run(workflow, context=context)
         )
         return 0
 
@@ -1921,6 +1957,12 @@ def _load_trigger_input(path: Path):
     if not isinstance(value, dict):
         raise ValueError("trigger input must be a JSON object")
     return value
+
+
+def _load_bundle_input(path: Path):
+    if path is None:
+        return None
+    return normalize_trigger_input(_load_json(path), label="bundle input")
 
 
 def _write_back_workflow(workflow, graph):

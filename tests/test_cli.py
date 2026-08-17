@@ -3586,8 +3586,10 @@ class CliTests(TestCase):
             root = Path(tmp)
             workflow_path = root / "workflow.json"
             bundle_path = root / "workflow.s2w"
+            input_path = root / "input.json"
             state_dir = root / "state"
             workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            input_path.write_text(json.dumps({"customer_id": "customer_123"}), encoding="utf-8")
             with redirect_stdout(StringIO()):
                 self.assertEqual(
                     main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
@@ -3603,6 +3605,8 @@ class CliTests(TestCase):
                         str(state_dir),
                         "--storage",
                         "sqlite",
+                        "--input",
+                        str(input_path),
                     ]
                 )
             self.assertTrue((state_dir / "runs.sqlite3").is_file())
@@ -3611,6 +3615,76 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(result["status"], "completed")
         self.assertEqual(result["workflow_id"], "workflow_demo")
+        self.assertEqual(result["context"]["input"], {"customer_id": "customer_123"})
+
+    def test_bundle_preflight_is_value_free_and_does_not_create_state(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            input_path = root / "input.json"
+            workflow_path.write_text(
+                json.dumps(_mapped_connector_workflow("https://example.com/task")),
+                encoding="utf-8",
+            )
+            input_path.write_text(json.dumps({"customer_id": "private-value"}), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
+                    0,
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "bundle-preflight",
+                        str(bundle_path),
+                        "--input",
+                        str(input_path),
+                    ]
+                )
+
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(report["ready"])
+        self.assertTrue(report["safety"]["side_effect_free"])
+        self.assertNotIn("private-value", stdout.getvalue())
+
+    def test_bundle_run_blocks_unready_input_before_creating_state(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            input_path = root / "input.json"
+            state_dir = root / "state"
+            workflow_path.write_text(
+                json.dumps(_mapped_connector_workflow("https://example.com/task")),
+                encoding="utf-8",
+            )
+            input_path.write_text(json.dumps({"other": "private-value"}), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
+                    0,
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "bundle-run",
+                        str(bundle_path),
+                        "--input",
+                        str(input_path),
+                        "--state-dir",
+                        str(state_dir),
+                    ]
+                )
+
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 1)
+        self.assertFalse(report["ready"])
+        self.assertFalse(state_dir.exists())
+        self.assertNotIn("private-value", stdout.getvalue())
 
     def test_bundle_run_rejects_invalid_bundle_before_creating_state(self):
         with TemporaryDirectory() as tmp:

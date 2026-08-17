@@ -28,11 +28,13 @@ weakened by this loop.
 ## Scope and exclusions
 
 This boundary applies to JSON operands loaded by the installed CLI, including
-`validate`, `visualize`, `write-back`, `run`, `publish`, retention policy
-commands, and protected service clients. It does not change Workflow DSL
-schema compatibility, JSON/SQLite state storage, service HTTP framing, or
-credential-provider semantics. It also does not turn local file inputs into a
-multi-tenant or remotely trusted upload surface.
+`validate`, `visualize`, `write-back`, `run`, `bundle-preflight`,
+`bundle-run --input`, `publish`, retention policy commands, and protected
+service clients. Bundle input then passes through the stricter 1 MiB trigger
+object boundary and the side-effect-free preflight contract. It does not
+change Workflow DSL schema compatibility, JSON/SQLite state storage, service
+HTTP framing, or credential-provider semantics. It also does not turn local
+file inputs into a multi-tenant or remotely trusted upload surface.
 
 The limit is intentionally fixed in the source and is covered by regression
 tests. Operators who need larger authored workflows should split the workflow

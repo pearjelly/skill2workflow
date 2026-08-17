@@ -70,6 +70,22 @@ or edge IDs. Titles, descriptions, connector requests, trigger inputs, and
 credentials never enter the report. Different workflow IDs fail closed rather
 than producing a misleading comparison.
 
+Check a received bundle and optional trigger input without creating state or
+calling a connector:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-preflight \
+  /tmp/approval-flow.s2w \
+  --input /tmp/approval-flow-input.json \
+  --format text
+```
+
+`bundle-preflight` verifies the bundle in memory and reuses the fixed trigger
+input, input-schema, and connector-mapping admission contract. Its report is
+side-effect-free and value-free: it reports input keys/counts and mapping
+status, never input values, credentials, connector calls, or run state. A
+blocked report exits non-zero so it can gate a later `bundle-run` step.
+
 Run a verified bundle through the normal local executor without publishing it:
 
 ```bash
@@ -81,14 +97,18 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
 
 `bundle-run` verifies the bundle before creating run state, then uses the same
 executor, storage, retry, timeout, and credential-file boundaries as `run`.
-It may execute explicitly requested connector side effects, but it does not
-create a published version, promote an alias, or introduce a second execution
-authority. Invalid bundles fail before the state directory is initialized.
+With `--input`, it first requires the same `bundle-preflight` admission report
+to be ready and stores the bounded input under `context.input`; a blocked input
+cannot create state or resolve credentials. It may execute explicitly
+requested connector side effects, but it does not create a published version,
+promote an alias, or introduce a second execution authority. Invalid bundles
+fail before the state directory is initialized.
 
-The successful report contains only workflow identity, status, byte counts,
-digests, member count, and fixed error fields. It does not echo workflow
-descriptions, trigger inputs, connector URLs, request bodies, credential
-values, or provider responses.
+The successful bundle verification report contains only workflow identity,
+status, byte counts, digests, member count, and fixed error fields. The
+preflight report likewise exposes only bounded structural metadata and input
+keys/counts. Neither report echoes workflow descriptions, trigger input values,
+connector URLs, request bodies, credential values, or provider responses.
 
 ## Reproducibility and trust boundary
 
