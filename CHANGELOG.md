@@ -8,6 +8,13 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded SQLite workflow registry `record_json` values to 2 MiB UTF-8 JSON
+  objects across publication, direct/complete reads, alias resolution,
+  snapshots, diagnostics, deprecation, promotion, and JSON-to-SQLite import.
+  Replacement and alias-update batches validate before mutation; registry
+  fields, aliases, checksums, artifacts, and compatibility paths remain
+  unchanged. See `docs/sqlite-workflow-record-boundary.md`.
+
 - Bounded local control-plane audit events to 1 MiB UTF-8 JSON-object
   documents across JSONL and SQLite writes, bounded reads, and JSON-to-SQLite
   import. Batch appends validate before emitting any member; event fields,

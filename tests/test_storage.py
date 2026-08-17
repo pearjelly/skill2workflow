@@ -13,6 +13,7 @@ from skill2workflow.storage import (
     MAX_AUDIT_EVENT_BYTES,
     MAX_JSON_CONTROL_INDEX_BYTES,
     MAX_JSON_RUN_STATE_BYTES,
+    MAX_SQLITE_WORKFLOW_RECORD_BYTES,
     MAX_SQLITE_RUN_STATE_BYTES,
     SqliteControlStore,
     SqliteRunStore,
@@ -318,8 +319,118 @@ class StorageTests(TestCase):
                 with self.assertRaisesRegex(
                     ValueError,
                     f"workflow index exceeds {MAX_JSON_CONTROL_INDEX_BYTES} bytes",
-                ):
+                    ):
                     store.load_index()
+
+    def test_sqlite_workflow_record_writes_reject_oversized_payloads_before_commit(self):
+        oversized = {
+            "workflow_id": "workflow_registry",
+            "name": "registry",
+            "version": "1.0.0",
+            "status": "published",
+            "checksum": "abc",
+            "artifact": "workflows/workflow_registry/1.0.0.json",
+            "published_at": "2026-08-17T00:00:00Z",
+            "description": "x" * MAX_SQLITE_WORKFLOW_RECORD_BYTES,
+        }
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "sqlite")
+            with self.assertRaisesRegex(
+                ValueError,
+                f"SQLite workflow record exceeds {MAX_SQLITE_WORKFLOW_RECORD_BYTES} bytes",
+            ):
+                store.save_index({"workflow_registry@1.0.0": oversized})
+            self.assertEqual(store.load_index(), {})
+
+    def test_sqlite_workflow_record_batch_validates_before_replacing_index(self):
+        existing = {
+            "workflow_id": "workflow_registry",
+            "name": "registry",
+            "version": "1.0.0",
+            "status": "published",
+            "checksum": "abc",
+            "artifact": "workflows/workflow_registry/1.0.0.json",
+            "published_at": "2026-08-17T00:00:00Z",
+        }
+        oversized = dict(existing)
+        oversized["version"] = "2.0.0"
+        oversized["description"] = "x" * MAX_SQLITE_WORKFLOW_RECORD_BYTES
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "sqlite")
+            store.save_index({"workflow_registry@1.0.0": existing})
+            with self.assertRaisesRegex(ValueError, "SQLite workflow record exceeds"):
+                store.save_index(
+                    {
+                        "workflow_registry@1.0.0": existing,
+                        "workflow_registry@2.0.0": oversized,
+                    }
+                )
+            self.assertEqual(
+                store.load_index(), {"workflow_registry@1.0.0": existing}
+            )
+
+    def test_sqlite_workflow_record_reads_reject_oversized_before_decode(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "sqlite")
+            store.save_index(
+                {
+                    "workflow_registry@1.0.0": {
+                        "workflow_id": "workflow_registry",
+                        "name": "registry",
+                        "version": "1.0.0",
+                        "status": "published",
+                        "checksum": "abc",
+                        "artifact": "workflows/workflow_registry/1.0.0.json",
+                        "published_at": "2026-08-17T00:00:00Z",
+                    }
+                }
+            )
+            with store._connection() as connection:
+                connection.execute(
+                    "update workflow_versions set record_json = ? where record_key = ?",
+                    ("x" * (MAX_SQLITE_WORKFLOW_RECORD_BYTES + 1), "workflow_registry@1.0.0"),
+                )
+            with self.assertRaisesRegex(
+                ValueError,
+                f"SQLite workflow record exceeds {MAX_SQLITE_WORKFLOW_RECORD_BYTES} bytes",
+            ):
+                store.load_index()
+
+    def test_sqlite_workflow_record_reads_reject_malformed_or_non_object_documents(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "sqlite")
+            store.save_index(
+                {
+                    "workflow_registry@1.0.0": {
+                        "workflow_id": "workflow_registry",
+                        "name": "registry",
+                        "version": "1.0.0",
+                        "status": "published",
+                        "checksum": "abc",
+                        "artifact": "workflows/workflow_registry/1.0.0.json",
+                        "published_at": "2026-08-17T00:00:00Z",
+                    }
+                }
+            )
+            with store._connection() as connection:
+                connection.execute(
+                    "update workflow_versions set record_json = ? where record_key = ?",
+                    ("not-json", "workflow_registry@1.0.0"),
+                )
+            with self.assertRaisesRegex(
+                ValueError, "SQLite workflow record is not valid JSON"
+            ):
+                store.load_index()
+
+            with store._connection() as connection:
+                connection.execute(
+                    "update workflow_versions set record_json = ? where record_key = ?",
+                    ("[]", "workflow_registry@1.0.0"),
+                )
+            with self.assertRaisesRegex(
+                ValueError, "SQLite workflow record must be an object"
+            ):
+                store.load_index()
 
     def test_interrupted_execution_rows_stream_without_fetchall(self):
         with TemporaryDirectory() as tmp:

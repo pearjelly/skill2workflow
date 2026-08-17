@@ -766,7 +766,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-175 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-176 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1399,6 +1399,13 @@ envelope, and batch writes validate before emitting any member. Bounded reads
 fail closed before decoding oversized or malformed payloads. See
 [`docs/audit-event-boundary.md`](docs/audit-event-boundary.md).
 
+Loop 176 hardens the SQLite workflow registry: each `record_json` value is a
+bounded 2 MiB UTF-8 JSON object, reads fail closed before decoding oversized or
+malformed records, and index replacement or alias updates validate every
+changed record before mutation. Workflow version, alias, checksum, and
+artifact semantics remain unchanged. See
+[`docs/sqlite-workflow-record-boundary.md`](docs/sqlite-workflow-record-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1415,6 +1422,7 @@ See:
 - `docs/external-connector-result-boundary.md`
 - `docs/json-run-state-boundary.md`
 - `docs/audit-event-boundary.md`
+- `docs/sqlite-workflow-record-boundary.md`
 - `docs/service-config-boundary.md`
 - `docs/credential-file-boundary.md`
 - `docs/skill-input-boundary.md`

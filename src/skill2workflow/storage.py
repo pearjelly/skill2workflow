@@ -34,6 +34,10 @@ MAX_JSON_RUN_STATE_BYTES = 8 * 1024 * 1024
 # not become an unbounded escape hatch for workflow/context/result state.
 MAX_SQLITE_RUN_STATE_BYTES = MAX_JSON_RUN_STATE_BYTES
 MAX_JSON_CONTROL_INDEX_BYTES = 8 * 1024 * 1024
+# A registry row carries only published-version metadata, but it is still a
+# durable SQLite document. Keep one row below the published-artifact ceiling so
+# metadata cannot become an unbounded side channel or a decode-time allocation.
+MAX_SQLITE_WORKFLOW_RECORD_BYTES = 2 * 1024 * 1024
 # Audit events are compact metadata by contract. Keep both local backends on
 # one fixed UTF-8 envelope so JSONL and SQLite cannot become unbounded sinks.
 MAX_AUDIT_EVENT_BYTES = 1 * 1024 * 1024
@@ -1180,7 +1184,7 @@ class SqliteControlStore:
             rows = connection.execute(
                 "select record_key, record_json from workflow_versions order by record_key"
             ).fetchall()
-        return {str(row[0]): json.loads(str(row[1])) for row in rows}
+        return {str(row[0]): _decode_sqlite_workflow_record(row[1]) for row in rows}
 
     def get_workflow_record(self, workflow_id: str, version: str) -> WorkflowRecord:
         key = _workflow_record_key(workflow_id, version)
@@ -1191,7 +1195,7 @@ class SqliteControlStore:
             ).fetchone()
         if row is None:
             raise ValueError(f"workflow version not found: {workflow_id}@{version}")
-        return json.loads(str(row[0]))
+        return _decode_sqlite_workflow_record(row[0])
 
     def resolve_workflow_version(self, workflow_id: str, requested: str) -> str:
         """Resolve one SQLite workflow alias without loading the global registry."""
@@ -1208,7 +1212,7 @@ class SqliteControlStore:
             matches = []
             rows = _iter_workflow_records_for_id(connection, workflow_id)
             for _record_key, raw_record in rows:
-                record = json.loads(str(raw_record))
+                record = _decode_sqlite_workflow_record(raw_record)
                 if (
                     record.get("status") == "published"
                     and requested in _sqlite_record_aliases(record)
@@ -1235,7 +1239,7 @@ class SqliteControlStore:
                 "select record_key, record_json from workflow_versions order by record_key"
             )
             for record_key, record_json in rows:
-                yield str(record_key), json.loads(str(record_json))
+                yield str(record_key), _decode_sqlite_workflow_record(record_json)
 
     def count_referenced_artifacts(self) -> int:
         """Count distinct safe-looking artifact references in SQLite."""
@@ -1277,6 +1281,14 @@ class SqliteControlStore:
         return row is not None
 
     def save_index(self, index: Dict[str, WorkflowRecord]) -> None:
+        serialized_records = [
+            (
+                key,
+                record,
+                _encode_sqlite_workflow_record(record),
+            )
+            for key, record in index.items()
+        ]
         with self._connection() as connection:
             connection.execute("delete from workflow_versions")
             connection.executemany(
@@ -1306,9 +1318,9 @@ class SqliteControlStore:
                         str(record.get("artifact", "")),
                         str(record.get("published_at", "")),
                         str(record.get("deprecated_at", "")),
-                        json.dumps(record, ensure_ascii=False, sort_keys=True),
+                        serialized,
                     )
-                    for key, record in index.items()
+                    for key, record, serialized in serialized_records
                 ],
             )
 
@@ -1324,6 +1336,7 @@ class SqliteControlStore:
         workflow_id = str(record.get("workflow_id", ""))
         version = str(record.get("version", ""))
         key = _workflow_record_key(workflow_id, version)
+        serialized_record = _encode_sqlite_workflow_record(record)
         with self._connection() as connection:
             connection.execute("begin immediate")
             row = connection.execute(
@@ -1332,7 +1345,7 @@ class SqliteControlStore:
             ).fetchone()
             if row is not None:
                 try:
-                    existing = json.loads(str(row[0]))
+                    existing = _decode_sqlite_workflow_record(row[0])
                 except (TypeError, ValueError, json.JSONDecodeError) as error:
                     raise ValueError("workflow registry record is invalid") from error
                 if str(existing.get("checksum", "")) != str(record.get("checksum", "")):
@@ -1374,7 +1387,7 @@ class SqliteControlStore:
                     str(record.get("artifact", "")),
                     str(record.get("published_at", "")),
                     str(record.get("deprecated_at", "")),
-                    json.dumps(record, ensure_ascii=False, sort_keys=True),
+                    serialized_record,
                 ),
             )
             _append_audit_connection(connection, audit_event)
@@ -1426,7 +1439,7 @@ class SqliteControlStore:
             if row is None:
                 raise ValueError(f"workflow version not found: {workflow_id}@{version}")
             try:
-                current = json.loads(str(row[0]))
+                current = _decode_sqlite_workflow_record(row[0])
             except (TypeError, ValueError, json.JSONDecodeError) as error:
                 raise ValueError("workflow registry record is invalid") from error
             record = dict(current)
@@ -1446,7 +1459,7 @@ class SqliteControlStore:
                 (
                     str(record.get("status", "deprecated")),
                     str(record.get("deprecated_at", "")),
-                    json.dumps(record, ensure_ascii=False, sort_keys=True),
+                    _encode_sqlite_workflow_record(record),
                     key,
                 ),
             )
@@ -1474,7 +1487,7 @@ class SqliteControlStore:
             ).fetchone()
             if target_row is None:
                 raise ValueError(f"workflow version not found: {workflow_id}@{version}")
-            target = dict(json.loads(str(target_row[0])))
+            target = dict(_decode_sqlite_workflow_record(target_row[0]))
             if target.get("status") != "published":
                 raise ValueError(
                     f"workflow version is not published: {workflow_id}@{version}"
@@ -1484,7 +1497,7 @@ class SqliteControlStore:
             changed_records = []
             rows = _iter_workflow_records_for_id(connection, workflow_id)
             for record_key, raw_record in rows:
-                existing = json.loads(str(raw_record))
+                existing = _decode_sqlite_workflow_record(raw_record)
                 existing_aliases = _sqlite_record_aliases(existing)
                 if alias not in existing_aliases:
                     continue
@@ -1518,15 +1531,13 @@ class SqliteControlStore:
                 changed_keys.add(target_key)
 
             if changed_keys:
+                serialized_updates = [
+                    (_encode_sqlite_workflow_record(updated_by_key[key]), key)
+                    for key in sorted(changed_keys)
+                ]
                 connection.executemany(
                     "update workflow_versions set record_json = ? where record_key = ?",
-                    [
-                        (
-                            json.dumps(updated_by_key[key], ensure_ascii=False, sort_keys=True),
-                            key,
-                        )
-                        for key in sorted(changed_keys)
-                    ],
+                    serialized_updates,
                 )
                 _append_audit_connection(connection, audit_event)
             return target
@@ -1847,7 +1858,7 @@ class SqliteControlStore:
                 str(status): int(count) for status, count in workflow_status_rows
             },
             "workflows": [
-                json.loads(str(row[0])) for row in reversed(workflow_rows)
+                _decode_sqlite_workflow_record(row[0]) for row in reversed(workflow_rows)
             ],
             "audit_total": audit_total,
             "audit_events": [
@@ -2391,6 +2402,29 @@ def _encode_sqlite_run_state(state: RunState) -> str:
     return raw.decode("utf-8")
 
 
+def _encode_sqlite_workflow_record(record: WorkflowRecord) -> str:
+    """Serialize one SQLite registry record within its durable byte boundary."""
+
+    if not isinstance(record, dict):
+        raise ValueError("SQLite workflow record must be an object")
+    try:
+        raw = json.dumps(record, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+        RecursionError,
+        UnicodeError,
+    ) as error:
+        raise ValueError("SQLite workflow record is not JSON serializable") from error
+    if len(raw) > MAX_SQLITE_WORKFLOW_RECORD_BYTES:
+        raise ValueError(
+            "SQLite workflow record exceeds "
+            f"{MAX_SQLITE_WORKFLOW_RECORD_BYTES} bytes"
+        )
+    return raw.decode("utf-8")
+
+
 def _encode_audit_event(event: AuditEvent) -> str:
     """Serialize one audit object within the shared UTF-8 event boundary."""
 
@@ -2472,6 +2506,38 @@ def _decode_sqlite_run_state(raw_state: object) -> RunState:
     if not isinstance(state, dict):
         raise ValueError("SQLite run state must be an object")
     return state
+
+
+def _decode_sqlite_workflow_record(raw_record: object) -> WorkflowRecord:
+    """Decode one registry record only after checking its UTF-8 byte bound."""
+
+    try:
+        text = (
+            raw_record.decode("utf-8")
+            if isinstance(raw_record, bytes)
+            else str(raw_record)
+        )
+        encoded = text.encode("utf-8")
+    except (TypeError, UnicodeError) as error:
+        raise ValueError("SQLite workflow record is not valid UTF-8") from error
+    if len(encoded) > MAX_SQLITE_WORKFLOW_RECORD_BYTES:
+        raise ValueError(
+            "SQLite workflow record exceeds "
+            f"{MAX_SQLITE_WORKFLOW_RECORD_BYTES} bytes"
+        )
+    try:
+        record = json.loads(text)
+    except (
+        TypeError,
+        ValueError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+    ) as error:
+        raise ValueError("SQLite workflow record is not valid JSON") from error
+    if not isinstance(record, dict):
+        raise ValueError("SQLite workflow record must be an object")
+    return record
 
 
 def _read_bounded_json_document(path: Path, max_bytes: int, label: str):

@@ -31,6 +31,11 @@ These surfaces should remain compatible during the `0.1.x` line:
   and SQLite writes, bounded JSONL line reads, SQLite payload decoding, and
   JSON-to-SQLite import; batch appends validate before writing any member,
   documented in [`audit-event-boundary.md`](audit-event-boundary.md)
+- SQLite workflow registry records use a fixed 2 MiB UTF-8 JSON-object envelope
+  across publication, complete/direct reads, alias resolution, snapshots,
+  diagnostics, deprecation, promotion, and JSON-to-SQLite import; replacement
+  and alias-update batches validate before mutation, documented in
+  [`sqlite-workflow-record-boundary.md`](sqlite-workflow-record-boundary.md)
 - Release manifest schema `skill2workflow-release-artifact-manifest-0.1.0`, including archive/member SHA-256 hashes, fixed package metadata, and rejection of private/state wheel content, documented in [`release-artifact-manifest.md`](release-artifact-manifest.md)
 - Release SBOM schema `skill2workflow-release-sbom-0.1.0`, using SPDX JSON 2.3 with one checksum entry per qualified wheel member and a package-to-file relationship set, documented in [`release-artifact-sbom.md`](release-artifact-sbom.md)
 - Reproducible release evidence schema `skill2workflow-reproducible-build-0.1.0`, recording two byte-identical fixed-epoch wheel builds for one checkout and toolchain, documented in [`reproducible-builds.md`](reproducible-builds.md)
