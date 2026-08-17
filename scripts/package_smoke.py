@@ -34,6 +34,8 @@ APACHE_2_0_LICENSE_SHA256 = (
 )
 REQUIRED_CONSOLE_COMMANDS = (
     "validate",
+    "bundle-create",
+    "bundle-verify",
     "publish",
     "promote",
     "workflow-diff",
@@ -297,6 +299,32 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     validate_result = json.loads(validate_output)
     if not validate_result.get("valid"):
         raise RuntimeError(f"installed skill2workflow validate returned invalid result: {validate_output}")
+    bundle_path = isolated_dir / "approval-flow.s2w"
+    bundle_create_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "bundle-create",
+                str(isolated_fixture),
+                "--output",
+                str(bundle_path),
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    bundle_verify_result = json.loads(
+        _run(
+            [str(console_script), "bundle-verify", str(bundle_path)],
+            cwd=isolated_dir,
+        )
+    )
+    if (
+        bundle_create_result.get("valid") is not True
+        or bundle_create_result.get("status") != "created"
+        or bundle_verify_result.get("valid") is not True
+        or not bundle_path.is_file()
+    ):
+        raise RuntimeError("installed bundle commands did not preserve their contract")
     _run(
         [
             str(python_bin),
@@ -350,6 +378,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "help_contains_usage": True,
         "required_command_help_contains_usage": True,
         "validate_status": True,
+        "bundle_status": True,
     }
 
 

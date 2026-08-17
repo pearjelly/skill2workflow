@@ -97,6 +97,20 @@ python3 -m json.tool /tmp/skill2workflow-backup-restore-loop44/backup-restore-sm
 
 The drill proves offline lease exclusion, a verified point-in-time snapshot, atomic restore, restored-service readiness and trigger execution, tamper rejection, credential exclusion, and graceful shutdown.
 
+Create and verify a portable Workflow DSL bundle without executing it:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-create \
+  examples/workflows/approval-flow.workflow.json \
+  --output /tmp/skill2workflow-approval.s2w
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-verify \
+  /tmp/skill2workflow-approval.s2w
+```
+
+The bundle path is deterministic and secret-checked; verification is bounded,
+read-only, and does not extract or execute either member. See
+[`docs/workflow-bundles.md`](docs/workflow-bundles.md).
+
 Run the state upgrade/migration evidence:
 
 ```bash

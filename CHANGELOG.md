@@ -8,6 +8,14 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added deterministic local Workflow DSL bundles through `bundle-create` and
+  `bundle-verify`. The fixed `skill2workflow-workflow-bundle-0.1.0` ZIP
+  contains only a digest-bound manifest and validated `workflow.json`; creation
+  and verification enforce secret hygiene, regular-file/path safety, bounded
+  archive/member sizes, and no-extraction/no-execution verification. Bundles
+  are a sharing format, not a credential container or second execution
+  authority. See `docs/workflow-bundles.md`.
+
 - Added local `preflight` and authenticated `service-workflow-preflight`
   commands for checking trigger input contracts and HTTP body mappings before
   execution. The fixed `skill2workflow-workflow-preflight-0.1.0` report is

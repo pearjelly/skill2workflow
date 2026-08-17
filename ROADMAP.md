@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-179
+- Completed delivery loops: 1-180
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 179 is complete with side-effect-free trigger preflight
+- Active loop: None; Loop 180 is complete with portable deterministic Workflow DSL bundles
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-179 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-180 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 179; the detailed
+The follow-on production hardening continues through Loop 180; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4300,9 +4300,53 @@ execution authority. It does not contact providers, inspect credential stores,
 invoke external connector hooks, or predict network/provider success. Workflow
 DSL and the normal trigger path remain authoritative.
 
+### Loop 180: Portable Workflow DSL Bundles
+
+**Status:** Complete.
+
+**Prior basis:** Loop 179 made a real trigger safe to inspect before admission,
+but sharing a validated workflow still required copying a loose JSON file and
+repeating the same manual integrity and secret-hygiene checks in every
+checkout. That made the open-source distribution path less reproducible than
+the runtime itself.
+
+**Outcome:** `bundle-create` writes a deterministic two-member ZIP containing
+only `workflow.json` and a digest-bound `manifest.json`. `bundle-verify` reads
+the archive through a regular-file/no-follow bound, rejects unsafe or oversized
+members, checks the manifest digest and connector summary, revalidates the
+Workflow DSL, and reruns secret hygiene without extracting or executing the
+workflow. Existing output is protected from accidental overwrite unless
+`--force` is explicit, and replacement is atomic.
+
+**Evidence:** [`docs/workflow-bundles.md`](docs/workflow-bundles.md) defines the
+`skill2workflow-workflow-bundle-0.1.0` manifest, fixed 8 MiB archive/2 MiB
+member/4 MiB total bounds, reproducibility rules, redacted verification
+report, and explicit non-goals. Bundle unit tests, CLI tests, documentation
+contracts, package help checks, full-suite validation, and secret hygiene prove
+the sharing boundary.
+
+**Safety boundary:** This is a local distribution and review format. It does
+not upload or install bundles, sign publishers, package source Skills or
+connector code, carry credentials or runtime state, alter Workflow DSL
+execution authority, or provide hosted marketplace behavior.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_bundles tests.test_bundle_docs -v
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-create \
+  examples/workflows/approval-flow.workflow.json \
+  --output /tmp/skill2workflow-approval.s2w
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-verify \
+  /tmp/skill2workflow-approval.s2w
+```
+
+Loop 180 closes the reproducible local sharing gap while preserving the
+Workflow DSL, published artifact, credential, and service contracts.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 179 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 180 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4447,6 +4491,7 @@ This rolling queue is ordered. Loop 179 is complete and there is no active deliv
 | Loop 177: Bounded SQLite Trigger-Ledger Responses | Complete | Keep completed trigger idempotency rows from bypassing a fixed replay-document boundary | Fixed 64 KiB UTF-8 JSON-object bound on replay writes and reads, atomic pending-claim preservation, fail-closed corruption handling, control-plane coverage, and SQLite trigger-ledger boundary documentation |
 | Loop 178: Bounded Workflow Execution Explanations | Complete | Give local and remote operators a safe pre-execution review of topology, gates, connector side effects, input shape, retries, and timeouts without exposing values or executing work | Fixed side-effect-free explanation schema, local/remote CLI, authenticated read-only route, 64 KiB/1,000-node/2,000-edge bounds, redaction tests, and operator documentation |
 | Loop 179: Side-Effect-Free Trigger Preflight | Complete | Let operators validate trigger input and HTTP body mappings before starting a real run without exposing values or invoking providers | Fixed value-free preflight schema, local/remote CLI, authenticated POST route, 1 MiB/64 KiB bounds, stable issue codes, redaction/read-only tests, package-smoke evidence, and operator documentation |
+| Loop 180: Portable Workflow DSL Bundles | Complete | Share one validated Workflow DSL artifact as a deterministic, secret-checked local bundle without packaging state or credentials | Fixed two-member ZIP manifest, digest verification, 8 MiB/2 MiB/4 MiB bounds, path/read safety, local CLI, tests, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

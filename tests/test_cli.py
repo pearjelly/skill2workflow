@@ -3422,6 +3422,46 @@ class CliTests(TestCase):
         self.assertEqual(edited["nodes"][0]["description"], "Edited entry point.")
         self.assertEqual(edited["edges"], workflow["edges"])
 
+    def test_bundle_commands_create_and_verify_a_portable_artifact(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            workflow_path.write_text(json.dumps(_approval_workflow()), encoding="utf-8")
+            created = StringIO()
+            with redirect_stdout(created):
+                create_exit = main(
+                    [
+                        "bundle-create",
+                        str(workflow_path),
+                        "--output",
+                        str(bundle_path),
+                    ]
+                )
+            verified = StringIO()
+            with redirect_stdout(verified):
+                verify_exit = main(["bundle-verify", str(bundle_path)])
+
+        self.assertEqual(create_exit, 0)
+        self.assertEqual(verify_exit, 0)
+        self.assertTrue(json.loads(created.getvalue())["valid"])
+        self.assertTrue(json.loads(verified.getvalue())["valid"])
+
+    def test_bundle_verify_maps_invalid_artifact_to_nonzero_without_traceback(self):
+        with TemporaryDirectory() as tmp:
+            bundle_path = Path(tmp) / "invalid.s2w"
+            bundle_path.write_bytes(b"not a zip")
+            stdout = StringIO()
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(["bundle-verify", str(bundle_path)])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "")
+        report = json.loads(stdout.getvalue())
+        self.assertFalse(report["valid"])
+        self.assertEqual(report["errors"][0]["code"], "bundle_unreadable")
+
 
 def _workflow():
     return {

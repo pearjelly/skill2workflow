@@ -204,9 +204,11 @@ Good first contribution lanes:
 - Connector manifests and example connectors
 - Example workflows for sales, approvals, customer service, risk review, and operations analysis
 - Documentation and enterprise adoption guides
+- Portable Workflow DSL bundles and reproducible example artifacts
 
 Before changing behavior, read:
 
+- `docs/README.md`
 - `ROADMAP.md`
 - `HARNESS.md`
 - `SECURITY.md`

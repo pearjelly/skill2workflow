@@ -147,6 +147,24 @@ class PackageSmokeTests(TestCase):
                     )
                 if "validate" in command:
                     return '{"valid": true}\n'
+                if "bundle-create" in command:
+                    output_path = Path(command[command.index("--output") + 1])
+                    output_path.write_bytes(b"bundle")
+                    return json.dumps(
+                        {
+                            "schema_version": "skill2workflow-workflow-bundle-verification-0.1.0",
+                            "status": "created",
+                            "valid": True,
+                        }
+                    )
+                if "bundle-verify" in command:
+                    return json.dumps(
+                        {
+                            "schema_version": "skill2workflow-workflow-bundle-verification-0.1.0",
+                            "valid": True,
+                            "errors": [],
+                        }
+                    )
                 return "ok\n"
 
             with patch("scripts.package_smoke.venv.EnvBuilder", FakeEnvBuilder), patch(
@@ -186,6 +204,7 @@ class PackageSmokeTests(TestCase):
         qualify_live_snapshot.assert_called_once()
         self.assertTrue(result["license_included"])
         self.assertTrue(result["private_artifacts_excluded"])
+        self.assertTrue(result["bundle_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])
         self.assertTrue(result["python_classifiers_valid"])

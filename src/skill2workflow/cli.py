@@ -15,6 +15,7 @@ from .backup import (
     restore_state_backup,
     verify_state_backup,
 )
+from .bundles import create_workflow_bundle, verify_workflow_bundle
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
@@ -116,6 +117,24 @@ def _main(argv=None) -> int:
     preflight_cmd.add_argument("workflow", type=Path)
     preflight_cmd.add_argument("--input", type=Path)
     preflight_cmd.add_argument("--format", choices=["json", "text"], default="json")
+
+    bundle_create_cmd = subparsers.add_parser(
+        "bundle-create",
+        help="Create a deterministic, secret-checked Workflow DSL bundle",
+    )
+    bundle_create_cmd.add_argument("workflow", type=Path)
+    bundle_create_cmd.add_argument("-o", "--output", type=Path, required=True)
+    bundle_create_cmd.add_argument(
+        "--force",
+        action="store_true",
+        help="Atomically replace an existing regular output file",
+    )
+
+    bundle_verify_cmd = subparsers.add_parser(
+        "bundle-verify",
+        help="Verify a Workflow DSL bundle without extracting or executing it",
+    )
+    bundle_verify_cmd.add_argument("bundle", type=Path)
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
     visualize_cmd.add_argument("workflow", type=Path)
@@ -874,6 +893,20 @@ def _main(argv=None) -> int:
         else:
             _print_json(report)
         return 0 if report["ready"] else 1
+
+    if args.command == "bundle-create":
+        result = create_workflow_bundle(
+            _load_json(args.workflow),
+            args.output,
+            overwrite=args.force,
+        )
+        _print_json(result)
+        return 0
+
+    if args.command == "bundle-verify":
+        report = verify_workflow_bundle(args.bundle)
+        _print_json(report)
+        return 0 if report["valid"] else 1
 
     if args.command == "visualize":
         workflow = _load_json(args.workflow)

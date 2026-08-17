@@ -45,6 +45,10 @@ Within the `0.1.x` release line:
 - Optional `input_schema` contracts are additive. Readers that do not enforce
   them may retain the historical open-object behavior, while current
   publishers and trigger boundaries validate the documented bounded subset.
+- The local Workflow Bundle manifest `skill2workflow-workflow-bundle-0.1.0`
+  is an additive distribution wrapper around one unchanged `0.1.0` DSL
+  artifact. Bundle verification checks the digest and revalidates the DSL;
+  bundles do not change execution semantics or publication immutability.
 
 Workflow version aliases are control-plane registry metadata, not Workflow DSL
 fields. They may point a trigger or schedule at one published immutable

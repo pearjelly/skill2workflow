@@ -13,6 +13,9 @@ Loop 178 adds the read-only Workflow explanation documented in
 [`workflow-explanation.md`](workflow-explanation.md).
 Loop 179 adds the side-effect-free trigger preflight documented in
 [`workflow-preflight.md`](workflow-preflight.md).
+Loop 180 adds the local-only Workflow DSL bundle format documented in
+[`workflow-bundles.md`](workflow-bundles.md); it does not add a service upload
+route or change the authenticated runtime boundary.
 Loop 92 adds the policy-bound remote retention preflight documented in
 [`remote-retention-readiness.md`](remote-retention-readiness.md).
 The installed `service-retention-readiness` client wraps the exact policy

@@ -174,6 +174,7 @@ explicit connector boundaries. It currently supports:
 - Inspect compact, bounded published-workflow inventory without workflow content
 - Explain a workflow before execution with a bounded, side-effect-free, value-free plan using the fixed `skill2workflow-workflow-explanation-0.1.0` contract
 - Preflight trigger input and HTTP body mappings with a bounded, side-effect-free, value-free admission report using the fixed `skill2workflow-workflow-preflight-0.1.0` contract
+- Create and verify deterministic, secret-checked Workflow DSL bundles for safe local sharing with the fixed `skill2workflow-workflow-bundle-0.1.0` manifest
 - Drain due schedule work in explicitly bounded side-effect batches
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
@@ -547,6 +548,22 @@ without executing connectors, resolving credentials, or echoing values. The
 authenticated `service-workflow-preflight` command performs the same check for
 one published version. See [`docs/workflow-preflight.md`](docs/workflow-preflight.md).
 
+Share one validated Workflow DSL artifact without packaging runtime state or
+credentials:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-create \
+  examples/workflows/approval-flow.workflow.json \
+  --output /tmp/approval-flow.s2w
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-verify \
+  /tmp/approval-flow.s2w
+```
+
+Bundles are deterministic ZIP files containing only the Workflow DSL and a
+digest-bound manifest. Creation and verification are secret-hygiene checked,
+bounded, read-only at verification time, and never execute connectors. See
+[`docs/workflow-bundles.md`](docs/workflow-bundles.md).
+
 Use `--version production` with `trigger`, webhook paths, or schedule
 definitions. The response reports the resolved immutable version; SQLite
 idempotency retries keep the original alias scope across later promotions.
@@ -778,7 +795,8 @@ examples/observability/ # Operator-managed Prometheus alerts and Grafana dashboa
 examples/control-plane-snapshot.json # Example control-plane UI snapshot
 schemas/           # Versioned Workflow DSL and service configuration JSON Schemas
 tests/            # Unit tests
-docs/             # Product spec and implementation plans
+docs/             # Product guides, specs, and implementation plans
+docs/README.md    # Documentation map and operator entry points
 docs/assets/      # README screenshots and system design diagrams
 docs/connectors.md # Connector runtime behavior and boundary guide
 docs/credential-boundary.md # Safe credential and fixture hygiene boundary
@@ -794,7 +812,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-179 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-180 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1441,6 +1459,21 @@ unresolved idempotency outcome. Trigger keys, fingerprints, replay fields, and
 the public response schema remain unchanged. See
 [`docs/sqlite-trigger-ledger-boundary.md`](docs/sqlite-trigger-ledger-boundary.md).
 
+Loop 178 adds a bounded [workflow explanation](docs/workflow-explanation.md):
+operators can review topology, human gates, connector metadata, input shape,
+retry policy, and timeouts without exposing workflow values or invoking work.
+
+Loop 179 adds [side-effect-free trigger preflight](docs/workflow-preflight.md):
+operators can validate input contracts and HTTP body mappings before a real
+run, while connector calls, credential reads, state writes, and input values
+remain outside the report.
+
+Loop 180 adds [portable Workflow DSL bundles](docs/workflow-bundles.md):
+`bundle-create` produces a deterministic, secret-checked two-file ZIP and
+`bundle-verify` checks its digest, bounds, path safety, DSL validity, and
+secret hygiene without extraction or execution. The format is a sharing and
+review surface, not a second runtime authority or credential container.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1491,6 +1524,7 @@ See:
 - `docs/remote-workflow-diff.md`
 - `docs/workflow-explanation.md`
 - `docs/workflow-preflight.md`
+- `docs/workflow-bundles.md`
 - `docs/remote-workflow-deprecation.md`
 - `docs/remote-workflow-inventory.md`
 - `docs/remote-retention-readiness.md`
