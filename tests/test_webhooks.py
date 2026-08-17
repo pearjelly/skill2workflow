@@ -74,7 +74,7 @@ class WebhookTests(TestCase):
                         ).encode("ascii")
                     )
                     connection.settimeout(2)
-                    response = connection.recv(4096)
+                    response = _recv_http_response(connection)
                 thread.join(timeout=2)
             runs = control.list_runs()
 
@@ -361,6 +361,32 @@ class WebhookTests(TestCase):
         )
         self.assertEqual(runs, [])
         self.assertFalse(thread.is_alive())
+
+
+def _recv_http_response(connection):
+    """Read one complete Content-Length framed response from a raw socket."""
+
+    response = bytearray()
+    expected_body_bytes = None
+    while True:
+        chunk = connection.recv(4096)
+        if not chunk:
+            break
+        response.extend(chunk)
+        header_end = response.find(b"\r\n\r\n")
+        if header_end < 0:
+            continue
+        if expected_body_bytes is None:
+            headers = response[:header_end].lower().split(b"\r\n")
+            for header in headers:
+                if header.startswith(b"content-length:"):
+                    expected_body_bytes = int(header.split(b":", 1)[1].strip())
+                    break
+        if expected_body_bytes is not None:
+            body_start = header_end + 4
+            if len(response) - body_start >= expected_body_bytes:
+                break
+    return bytes(response)
 
 
 def _workflow(version: str):

@@ -3,6 +3,7 @@ import os
 import stat
 import subprocess
 import sys
+import warnings
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -178,14 +179,16 @@ class ServiceBootstrapTests(TestCase):
             stdout = StringIO()
             stderr = StringIO()
 
-            with redirect_stdout(stdout), redirect_stderr(stderr):
-                exit_code = main(
-                    [
-                        "service-token-rotate",
-                        "--config",
-                        str(config_path),
-                    ]
-                )
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", ResourceWarning)
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    exit_code = main(
+                        [
+                            "service-token-rotate",
+                            "--config",
+                            str(config_path),
+                        ]
+                    )
 
             result = json.loads(stdout.getvalue())
             rotated = (root / "secrets" / "ingress-token").read_text(encoding="utf-8").strip()
