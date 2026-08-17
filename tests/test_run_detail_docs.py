@@ -137,5 +137,7 @@ class RunDetailDocumentationTests(TestCase):
             "workflow DSL",
             "credential values",
             "does not include",
+            "Download Support Bundle",
+            "installed-ui.md",
         ):
             self.assertIn(phrase, guide)

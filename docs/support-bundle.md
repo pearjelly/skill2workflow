@@ -62,6 +62,12 @@ single run needs deeper redacted inspection; do not send the full SQLite
 directory or an offline control snapshot unless its wider metadata is
 intended for the recipient.
 
+When the installed UI is running in explicitly configured live mode, the same
+artifact is available through **Download Support Bundle** in the control-plane
+page. It uses the fixed server-side proxy documented in
+[`installed-ui.md`](installed-ui.md); the browser does not receive the ingress
+token and no automatic upload occurs.
+
 ## Verification
 
 ```bash

@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a live-console **Download Support Bundle** action for the existing
+  bounded, redacted support artifact. It uses a fixed read-only proxy and
+  protected server-side token handling; the bundle is never uploaded
+  automatically.
+
 - Added explicit fixed-interval live snapshot refresh to the installed control
   console. The 10-second timer pauses while the page is hidden, stops when the
   operator returns to static/file snapshots, and preserves the last valid view

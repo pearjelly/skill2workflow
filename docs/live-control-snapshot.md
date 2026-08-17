@@ -121,6 +121,12 @@ fixed 10-second interval, skips hidden pages, and keeps the last valid snapshot
 visible when a refresh fails. Loading an example or file stops the timer; there
 is no background polling in static mode.
 
+The same live console can download the existing redacted support artifact with
+**Download Support Bundle**. This is a fixed read-only proxy for
+`GET /api/v1/support-bundle`, retains the service's 128 KiB contract and
+`no-store` response, and never sends the ingress token to the browser. It is an
+explicit operator download, not automatic support upload.
+
 ## Verification
 
 Run the real-process drill:

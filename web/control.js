@@ -2,6 +2,7 @@
   const EXAMPLE_URL = "../examples/control-plane-snapshot.json";
   const LIVE_SNAPSHOT_URL = "/api/v1/control-snapshot";
   const SERVICE_PROBE_URL = "/api/v1/service-probe";
+  const SUPPORT_BUNDLE_URL = "/api/v1/support-bundle";
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
   const AUTO_REFRESH_INTERVAL_MS = 10000;
   const state = {
@@ -33,6 +34,7 @@
     els.loadExample = document.getElementById("load-example");
     els.loadLive = document.getElementById("load-live");
     els.toggleRefresh = document.getElementById("toggle-refresh");
+    els.downloadBundle = document.getElementById("download-bundle");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
@@ -66,6 +68,7 @@
     els.loadExample.addEventListener("click", loadExample);
     els.loadLive.addEventListener("click", loadLiveSnapshot);
     els.toggleRefresh.addEventListener("click", toggleAutoRefresh);
+    els.downloadBundle.addEventListener("click", downloadSupportBundle);
     els.snapshotFile.addEventListener("change", loadSelectedFile);
     els.filterInput.addEventListener("input", function () {
       state.filter = els.filterInput.value.trim().toLowerCase();
@@ -158,6 +161,31 @@
     }
   }
 
+  async function downloadSupportBundle() {
+    if (!state.liveModeConfigured) {
+      return;
+    }
+    setStatus("Downloading", "");
+    try {
+      const response = await fetch(SUPPORT_BUNDLE_URL, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("support bundle unavailable");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "skill2workflow-support-bundle.json";
+      link.click();
+      window.setTimeout(function () {
+        URL.revokeObjectURL(url);
+      }, 0);
+      setStatus("Downloaded", "is-valid");
+    } catch (error) {
+      setStatus("Unavailable", "is-invalid");
+    }
+  }
+
   async function loadServiceProbe() {
     setServiceStatus("Live service: checking", "");
     try {
@@ -166,11 +194,13 @@
         state.liveModeConfigured = false;
         stopAutoRefresh();
         els.toggleRefresh.disabled = true;
+        els.downloadBundle.disabled = true;
         setServiceStatus("Live service: static mode", "");
         return;
       }
       state.liveModeConfigured = true;
       els.toggleRefresh.disabled = false;
+      els.downloadBundle.disabled = false;
       if (!response.ok) {
         throw new Error("service probe unavailable");
       }
@@ -187,6 +217,7 @@
     } catch (error) {
       state.liveModeConfigured = true;
       els.toggleRefresh.disabled = false;
+      els.downloadBundle.disabled = false;
       setServiceStatus("Live service: unavailable", "is-invalid");
     }
   }

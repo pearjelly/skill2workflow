@@ -14,6 +14,8 @@ from .live_snapshot import fetch_live_control_snapshot
 from .service import read_service_bearer_token
 from .service_client import (
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
+    MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
+    fetch_support_bundle,
     fetch_service_probe,
     service_endpoint,
 )
@@ -25,6 +27,8 @@ _LIVE_SNAPSHOT_PATH = "/api/v1/control-snapshot"
 _LIVE_SNAPSHOT_MAX_RESPONSE_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 _SERVICE_PROBE_PATH = "/api/v1/service-probe"
 _SERVICE_PROBE_MAX_RESPONSE_BYTES = MAX_SERVICE_PROBE_RESPONSE_BYTES
+_SUPPORT_BUNDLE_PATH = "/api/v1/support-bundle"
+_SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
 
 
 def find_ui_root() -> Path:
@@ -104,6 +108,15 @@ def serve_ui(
                     {"error": "service probe path does not accept query parameters"},
                 )
                 return
+            if self.path == _SUPPORT_BUNDLE_PATH:
+                self._serve_support_bundle()
+                return
+            if self.path.startswith(_SUPPORT_BUNDLE_PATH + "?"):
+                self._write_json(
+                    404,
+                    {"error": "support bundle path does not accept query parameters"},
+                )
+                return
             super().do_GET()
 
         def _serve_live_snapshot(self):
@@ -148,7 +161,39 @@ def serve_ui(
                 return
             self._write_json(200, body, content_type="application/json")
 
-        def _write_json(self, status, payload, *, content_type="application/json"):
+        def _serve_support_bundle(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "support bundle is not configured"})
+                return
+            try:
+                bundle = fetch_support_bundle(configured_service_url, token_file)
+                body = json.dumps(
+                    bundle,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES:
+                    raise ValueError("support bundle unavailable")
+            except Exception:
+                self._write_json(503, {"error": "support bundle unavailable"})
+                return
+            self._write_json(
+                200,
+                body,
+                content_type="application/json",
+                content_disposition='attachment; filename="skill2workflow-support-bundle.json"',
+            )
+
+        def _write_json(
+            self,
+            status,
+            payload,
+            *,
+            content_type="application/json",
+            content_disposition=None,
+        ):
             if isinstance(payload, dict):
                 body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
             else:
@@ -157,6 +202,8 @@ def serve_ui(
             self.send_header("Content-Type", f"{content_type}; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            if content_disposition:
+                self.send_header("Content-Disposition", content_disposition)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

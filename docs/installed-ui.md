@@ -50,6 +50,12 @@ while the page is hidden, and preserves the last valid snapshot if a refresh
 fails. Switching back to the example or loading a file stops the timer. Static
 mode disables the control.
 
+The **Download Support Bundle** action is also available only in live mode. It
+fetches the fixed same-origin `/api/v1/support-bundle` route and downloads the
+existing bounded, redacted `skill2workflow-support-bundle-0.1.0` artifact. The
+route is read-only and uses the protected token file server-side; it does not
+upload the bundle or proxy arbitrary service paths.
+
 The live mode does not add TLS, public ingress, RBAC, mutations, or provider
 reconciliation. Keep the UI on loopback or place it behind an operator-managed
 HTTPS boundary when serving a wider network.

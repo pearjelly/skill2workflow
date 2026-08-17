@@ -861,7 +861,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-209 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-210 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -915,6 +915,10 @@ probe contract, without exposing credentials or adding an arbitrary proxy.
 Loop 209 adds explicit 10-second live snapshot refresh with visibility-aware
 pausing and stale-data preservation on transient failures; static mode remains
 poll-free.
+
+Loop 210 adds one-click download of the existing bounded, redacted support
+bundle from the live console. The fixed route remains read-only and server-side
+authenticated; no automatic upload or arbitrary proxy is introduced.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
