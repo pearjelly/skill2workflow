@@ -22,6 +22,8 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION,
     MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
+    RECURRING_SCHEDULE_PATCH_SCHEMA_VERSION,
+    MAX_RECURRING_SCHEDULE_PATCH_RESPONSE_BYTES,
     RECURRING_SCHEDULE_DELETE_SCHEMA_VERSION,
     MAX_RECURRING_SCHEDULE_DELETE_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
@@ -69,6 +71,7 @@ MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_CREATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_RECURRING_SCHEDULE_UPDATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_RECURRING_SCHEDULE_PATCH_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_RECURRING_SCHEDULE_DELETE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
@@ -868,6 +871,57 @@ def put_recurring_schedule_update(
         max_response_bytes=MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
     )
     _validate_recurring_schedule_update(payload, normalized)
+    return payload
+
+
+def patch_recurring_schedule(
+    service_url: str,
+    token_file: Path,
+    schedule_id: str,
+    patch: Dict[str, object],
+    *,
+    expected_next_run_at: str,
+) -> Dict[str, object]:
+    """Patch safe recurring fields while keeping the stored trigger private."""
+
+    normalized_schedule_id = _validate_schedule_id(schedule_id)
+    if not isinstance(patch, dict) or not patch:
+        raise ValueError("recurring schedule patch must contain at least one field")
+    allowed_fields = {
+        "workflow_id",
+        "version",
+        "starts_at",
+        "interval_seconds",
+        "missed_run_policy",
+        "enabled",
+    }
+    if set(patch) - allowed_fields:
+        raise ValueError("recurring schedule patch contains unsupported fields")
+    if not isinstance(expected_next_run_at, str) or not 1 <= len(expected_next_run_at) <= 64:
+        raise ValueError("expected_next_run_at must be a non-empty timestamp")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in expected_next_run_at):
+        raise ValueError("expected_next_run_at must be a non-empty timestamp")
+    body = json.dumps(
+        {
+            "schedule": patch,
+            "expected_next_run_at": expected_next_run_at,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if len(body) > MAX_RECURRING_SCHEDULE_PATCH_REQUEST_BYTES:
+        raise ServiceActionError("service action body is too large", status_code=413)
+    payload = _request_json(
+        service_url,
+        token_file,
+        f"/api/v1/recurring-schedules/{normalized_schedule_id}",
+        method="PATCH",
+        body=body,
+        conflict_message="recurring schedule patch precondition failed",
+        not_found_message="recurring schedule not found",
+        max_response_bytes=MAX_RECURRING_SCHEDULE_PATCH_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_patch(payload, normalized_schedule_id)
     return payload
 
 
@@ -1996,6 +2050,52 @@ def _validate_recurring_schedule_update(
         or (payload.get("status") == "active") != enabled
         or not isinstance(payload.get("next_run_at"), str)
         or not payload.get("next_run_at")
+        or not isinstance(payload.get("changed"), bool)
+    ):
+        raise ServiceActionError()
+
+
+def _validate_recurring_schedule_patch(
+    payload: Dict[str, object],
+    schedule_id: str,
+) -> None:
+    """Validate the fixed redacted recurring schedule patch response."""
+
+    fields = {
+        "schema_version",
+        "schedule_id",
+        "workflow_id",
+        "workflow_version",
+        "status",
+        "enabled",
+        "starts_at",
+        "next_run_at",
+        "interval_seconds",
+        "missed_run_policy",
+        "changed",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RECURRING_SCHEDULE_PATCH_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if payload.get("schedule_id") != schedule_id:
+        raise ServiceActionError()
+    if (
+        not isinstance(payload.get("workflow_id"), str)
+        or not payload.get("workflow_id")
+        or not isinstance(payload.get("workflow_version"), str)
+        or not payload.get("workflow_version")
+        or payload.get("status") not in {"active", "disabled"}
+        or not isinstance(payload.get("enabled"), bool)
+        or (payload.get("status") == "active") != payload.get("enabled")
+        or not isinstance(payload.get("starts_at"), str)
+        or not payload.get("starts_at")
+        or not isinstance(payload.get("next_run_at"), str)
+        or not payload.get("next_run_at")
+        or not isinstance(payload.get("interval_seconds"), int)
+        or isinstance(payload.get("interval_seconds"), bool)
+        or not 1 <= payload.get("interval_seconds") <= 31536000
+        or payload.get("missed_run_policy") not in {"latest", "skip"}
         or not isinstance(payload.get("changed"), bool)
     ):
         raise ServiceActionError()

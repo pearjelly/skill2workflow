@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added protected remote recurring-schedule patches through
+  `PATCH /api/v1/recurring-schedules/{schedule_id}` and the installed
+  `service-recurring-schedule-patch` CLI. Operators can update only safe
+  workflow/timing fields while the service preserves trigger input and durable
+  dispatch progress; stale `next_run_at` intent returns a fixed `409`.
 - Added optional compare-and-swap protection to the existing remote recurring
   schedule enable/disable actions. Legacy empty-body callers remain supported;
   protected CLI callers can bind the transition to the last observed

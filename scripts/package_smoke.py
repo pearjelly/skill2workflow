@@ -67,6 +67,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-recurring-schedules",
     "service-recurring-schedule-add",
     "service-recurring-schedule-update",
+    "service-recurring-schedule-patch",
     "service-recurring-schedule-delete",
     "service-recurring-dispatches",
     "service-workflow-artifacts",

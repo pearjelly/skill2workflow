@@ -146,13 +146,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("release-artifact-sbom.md", guide)
         self.assertIn("member SHA-256 hashes", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
-        self.assertIn("- Completed delivery loops: 1-157", roadmap)
+        self.assertIn("- Completed delivery loops: 1-158", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 157 is complete with CAS-protected remote recurring-schedule state actions",
+            "- Active loop: None; Loop 158 is complete with safe, CAS-protected remote recurring-schedule patches",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-157 are complete", readme)
+        self.assertIn("Delivery Loops 1-158 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

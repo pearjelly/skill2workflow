@@ -755,7 +755,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-157 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-158 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1281,6 +1281,12 @@ Loop 157 hardens [remote recurring-schedule state actions](docs/remote-schedule-
 the existing enable/disable routes still accept their legacy empty body, while
 operators can now supply the last observed `next_run_at` to reject stale
 requests atomically with dispatcher claims through the installed CLI.
+
+Loop 158 adds [safe remote recurring-schedule patches](docs/remote-schedule-patch.md):
+the authenticated PATCH route and installed CLI update workflow/version/timing
+fields without requiring or returning the existing trigger input. The server
+preserves dispatch progress and rejects stale inventory intent with the same
+`next_run_at` compare-and-swap boundary.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

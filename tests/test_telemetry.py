@@ -123,6 +123,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry.observe_http("audit_consistency", 200)
             telemetry.observe_http("recurring_schedule_dispatch_list", 200)
             telemetry.observe_http("recurring_schedule_update", 200)
+            telemetry.observe_http("recurring_schedule_patch", 200)
             telemetry.observe_http("recurring_schedule_delete", 200)
             telemetry.observe_http("workflow_artifact_report", 200)
             telemetry.observe_http("backup_readiness", 200)
@@ -160,6 +161,7 @@ class RuntimeTelemetryTests(TestCase):
             'skill2workflow_http_requests_total{route="recurring_schedule_create",status_class="2xx"} 0',
             'skill2workflow_http_requests_total{route="recurring_schedule_action",status_class="2xx"} 0',
             'skill2workflow_http_requests_total{route="recurring_schedule_update",status_class="2xx"} 1',
+            'skill2workflow_http_requests_total{route="recurring_schedule_patch",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="recurring_schedule_delete",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="recurring_schedule_dispatch_list",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_artifact_report",status_class="2xx"} 1',
@@ -224,7 +226,7 @@ class RuntimeTelemetryTests(TestCase):
             set(aggregate["http_requests"]),
             {
                 "health", "readiness", "metrics", "control_snapshot", "recurring_schedule_list",
-                "recurring_schedule_create", "recurring_schedule_action", "recurring_schedule_update", "recurring_schedule_delete", "recurring_schedule_dispatch_list",
+                "recurring_schedule_create", "recurring_schedule_action", "recurring_schedule_update", "recurring_schedule_patch", "recurring_schedule_delete", "recurring_schedule_dispatch_list",
                 "workflow_artifact_report",
                 "backup_readiness",
                 "retention_readiness",

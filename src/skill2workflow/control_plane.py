@@ -993,7 +993,7 @@ class LocalControlPlane:
         """Persist allowlisted authentication evidence without request credentials."""
 
         normalized_method = str(method).upper()
-        if normalized_method not in {"GET", "POST", "PUT", "DELETE"}:
+        if normalized_method not in {"GET", "POST", "PUT", "PATCH", "DELETE"}:
             normalized_method = "OTHER"
         normalized_route = str(route)
         if normalized_route not in {
@@ -1006,6 +1006,7 @@ class LocalControlPlane:
             "recurring_schedule_create",
             "recurring_schedule_action",
             "recurring_schedule_update",
+            "recurring_schedule_patch",
             "recurring_schedule_delete",
             "workflow_release",
             "workflow_promotion",
@@ -1074,6 +1075,31 @@ class LocalControlPlane:
                 "type": "recurring_schedule_created",
                 "schedule_id": normalized_id,
                 "created": created,
+                "timestamp": _now(),
+            }
+        )
+
+    def record_recurring_schedule_patched(
+        self,
+        schedule_id: str,
+        changed: bool,
+    ) -> None:
+        """Persist bounded evidence for a remote safe schedule patch."""
+
+        normalized_id = str(schedule_id)
+        if (
+            not normalized_id
+            or len(normalized_id) > 128
+            or any(not (char.isalnum() or char in {"-", "_", "."}) for char in normalized_id)
+        ):
+            raise ValueError("schedule_id must be a safe schedule identifier")
+        if not isinstance(changed, bool):
+            raise ValueError("recurring schedule patch state must be boolean")
+        self._append_audit(
+            {
+                "type": "recurring_schedule_patched",
+                "schedule_id": normalized_id,
+                "changed": changed,
                 "timestamp": _now(),
             }
         )

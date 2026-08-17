@@ -32,6 +32,7 @@ _ROUTES = (
     "recurring_schedule_create",
     "recurring_schedule_action",
     "recurring_schedule_update",
+    "recurring_schedule_patch",
     "recurring_schedule_delete",
     "recurring_schedule_dispatch_list",
     "audit_consistency",
@@ -64,7 +65,7 @@ _RUN_STATUSES = (
 )
 _DISPATCH_STATUSES = ("claimed", "completed", "failed", "skipped", "uncertain", "other")
 _LIFECYCLE_STATUSES = {"starting", "ready", "draining", "stopped"}
-_METHODS = {"GET", "POST", "PUT", "DELETE"}
+_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 
 
 class RuntimeTelemetry:

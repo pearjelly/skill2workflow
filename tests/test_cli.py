@@ -1041,6 +1041,57 @@ class CliTests(TestCase):
             expected_next_run_at="2026-08-11T00:00:00+00:00",
         )
 
+    def test_service_recurring_schedule_patch_command_prints_patch_result(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        schedule_file = Path("/private/schedule-patch.json")
+        patch_fields = {
+            "workflow_id": "workflow_v2",
+            "version": "2.0.0",
+            "interval_seconds": 120,
+        }
+        expected = {
+            "schema_version": "skill2workflow-recurring-schedule-patch-0.1.0",
+            "schedule_id": "schedule_remote",
+            "workflow_id": "workflow_v2",
+            "workflow_version": "2.0.0",
+            "status": "active",
+            "enabled": True,
+            "starts_at": "2026-08-11T00:00:00+00:00",
+            "next_run_at": "2026-08-11T00:01:00+00:00",
+            "interval_seconds": 120,
+            "missed_run_policy": "latest",
+            "changed": True,
+        }
+        with patch("skill2workflow.cli._load_json", return_value=patch_fields), patch(
+            "skill2workflow.cli.patch_recurring_schedule",
+            return_value=expected,
+        ) as patch_schedule:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-recurring-schedule-patch",
+                        "schedule_remote",
+                        str(schedule_file),
+                        "--expected-next-run-at",
+                        "2026-08-11T00:00:00+00:00",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        patch_schedule.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            "schedule_remote",
+            patch_fields,
+            expected_next_run_at="2026-08-11T00:00:00+00:00",
+        )
+
     def test_service_recurring_schedule_delete_command_prints_delete_result(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

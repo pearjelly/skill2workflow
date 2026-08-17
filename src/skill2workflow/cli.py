@@ -51,6 +51,7 @@ from .service_client import (
     post_recurring_schedule_state,
     post_recurring_schedule_create,
     put_recurring_schedule_update,
+    patch_recurring_schedule,
     delete_recurring_schedule,
     post_run_cancel,
     post_run_resume,
@@ -604,6 +605,24 @@ def main(argv=None) -> int:
     )
     service_schedule_update_cmd.add_argument("--service-url", required=True)
     service_schedule_update_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_schedule_patch_cmd = subparsers.add_parser(
+        "service-recurring-schedule-patch",
+        help="Patch safe recurring schedule fields without replacing trigger input",
+    )
+    service_schedule_patch_cmd.add_argument("schedule_id")
+    service_schedule_patch_cmd.add_argument(
+        "schedule",
+        type=Path,
+        help="JSON object containing only safe fields: workflow_id, version, starts_at, interval_seconds, missed_run_policy, enabled",
+    )
+    service_schedule_patch_cmd.add_argument(
+        "--expected-next-run-at",
+        required=True,
+        help="Last observed next_run_at; prevents stale patches from overwriting progress",
+    )
+    service_schedule_patch_cmd.add_argument("--service-url", required=True)
+    service_schedule_patch_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_schedule_delete_cmd = subparsers.add_parser(
         "service-recurring-schedule-delete",
@@ -1250,6 +1269,17 @@ def main(argv=None) -> int:
     if args.command == "service-recurring-schedule-update":
         return _service_action(
             lambda: put_recurring_schedule_update(
+                args.service_url,
+                args.auth_token_file,
+                args.schedule_id,
+                _load_json(args.schedule),
+                expected_next_run_at=args.expected_next_run_at,
+            )
+        )
+
+    if args.command == "service-recurring-schedule-patch":
+        return _service_action(
+            lambda: patch_recurring_schedule(
                 args.service_url,
                 args.auth_token_file,
                 args.schedule_id,

@@ -137,6 +137,52 @@ class RecurringSchedulePersistenceTests(TestCase):
                     expected_next_run_at="2026-08-11T00:00:00+00:00",
                 )
 
+    def test_patch_with_result_preserves_trigger_and_progress_and_rejects_unsafe_fields(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            store.add(_recurring_definition(input_value={"private": "trigger-secret"}))
+            dispatcher = RecurringScheduleDispatcher(Path(tmp), owner_id="patch-owner")
+            self.assertTrue(dispatcher.try_acquire(now_epoch=1000))
+            dispatcher.claim_due("2026-08-11T00:00:00Z", now_epoch=1001)
+            current = store.get("schedule_hourly_report")
+            patched, changed = store.patch_with_result(
+                "schedule_hourly_report",
+                {"workflow_id": "workflow_recurring_v2", "version": "2.0.0", "interval_seconds": 120},
+                expected_next_run_at=current["schedule"]["next_run_at"],
+            )
+            disabled, disabled_changed = store.patch_with_result(
+                "schedule_hourly_report",
+                {"enabled": False},
+                expected_next_run_at=patched["schedule"]["next_run_at"],
+            )
+            repeated, repeated_changed = store.patch_with_result(
+                "schedule_hourly_report",
+                {"workflow_id": "workflow_recurring_v2", "version": "2.0.0", "interval_seconds": 120},
+                expected_next_run_at=disabled["schedule"]["next_run_at"],
+            )
+            with self.assertRaisesRegex(ValueError, "unknown fields"):
+                store.patch_with_result(
+                    "schedule_hourly_report",
+                    {"trigger": {"input": {"leak": "no"}}},
+                    expected_next_run_at=disabled["schedule"]["next_run_at"],
+                )
+            with self.assertRaisesRegex(ValueError, "precondition failed"):
+                store.patch_with_result(
+                    "schedule_hourly_report",
+                    {"enabled": False},
+                    expected_next_run_at="2026-08-11T00:00:00Z",
+                )
+
+        self.assertTrue(changed)
+        self.assertTrue(disabled_changed)
+        self.assertFalse(repeated_changed)
+        self.assertEqual(repeated, disabled)
+        self.assertEqual(disabled["schedule"]["status"], "disabled")
+        self.assertFalse(disabled["schedule"]["enabled"])
+        self.assertEqual(disabled["schedule"]["next_run_at"], "2026-08-11T00:01:00+00:00")
+        self.assertEqual(disabled["schedule"]["last_scheduled_for"], "2026-08-11T00:00:00+00:00")
+        self.assertEqual(disabled["trigger"]["input"], {"private": "trigger-secret"})
+
     def test_delete_with_result_requires_disabled_cas_preserves_history_and_tombstones_id(self):
         with TemporaryDirectory() as tmp:
             store = RecurringScheduleStore(Path(tmp))

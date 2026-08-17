@@ -1123,6 +1123,81 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("must-not-leak", json.dumps(audit, ensure_ascii=False))
         self.assertFalse(serve_thread.is_alive())
 
+    def test_recurring_schedule_patch_preserves_trigger_and_rejects_trigger_fields(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            service = RuntimeService(config)
+            definition = {
+                "schema_version": "skill2workflow-schedule-0.2.0",
+                "schedule": {
+                    "id": "schedule_remote_patch",
+                    "workflow_id": "workflow_service",
+                    "version": "0.1.0",
+                    "starts_at": "2099-08-11T00:00:00Z",
+                    "interval_seconds": 60,
+                    "missed_run_policy": "latest",
+                    "enabled": True,
+                },
+                "trigger": {"input": {"private": "patch-secret"}},
+            }
+            service.scheduler.dispatcher.store.add(definition)
+            ready = threading.Event()
+            serve_thread = threading.Thread(
+                target=service.serve,
+                kwargs={"ready_callback": lambda _service: ready.set()},
+                daemon=True,
+            )
+            serve_thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = service.server_address
+            url = f"http://{host}:{port}/api/v1/recurring-schedules/schedule_remote_patch"
+            current = service.scheduler.dispatcher.store.get("schedule_remote_patch")
+            patch = {"workflow_id": "workflow_service_v2", "version": "2.0.0", "interval_seconds": 120}
+            denied_status, denied = _patch_json(
+                url,
+                {"schedule": patch, "expected_next_run_at": current["schedule"]["next_run_at"]},
+            )
+            updated_status, updated = _patch_json(
+                url,
+                {"schedule": patch, "expected_next_run_at": current["schedule"]["next_run_at"]},
+                token=AUTH_TOKEN,
+            )
+            invalid_status, invalid = _patch_json(
+                url,
+                {
+                    "schedule": {"trigger": {"input": {"private": "no"}}},
+                    "expected_next_run_at": updated["next_run_at"],
+                },
+                token=AUTH_TOKEN,
+            )
+            stale_status, stale = _patch_json(
+                url,
+                {"schedule": {"enabled": False}, "expected_next_run_at": "2099-08-11T00:01:00+00:00"},
+                token=AUTH_TOKEN,
+            )
+            service.begin_shutdown()
+            serve_thread.join(timeout=3)
+            stored = service.scheduler.dispatcher.store.get("schedule_remote_patch")
+            audit = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(updated_status, 200)
+        self.assertTrue(updated["changed"])
+        self.assertEqual(updated["workflow_id"], "workflow_service_v2")
+        self.assertEqual(updated["interval_seconds"], 120)
+        self.assertEqual(invalid_status, 400)
+        self.assertEqual(invalid, {"error": "recurring schedule patch rejected"})
+        self.assertEqual(stale_status, 409)
+        self.assertEqual(stale, {"error": "recurring schedule patch precondition failed"})
+        self.assertEqual(stored["trigger"]["input"], {"private": "patch-secret"})
+        self.assertNotIn("patch-secret", json.dumps(updated, ensure_ascii=False))
+        self.assertNotIn("patch-secret", json.dumps(audit, ensure_ascii=False))
+        self.assertTrue(any(event.get("type") == "recurring_schedule_patched" for event in audit))
+        self.assertFalse(serve_thread.is_alive())
+
     def test_recurring_schedule_delete_requires_disabled_cas_and_preserves_history(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -3824,6 +3899,26 @@ def _put_json(url: str, payload, token=None):
         data=json.dumps(payload).encode("utf-8"),
         headers=headers,
         method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.loads(error.read().decode("utf-8"))
+        finally:
+            error.close()
+
+
+def _patch_json(url: str, payload, token=None):
+    headers = {"Content-Type": "application/json"}
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="PATCH",
     )
     try:
         with urllib.request.urlopen(request, timeout=2) as response:

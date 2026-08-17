@@ -27,6 +27,7 @@ from skill2workflow.service_client import (
     post_recurring_schedule_state,
     post_recurring_schedule_create,
     put_recurring_schedule_update,
+    patch_recurring_schedule,
     delete_recurring_schedule,
     post_run_cancel,
     post_run_resume,
@@ -212,6 +213,91 @@ class ServiceClientTests(TestCase):
                     "schedule_hourly_report",
                     _recurring_definition(),
                     expected_next_run_at="",
+                )
+
+    def test_recurring_schedule_patch_uses_authenticated_patch_and_rejects_trigger_input(self):
+        observed = {}
+        patch_fields = {"workflow_id": "workflow_recurring_v2", "version": "2.0.0", "interval_seconds": 120}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_PATCH(self):
+                observed["path"] = self.path
+                observed["method"] = self.command
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(
+                    self,
+                    200,
+                    {
+                        "schema_version": "skill2workflow-recurring-schedule-patch-0.1.0",
+                        "schedule_id": "schedule_hourly_report",
+                        "workflow_id": "workflow_recurring_v2",
+                        "workflow_version": "2.0.0",
+                        "status": "active",
+                        "enabled": True,
+                        "starts_at": "2026-08-11T00:00:00+00:00",
+                        "next_run_at": "2026-08-11T00:01:00+00:00",
+                        "interval_seconds": 120,
+                        "missed_run_policy": "latest",
+                        "changed": True,
+                    },
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            result = patch_recurring_schedule(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "schedule_hourly_report",
+                patch_fields,
+                expected_next_run_at="2026-08-11T00:00:00+00:00",
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertTrue(result["changed"])
+        self.assertEqual(observed["method"], "PATCH")
+        self.assertEqual(observed["path"], "/api/v1/recurring-schedules/schedule_hourly_report")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(
+            observed["body"],
+            {
+                "schedule": patch_fields,
+                "expected_next_run_at": "2026-08-11T00:00:00+00:00",
+            },
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_schedule_patch_rejects_trigger_and_empty_patch_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaises(ValueError):
+                patch_recurring_schedule(
+                    "https://service.example",
+                    token_file,
+                    "schedule_hourly_report",
+                    {"trigger": {"input": {"private": "no"}}},
+                    expected_next_run_at="2026-08-11T00:00:00+00:00",
+                )
+            with self.assertRaises(ValueError):
+                patch_recurring_schedule(
+                    "https://service.example",
+                    token_file,
+                    "schedule_hourly_report",
+                    {},
+                    expected_next_run_at="2026-08-11T00:00:00+00:00",
                 )
 
     def test_recurring_schedule_create_uses_authenticated_post_and_redacted_contract(self):

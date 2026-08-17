@@ -188,6 +188,23 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(event["schedule_id"], "schedule_hourly_report")
         self.assertFalse(event["deleted"])
 
+    def test_recurring_schedule_patch_audit_is_value_free(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.record_ingress_authentication(True, "PATCH", "recurring_schedule_patch")
+            control.record_recurring_schedule_patched(
+                "schedule_hourly_report",
+                changed=True,
+            )
+            events = control.list_audit_events()
+
+        self.assertEqual(events[0]["method"], "PATCH")
+        self.assertEqual(events[0]["route"], "recurring_schedule_patch")
+        self.assertEqual(
+            set(events[1]), {"type", "schedule_id", "changed", "timestamp"}
+        )
+        self.assertEqual(events[1]["type"], "recurring_schedule_patched")
+
     def test_publish_workflow_persists_immutable_version_and_audit(self):
         workflow = _workflow(version="1.0.0")
 

@@ -31,9 +31,11 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
+    MAX_RECURRING_SCHEDULE_PATCH_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_DELETE_RESPONSE_BYTES,
     build_recurring_schedule_create_response,
     build_recurring_schedule_update_response,
+    build_recurring_schedule_patch_response,
     build_recurring_schedule_delete_response,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
     MAX_WORKFLOW_INVENTORY_ITEMS,
@@ -121,6 +123,7 @@ _MUTATING_REQUEST_ROUTES = frozenset(
         "recurring_schedule_action",
         "recurring_schedule_create",
         "recurring_schedule_update",
+        "recurring_schedule_patch",
         "recurring_schedule_delete",
         "run_resume",
         "run_cancel",
@@ -715,6 +718,9 @@ def _handler_for(service: RuntimeService):
         def do_PUT(self):
             self._dispatch_request()
 
+        def do_PATCH(self):
+            self._dispatch_request()
+
         def do_DELETE(self):
             self._dispatch_request()
 
@@ -782,6 +788,10 @@ def _handler_for(service: RuntimeService):
                         self._handle_recurring_schedule_list()
                     elif self.command == "POST" and path == "/api/v1/recurring-schedules":
                         self._handle_recurring_schedule_create()
+                    elif self.command == "PATCH" and _recurring_schedule_patch(path):
+                        self._handle_recurring_schedule_patch(
+                            _recurring_schedule_patch(path)
+                        )
                     elif self.command == "PUT" and _recurring_schedule_update(path):
                         self._handle_recurring_schedule_update(
                             _recurring_schedule_update(path)
@@ -1364,6 +1374,101 @@ def _handler_for(service: RuntimeService):
                     )
             except (OSError, sqlite3.Error):
                 self._send_json(503, {"error": "recurring schedule update unavailable"})
+
+        def _handle_recurring_schedule_patch(self, schedule_id: str):
+            """Patch safe recurring fields while preserving trigger metadata."""
+
+            readiness_status, _ = service.readiness()
+            if readiness_status != 200:
+                self._send_json(503, {"error": "service is not ready"})
+                return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                service.control_plane.record_ingress_authentication(
+                    False,
+                    self.command,
+                    "recurring_schedule_patch",
+                    reason=reason,
+                )
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            service.control_plane.record_ingress_authentication(
+                True,
+                self.command,
+                "recurring_schedule_patch",
+            )
+            try:
+                body = read_request_body(self)
+                if not body:
+                    raise ValueError(
+                        "recurring schedule patch body must contain schedule and expected_next_run_at"
+                    )
+                payload = json.loads(body.decode("utf-8"))
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != {"schedule", "expected_next_run_at"}
+                    or not isinstance(payload.get("schedule"), dict)
+                    or not isinstance(payload.get("expected_next_run_at"), str)
+                    or not payload.get("expected_next_run_at")
+                ):
+                    raise ValueError(
+                        "recurring schedule patch body must contain schedule and expected_next_run_at"
+                    )
+                definition, changed = service.scheduler.dispatcher.store.patch_with_result(
+                    schedule_id,
+                    payload["schedule"],
+                    expected_next_run_at=payload["expected_next_run_at"],
+                )
+                service.control_plane.record_recurring_schedule_patched(
+                    schedule_id,
+                    changed,
+                )
+                response = build_recurring_schedule_patch_response(
+                    definition,
+                    changed=changed,
+                )
+                encoded = json.dumps(response, ensure_ascii=False).encode("utf-8")
+                if len(encoded) > MAX_RECURRING_SCHEDULE_PATCH_RESPONSE_BYTES:
+                    raise ValueError("recurring schedule patch exceeds response limit")
+                self._send_json(200, response)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._send_json(
+                    400,
+                    {"error": "recurring schedule patch body must be valid JSON"},
+                )
+            except ValueError as error:
+                message = str(error)
+                if "not found" in message:
+                    self._send_json(404, {"error": "recurring schedule not found"})
+                elif "precondition failed" in message:
+                    self._send_json(
+                        409,
+                        {"error": "recurring schedule patch precondition failed"},
+                    )
+                elif "body must" in message:
+                    self._send_json(400, {"error": message})
+                else:
+                    self._send_json(
+                        400,
+                        {"error": "recurring schedule patch rejected"},
+                    )
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "recurring schedule patch unavailable"})
 
         def _handle_recurring_schedule_delete(self, schedule_id: str):
             """Retire one authenticated recurring schedule safely."""
@@ -2586,6 +2691,8 @@ def _request_route(method: str, path: str) -> str:
         return "recurring_schedule_list"
     if method == "POST" and path == "/api/v1/recurring-schedules":
         return "recurring_schedule_create"
+    if method == "PATCH" and _recurring_schedule_patch(path):
+        return "recurring_schedule_patch"
     if method == "PUT" and _recurring_schedule_update(path):
         return "recurring_schedule_update"
     if method == "DELETE" and _recurring_schedule_delete(path):
@@ -2649,6 +2756,25 @@ def _recurring_schedule_action(path: str):
 
 
 def _recurring_schedule_update(path: str):
+    parts = path.split("/")
+    if (
+        len(parts) != 5
+        or parts[:4] != ["", "api", "v1", "recurring-schedules"]
+    ):
+        return ""
+    schedule_id = parts[4]
+    if (
+        not schedule_id
+        or len(schedule_id) > 128
+        or any(not (char.isalnum() or char in {"-", "_", "."}) for char in schedule_id)
+    ):
+        return ""
+    return schedule_id
+
+
+def _recurring_schedule_patch(path: str):
+    """Return a safe schedule id for the PATCH mutation route."""
+
     parts = path.split("/")
     if (
         len(parts) != 5

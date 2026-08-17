@@ -670,6 +670,78 @@ class RecurringScheduleStore:
                 _upsert_recurring_schedule_summary(connection, effective)
         return effective, changed
 
+    def patch_with_result(
+        self,
+        schedule_id: str,
+        patch: object,
+        *,
+        expected_next_run_at: str,
+    ) -> Tuple[Schedule, bool]:
+        """Patch author-controlled schedule fields without accepting trigger data.
+
+        Remote inventory intentionally redacts trigger input.  This operation
+        therefore merges only the safe schedule fields into the persisted
+        definition and keeps the trigger and durable dispatch progress intact.
+        The compare-and-swap token is checked in the same ``BEGIN IMMEDIATE``
+        transaction as the write, so a stale operator cannot overwrite a
+        concurrent scheduler or operator update.
+        """
+
+        normalized_id = str(schedule_id)
+        _safe_schedule_id(normalized_id)
+        if not isinstance(expected_next_run_at, str) or not expected_next_run_at:
+            raise ValueError("expected_next_run_at must be an ISO-8601 timestamp")
+        expected = _normalize_aware_timestamp(
+            expected_next_run_at,
+            "expected_next_run_at",
+        )
+        if not isinstance(patch, dict) or not patch:
+            raise ValueError("recurring schedule patch must contain at least one field")
+        allowed_fields = {
+            "workflow_id",
+            "version",
+            "starts_at",
+            "interval_seconds",
+            "missed_run_policy",
+            "enabled",
+        }
+        unknown = set(patch) - allowed_fields
+        if unknown:
+            raise ValueError(
+                "recurring schedule patch has unknown fields: "
+                + ", ".join(sorted(unknown))
+            )
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            row = connection.execute(
+                "select definition_json from recurring_schedules where schedule_id = ?",
+                (normalized_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"recurring schedule not found: {normalized_id}")
+            existing = _load_recurring_definition(row[0])
+            current_next_run_at = str(existing["schedule"]["next_run_at"])
+            if current_next_run_at != expected:
+                raise ValueError("recurring schedule patch precondition failed")
+
+            candidate = copy.deepcopy(existing)
+            candidate_schedule = candidate["schedule"]
+            for field, value in patch.items():
+                candidate_schedule[field] = value
+            if "enabled" in patch:
+                candidate_schedule["status"] = (
+                    "active" if patch["enabled"] else "disabled"
+                )
+            effective = normalize_recurring_schedule_definition(candidate, persisted=True)
+            changed = _json_text(existing) != _json_text(effective)
+            if changed:
+                connection.execute(
+                    "update recurring_schedules set definition_json = ?, updated_at = ? where schedule_id = ?",
+                    (_json_text(effective), _utc_now(), normalized_id),
+                )
+                _upsert_recurring_schedule_summary(connection, effective)
+        return effective, changed
+
     def delete_with_result(
         self,
         schedule_id: str,
