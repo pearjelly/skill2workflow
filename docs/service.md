@@ -132,6 +132,14 @@ operator-input failures return a stable non-zero exit without a traceback.
 This does not change the service's HTTP body limits or its authenticated
 single-tenant boundary.
 
+Loop 167 hardens the startup configuration read described in
+[`service-config-boundary.md`](service-config-boundary.md). The runtime and
+Doctor accept at most 64 KiB, reject symlinks and non-regular files, bind the
+read to one device/inode, and fail closed on growth or replacement races. The
+generated workspace continues to publish its configuration as owner-only
+`0600`; hand-made configurations remain subject to the separate Doctor
+permission checks.
+
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
 The HTTP control plane and recurring dispatcher share the scheduler lease owner.

@@ -97,6 +97,7 @@ WORKFLOW_DIFF_SCHEMA_VERSION = "skill2workflow-workflow-diff-0.1.0"
 WORKFLOW_DEPRECATION_SCHEMA_VERSION = "skill2workflow-workflow-deprecation-0.1.0"
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 MAX_AUTH_TOKEN_BYTES = 16 * 1024
+MAX_SERVICE_CONFIG_BYTES = 64 * 1024
 LIVE_CONTROL_SNAPSHOT_MAX_ITEMS = 100
 MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
@@ -159,12 +160,66 @@ class ServiceConfig:
 def load_service_config(path: Path) -> ServiceConfig:
     """Load and validate a versioned service configuration file."""
 
+    payload = _read_service_config_payload(path)
+    return parse_service_config(payload)
+
+
+def _read_service_config_payload(path: Path):
+    """Read one bounded configuration without following a path race."""
+
     config_path = Path(path)
     try:
-        payload = json.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError(f"service config could not be loaded: {config_path}") from error
-    return parse_service_config(payload)
+        before = config_path.lstat()
+    except OSError as error:
+        raise ValueError("service config is unavailable") from error
+    if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+        raise ValueError("service config must be a regular non-symlink file")
+    if before.st_size > MAX_SERVICE_CONFIG_BYTES:
+        raise ValueError("service config exceeds the size limit")
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(config_path, flags)
+    except OSError as error:
+        raise ValueError("service config is unavailable") from error
+    try:
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_dev != before.st_dev
+                or opened.st_ino != before.st_ino
+            ):
+                raise ValueError("service config changed while being read")
+            if opened.st_size > MAX_SERVICE_CONFIG_BYTES:
+                raise ValueError("service config exceeds the size limit")
+            chunks = []
+            remaining = MAX_SERVICE_CONFIG_BYTES + 1
+            while remaining:
+                chunk = os.read(descriptor, min(4096, remaining))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            raw = b"".join(chunks)
+            if len(raw) > MAX_SERVICE_CONFIG_BYTES:
+                raise ValueError("service config exceeds the size limit")
+            after = config_path.lstat()
+            if after.st_dev != before.st_dev or after.st_ino != before.st_ino:
+                raise ValueError("service config changed while being read")
+            if after.st_size > MAX_SERVICE_CONFIG_BYTES:
+                raise ValueError("service config exceeds the size limit")
+        except OSError as error:
+            raise ValueError("service config is unavailable") from error
+    finally:
+        os.close(descriptor)
+
+    try:
+        return json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("service config is unavailable") from error
 
 
 def parse_service_config(payload: object) -> ServiceConfig:

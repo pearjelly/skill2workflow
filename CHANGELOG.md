@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Hardened runtime service configuration loading with a fixed 64 KiB bound,
+  regular-file and no-symlink checks, descriptor identity binding, and
+  growth/replacement-race rejection for `service` and `service-doctor`.
+
 - Added a shared 8 MiB UTF-8 boundary for generic JSON files supplied to the
   local CLI. Reads check the size before opening and after a bounded read to
   catch growth races; invalid operator inputs now return a stable non-zero

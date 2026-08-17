@@ -22,6 +22,7 @@ from skill2workflow.service import (
     SERVICE_SCHEMA_VERSION,
     FileBearerTokenAuthenticator,
     MAX_AUTH_TOKEN_BYTES,
+    MAX_SERVICE_CONFIG_BYTES,
     MAX_CONCURRENT_BUSINESS_REQUESTS,
     MAX_LIVE_CONTROL_SNAPSHOT_BYTES,
     MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES,
@@ -52,6 +53,76 @@ AUTH_TOKEN = "loop42-test-bearer-token-0123456789abcdef"
 
 
 class ServiceConfigTests(TestCase):
+    def test_load_service_config_rejects_oversized_file_before_opening(self):
+        with TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "service.json"
+            config_path.write_bytes(b"{" + b"x" * MAX_SERVICE_CONFIG_BYTES)
+            config_path.chmod(0o600)
+
+            with patch("skill2workflow.service.os.open") as open_file:
+                with self.assertRaisesRegex(ValueError, "size limit"):
+                    load_service_config(config_path)
+
+            open_file.assert_not_called()
+
+    def test_load_service_config_rejects_symlink_and_path_replacement(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "target.json"
+            config_path = root / "service.json"
+            replacement = root / "replacement.json"
+            payload = {
+                "schema_version": SERVICE_SCHEMA_VERSION,
+                "service": {"host": "127.0.0.1", "port": 8080},
+                "runtime": {"state_dir": str(root / "state"), "storage": "sqlite"},
+                "auth": {
+                    "provider": "bearer_token_file",
+                    "token_file": str(root / "ingress.token"),
+                },
+                "credentials": {
+                    "provider": "directory",
+                    "directory": str(root / "credentials"),
+                },
+            }
+            target.write_text(json.dumps(payload), encoding="utf-8")
+            target.chmod(0o600)
+            config_path.symlink_to(target)
+
+            with self.assertRaisesRegex(ValueError, "regular non-symlink"):
+                load_service_config(config_path)
+
+            config_path.unlink()
+            config_path.write_text(json.dumps(payload), encoding="utf-8")
+            config_path.chmod(0o600)
+            replacement.write_text(json.dumps(payload), encoding="utf-8")
+            replacement.chmod(0o600)
+            real_open = __import__("os").open
+            replaced = False
+
+            def replace_before_open(path, flags, *args):
+                nonlocal replaced
+                if Path(path) == config_path and not replaced:
+                    replaced = True
+                    replacement.replace(config_path)
+                return real_open(path, flags, *args)
+
+            with patch("skill2workflow.service.os.open", side_effect=replace_before_open):
+                with self.assertRaisesRegex(ValueError, "changed while being read"):
+                    load_service_config(config_path)
+
+    def test_load_service_config_rejects_growth_after_bounded_read(self):
+        with TemporaryDirectory() as tmp:
+            config_path = Path(tmp) / "service.json"
+            config_path.write_text("{}", encoding="utf-8")
+            config_path.chmod(0o600)
+
+            with patch(
+                "skill2workflow.service.os.read",
+                return_value=b"x" * (MAX_SERVICE_CONFIG_BYTES + 1),
+            ):
+                with self.assertRaisesRegex(ValueError, "size limit"):
+                    load_service_config(config_path)
+
     def test_load_service_config_accepts_explicit_loopback_sqlite_configuration(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
