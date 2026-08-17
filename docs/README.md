@@ -8,6 +8,7 @@ working on.
 
 - [README](../README.md) — product boundary and the fastest controlled journey
 - [Quickstart](quickstart.md) — install, bootstrap, run, approve, and trigger
+- [Installed UI](installed-ui.md) — serve the packaged editor and control-plane inspector
 - [Authoring](authoring.md) — compile Skills, edit the graph, and write back DSL
 - [Examples](examples.md) — scenario gallery and repeatable inspection commands
 - [Workflow DSL contract](workflow-dsl-contract.md) — execution truth and schema

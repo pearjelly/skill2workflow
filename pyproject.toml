@@ -47,3 +47,18 @@ skill2workflow = "skill2workflow.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.data-files]
+"share/skill2workflow/web" = [
+  "web/app.js",
+  "web/control.css",
+  "web/control.html",
+  "web/index.html",
+  "web/styles.css",
+]
+"share/skill2workflow/examples" = [
+  "examples/control-plane-snapshot.json",
+]
+"share/skill2workflow/examples/workflows" = [
+  "examples/workflows/*.json",
+]

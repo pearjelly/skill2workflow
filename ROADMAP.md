@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-205
+- Completed delivery loops: 1-206
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 205 is complete with a protected uncertain-dispatch review action
+- Active loop: None; Loop 206 is complete with an installed static UI launcher
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-205 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-206 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5270,9 +5270,45 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_service_client.ServiceClientTests.test_recurring_dispatch_review_posts_cas_payload_and_fetches_projection -v
 ```
 
+### Loop 206: Installed Static UI Launcher
+
+**Status:** Complete.
+
+**Prior basis:** The repository already shipped a LiteGraph editor and a
+control-plane inspector, but wheel users had to return to a source checkout
+and invoke a generic `http.server` command. That made the first-value path
+less reproducible and left the packaged artifact without a qualified UI
+surface.
+
+**Outcome:** The installed `skill2workflow ui` command serves the editor,
+control-plane inspector, and non-sensitive example assets from the wheel. It
+binds only to loopback addresses, supports a bounded `--once` request for
+smoke tests, and never reads runtime state, resolves credentials, or mutates
+workflows. The wheel provenance manifest and SBOM now include the static
+assets, and the package smoke starts the installed command with source imports
+disabled before fetching `/web/index.html`.
+
+**Evidence:** UI unit tests cover source discovery, loopback rejection, static
+serving, and CLI forwarding. The isolated wheel smoke verifies the packaged
+asset members, installed command help, and a real one-request server. Full
+tests, secret hygiene, reproducible wheel, external connector, and Production
+Baseline checks remain the release gates.
+
+**Safety boundary:** This is a static local presentation surface. It does not
+serve service state, provide authentication, add public ingress, or replace
+the authenticated runtime API. Operators must keep it on loopback or place it
+behind their own HTTPS boundary when widening access.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui -v
+python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke-loop206
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 205 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 206 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5444,6 +5480,7 @@ This rolling queue is ordered. Loop 205 is complete and there is no active deliv
 | Loop 203: Durable External Connector Metadata Boundary | Complete | Keep arbitrary external connector output, audit, input-mapping, and credential strings out of durable state without breaking immediate callers | Fixed value-free durable projection, direct-result compatibility, SQLite reload evidence, docs, and production gates |
 | Loop 204: Manifest-Declared External Connector Metadata Policy | Complete | Let reviewed external connectors retain safe connector-specific finite metadata without widening durable state to arbitrary provider values | Strict manifest policy validation, JSON/SQLite custom-vocabulary projection evidence, docs, and production gates |
 | Loop 205: Protected Uncertain-Dispatch Reviews | Complete | Let operators persist a bounded, compare-and-swap review of uncertain recurring effects without replaying or changing dispatch state | Fixed review schema, authenticated/local CLI and service routes, idempotent/conflict-safe SQLite evidence, redacted audit, package/docs/full-suite gates |
+| Loop 206: Installed Static UI Launcher | Complete | Let wheel users launch the editor and control-plane inspector without a source checkout or ad hoc server command | Loopback-only `ui` CLI, packaged static/example assets, isolated wheel serving evidence, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

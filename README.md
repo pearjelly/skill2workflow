@@ -55,6 +55,17 @@ result also contains safe `operator_commands` argv arrays for those next
 steps, so integrations do not need to rebuild paths or interpolate shell
 input.
 
+The installed wheel also includes the static editor and control-plane inspector:
+
+```bash
+skill2workflow ui --port 4173
+```
+
+Open `http://127.0.0.1:4173/web/` or
+`http://127.0.0.1:4173/web/control.html`. The UI server is loopback-only and
+static; it does not read runtime state or credentials. See the [installed UI
+guide](docs/installed-ui.md).
+
 ## Visual Overview
 
 ### Controlled Workflow Authoring
@@ -850,7 +861,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-205 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-206 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -884,6 +895,12 @@ operators can persist one compare-and-swap guarded conclusion about a recovered
 dispatch through the local or authenticated service CLI. The dispatch remains
 `uncertain`, no review triggers replay, and the redacted review is retained in
 SQLite and the audit chain.
+
+Loop 206 adds the [installed static UI](docs/installed-ui.md): wheel users can
+launch the LiteGraph editor and control-plane inspector with `skill2workflow ui`
+without a source checkout or ad hoc server command. Assets are packaged and
+qualified in isolation; the server remains loopback-only, static, and outside
+the authenticated runtime state boundary.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

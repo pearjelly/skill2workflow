@@ -47,6 +47,10 @@ The installed command set also includes the protected `service-resume`,
 owner-only `service-support-bundle` operator
 clients.
 
+The installed command set also includes `ui`. The qualification starts it with
+the source checkout unavailable, fetches `/web/index.html`, and checks that the
+static editor and example assets were carried into the wheel's data area.
+
 Before the command checks, the smoke runs the installed console script's
 `--version` flag and requires an exact match with the wheel metadata. This
 keeps support reports and upgrade checks tied to the artifact that is actually
@@ -89,7 +93,8 @@ Before installation, the qualification opens the wheel itself. It requires
 the byte-for-byte official Apache-2.0 license under the single `dist-info`
 directory, pinned by SHA-256, verifies the name, version, license expression,
 and Python compatibility metadata, and allows only the `skill2workflow`
-package plus its `dist-info` content. It rejects private or state artifacts
+package, its `dist-info` content, and the exact packaged UI/example data area.
+It rejects private or state artifacts
 such as Pilot evidence, secret directories, SQLite databases, tokens, keys,
 JSONL state, bytecode, and unexpected top-level trees.
 

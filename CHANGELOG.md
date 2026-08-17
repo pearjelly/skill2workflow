@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added the installed `skill2workflow ui` launcher. Wheel users can serve the
+  static LiteGraph editor, control-plane inspector, and example assets from a
+  loopback-only command without a source checkout; the packaged surface does
+  not read runtime state or credentials.
+
 - Added a protected, compare-and-swap uncertain-dispatch review action. Operators
   can persist one of three fixed conclusions and read it back through the
   authenticated service or installed CLI without changing `uncertain` status,

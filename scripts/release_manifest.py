@@ -30,6 +30,28 @@ _FORBIDDEN_SUFFIXES = {
     ".sqlite3",
     ".token",
 }
+PACKAGED_UI_DATA_FILES = frozenset(
+    {
+        "data/share/skill2workflow/web/app.js",
+        "data/share/skill2workflow/web/control.css",
+        "data/share/skill2workflow/web/control.html",
+        "data/share/skill2workflow/web/index.html",
+        "data/share/skill2workflow/web/styles.css",
+        "data/share/skill2workflow/examples/control-plane-snapshot.json",
+        "data/share/skill2workflow/examples/workflows/approval-flow.litegraph.json",
+        "data/share/skill2workflow/examples/workflows/approval-flow.workflow.json",
+        "data/share/skill2workflow/examples/workflows/customer-service-escalation.litegraph.json",
+        "data/share/skill2workflow/examples/workflows/customer-service-escalation.workflow.json",
+        "data/share/skill2workflow/examples/workflows/http-connector.litegraph.json",
+        "data/share/skill2workflow/examples/workflows/http-connector.workflow.json",
+        "data/share/skill2workflow/examples/workflows/operations-analysis.litegraph.json",
+        "data/share/skill2workflow/examples/workflows/operations-analysis.workflow.json",
+        "data/share/skill2workflow/examples/workflows/risk-review.litegraph.json",
+        "data/share/skill2workflow/examples/workflows/risk-review.workflow.json",
+        "data/share/skill2workflow/examples/workflows/sales-follow-up.litegraph.json",
+        "data/share/skill2workflow/examples/workflows/sales-follow-up.workflow.json",
+    }
+)
 
 
 def build_release_manifest(wheel: Path) -> Dict[str, object]:
@@ -50,10 +72,19 @@ def build_release_manifest(wheel: Path) -> Dict[str, object]:
             names = [info.filename for info in infos]
 
             dist_info = _dist_info_root(names)
+            data_root = f"{dist_info[:-len('.dist-info')]}.data"
             roots = {PurePosixPath(name).parts[0] for name in names}
-            unexpected = sorted(roots - {_PACKAGE_ROOT, dist_info})
+            unexpected = sorted(roots - {_PACKAGE_ROOT, dist_info, data_root})
             if unexpected:
                 raise RuntimeError("wheel contains unexpected top-level content")
+            if data_root in roots:
+                data_members = {
+                    name[len(data_root) + 1 :]
+                    for name in names
+                    if name.startswith(f"{data_root}/")
+                }
+                if data_members != PACKAGED_UI_DATA_FILES:
+                    raise RuntimeError("wheel data area contains unexpected or missing members")
 
             metadata_name = f"{dist_info}/METADATA"
             if metadata_name not in names:

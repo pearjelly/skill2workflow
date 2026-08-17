@@ -40,6 +40,7 @@ This repository is the `skill2workflow` open-source harness.
 - Example fixture sync: `PYTHONPATH=src python3 -m unittest tests.test_examples -v`
 - Web preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/`
 - Control UI preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/control.html`
+- Installed UI preview: `skill2workflow ui --port 4173`, then open `http://127.0.0.1:4173/web/`
 - Secure service bootstrap: `PYTHONPATH=src python3 -m skill2workflow.cli service-init --root /tmp/skill2workflow-service --port 8080`
 - Rotate service ingress token: `PYTHONPATH=src python3 -m skill2workflow.cli service-token-rotate --config /tmp/skill2workflow-runtime/config/service.json`
 - Installed controlled quickstart: `PYTHONPATH=src python3 -m skill2workflow.cli quickstart --root /tmp/skill2workflow-quickstart --port 8080`

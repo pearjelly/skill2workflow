@@ -8,9 +8,13 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import threading
+import time
+import urllib.error
+import urllib.request
 import venv
 import zipfile
 from email.parser import Parser
@@ -20,10 +24,18 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Dict, List
 
 try:
-    from release_manifest import build_release_manifest, write_release_manifest
+    from release_manifest import (
+        PACKAGED_UI_DATA_FILES,
+        build_release_manifest,
+        write_release_manifest,
+    )
     from release_sbom import build_release_sbom, write_release_sbom
 except ImportError:  # pragma: no cover - exercised when imported as scripts.package_smoke
-    from scripts.release_manifest import build_release_manifest, write_release_manifest
+    from scripts.release_manifest import (
+        PACKAGED_UI_DATA_FILES,
+        build_release_manifest,
+        write_release_manifest,
+    )
     from scripts.release_sbom import build_release_sbom, write_release_sbom
 
 
@@ -83,6 +95,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-recurring-dispatch-page",
     "service-recurring-dispatch-review",
     "service-recurring-dispatch-review-get",
+    "ui",
     "service-workflow-artifacts",
     "service-backup-readiness",
     "service-backup-inventory",
@@ -165,6 +178,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     )
     wheel = _built_wheel(wheel_dir)
     wheel_contents = _inspect_wheel(wheel)
+    _verify_packaged_ui_assets(wheel)
     release_manifest = build_release_manifest(wheel)
     release_manifest_path = work_dir / "release-artifact-manifest.json"
     write_release_manifest(release_manifest_path, release_manifest)
@@ -301,6 +315,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         isolated_dir,
         bootstrap_secret_path,
     )
+    ui_status = _qualify_installed_ui(console_script, isolated_dir)
     validate_output = _run(
         [
             str(console_script),
@@ -457,6 +472,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "service_doctor_status": True,
         "systemd_unit_status": systemd_unit_status,
         "live_snapshot_status": live_snapshot_status,
+        "ui_status": ui_status,
         "release_manifest_status": True,
         "release_manifest_file_count": len(release_manifest["files"]),
         "release_artifact_sha256": release_manifest["artifact"]["sha256"],
@@ -671,6 +687,69 @@ def _qualify_systemd_unit(
     return True
 
 
+def _qualify_installed_ui(console_script: Path, isolated_dir: Path) -> bool:
+    """Prove an installed wheel serves its packaged UI and example assets."""
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+    environment["PYTHONNOUSERSITE"] = "1"
+    process = subprocess.Popen(
+        [str(console_script), "ui", "--port", str(port), "--once"],
+        cwd=str(isolated_dir),
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    body = b""
+    error = None
+    deadline = time.monotonic() + 5
+    try:
+        while time.monotonic() < deadline:
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/web/index.html", timeout=1
+                ) as response:
+                    body = response.read()
+                break
+            except (OSError, urllib.error.URLError) as caught:
+                error = caught
+                time.sleep(0.05)
+        if not body:
+            raise RuntimeError(f"installed UI did not serve index.html: {error}")
+        process.wait(timeout=5)
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+    if process.returncode != 0:
+        raise RuntimeError("installed UI server did not exit cleanly")
+    if b"skill2workflow" not in body or b"Workflow DSL Visual Editor" not in body:
+        raise RuntimeError("installed UI served an unexpected index document")
+    return True
+
+
+def _verify_packaged_ui_assets(wheel: Path) -> None:
+    """Require the installed artifact to carry the static UI and examples."""
+
+    with zipfile.ZipFile(Path(wheel)) as archive:
+        names = set(archive.namelist())
+    dist_info = sorted({
+        name.split("/", 1)[0]
+        for name in names
+        if name.split("/", 1)[0].endswith(".dist-info")
+    })
+    if len(dist_info) != 1:
+        raise RuntimeError("wheel must contain exactly one dist-info directory")
+    data_root = f"{dist_info[0][:-len('.dist-info')]}.data"
+    required = {f"{data_root}/{relative}" for relative in PACKAGED_UI_DATA_FILES}
+    if not required.issubset(names):
+        raise RuntimeError("wheel is missing packaged UI or example assets")
+
+
 def _venv_executable(venv_dir: Path, name: str) -> Path:
     scripts_dir = "Scripts" if os.name == "nt" else "bin"
     suffix = ".exe" if os.name == "nt" else ""
@@ -708,7 +787,8 @@ def _inspect_wheel(wheel: Path) -> Dict[str, object]:
             )
             if len(dist_info) != 1:
                 raise RuntimeError("wheel must contain exactly one dist-info directory")
-            allowed_roots = {"skill2workflow", dist_info[0]}
+            data_root = f"{dist_info[0][:-len('.dist-info')]}.data"
+            allowed_roots = {"skill2workflow", dist_info[0], data_root}
             unexpected_roots = sorted(
                 {path.parts[0] for path in paths} - allowed_roots
             )

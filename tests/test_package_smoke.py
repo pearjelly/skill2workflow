@@ -7,6 +7,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from scripts.package_smoke import (
+    PACKAGED_UI_DATA_FILES,
     REQUIRED_CONSOLE_COMMANDS,
     _inspect_wheel,
     _run,
@@ -54,6 +55,9 @@ class PackageSmokeTests(TestCase):
                             "skill2workflow-0.1.0.dist-info/METADATA",
                             _valid_metadata(),
                         )
+                        data_prefix = "skill2workflow-0.1.0.data"
+                        for name in PACKAGED_UI_DATA_FILES:
+                            archive.writestr(f"{data_prefix}/{name}", "{}")
                 if "importlib.metadata" in " ".join(command):
                     return (
                         '{"version": "0.1.0", "classifiers": '
@@ -225,7 +229,10 @@ class PackageSmokeTests(TestCase):
             ), patch(
                 "scripts.package_smoke._qualify_live_snapshot",
                 return_value=True,
-            ) as qualify_live_snapshot:
+            ) as qualify_live_snapshot, patch(
+                "scripts.package_smoke._qualify_installed_ui",
+                return_value=True,
+            ) as qualify_installed_ui:
                 result = run_package_smoke(repo, work)
 
         flattened = [part for command, _cwd in commands for part in command]
@@ -256,6 +263,8 @@ class PackageSmokeTests(TestCase):
         executable_index = systemd_commands[0].index("--executable") + 1
         self.assertTrue(systemd_commands[0][executable_index].endswith("skill2workflow"))
         qualify_live_snapshot.assert_called_once()
+        qualify_installed_ui.assert_called_once()
+        self.assertTrue(result["ui_status"])
         self.assertTrue(result["license_included"])
         self.assertTrue(result["private_artifacts_excluded"])
         self.assertTrue(result["bundle_status"])

@@ -52,6 +52,9 @@ PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/s
 python3 -m http.server 4173
 ```
 
+Wheel users can serve the packaged editor and inspector with
+`skill2workflow ui --port 4173`; see [`installed-ui.md`](installed-ui.md).
+
 ## Safe Write-Back
 
 `write-back` preserves topology and execution identity:

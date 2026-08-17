@@ -85,6 +85,7 @@ from .triggers import normalize_trigger_input
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 from .webhooks import serve_webhook_requests
 from .external_connectors import load_external_connector
+from .ui import serve_ui
 
 
 MAX_CLI_JSON_DOCUMENT_BYTES = 8 * 1024 * 1024
@@ -404,6 +405,14 @@ def _main(argv=None) -> int:
     webhook_server_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
     webhook_server_cmd.add_argument("--credential-file", type=Path)
     webhook_server_cmd.add_argument("--once", action="store_true", help="Handle one request and then exit")
+
+    ui_cmd = subparsers.add_parser(
+        "ui",
+        help="Serve the static authoring and control-plane UI on loopback",
+    )
+    ui_cmd.add_argument("--host", default="127.0.0.1")
+    ui_cmd.add_argument("--port", type=int, default=4173)
+    ui_cmd.add_argument("--once", action="store_true", help="Handle one request and then exit")
 
     service_cmd = subparsers.add_parser(
         "service",
@@ -1323,6 +1332,9 @@ def _main(argv=None) -> int:
     if args.command == "webhook-server":
         return _serve_webhook_server(args)
 
+    if args.command == "ui":
+        return _serve_ui(args)
+
     if args.command == "service":
         return _serve_runtime_service(args)
 
@@ -2081,6 +2093,17 @@ def _serve_webhook_server(args) -> int:
             ),
             once=args.once,
         )
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
+
+
+def _serve_ui(args) -> int:
+    try:
+        serve_ui(host=args.host, port=args.port, once=args.once)
         return 0
     except ValueError as error:
         print(str(error), file=sys.stderr)
