@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-198
+- Completed delivery loops: 1-199
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 198 is complete with fixed HTTP transport error redaction
+- Active loop: None; Loop 199 is complete with an external connector exception boundary
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-198 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-199 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -123,6 +123,10 @@ requests, enforced before credential resolution and network access.
 Loop 198 adds fixed, value-free built-in HTTP transport and request-body
 serialization failures so provider-transport, URL, proxy, socket, and
 mapped-value exception text cannot enter durable connector failure results.
+
+Loop 199 adds a fixed boundary for ordinary exceptions raised by explicitly
+loaded external connector fixtures before they can escape into the executor or
+durable run state.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4997,9 +5001,46 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_connectors.ConnectorTests.test_http_connector_normalizes_transport_failures_without_leaking_details -v
 ```
 
+### Loop 199: External Connector Exception Boundary
+
+**Status:** Complete.
+
+**Prior basis:** The external connector result envelope was bounded and
+round-tripped through JSON, but an explicitly loaded fixture that raised an
+ordinary Python exception could bypass that result boundary. The exception
+could escape the executor with provider, URL, socket, or traceback text and
+leave no normalized connector failure result.
+
+**Outcome:** `_execute_external_connector` now preserves the explicit
+`ConnectorExecutionError` contract while converting every other ordinary
+fixture exception into the fixed `external connector execution failed` error.
+The executor therefore records the normal failed-node, retry, and audit path;
+the underlying exception remains available only through Python exception
+chaining inside the process and is not serialized.
+
+**Evidence:** Direct runtime tests inject a private-marker `RuntimeError` and
+assert the fixed error. A SQLite executor regression proves the failed node
+and reloaded run contain only the fixed message and no marker. Existing
+external result bounds, explicit credential behavior, built-in HTTP, full
+suite, package, secret-hygiene, and Production Baseline checks remain green.
+The contract is documented in [`docs/external-connector-result-boundary.md`](docs/external-connector-result-boundary.md), connector guidance, and stability boundaries.
+
+**Safety boundary:** This normalizes unexpected fixture exceptions; it does
+not sandbox imported Python, rewrite connector-authored `ConnectorExecutionError`
+messages, cancel provider I/O, redact connector output values, or claim
+exactly-once external effects.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_external_connector_normalizes_unexpected_executor_failures \
+  tests.test_executor.ExecutorTests.test_unexpected_external_connector_failure_persists_fixed_value_free_error -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 198 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 199 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5164,6 +5205,7 @@ This rolling queue is ordered. Loop 198 is complete and there is no active deliv
 | Loop 196: Bounded HTTP Request Metadata | Complete | Keep URL, method, and headers bounded and normalize malformed request failures before network access | Fixed URL/method/header bounds, injection and invalid-port rejection, raw-exception regression tests, docs, and package evidence |
 | Loop 197: Declarative HTTP Origin Governance | Complete | Let reviewed workflows restrict built-in HTTP egress to exact origins before credential resolution | Additive `allowed_origins` schema/compiler/runtime contract, no-network mismatch tests, LiteGraph write-back, docs, and package evidence |
 | Loop 198: Fixed HTTP Transport Error Redaction | Complete | Keep built-in HTTP transport and request-body failures value-free before durable connector persistence | Fixed timeout/network/serialization messages, injected leakage regressions, compatibility/docs updates, and package evidence |
+| Loop 199: External Connector Exception Boundary | Complete | Keep unexpected explicitly loaded connector exceptions inside the normalized durable failure path | Fixed unexpected-exception message, direct and SQLite leakage regressions, result-boundary docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -16,7 +16,9 @@ class ExternalConnectorResultBoundaryDocsTests(TestCase):
             "allow_nan=false",
             "ConnectorExecutionError",
             "durable run state",
+            "external connector execution failed",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("external-connector-result-boundary.md", connectors)
         self.assertIn("normalized result envelope is bounded to 1 MiB", connectors)
+        self.assertIn("ordinary exception raised by a fixture is normalized", connectors)

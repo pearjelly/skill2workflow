@@ -17,6 +17,14 @@ bound, or cannot be round-tripped through standard JSON fail as a fixed
 The accepted result is reconstructed from that JSON representation, so custom
 Python objects cannot cross into run state or SQLite.
 
+If an external executor raises an ordinary Python exception instead of the
+declared `ConnectorExecutionError`, the runtime converts it to the fixed
+`external connector execution failed` error before the executor sees it. The
+underlying provider, URL, socket, traceback, and exception text therefore do
+not enter connector results or durable state. Connector code that deliberately
+raises `ConnectorExecutionError` remains responsible for using a compact,
+value-free message.
+
 The limit is enforced for explicitly loaded external connectors only. The
 built-in HTTP connector keeps its existing 1 MiB request/response payload
 contract; its response shape remains unchanged. External connector packages
@@ -25,12 +33,13 @@ but they cannot bypass this final runtime persistence boundary.
 
 ## Safety boundary
 
-This contract bounds the result handed to the local executor. It does not
-sandbox imported Python code, interrupt an outbound provider call, redact
-business values returned by a connector, add remote package installation, or
-claim exactly-once external effects. Connector authors must continue to return
-compact, value-safe audit and credential summaries and must keep resolved
-secrets out of `output`.
+This contract bounds the result and unexpected-exception handoff to the local
+executor. It does not sandbox imported Python code, interrupt an outbound
+provider call, redact business values returned by a connector, add remote
+package installation, or claim exactly-once external effects. Connector
+authors must continue to return compact, value-safe audit and credential
+summaries, use value-free `ConnectorExecutionError` messages, and keep
+resolved secrets out of `output`.
 
 The focused evidence command is:
 

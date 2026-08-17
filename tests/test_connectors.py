@@ -140,6 +140,22 @@ class ConnectorTests(TestCase):
         ):
             runtime.execute_connector(_local_echo_node())
 
+    def test_external_connector_normalizes_unexpected_executor_failures(self):
+        fixture = _load_local_echo_fixture()
+        private_marker = "private-provider-detail-should-not-leak"
+
+        def execute(_binding, credential_provider=None, context=None):
+            raise RuntimeError(f"provider request failed: {private_marker}")
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, execute)])
+
+        with self.assertRaisesRegex(
+            ConnectorExecutionError,
+            "^external connector execution failed$",
+        ) as raised:
+            runtime.execute_connector(_local_echo_node())
+        self.assertNotIn(private_marker, str(raised.exception))
+
     def test_http_connector_sends_method_headers_json_body_and_normalizes_response(self):
         server = _ConnectorTestServer()
 

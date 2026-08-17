@@ -118,7 +118,11 @@ backward compatible.
 External connector packages own their provider-specific I/O limits, but their
 normalized result still crosses the runtime's fixed 1 MiB persistence
 boundary. Non-JSON or oversized external results fail before they are attached
-to durable run state; see [`external-connector-result-boundary.md`](external-connector-result-boundary.md).
+to durable run state. An ordinary exception raised by a fixture is normalized
+to `external connector execution failed`; connector-authored
+`ConnectorExecutionError` messages remain part of the explicit fixture
+contract and must be compact and value-free. See
+[`external-connector-result-boundary.md`](external-connector-result-boundary.md).
 
 If `body` is present and no case-insensitive `Content-Type` header is supplied, the connector adds `Content-Type: application/json`.
 

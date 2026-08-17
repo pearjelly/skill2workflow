@@ -10,7 +10,9 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
+from skill2workflow.connectors import ConnectorRuntime, ExternalConnector
 from skill2workflow.credentials import StaticCredentialProvider
+from skill2workflow.external_connectors import load_external_connector
 from skill2workflow.executor import LocalExecutor
 
 
@@ -473,8 +475,48 @@ class ExecutorTests(TestCase):
                 state["run_id"]
             )
 
-        for result in (state["node_results"]["call_api"], persisted["node_results"]["call_api"]):
+        for result in (
+            state["node_results"]["call_api"],
+            persisted["node_results"]["call_api"],
+        ):
             self.assertEqual(result["error"], "http connector request failed")
+        self.assertNotIn(private_marker, json.dumps(state, ensure_ascii=False))
+        self.assertNotIn(private_marker, json.dumps(persisted, ensure_ascii=False))
+
+    def test_unexpected_external_connector_failure_persists_fixed_value_free_error(self):
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "connectors"
+            / "local_echo_connector.py"
+        )
+        fixture = load_external_connector(fixture_path)
+        private_marker = "private-provider-detail-should-not-leak"
+
+        def execute(_binding, credential_provider=None, context=None):
+            raise RuntimeError(f"provider request failed: {private_marker}")
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.manifest, execute)])
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["nodes"][1]["connector"] = {
+            "id": "local_echo",
+            "kind": "local_echo",
+            "request": {},
+        }
+
+        with TemporaryDirectory() as tmp:
+            state = LocalExecutor(
+                Path(tmp), storage="sqlite", connector_runtime=runtime
+            ).run(workflow)
+            persisted = LocalExecutor(Path(tmp), storage="sqlite").get_run(
+                state["run_id"]
+            )
+
+        for result in (
+            state["node_results"]["call_api"],
+            persisted["node_results"]["call_api"],
+        ):
+            self.assertEqual(result["error"], "external connector execution failed")
         self.assertNotIn(private_marker, json.dumps(state, ensure_ascii=False))
         self.assertNotIn(private_marker, json.dumps(persisted, ensure_ascii=False))
 

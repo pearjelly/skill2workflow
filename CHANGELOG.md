@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Normalized unexpected exceptions from explicitly loaded external connector
+  fixtures to the fixed `external connector execution failed` message before
+  they can enter durable run state.
+
 - Normalized built-in HTTP transport and request-body serialization failures
   to fixed value-free messages, preventing URLs, provider-transport details,
   proxy text, socket errors, and mapped-value representations from entering

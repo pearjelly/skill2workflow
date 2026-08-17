@@ -305,7 +305,19 @@ def _execute_external_connector(
 ) -> ConnectorResult:
     if not isinstance(binding, dict):
         raise ConnectorExecutionError("external connector binding must be an object")
-    result = connector.executor(copy.deepcopy(binding), credential_provider=credential_provider, context=context)
+    try:
+        result = connector.executor(
+            copy.deepcopy(binding),
+            credential_provider=credential_provider,
+            context=context,
+        )
+    except ConnectorExecutionError:
+        # Preserve the explicit connector contract for expected validation or
+        # credential failures. Unexpected fixture exceptions use the fixed
+        # boundary below so provider/transport text cannot cross the runtime.
+        raise
+    except Exception as error:
+        raise ConnectorExecutionError("external connector execution failed") from error
     if not isinstance(result, dict):
         raise ConnectorExecutionError("external connector executor must return an object")
 
