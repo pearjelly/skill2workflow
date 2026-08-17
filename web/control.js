@@ -1,5 +1,6 @@
 (function () {
   const EXAMPLE_URL = "../examples/control-plane-snapshot.json";
+  const LIVE_SNAPSHOT_URL = "/api/v1/control-snapshot";
   const state = {
     snapshot: null,
     view: "operator",
@@ -20,6 +21,7 @@
 
   function cacheElements() {
     els.loadExample = document.getElementById("load-example");
+    els.loadLive = document.getElementById("load-live");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
@@ -50,6 +52,7 @@
 
   function bindEvents() {
     els.loadExample.addEventListener("click", loadExample);
+    els.loadLive.addEventListener("click", loadLiveSnapshot);
     els.snapshotFile.addEventListener("change", loadSelectedFile);
     els.filterInput.addEventListener("input", function () {
       state.filter = els.filterInput.value.trim().toLowerCase();
@@ -72,6 +75,19 @@
       loadSnapshot(await response.json(), "Example Snapshot");
     } catch (error) {
       rejectSnapshot("Example Snapshot", { error: error.message });
+    }
+  }
+
+  async function loadLiveSnapshot() {
+    setStatus("Loading", "");
+    try {
+      const response = await fetch(LIVE_SNAPSHOT_URL, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("live snapshot unavailable");
+      }
+      loadSnapshot(await response.json(), "Live Service Snapshot");
+    } catch (error) {
+      rejectSnapshot("Live Service Snapshot", { error: "live snapshot unavailable" });
     }
   }
 

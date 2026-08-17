@@ -2,15 +2,23 @@
 
 from __future__ import annotations
 
+import json
 import sysconfig
 from functools import partial
 from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable, Optional
 
+from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
+from .live_snapshot import fetch_live_control_snapshot
+from .service import read_service_bearer_token
+from .service_client import service_endpoint
+
 
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _DATA_ROOT = Path("share") / "skill2workflow"
+_LIVE_SNAPSHOT_PATH = "/api/v1/control-snapshot"
+_LIVE_SNAPSHOT_MAX_RESPONSE_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 
 
 def find_ui_root() -> Path:
@@ -48,20 +56,82 @@ def serve_ui(
     *,
     once: bool = False,
     ready_callback: Optional[Callable[[ThreadingHTTPServer], None]] = None,
+    service_url: Optional[str] = None,
+    auth_token_file: Optional[Path] = None,
 ) -> None:
-    """Serve the static UI on a loopback address without accessing runtime state."""
+    """Serve the UI, optionally adding one authenticated read-only live route.
+
+    Static mode never accesses runtime state. Live mode is opt-in and keeps the
+    Bearer token server-side: the browser can request only the fixed snapshot
+    path, while the UI process reads the owner-only token file per request.
+    """
 
     if str(host).lower() not in _LOOPBACK_HOSTS:
         raise ValueError("UI server must bind to a loopback host")
+    if (service_url is None) != (auth_token_file is None):
+        raise ValueError("live UI mode requires both --service-url and --auth-token-file")
+    if service_url is not None:
+        service_endpoint(service_url, _LIVE_SNAPSHOT_PATH)
+        read_service_bearer_token(Path(auth_token_file))
     root = find_ui_root()
 
     class QuietHandler(SimpleHTTPRequestHandler):
         def log_message(self, *_args):
             return
 
+        def do_GET(self):
+            if self.path == _LIVE_SNAPSHOT_PATH:
+                self._serve_live_snapshot()
+                return
+            if self.path.startswith(_LIVE_SNAPSHOT_PATH + "?"):
+                self._write_json(
+                    404,
+                    {"error": "live control snapshot path does not accept query parameters"},
+                )
+                return
+            super().do_GET()
+
+        def _serve_live_snapshot(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "live control snapshot is not configured"})
+                return
+            try:
+                snapshot = fetch_live_control_snapshot(
+                    configured_service_url,
+                    token_file,
+                )
+                body = json.dumps(
+                    snapshot,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _LIVE_SNAPSHOT_MAX_RESPONSE_BYTES:
+                    raise ValueError("live control snapshot unavailable")
+            except Exception:
+                self._write_json(503, {"error": "live control snapshot unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
+        def _write_json(self, status, payload, *, content_type="application/json"):
+            if isinstance(payload, dict):
+                body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+            else:
+                body = bytes(payload)
+            self.send_response(int(status))
+            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
     handler = partial(QuietHandler, directory=str(root))
     server_class = HTTPServer if once else ThreadingHTTPServer
     server = server_class((host, int(port)), handler)
+    server.live_service_url = service_url
+    server.live_auth_token_file = Path(auth_token_file) if auth_token_file else None
     try:
         if ready_callback:
             ready_callback(server)

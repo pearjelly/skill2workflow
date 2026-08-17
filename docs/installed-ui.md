@@ -18,8 +18,29 @@ http://127.0.0.1:4173/web/control.html
 The server is loopback-only by default and serves static editor assets and
 non-sensitive example JSON. It does not read runtime state or the service state directory,
 resolve credentials, expose an ingress token, or mutate workflows. The
-control-plane page still accepts an exported snapshot file; it is not a live
-authenticated service console.
+control-plane page still accepts an exported snapshot file; by default it is
+not a live authenticated service console.
+
+For an explicit, read-only live view of one running service, configure both the
+service origin and its owner-only ingress token file:
+
+```bash
+skill2workflow ui \
+  --service-url http://127.0.0.1:8080 \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+```
+
+The control-plane page's **Load Live Snapshot** action then calls the UI's
+fixed same-origin `/api/v1/control-snapshot` route. The UI process reads the
+token server-side for each request and forwards only that bounded, authenticated
+snapshot request; the browser never receives the token, and arbitrary service
+paths are not proxied. Live responses remain read-only, `no-store`, and subject
+to the service's bounded snapshot window. If either option is omitted, the live
+route is unavailable and static/example/file loading continues to work.
+
+The live mode does not add TLS, public ingress, RBAC, mutations, or provider
+reconciliation. Keep the UI on loopback or place it behind an operator-managed
+HTTPS boundary when serving a wider network.
 
 Use `--once` for a bounded packaging or smoke-test request. The command does
 not provide TLS, public ingress, authentication, or a reverse-proxy boundary;

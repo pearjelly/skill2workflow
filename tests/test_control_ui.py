@@ -12,12 +12,15 @@ class ControlUiContractTests(TestCase):
         css = (ROOT / "web" / "control.css").read_text(encoding="utf-8")
 
         self.assertIn('id="snapshot-scope"', html)
+        self.assertIn('id="load-live"', html)
         self.assertIn('aria-live="polite"', html)
         self.assertIn("validateSnapshotWindow", javascript)
         self.assertIn("renderSnapshotScope", javascript)
         self.assertIn("Complete offline snapshot", javascript)
         self.assertIn("Bounded snapshot", javascript)
         self.assertIn("collection is truncated", javascript)
+        self.assertIn("/api/v1/control-snapshot", javascript)
+        self.assertIn("loadLiveSnapshot", javascript)
         self.assertIn(".snapshot-scope.is-bounded", css)
         self.assertIn(".snapshot-scope.is-truncated", css)
 

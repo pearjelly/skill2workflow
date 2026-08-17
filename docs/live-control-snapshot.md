@@ -105,6 +105,13 @@ exports separately from bounded snapshots and highlights truncated collections,
 while Summary continues to show the total counts. A malformed or internally
 inconsistent window is rejected and clears previously displayed snapshot data.
 
+The installed UI can also fetch one live snapshot without placing the service
+token in browser state. Start it with both `--service-url` and
+`--auth-token-file` as documented in [`installed-ui.md`](installed-ui.md), then
+use **Load Live Snapshot**. This is a fixed, read-only same-origin proxy for
+`GET /api/v1/control-snapshot`; it does not proxy arbitrary paths or expose the
+token. Without both options, the button reports that live mode is unavailable.
+
 ## Verification
 
 Run the real-process drill:
@@ -121,8 +128,9 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-Loop 55 is a single-team read surface. It excludes browser credential storage,
-CORS, live UI polling, workflow publication, approval or cancellation controls,
-RBAC, pagination cursors, remote audit storage, multi-tenant filtering, and
-hosted TLS. Network exposure still requires the external TLS and private
-operator boundary documented in [security-boundary.md](security-boundary.md).
+Loop 55 remains a single-team read surface. The Loop 207 UI proxy excludes
+browser credential storage, CORS, workflow publication, approval or
+cancellation controls, RBAC, pagination cursors, remote audit storage,
+multi-tenant filtering, and hosted TLS. Network exposure still requires the
+external TLS and private operator boundary documented in
+[security-boundary.md](security-boundary.md).

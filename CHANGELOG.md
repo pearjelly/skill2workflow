@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added an opt-in live control-plane view to the installed `skill2workflow ui`
+  launcher. With an exact service origin and owner-only ingress token file,
+  **Load Live Snapshot** uses a fixed same-origin read-only proxy; the browser
+  never receives the token and static mode remains the default.
+
 - Added the installed `skill2workflow ui` launcher. Wheel users can serve the
   static LiteGraph editor, control-plane inspector, and example assets from a
   loopback-only command without a source checkout; the packaged surface does

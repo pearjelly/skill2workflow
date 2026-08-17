@@ -413,6 +413,15 @@ def _main(argv=None) -> int:
     ui_cmd.add_argument("--host", default="127.0.0.1")
     ui_cmd.add_argument("--port", type=int, default=4173)
     ui_cmd.add_argument("--once", action="store_true", help="Handle one request and then exit")
+    ui_cmd.add_argument(
+        "--service-url",
+        help="Optional service origin for the read-only live control snapshot proxy",
+    )
+    ui_cmd.add_argument(
+        "--auth-token-file",
+        type=Path,
+        help="Owner-only service Bearer token file used only by the live snapshot proxy",
+    )
 
     service_cmd = subparsers.add_parser(
         "service",
@@ -2103,7 +2112,13 @@ def _serve_webhook_server(args) -> int:
 
 def _serve_ui(args) -> int:
     try:
-        serve_ui(host=args.host, port=args.port, once=args.once)
+        serve_ui(
+            host=args.host,
+            port=args.port,
+            once=args.once,
+            service_url=args.service_url,
+            auth_token_file=args.auth_token_file,
+        )
         return 0
     except ValueError as error:
         print(str(error), file=sys.stderr)
