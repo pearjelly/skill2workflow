@@ -4,6 +4,8 @@
   const SERVICE_PROBE_URL = "/api/v1/service-probe";
   const SUPPORT_BUNDLE_URL = "/api/v1/support-bundle";
   const LIVE_RESUME_PREFIX = "/api/v1/runs/";
+  const LIVE_RUN_DETAIL_PREFIX = "/api/v1/runs/";
+  const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
   const AUTO_REFRESH_INTERVAL_MS = 10000;
   const state = {
@@ -17,6 +19,10 @@
     liveRefreshTimer: null,
     liveLoading: false,
     humanGateLoading: false,
+    liveRunDetail: null,
+    liveRunDetailId: "",
+    liveRunDetailLoading: false,
+    liveRunDetailError: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -67,6 +73,7 @@
     els.humanGateStatus = document.getElementById("human-gate-status");
     els.approveRun = document.getElementById("approve-run");
     els.rejectRun = document.getElementById("reject-run");
+    els.runDetailStatus = document.getElementById("run-detail-status");
     els.detailJson = document.getElementById("detail-json");
   }
 
@@ -251,9 +258,97 @@
     }
   }
 
+  async function loadLiveRunDetail(runId) {
+    if (!isLiveSnapshot() || !isSafeRunId(runId)) {
+      return;
+    }
+    state.liveRunDetailId = runId;
+    state.liveRunDetail = null;
+    state.liveRunDetailLoading = true;
+    state.liveRunDetailError = false;
+    renderDetail();
+    try {
+      const response = await fetch(
+        LIVE_RUN_DETAIL_PREFIX + encodeURIComponent(runId),
+        { cache: "no-store" },
+      );
+      if (!response.ok) {
+        throw new Error("run detail unavailable");
+      }
+      const detail = await response.json();
+      if (!validateLiveRunDetail(detail, runId)) {
+        throw new Error("run detail unavailable");
+      }
+      if (!selectedRunIs(runId)) {
+        return;
+      }
+      state.liveRunDetail = detail;
+    } catch (error) {
+      if (selectedRunIs(runId)) {
+        state.liveRunDetailError = true;
+      }
+    } finally {
+      if (selectedRunIs(runId)) {
+        state.liveRunDetailLoading = false;
+        renderDetail();
+      }
+    }
+  }
+
+  function validateLiveRunDetail(detail, runId) {
+    if (
+      !detail ||
+      typeof detail !== "object" ||
+      detail.schema_version !== RUN_DETAIL_SCHEMA ||
+      !detail.run ||
+      typeof detail.run !== "object" ||
+      detail.run.run_id !== runId ||
+      !Array.isArray(detail.events) ||
+      detail.events.length > 50 ||
+      !detail.window ||
+      typeof detail.window !== "object" ||
+      detail.window.max_events !== 50 ||
+      !Number.isInteger(detail.window.total) ||
+      detail.window.total < 0 ||
+      detail.window.returned !== detail.events.length ||
+      detail.window.returned > detail.window.total ||
+      typeof detail.window.truncated !== "boolean" ||
+      detail.window.truncated !== (detail.window.returned < detail.window.total)
+    ) {
+      return false;
+    }
+    return detail.events.every(function (event) {
+      return (
+        event &&
+        typeof event === "object" &&
+        Number.isInteger(event.sequence) &&
+        event.sequence >= 0 &&
+        typeof event.type === "string" &&
+        typeof event.has_error === "boolean"
+      );
+    });
+  }
+
+  function selectedRunIs(runId) {
+    return Boolean(
+      state.selected &&
+      state.selected.kind === "run" &&
+      state.selected.value &&
+      state.selected.value.run_id === runId
+    );
+  }
+
+  function isSafeRunId(runId) {
+    return typeof runId === "string" && /^run_[A-Za-z0-9_-]{1,123}$/.test(runId);
+  }
+
+  function isLiveSnapshot() {
+    return state.sourceLabel === "Live Service Snapshot" && Boolean(state.snapshot);
+  }
+
   function selectedWaitingRun() {
     if (
-      !state.liveModeConfigured ||
+      !isLiveSnapshot() ||
       !state.selected ||
       state.selected.kind !== "run"
     ) {
@@ -281,7 +376,7 @@
         els.toggleRefresh.disabled = true;
         els.downloadBundle.disabled = true;
         setServiceStatus("Live service: static mode", "");
-        renderHumanGateActions();
+        renderDetail();
         return;
       }
       state.liveModeConfigured = true;
@@ -300,13 +395,13 @@
         unavailable: ["Live service: unavailable", "is-invalid"],
       };
       setServiceStatus(labels[probe.status][0], labels[probe.status][1]);
-      renderHumanGateActions();
+      renderDetail();
     } catch (error) {
       state.liveModeConfigured = true;
       els.toggleRefresh.disabled = false;
       els.downloadBundle.disabled = false;
       setServiceStatus("Live service: unavailable", "is-invalid");
-      renderHumanGateActions();
+      renderDetail();
     }
   }
 
@@ -342,8 +437,17 @@
       rejectSnapshot(label, { errors: errors });
       return;
     }
+    const previousRunId =
+      state.sourceLabel === "Live Service Snapshot" &&
+      state.selected && state.selected.kind === "run" && state.selected.value
+        ? state.selected.value.run_id
+        : "";
     state.snapshot = snapshot;
     state.sourceLabel = label;
+    state.liveRunDetail = null;
+    state.liveRunDetailId = "";
+    state.liveRunDetailLoading = false;
+    state.liveRunDetailError = false;
     if (label === "Live Service Snapshot") {
       state.lastLiveLoadedAt = new Date().toISOString();
       state.liveRefreshError = false;
@@ -359,13 +463,28 @@
         { window: snapshot.window || null },
       ),
     };
+    if (label === "Live Service Snapshot" && isSafeRunId(previousRunId)) {
+      const refreshedRun = (snapshot.runs || []).find(function (run) {
+        return run && run.run_id === previousRunId;
+      });
+      if (refreshedRun) {
+        state.selected = { kind: "run", value: refreshedRun };
+      }
+    }
     setStatus("Loaded", "is-valid");
     render();
+    if (state.selected.kind === "run" && label === "Live Service Snapshot") {
+      loadLiveRunDetail(state.selected.value.run_id);
+    }
   }
 
   function rejectSnapshot(label, details) {
     state.snapshot = null;
     state.sourceLabel = label;
+    state.liveRunDetail = null;
+    state.liveRunDetailId = "";
+    state.liveRunDetailLoading = false;
+    state.liveRunDetailError = false;
     state.selected = {
       kind: "error",
       value: Object.assign({ label: label }, details || {}),
@@ -695,8 +814,15 @@
       }
       tr.addEventListener("click", function () {
         state.selected = { kind: kind, value: row };
+        state.liveRunDetail = null;
+        state.liveRunDetailId = "";
+        state.liveRunDetailLoading = false;
+        state.liveRunDetailError = false;
         renderTables();
         renderDetail();
+        if (kind === "run" && isLiveSnapshot()) {
+          loadLiveRunDetail(row.run_id || "");
+        }
       });
       cellsForRow(row).forEach(function (cell) {
         tr.appendChild(cell);
@@ -734,6 +860,41 @@
     const value = selected.value || {};
     showDetail(titleForSelection(selected), value);
     renderHumanGateActions();
+    renderRunDetailStatus(selected);
+  }
+
+  function renderRunDetailStatus(selected) {
+    const isRun = Boolean(
+      isLiveSnapshot() && selected && selected.kind === "run" && selected.value
+    );
+    els.runDetailStatus.hidden = !isRun;
+    els.runDetailStatus.className = "run-detail-status";
+    if (!isRun) {
+      return;
+    }
+    const runId = selected.value.run_id || "";
+    if (state.liveRunDetailLoading && state.liveRunDetailId === runId) {
+      els.runDetailStatus.textContent = "Loading bounded redacted run evidence…";
+      return;
+    }
+    if (state.liveRunDetailError && state.liveRunDetailId === runId) {
+      els.runDetailStatus.textContent = "Run evidence unavailable; summary remains visible.";
+      els.runDetailStatus.classList.add("is-invalid");
+      return;
+    }
+    if (state.liveRunDetail && state.liveRunDetailId === runId) {
+      const windowState = state.liveRunDetail.window;
+      els.runDetailStatus.textContent =
+        "Redacted event tail loaded: " +
+        windowState.returned +
+        " of " +
+        windowState.total +
+        " events" +
+        (windowState.truncated ? " (truncated)." : ".");
+      els.runDetailStatus.classList.add("is-valid");
+      return;
+    }
+    els.runDetailStatus.textContent = "Select a live run to load its bounded evidence.";
   }
 
   function renderHumanGateActions() {
@@ -751,7 +912,14 @@
 
   function showDetail(title, value) {
     els.detailTitle.textContent = title;
-    els.detailJson.textContent = JSON.stringify(value, null, 2);
+    const detail =
+      value &&
+      value.run_id &&
+      state.liveRunDetail &&
+      state.liveRunDetailId === value.run_id
+        ? { summary: value, redacted_detail: state.liveRunDetail }
+        : value;
+    els.detailJson.textContent = JSON.stringify(detail, null, 2);
     renderStatusGrid(value);
   }
 

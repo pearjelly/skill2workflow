@@ -64,6 +64,14 @@ with the protected token file, validates the fixed response, and refreshes the
 live snapshot; it never stores the token in browser state or proxies arbitrary
 paths. Static, example, and file snapshots never expose these controls.
 
+Selecting any live run also loads the fixed, redacted
+`skill2workflow-run-detail-0.1.0` projection from
+`GET /api/v1/runs/{run_id}`. The browser receives at most the existing 50-event
+and 64 KiB contract; the UI validates the run identifier, schema, event window,
+and status before replacing the summary JSON with the evidence view. A detail
+failure leaves the bounded run summary visible and never blocks the decision
+controls or exposes raw state.
+
 This live mode adds one explicit human-gate mutation only. It does not add TLS,
 public ingress, RBAC, workflow publication, cancellation, automatic retries,
 or provider reconciliation. Keep the UI on loopback or place it behind an

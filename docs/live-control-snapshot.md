@@ -138,6 +138,14 @@ the snapshot. `404` and `409` remain fixed not-found/not-waiting outcomes;
 other upstream failures are reduced to a value-free `503`. Static, example,
 and file snapshots never expose the controls.
 
+Selecting a live run also fetches the existing redacted run-detail projection
+through the fixed same-origin `GET /api/v1/runs/{run_id}` route. The UI keeps
+the service-side 50-event and 64 KiB bounds, validates the schema and event
+window before rendering it, and leaves the run summary visible if the detail
+fetch fails. The detail route is read-only and uses the same server-side token
+boundary; it does not proxy arbitrary paths or return workflow inputs,
+connector output, credentials, or raw errors.
+
 ## Verification
 
 Run the real-process drill:
@@ -154,10 +162,10 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. The Loop 211 UI
-proxy adds only the existing human-gate resume decision; it excludes browser
-credential storage, CORS, workflow publication, cancellation, RBAC, pagination
-cursors, remote audit storage, multi-tenant filtering, automatic retries,
-provider reconciliation, and hosted TLS. Network exposure still requires the
-external TLS and private operator boundary documented in
+The live console remains a single-team operator boundary. Loops 211-212 add
+only the existing human-gate resume decision and redacted run-detail read; the
+UI excludes browser credential storage, CORS, workflow publication,
+cancellation, RBAC, pagination cursors, remote audit storage, multi-tenant
+filtering, automatic retries, provider reconciliation, and hosted TLS. Network
+exposure still requires the external TLS and private operator boundary documented in
 [security-boundary.md](security-boundary.md).

@@ -429,6 +429,21 @@ tbody tr.is-selected {
   font-size: 18px;
 }
 
+.run-detail-status {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.run-detail-status.is-invalid {
+  color: var(--red);
+}
+
+.run-detail-status.is-valid {
+  color: var(--green);
+}
+
 .status-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

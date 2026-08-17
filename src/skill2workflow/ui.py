@@ -14,9 +14,11 @@ from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
 from .service import read_service_bearer_token
 from .service_client import (
+    MAX_SERVICE_ACTION_RESPONSE_BYTES,
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     ServiceActionError,
+    fetch_run_detail,
     fetch_support_bundle,
     fetch_service_probe,
     post_run_resume,
@@ -35,6 +37,8 @@ _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
 _LIVE_RESUME_PREFIX = "/api/v1/runs/"
 _LIVE_RESUME_SUFFIX = "/resume"
 _LIVE_RESUME_MAX_REQUEST_BYTES = 128
+_LIVE_RUN_DETAIL_PREFIX = "/api/v1/runs/"
+_LIVE_RUN_DETAIL_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 
 
 def find_ui_root() -> Path:
@@ -96,6 +100,17 @@ def serve_ui(
             return
 
         def do_GET(self):
+            parsed = urlsplit(self.path)
+            if parsed.path.startswith(_LIVE_RUN_DETAIL_PREFIX):
+                run_id = parsed.path[len(_LIVE_RUN_DETAIL_PREFIX) :]
+                if parsed.query or not _is_safe_live_run_id(run_id):
+                    self._write_json(
+                        404,
+                        {"error": "run detail path is not available"},
+                    )
+                    return
+                self._serve_live_run_detail(run_id)
+                return
             if self.path == _LIVE_SNAPSHOT_PATH:
                 self._serve_live_snapshot()
                 return
@@ -213,6 +228,32 @@ def serve_ui(
                 content_type="application/json",
                 content_disposition='attachment; filename="skill2workflow-support-bundle.json"',
             )
+
+        def _serve_live_run_detail(self, run_id):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "run detail is not configured"})
+                return
+            try:
+                detail = fetch_run_detail(configured_service_url, token_file, run_id)
+                body = json.dumps(
+                    detail,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _LIVE_RUN_DETAIL_MAX_RESPONSE_BYTES:
+                    raise ValueError("run detail unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "run not found"})
+                else:
+                    self._write_json(503, {"error": "run detail unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "run detail unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
 
         def _serve_live_resume(self, run_id):
             configured_service_url = getattr(self.server, "live_service_url", None)

@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added bounded redacted live run-detail inspection to the control-plane UI.
+  Selecting a live run fetches at most the existing 50-event/64 KiB projection
+  through a fixed server-side proxy before an operator makes a human-gate
+  decision; raw workflow inputs, connector output, and credentials remain out
+  of the browser contract.
+
 - Added a confirmation-protected human-gate action to the live control-plane
   UI. Selecting a waiting run exposes fixed Approve/Reject controls that reuse
   the authenticated resume contract without placing the ingress token in the
