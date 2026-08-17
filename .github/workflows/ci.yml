@@ -66,6 +66,7 @@ jobs:
       - run: python scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-ci
       - run: python scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-recurring-scheduler-ci
       - run: python scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-doctor-ci
+      - run: python scripts/service_soak_smoke.py --work-dir /tmp/skill2workflow-service-soak-ci --cycles 3 --triggers-per-cycle 6
 
   artifact-gates:
     name: release artifact gates

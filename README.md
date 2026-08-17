@@ -181,6 +181,7 @@ explicit connector boundaries. It currently supports:
 - Run read-only release preflight checks for package version, release notes, tag availability, tests, and Python compilation
 - Generate a value-free wheel provenance manifest with archive/member SHA-256 hashes and package metadata
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
+- Run a bounded real-process service soak with repeated cutovers, idempotency replay/conflict checks, and SQLite/audit continuity evidence
 
 ## Quickstart
 
@@ -752,7 +753,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-150 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-151 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1238,6 +1239,12 @@ to the release path. The proof builds the wheel twice, requires byte and
 manifest equality, writes public evidence, and runs in release preflight and
 the dedicated CI artifact gate. It is scoped to one checkout and toolchain;
 signing, independent builders, and registry publication remain separate.
+
+Loop 151 adds a bounded [service soak and cutover drill](docs/service-soak.md)
+to the operational gates. It runs repeated real-process restarts against one
+SQLite state directory, checks authenticated trigger replay and conflict
+handling, and verifies audit continuity without external providers or a claim
+of indefinite capacity.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

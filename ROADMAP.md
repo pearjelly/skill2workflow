@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-150
+- Completed delivery loops: 1-151
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 150 is complete with reproducible release artifact evidence
+- Active loop: None; Loop 151 is complete with bounded service soak and cutover evidence
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-150 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-151 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 150; the detailed
+The follow-on production hardening continues through Loop 151; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -97,7 +97,7 @@ Doctor now run as isolated Python 3.14 gates on every push and pull request.
 
 Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; atomic workflow alias promotion became Loop 72 after review of the release-review drill; atomic workflow registry mutations became Loop 73 after review of the promotion transaction drill; workflow artifact consistency diagnostics became Loop 74 after review of the registry mutation drill; atomic run-audit emission and consistency diagnostics became Loop 75 after review of the artifact consistency drill; authenticated remote run-audit consistency became Loop 76 after review of the remote diagnostic drill; targeted remote run-audit inspection became Loop 77 after review of the global-window operator gap; remote recurring-schedule inventory became Loop 78 after review of the remote operator scheduling gap; protected remote recurring-schedule actions became Loop 79 after review of the inventory drill; remote recurring-schedule dispatch diagnostics became Loop 80 after review of the schedule action drill; remote workflow artifact consistency diagnostics became Loop 81 after review of the remote dispatch evidence; remote backup readiness diagnostics became Loop 82 after review of the remote artifact consistency evidence; remote audit-chain verification became Loop 83 after review of the backup-readiness evidence; remote runtime identity diagnostics became Loop 84 after review of the remote audit-integrity evidence; protected remote workflow triggering became Loop 85 after review of the remote runtime-info evidence; protected remote Workflow publication became Loop 86 after review of the remote-trigger evidence; protected remote Workflow promotion became Loop 87 after review of the remote-publication evidence; protected remote Workflow diff became Loop 88 after review of the remote-promotion evidence; protected local ingress-token rotation became Loop 89 after review of the remote-diff evidence; protected remote Workflow deprecation became Loop 90 after review of the token-rotation evidence; bounded remote Workflow inventory became Loop 91 after review of the remote-deprecation evidence; policy-bound remote retention readiness became Loop 92 after review of the remote-inventory evidence; aggregate remote operational readiness became Loop 93 after review of the retention evidence; bounded request-body reads became Loop 94 after review of the operational-readiness evidence; and the deployment service probe became Loop 95 after review of the transport-boundary evidence; exact-length request-body reads became Loop 96 after review of the service-probe evidence; the fail-closed service exception boundary became Loop 97 after review of the body-read evidence. The bounded global workflow deadline became Loop 115 after review of the retry-backoff evidence. Remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
-Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-use initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux systemd unit, an authenticated human-gate decision endpoint, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, workflow artifact consistency diagnostics, atomic run-audit emission and consistency diagnostics, targeted remote run-audit inspection, remote recurring-schedule inventory, protected remote recurring-schedule actions, bounded remote recurring-schedule dispatch diagnostics, remote workflow artifact consistency diagnostics, remote backup readiness diagnostics, remote audit-chain verification, remote runtime identity diagnostics, protected remote workflow triggering, protected remote Workflow publication, protected remote Workflow promotion, protected remote Workflow diff, protected local ingress-token rotation, protected remote Workflow deprecation, bounded remote Workflow inventory, policy-bound remote retention readiness, aggregate remote operational readiness, bounded request-body reads, the fixed deployment service probe, exact-length request-body reads, lifecycle event-logger isolation, deterministic service teardown, production-boundary CI gates for security, observability, and restart continuity, the uniform zero-body metrics boundary, startup-shutdown race protection, atomic lifecycle state transitions, atomic shutdown admission, and atomic scheduler dispatch admission, live in-flight request pressure metrics, a fixed Prometheus alert starter pack, a read-only Grafana dashboard starter pack, and a value-free release artifact provenance manifest, bounded connector retry backoff, a bounded global workflow deadline, filtered cursor-paged run discovery, per-node active execution deadlines, a bounded built-in HTTP connector payload boundary, atomic first-use SQLite state initialization, bounded local audit inspection, bounded offline control snapshots, bounded local run discovery, bounded local backup inventory, bounded backup retention planning, bounded local schedule inspection, bounded local workflow inventory, bounded interrupted-run audit reconciliation, bounded run-detail audit reads, and compact SQLite run-summary projections, compact SQLite recurring-schedule projections, compact SQLite run-detail projections, and recovery and state-safety CI gates, an SPDX release artifact SBOM, and reproducible fixed-epoch wheel builds, are achieved by Loops 44-150. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-use initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux systemd unit, an authenticated human-gate decision endpoint, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, workflow artifact consistency diagnostics, atomic run-audit emission and consistency diagnostics, targeted remote run-audit inspection, remote recurring-schedule inventory, protected remote recurring-schedule actions, bounded remote recurring-schedule dispatch diagnostics, remote workflow artifact consistency diagnostics, remote backup readiness diagnostics, remote audit-chain verification, remote runtime identity diagnostics, protected remote workflow triggering, protected remote Workflow publication, protected remote Workflow promotion, protected remote Workflow diff, protected local ingress-token rotation, protected remote Workflow deprecation, bounded remote Workflow inventory, policy-bound remote retention readiness, aggregate remote operational readiness, bounded request-body reads, the fixed deployment service probe, exact-length request-body reads, lifecycle event-logger isolation, deterministic service teardown, production-boundary CI gates for security, observability, and restart continuity, the uniform zero-body metrics boundary, startup-shutdown race protection, atomic lifecycle state transitions, atomic shutdown admission, and atomic scheduler dispatch admission, live in-flight request pressure metrics, a fixed Prometheus alert starter pack, a read-only Grafana dashboard starter pack, and a value-free release artifact provenance manifest, bounded connector retry backoff, a bounded global workflow deadline, filtered cursor-paged run discovery, per-node active execution deadlines, a bounded built-in HTTP connector payload boundary, atomic first-use SQLite state initialization, bounded local audit inspection, bounded offline control snapshots, bounded local run discovery, bounded local backup inventory, bounded backup retention planning, bounded local schedule inspection, bounded local workflow inventory, bounded interrupted-run audit reconciliation, bounded run-detail audit reads, and compact SQLite run-summary projections, compact SQLite recurring-schedule projections, compact SQLite run-detail projections, and recovery and state-safety CI gates, an SPDX release artifact SBOM, reproducible fixed-epoch wheel builds, and bounded service soak/cutover evidence, are achieved by Loops 44-151. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -3465,9 +3465,41 @@ commit attestation, independent-builder comparison, all-platform guarantee,
 registry upload, or maturity-gate claim. Workflow DSL, runtime, storage, and
 connector behavior remain unchanged.
 
+### Loop 151: Bounded Service Soak And Cutover Evidence
+
+**Status:** Complete.
+
+**Prior basis:** The service boundary smoke proved two graceful restarts with
+one trigger per cycle, but it did not exercise repeated cutovers, durable
+idempotency replay/conflict behavior, or post-restart audit diagnostics. That
+left sustained operating evidence dependent on ad hoc operator testing.
+
+**Outcome:** `scripts/service_soak_smoke.py` runs a bounded three-cycle real
+process drill against one SQLite state directory. Each cycle checks health and
+readiness, submits six authenticated start-to-end triggers, replays one exact
+request, rejects one changed-input conflict, performs graceful `SIGTERM`, and
+verifies that all persisted runs remain completed. A final cutover checks live
+audit integrity and audit consistency through the authenticated service. The
+operational CI gate runs the same command on Python 3.14.
+
+**Evidence:** `tests.test_service_soak_smoke` locks option bounds, fixture
+shape, public evidence permissions, and safe work-directory handling. The real
+smoke command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_service_soak_smoke tests.test_ci -v
+python3 scripts/service_soak_smoke.py --work-dir /tmp/skill2workflow-service-soak-loop151 --cycles 3 --triggers-per-cycle 6
+```
+
+**Safety boundary:** This is a bounded local operating drill, not a load test,
+capacity target, zero-downtime guarantee, exactly-once provider claim, hosted
+availability commitment, or external-side-effect reconciliation. It does not
+change Workflow DSL, service routes, storage schemas, connector behavior, or
+the single-tenant loopback/TLS boundary.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 150 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 151 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -3583,6 +3615,7 @@ This rolling queue is ordered. Loop 150 is complete and there is no active deliv
 | Loop 148: Recovery And State-Safety CI Gates | Complete | Make deterministic recovery and state-safety evidence mandatory on every change | Dedicated Python 3.14 CI job, eight isolated smoke drills, CI contract test, contributor/release reproduction docs |
 | Loop 149: Release Artifact SPDX SBOM | Complete | Make a qualified wheel's contents consumable by standard supply-chain tooling without adding runtime dependencies | SPDX 2.3 SBOM generator, package-smoke output, dedicated artifact CI gate, hash/safety tests, and release documentation |
 | Loop 150: Reproducible Release Artifact Builds | Complete | Prove that fixed inputs produce identical qualified release wheels before publication | Two isolated fixed-epoch wheel builds, byte and manifest equality, public evidence, release-preflight and CI gates, tests, and documentation |
+| Loop 151: Bounded Service Soak And Cutover Evidence | Complete | Prove repeated real-process cutovers preserve idempotent trigger behavior and SQLite/audit continuity | Three-cycle service soak, replay/conflict checks, graceful shutdown, authenticated audit diagnostics, operational CI gate, tests, and documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -60,6 +60,11 @@ Loop 110 adds the installed `service-wait` client command, which polls the
 existing public probes with bounded timeout and interval values for safe
 startup/cutover automation; it adds no route or authentication bypass.
 
+Loop 151 adds the bounded [`service-soak-smoke.py`](../scripts/service_soak_smoke.py)
+cutover drill. It repeats real-process startup, authenticated triggers,
+idempotency replay/conflict checks, graceful shutdown, and SQLite/audit
+continuity without changing the service protocol or claiming hosted capacity.
+
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
 The HTTP control plane and recurring dispatcher share the scheduler lease owner.
@@ -286,6 +291,9 @@ python3 scripts/service_boundary_smoke.py \
 The smoke starts the service twice against one SQLite state directory, checks health and readiness, triggers one run per cycle, sends `SIGTERM`, and writes `service-boundary-smoke.json`. The report contains only booleans and counts; it excludes request values, run identifiers, and credentials.
 
 For scrape configuration, the fixed metric vocabulary, operational log schema, and the real-process telemetry drill, follow [`observability.md`](observability.md).
+
+For repeated local cutovers and durable trigger replay evidence, follow
+[`service-soak.md`](service-soak.md).
 
 For offline sensitive run-data minimization, stop every writer and follow [`data-retention.md`](data-retention.md). Retention publishes a new verified state directory; validate its service readiness before cutover, and explicitly manage destruction of the old source and backups.
 

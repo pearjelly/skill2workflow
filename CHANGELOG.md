@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded real-process service soak and cutover drill. It repeats
+  authenticated triggers across SQLite restarts, verifies idempotency replay
+  and conflict handling, checks audit integrity/consistency, and runs in the
+  operational CI gate without external providers.
 - Added a dependency-free fixed-epoch reproducibility proof for release wheels.
   The release path builds twice, requires byte and manifest equality, writes
   value-free `reproducible-build.json` evidence, and repeats the proof in the

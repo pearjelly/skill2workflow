@@ -60,6 +60,10 @@ class ContinuousIntegrationContractTests(TestCase):
         self.assertIn("schedule_smoke.py", workflow)
         self.assertIn("recurring_scheduler_smoke.py", workflow)
         self.assertIn("service_doctor_smoke.py", workflow)
+        self.assertIn(
+            "service_soak_smoke.py --work-dir /tmp/skill2workflow-service-soak-ci --cycles 3 --triggers-per-cycle 6",
+            workflow,
+        )
 
     def test_ci_runs_release_artifact_gates(self):
         workflow = (

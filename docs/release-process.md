@@ -54,6 +54,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-release-package-smoke
 python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-release-reproducible-build
+python3 scripts/service_soak_smoke.py --work-dir /tmp/skill2workflow-release-service-soak --cycles 3 --triggers-per-cycle 6
 git diff --check
 ```
 
@@ -78,6 +79,11 @@ The CI `operational-gates` job also runs the state-safety and recovery drills
 on Python 3.14: backup/restore, state upgrade, retention, cancellation,
 interrupted recovery, one-shot and recurring scheduling, and the service
 Doctor. Reproduce the same isolated sequence before a release PR:
+
+It also runs the three-cycle service soak and cutover drill, which verifies
+repeated authenticated triggers, idempotency replay/conflict handling, graceful
+shutdown, and SQLite/audit continuity. See
+[`service-soak.md`](service-soak.md) for its bounded evidence contract.
 
 ```bash
 python3 scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-release-backup-ci
@@ -172,6 +178,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-release-package-smoke
 python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-release-reproducible-build
+python3 scripts/service_soak_smoke.py --work-dir /tmp/skill2workflow-release-service-soak --cycles 3 --triggers-per-cycle 6
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/approval-flow.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json
 git tag -a v<version> -m "skill2workflow v<version>"
