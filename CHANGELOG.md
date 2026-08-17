@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded remote backup retention-plan directory scanning. The local and
+  authenticated remote preflight stops after the first over-budget backup set,
+  preserving the fixed `inventory_truncated` contract while preventing an
+  arbitrarily large backup parent from causing an unbounded retention scan.
+
 - Added protected remote backup retention planning through
   `POST /api/v1/backup-retention-plan` and the installed
   `service-backup-retention-plan` CLI. The fixed redacted

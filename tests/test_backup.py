@@ -456,6 +456,49 @@ class StateBackupTests(TestCase):
         self.assertEqual(result["backups"][0]["status"], "invalid")
         self.assertEqual(result["backups"][0]["name"], "broken")
 
+    def test_backup_inventory_can_stop_after_over_budget_scan(self):
+        with TemporaryDirectory() as tmp:
+            parent = Path(tmp) / "backups"
+            parent.mkdir()
+            parent.chmod(0o700)
+            for index in range(1002):
+                child = parent / f"backup-{index:04d}"
+                child.mkdir()
+                child.chmod(0o700)
+
+            with patch(
+                "skill2workflow.backup._verify_backup_directory",
+                side_effect=ValueError("synthetic invalid backup"),
+            ):
+                result = list_state_backups(parent, limit=1000, scan_limit=1000)
+
+        self.assertEqual(result["total"], 1001)
+        self.assertEqual(
+            result["window"],
+            {"max_items": 1000, "returned": 1000, "truncated": True},
+        )
+
+    def test_backup_retention_plan_passes_the_fixed_scan_guard(self):
+        with TemporaryDirectory() as tmp:
+            parent = Path(tmp) / "backups"
+            parent.mkdir()
+            parent.chmod(0o700)
+            policy = {
+                "schema_version": BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
+                "retention": {
+                    "expire_before": "2026-08-14T00:00:03Z",
+                    "minimum_keep": 1,
+                },
+            }
+            with patch(
+                "skill2workflow.backup.list_state_backups",
+                wraps=list_state_backups,
+            ) as inventory:
+                result = build_backup_retention_plan(parent, policy, limit=7)
+
+        inventory.assert_called_once_with(parent, limit=7, scan_limit=7)
+        self.assertEqual(result["status"], "ready")
+
     def test_remote_backup_inventory_redacts_names_and_orders_newest_first(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

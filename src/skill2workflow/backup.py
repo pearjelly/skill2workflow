@@ -337,10 +337,27 @@ def verify_state_backup(backup_dir: Path) -> Dict[str, object]:
     return _summary("valid", backup)
 
 
-def list_state_backups(parent_dir: Path, limit: int = 100) -> Dict[str, object]:
-    """Return a bounded, read-only inventory of direct child backup sets."""
+def list_state_backups(
+    parent_dir: Path,
+    limit: int = 100,
+    *,
+    scan_limit: Optional[int] = None,
+) -> Dict[str, object]:
+    """Return a bounded, read-only inventory of direct child backup sets.
+
+    ``scan_limit`` is an internal early-stop guard for callers that only need
+    to know whether the inventory exceeds a fixed budget.  When present, the
+    returned ``total`` is a lower bound once the guard trips; callers must use
+    ``window.truncated`` rather than treating it as a complete count.
+    """
 
     _validate_backup_list_limit(limit)
+    if scan_limit is not None and (
+        isinstance(scan_limit, bool)
+        or not isinstance(scan_limit, int)
+        or scan_limit < 1
+    ):
+        raise ValueError("backup scan limit must be a positive integer")
     parent = _existing_directory(parent_dir, "backup parent directory")
     _require_owner_only_directory(parent, "backup parent directory")
     selected = []
@@ -349,6 +366,8 @@ def list_state_backups(parent_dir: Path, limit: int = 100) -> Dict[str, object]:
         if candidate.is_symlink() or not candidate.is_dir():
             continue
         total += 1
+        if scan_limit is not None and total > scan_limit:
+            break
         metadata, sort_key = _backup_inventory_metadata(candidate)
         item = (sort_key, candidate.name, metadata)
         if len(selected) < limit:
@@ -625,7 +644,11 @@ def build_backup_retention_plan(
 
     _validate_backup_list_limit(limit)
     normalized = normalize_backup_retention_policy(policy)
-    inventory = list_state_backups(parent_dir, limit=limit)
+    # Retention planning fails closed once the fixed inventory budget is
+    # exceeded.  Stop enumerating after the first over-budget directory so a
+    # remote request cannot spend unbounded time walking a hostile or simply
+    # overgrown backup parent before returning the already-determined block.
+    inventory = list_state_backups(parent_dir, limit=limit, scan_limit=limit)
     base = {
         "schema_version": BACKUP_RETENTION_PLAN_SCHEMA_VERSION,
         "storage": "filesystem",

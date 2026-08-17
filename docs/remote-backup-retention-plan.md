@@ -1,7 +1,9 @@
 # Remote Backup Retention Plan
 
 Loop 162 adds an authenticated, read-only plan for reviewing backup
-expiration remotely. It reuses the local backup-retention policy and complete
+expiration remotely. Loop 163 bounds the directory scan used by that plan: it
+stops after the first over-budget set instead of walking an arbitrarily large
+backup parent. The route reuses the local backup-retention policy and complete
 inventory check, but exports only aggregate counts and byte totals. Backup
 names, paths, per-set reasons, manifest contents, and credentials never cross
 the service boundary.
@@ -35,16 +37,17 @@ floor are returned so an approval record can bind to the exact policy.
 
 The plan is `ready` only when the bounded inventory is complete. If more than
 1,000 direct child directories exist, it is `blocked` with
-`inventory_truncated` and all summary values are `null`; the service never
-guesses which older sets were omitted. A ready response reports valid and
-invalid counts, eligible and preserved counts, and their byte totals. The
-response is capped at 16 KiB and the request at 64 KiB.
+`inventory_truncated` and all summary values are `null`; the service stops
+after observing the first 1,001 sets and never guesses which older sets were
+omitted. A ready response reports valid and invalid counts, eligible and
+preserved counts, and their byte totals. The response is capped at 16 KiB and
+the request at 64 KiB.
 
 ## Safe operating sequence
 
 1. Fetch the report and record its policy digest with the retention approval.
 2. If blocked, use shell access to inspect or increase the bounded inventory;
-   do not treat a partial report as an expiration plan.
+   do not treat the lower-bound scan or partial report as an expiration plan.
 3. For an approved ready report, stop the service and run the local
    [`backup-retention-plan`](backup-restore.md#verified-backup-and-restore)
    command again before any manual deletion. Compare its digest and counts.

@@ -69,7 +69,9 @@ skill2workflow backup-retention-plan \
   --parent-dir /var/backups/skill2workflow
 ```
 
-The plan is `ready` only when the bounded inventory is complete. It marks a
+The plan is `ready` only when the bounded inventory is complete. The retention
+preflight stops after the first over-budget directory, so an overgrown parent
+does not require a full filesystem walk before it fails closed. It marks a
 valid set as eligible only when it is strictly older than `expire_before` and
 outside the newest `minimum_keep` valid sets. Invalid sets are always
 preserved and do not satisfy the minimum. If the parent contains more than the
