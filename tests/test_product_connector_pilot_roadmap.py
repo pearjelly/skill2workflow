@@ -9,7 +9,7 @@ class ProductConnectorPilotRoadmapTests(TestCase):
     def test_loop_40_controlled_pilot_is_complete_and_scoped(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Active loop: None; Loop 178 is complete with bounded, side-effect-free workflow explanations", roadmap)
+        self.assertIn("Active loop: None; Loop 179 is complete with side-effect-free trigger preflight", roadmap)
         self.assertIn("| Loop 36: First Product Connector Package Smoke | Complete |", roadmap)
         self.assertIn("| Loop 37: Product Connector Pilot Scenario | Complete |", roadmap)
         self.assertIn("| Loop 38: Live Connector Readiness Review | Complete |", roadmap)

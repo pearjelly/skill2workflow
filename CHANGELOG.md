@@ -8,6 +8,13 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added local `preflight` and authenticated `service-workflow-preflight`
+  commands for checking trigger input contracts and HTTP body mappings before
+  execution. The fixed `skill2workflow-workflow-preflight-0.1.0` report is
+  bounded, side-effect free, and value free: it never calls connectors,
+  resolves credentials, writes state, or echoes trigger values. See
+  `docs/workflow-preflight.md`.
+
 - Added `explain` and authenticated `service-workflow-explain` execution-plan
   views for Workflow DSL artifacts. The fixed
   `skill2workflow-workflow-explanation-0.1.0` contract is bounded to 64 KiB,

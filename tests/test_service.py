@@ -44,6 +44,7 @@ from skill2workflow.service_client import (
     fetch_operational_readiness,
     fetch_workflow_diff,
     fetch_workflow_explanation,
+    fetch_workflow_preflight,
     post_workflow_trigger,
 )
 from skill2workflow.service_bootstrap import rotate_service_token
@@ -3598,6 +3599,81 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("private workflow name", serialized)
         self.assertNotIn("private title", serialized)
         self.assertNotIn("artifact", serialized)
+        self.assertEqual(audit_after, audit_count)
+        self.assertFalse(thread.is_alive())
+
+    def test_remote_workflow_preflight_is_authenticated_read_only_and_value_free(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            workflow = _workflow()
+            workflow["nodes"][0]["on_success"] = "call_api"
+            workflow["nodes"][1] = {
+                "id": "call_api",
+                "type": "tool_call",
+                "title": "Private call",
+                "action": {"kind": "tool_call", "instruction": "private"},
+                "on_success": "end",
+                "connector": {
+                "id": "http",
+                "kind": "http",
+                "request": {
+                    "url": "http://127.0.0.1/private",
+                    "input_mapping": [
+                        {"from": "/input/customer_id", "to": "/body/customer_id", "required": True}
+                    ],
+                },
+                "credentials": [{"target": "header", "name": "Authorization", "handle": "secret_handle"}],
+            }
+            }
+            workflow["nodes"].append({"id": "end", "type": "end", "title": "End"})
+            workflow["edges"] = [
+                {"id": "edge_start_call", "from": "start", "to": "call_api", "label": "next"},
+                {"id": "edge_call_end", "from": "call_api", "to": "end", "label": "next"},
+            ]
+            control.publish_workflow(workflow)
+            audit_count = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (holder.update({"service": service}), ready.set()),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            url = f"{base_url}/api/v1/workflow-preflights/workflow_service/0.1.0"
+            try:
+                denied_status, denied = _post_json(url, {"input": {"customer_id": "private"}})
+                malformed_status, malformed = _post_json(url, {"input": "not-object"}, token=AUTH_TOKEN)
+                report = fetch_workflow_preflight(
+                    base_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.1.0",
+                    input_value={"customer_id": "private"},
+                    input_present=True,
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            audit_after = len(LocalControlPlane(state_dir, storage="sqlite").list_audit_events())
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "workflow preflight request rejected"})
+        self.assertTrue(report["ready"])
+        self.assertEqual(report["nodes"][1]["connector"]["credential_handle_count"], 1)
+        self.assertFalse(report["safety"]["connector_calls"])
+        self.assertNotIn("private", json.dumps(report, ensure_ascii=False))
         self.assertEqual(audit_after, audit_count)
         self.assertFalse(thread.is_alive())
 

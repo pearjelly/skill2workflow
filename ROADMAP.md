@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-178
+- Completed delivery loops: 1-179
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 178 is complete with bounded, side-effect-free workflow explanations
+- Active loop: None; Loop 179 is complete with side-effect-free trigger preflight
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-178 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-179 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 178; the detailed
+The follow-on production hardening continues through Loop 179; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4269,9 +4269,40 @@ Workflow DSL remains authoritative. The plan does not validate provider
 availability, resolve credentials, predict external outcomes, or claim
 exactly-once effects.
 
+### Loop 179: Side-Effect-Free Trigger Preflight
+
+**Status:** Complete.
+
+**Prior basis:** Loop 178 made the workflow topology and policy reviewable,
+but an operator still learned whether a trigger input satisfied its schema or
+HTTP body mappings only after starting a real run. That made a missing
+required mapping an avoidable production failure and gave local and remote
+operators no common admission contract.
+
+**Outcome:** The local `preflight` command and authenticated remote
+`service-workflow-preflight` client now validate a supplied object (or an
+explicit empty-object draft) against the input contract and every built-in
+HTTP body mapping. The fixed
+`skill2workflow-workflow-preflight-0.1.0` report returns only counts, stable
+issue codes, safe paths, connector/credential-handle counts, and per-node
+mapping status. It never invokes a connector, resolves a credential, writes
+state, or copies trigger values.
+
+**Evidence:** [`docs/workflow-preflight.md`](docs/workflow-preflight.md) and
+[`schemas/workflow-preflight-0.1.0.schema.json`](schemas/workflow-preflight-0.1.0.schema.json)
+define the local/remote request and response contracts. Builder, CLI, service,
+client, telemetry, package-smoke, documentation, and full-suite tests cover
+determinism, missing mappings, input-schema errors, authentication, bounds,
+redaction, and the no-side-effect boundary.
+
+**Safety boundary:** Preflight is an admission hint, not a dry-run or a second
+execution authority. It does not contact providers, inspect credential stores,
+invoke external connector hooks, or predict network/provider success. Workflow
+DSL and the normal trigger path remain authoritative.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 178 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 179 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4415,6 +4446,7 @@ This rolling queue is ordered. Loop 178 is complete and there is no active deliv
 | Loop 176: Bounded SQLite Workflow Registry Records | Complete | Keep the recommended SQLite workflow registry from bypassing a fixed per-record document boundary | Fixed 2 MiB UTF-8 JSON-object bound on registry writes and reads, atomic replacement and alias-update validation, import/diagnostic coverage, and SQLite registry boundary documentation |
 | Loop 177: Bounded SQLite Trigger-Ledger Responses | Complete | Keep completed trigger idempotency rows from bypassing a fixed replay-document boundary | Fixed 64 KiB UTF-8 JSON-object bound on replay writes and reads, atomic pending-claim preservation, fail-closed corruption handling, control-plane coverage, and SQLite trigger-ledger boundary documentation |
 | Loop 178: Bounded Workflow Execution Explanations | Complete | Give local and remote operators a safe pre-execution review of topology, gates, connector side effects, input shape, retries, and timeouts without exposing values or executing work | Fixed side-effect-free explanation schema, local/remote CLI, authenticated read-only route, 64 KiB/1,000-node/2,000-edge bounds, redaction tests, and operator documentation |
+| Loop 179: Side-Effect-Free Trigger Preflight | Complete | Let operators validate trigger input and HTTP body mappings before starting a real run without exposing values or invoking providers | Fixed value-free preflight schema, local/remote CLI, authenticated POST route, 1 MiB/64 KiB bounds, stable issue codes, redaction/read-only tests, package-smoke evidence, and operator documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -4667,7 +4699,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, bounded active timeout policy, human gates, retry/recovery policy, run context, connector events, and verifiable SQLite audit evidence |
-| Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish/promote/deprecate/inventory bounded versions through the authenticated service, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, write a redacted support bundle, rotate the local ingress token atomically, preflight a normalized retention policy through the authenticated service, inspect bounded local and protected remote backup inventories (including cursor-paged older evidence) and retention plans, inspect bounded redacted local workflow inventory, and consume aggregate operational readiness through the authenticated service |
+| Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish/promote/deprecate/inventory bounded versions through the authenticated service, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, write a redacted support bundle, rotate the local ingress token atomically, preflight retention policy and trigger inputs/mappings through authenticated service diagnostics, inspect bounded local and protected remote backup inventories (including cursor-paged older evidence) and retention plans, inspect bounded redacted local workflow inventory, and consume aggregate operational readiness through the authenticated service |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:

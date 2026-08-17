@@ -35,6 +35,11 @@ from .explain import (
     MAX_WORKFLOW_EXPLANATION_BYTES,
     build_workflow_explanation,
 )
+from .preflight import (
+    MAX_WORKFLOW_PREFLIGHT_BYTES,
+    MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS,
+    build_workflow_preflight,
+)
 from .dashboard import (
     MAX_LIVE_SNAPSHOT_BYTES,
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
@@ -107,6 +112,7 @@ MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_PAGE_RESPONSE_BYTES = 64 * 1024
+MAX_WORKFLOW_PREFLIGHT_RESPONSE_BYTES = MAX_WORKFLOW_PREFLIGHT_BYTES
 MAX_AUDIT_EVENT_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
@@ -867,6 +873,8 @@ def _handler_for(service: RuntimeService):
                         self._handle_workflow_inventory()
                     elif self.command == "GET" and _workflow_explanation_parts(path) is not None:
                         self._handle_workflow_explanation(_workflow_explanation_parts(path))
+                    elif self.command == "POST" and _workflow_preflight_parts(path) is not None:
+                        self._handle_workflow_preflight(_workflow_preflight_parts(path))
                     elif self.command == "POST" and path == "/api/v1/workflow-releases":
                         self._handle_workflow_release()
                     elif self.command == "POST" and path == "/api/v1/workflow-promotions":
@@ -2016,6 +2024,64 @@ def _handler_for(service: RuntimeService):
                 return
             self._send_json(200, payload)
 
+        def _handle_workflow_preflight(self, parts):
+            """Serve a bounded trigger preflight without executing the workflow."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                body = read_request_body(self)
+                payload = json.loads(body.decode("utf-8")) if body else {}
+                if not isinstance(payload, dict) or set(payload) not in ({}, {"input"}):
+                    raise ValueError("workflow preflight request must contain an optional input object")
+                input_present = "input" in payload
+                if input_present and not isinstance(payload.get("input"), dict):
+                    raise ValueError("workflow preflight request input must be an object")
+                if input_present and len(payload["input"]) > MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS:
+                    raise ValueError("workflow preflight request input has too many properties")
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            except (UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError, OverflowError, RecursionError):
+                self._send_json(400, {"error": "workflow preflight request rejected"})
+                return
+            workflow_id, version = parts
+            try:
+                report = build_workflow_preflight(
+                    service.control_plane.get_workflow(workflow_id, version),
+                    input_value=payload.get("input"),
+                    input_present=input_present,
+                )
+                encoded = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_WORKFLOW_PREFLIGHT_RESPONSE_BYTES:
+                    raise ValueError("workflow preflight exceeds response limit")
+            except ValueError as error:
+                message = str(error).lower()
+                if "version not found" in message:
+                    self._send_json(404, {"error": "workflow version not found"})
+                else:
+                    self._send_json(503, {"error": "workflow preflight unavailable"})
+                return
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "workflow preflight unavailable"})
+                return
+            self._send_json(200, report)
+
         def _handle_backup_readiness(self):
             """Serve fixed read-only preflight data for an offline backup."""
 
@@ -3055,6 +3121,8 @@ def _request_route(method: str, path: str) -> str:
         return "workflow_inventory"
     if method == "GET" and _workflow_explanation_parts(path) is not None:
         return "workflow_explanation"
+    if method == "POST" and _workflow_preflight_parts(path) is not None:
+        return "workflow_preflight"
     if method == "POST" and path == "/api/v1/workflow-releases":
         return "workflow_release"
     if method == "POST" and path == "/api/v1/workflow-promotions":
@@ -3450,6 +3518,21 @@ def _workflow_diff_parts(path: str):
 def _workflow_explanation_parts(path: str):
     parts = path.split("/")
     if len(parts) != 6 or parts[:4] != ["", "api", "v1", "workflow-explanations"]:
+        return None
+    values = tuple(unquote(value) for value in parts[4:])
+    if any(not value or len(value) > 128 for value in values):
+        return None
+    if any(
+        any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+        for value in values
+    ):
+        return None
+    return values
+
+
+def _workflow_preflight_parts(path: str):
+    parts = path.split("/")
+    if len(parts) != 6 or parts[:4] != ["", "api", "v1", "workflow-preflights"]:
         return None
     values = tuple(unquote(value) for value in parts[4:])
     if any(not value or len(value) > 128 for value in values):

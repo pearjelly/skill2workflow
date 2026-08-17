@@ -52,6 +52,7 @@ _ROUTES = (
     "workflow_inventory",
     "workflow_diff",
     "workflow_explanation",
+    "workflow_preflight",
     "run_cancel",
     "run_resume",
     "unknown",

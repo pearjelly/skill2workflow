@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/workflow-preflight-0.1.0.schema.json",
+  "title": "skill2workflow workflow trigger preflight",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "workflow", "ready", "input", "summary", "nodes", "issues", "safety"],
+  "properties": {
+    "schema_version": {"const": "skill2workflow-workflow-preflight-0.1.0"},
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "status"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "status": {"enum": ["draft", "published", "deprecated"]}
+      }
+    },
+    "ready": {"type": "boolean"},
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provided", "status", "provided_property_count", "declared_property_count", "required_property_count", "missing_required_count", "unknown_property_count", "error_code", "error_path"],
+      "properties": {
+        "provided": {"type": "boolean"},
+        "status": {"enum": ["valid", "invalid"]},
+        "provided_property_count": {"type": "integer", "minimum": 0, "maximum": 128},
+        "declared_property_count": {"type": "integer", "minimum": 0, "maximum": 128},
+        "required_property_count": {"type": "integer", "minimum": 0, "maximum": 128},
+        "missing_required_count": {"type": "integer", "minimum": 0, "maximum": 128},
+        "unknown_property_count": {"type": "integer", "minimum": 0, "maximum": 128},
+        "error_code": {"type": ["string", "null"], "maxLength": 128},
+        "error_path": {"type": ["array", "null"], "maxItems": 16, "items": {"type": ["string", "integer"]}}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["node_count", "connector_node_count", "side_effecting_node_count", "mapping_count", "blocked_node_count", "issue_count"],
+      "properties": {
+        "node_count": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "connector_node_count": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "side_effecting_node_count": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "mapping_count": {"type": "integer", "minimum": 0},
+        "blocked_node_count": {"type": "integer", "minimum": 0},
+        "issue_count": {"type": "integer", "minimum": 0, "maximum": 64}
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "connector", "input_mapping"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "type": {"type": "string", "minLength": 1},
+          "connector": {
+            "type": ["object", "null"],
+            "additionalProperties": false,
+            "required": ["id", "kind", "external_side_effect", "credential_handle_count", "credentials_resolved"],
+            "properties": {
+              "id": {"type": "string", "minLength": 1, "maxLength": 128},
+              "kind": {"type": "string"},
+              "external_side_effect": {"type": "boolean"},
+              "credential_handle_count": {"type": "integer", "minimum": 0},
+              "credentials_resolved": {"const": false}
+            }
+          },
+          "input_mapping": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "mapping_count", "mapped_count", "missing_required_count", "missing_optional_count"],
+            "properties": {
+              "status": {"enum": ["not_applicable", "ready", "skipped", "blocked"]},
+              "mapping_count": {"type": "integer", "minimum": 0, "maximum": 2000},
+              "mapped_count": {"type": "integer", "minimum": 0},
+              "missing_required_count": {"type": "integer", "minimum": 0},
+              "missing_optional_count": {"type": "integer", "minimum": 0}
+            }
+          }
+        }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity", "node_id", "path"],
+        "properties": {
+          "code": {"enum": ["input_invalid", "required_mapping_input_missing"]},
+          "severity": {"const": "error"},
+          "node_id": {"type": ["string", "null"]},
+          "path": {"type": "array", "maxItems": 16, "items": {"type": ["string", "integer"]}}
+        }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "side_effect_free": {"const": true},
+        "connector_calls": {"const": false},
+        "credentials_resolved": {"const": false},
+        "raw_values_included": {"const": false}
+      },
+      "required": ["side_effect_free", "connector_calls", "credentials_resolved", "raw_values_included"]
+    }
+  }
+}

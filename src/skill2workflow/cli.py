@@ -20,6 +20,7 @@ from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
 from .dashboard import build_control_snapshot, build_workflow_inventory_from_control
 from .explain import build_workflow_explanation, render_workflow_explanation_text
+from .preflight import build_workflow_preflight, render_workflow_preflight_text
 from .executor import LocalExecutor
 from .live_snapshot import fetch_live_control_snapshot, write_private_snapshot
 from .migration import inspect_state_upgrade, upgrade_state
@@ -50,6 +51,7 @@ from .service_client import (
     fetch_runtime_info,
     fetch_workflow_diff,
     fetch_workflow_explanation,
+    fetch_workflow_preflight,
     fetch_run_detail,
     fetch_run_list,
     fetch_run_page,
@@ -106,6 +108,14 @@ def _main(argv=None) -> int:
     )
     explain_cmd.add_argument("workflow", type=Path)
     explain_cmd.add_argument("--format", choices=["json", "text"], default="json")
+
+    preflight_cmd = subparsers.add_parser(
+        "preflight",
+        help="Check trigger input and connector mappings without executing a workflow",
+    )
+    preflight_cmd.add_argument("workflow", type=Path)
+    preflight_cmd.add_argument("--input", type=Path)
+    preflight_cmd.add_argument("--format", choices=["json", "text"], default="json")
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
     visualize_cmd.add_argument("workflow", type=Path)
@@ -589,6 +599,16 @@ def _main(argv=None) -> int:
     service_explain_cmd.add_argument("--service-url", required=True)
     service_explain_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
+    service_preflight_cmd = subparsers.add_parser(
+        "service-workflow-preflight",
+        help="Check trigger input and mappings through the authenticated service",
+    )
+    service_preflight_cmd.add_argument("workflow_id")
+    service_preflight_cmd.add_argument("--version", required=True)
+    service_preflight_cmd.add_argument("--input", type=Path)
+    service_preflight_cmd.add_argument("--service-url", required=True)
+    service_preflight_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
     service_release_cmd = subparsers.add_parser(
         "service-workflow-publish",
         help="Publish one Workflow DSL document through the authenticated service",
@@ -840,6 +860,20 @@ def _main(argv=None) -> int:
         else:
             _print_json(explanation)
         return 0
+
+    if args.command == "preflight":
+        workflow = _load_json(args.workflow)
+        input_value = _load_json(args.input) if args.input else None
+        report = build_workflow_preflight(
+            workflow,
+            input_value=input_value,
+            input_present=args.input is not None,
+        )
+        if args.format == "text":
+            print(render_workflow_preflight_text(report), end="")
+        else:
+            _print_json(report)
+        return 0 if report["ready"] else 1
 
     if args.command == "visualize":
         workflow = _load_json(args.workflow)
@@ -1327,6 +1361,18 @@ def _main(argv=None) -> int:
             )
         )
 
+    if args.command == "service-workflow-preflight":
+        return _service_preflight_action(
+            lambda: fetch_workflow_preflight(
+                args.service_url,
+                args.auth_token_file,
+                args.workflow_id,
+                args.version,
+                input_value=_load_json(args.input) if args.input else None,
+                input_present=args.input is not None,
+            )
+        )
+
     if args.command == "service-workflow-publish":
         return _service_action(
             lambda: post_workflow_release(
@@ -1595,6 +1641,19 @@ def _service_action(callback) -> int:
     try:
         _print_json(callback())
         return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except OSError:
+        print("service action failed", file=sys.stderr)
+        return 1
+
+
+def _service_preflight_action(callback) -> int:
+    try:
+        result = callback()
+        _print_json(result)
+        return 0 if result.get("ready") is True else 1
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1

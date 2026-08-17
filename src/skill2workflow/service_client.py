@@ -62,6 +62,13 @@ from .explain import (
     MAX_WORKFLOW_EXPLANATION_NODES,
     WORKFLOW_EXPLANATION_SCHEMA_VERSION,
 )
+from .preflight import (
+    MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS,
+    MAX_WORKFLOW_PREFLIGHT_ISSUES,
+    MAX_WORKFLOW_PREFLIGHT_MAPPINGS,
+    MAX_WORKFLOW_PREFLIGHT_NODES,
+    WORKFLOW_PREFLIGHT_SCHEMA_VERSION,
+)
 from .service import (
     RUNTIME_INFO_SCHEMA_VERSION,
     SERVICE_SCHEMA_VERSION,
@@ -117,6 +124,8 @@ MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES = 64 * 1024
+MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES = 64 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 
@@ -528,6 +537,45 @@ def fetch_workflow_explanation(
         max_response_bytes=MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
     )
     _validate_workflow_explanation_response(
+        payload,
+        workflow_id=normalized_workflow_id,
+        version=normalized_version,
+    )
+    return payload
+
+
+def fetch_workflow_preflight(
+    service_url: str,
+    token_file: Path,
+    workflow_id: str,
+    version: str,
+    *,
+    input_value: Optional[Dict[str, object]] = None,
+    input_present: bool = False,
+) -> Dict[str, object]:
+    """Run the authenticated, side-effect-free trigger preflight endpoint."""
+
+    normalized_workflow_id = _validate_workflow_ref(workflow_id, "workflow_id")
+    normalized_version = _validate_workflow_ref(version, "version")
+    if input_present and not isinstance(input_value, dict):
+        raise ValueError("preflight input must be a JSON object")
+    if input_present and len(input_value) > MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS:
+        raise ValueError("preflight input has too many properties")
+    body = {"input": input_value} if input_present else {}
+    payload = _post_json(
+        service_url,
+        token_file,
+        "/api/v1/workflow-preflights/{}/{}".format(
+            quote(normalized_workflow_id, safe=""),
+            quote(normalized_version, safe=""),
+        ),
+        body,
+        conflict_message="workflow preflight unavailable",
+        not_found_message="workflow version not found",
+        max_request_bytes=MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES,
+        max_response_bytes=MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES,
+    )
+    _validate_workflow_preflight_response(
         payload,
         workflow_id=normalized_workflow_id,
         version=normalized_version,
@@ -1905,6 +1953,141 @@ def _validate_workflow_explanation_response(
     }:
         raise ServiceActionError()
     if summary["node_count"] != len(nodes) or summary["edge_count"] != len(edges):
+        raise ServiceActionError()
+
+
+def _validate_workflow_preflight_response(
+    payload: Dict[str, object],
+    *,
+    workflow_id: str,
+    version: str,
+) -> None:
+    """Reject responses outside the fixed value-free preflight contract."""
+
+    fields = {"schema_version", "workflow", "ready", "input", "summary", "nodes", "issues", "safety"}
+    if set(payload) != fields or payload.get("schema_version") != WORKFLOW_PREFLIGHT_SCHEMA_VERSION:
+        raise ServiceActionError()
+    metadata = payload.get("workflow")
+    if (
+        not isinstance(metadata, dict)
+        or set(metadata) != {"id", "version", "status"}
+        or metadata.get("id") != workflow_id
+        or metadata.get("version") != version
+        or metadata.get("status") not in {"published", "deprecated"}
+        or not isinstance(payload.get("ready"), bool)
+    ):
+        raise ServiceActionError()
+    input_report = payload.get("input")
+    input_fields = {
+        "provided", "status", "provided_property_count", "declared_property_count",
+        "required_property_count", "missing_required_count", "unknown_property_count",
+        "error_code", "error_path",
+    }
+    if (
+        not isinstance(input_report, dict)
+        or set(input_report) != input_fields
+        or not isinstance(input_report.get("provided"), bool)
+        or input_report.get("status") not in {"valid", "invalid"}
+        or any(
+            not _is_non_negative_integer(input_report.get(field))
+            or input_report.get(field) > MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS
+            for field in (
+                "provided_property_count", "declared_property_count", "required_property_count",
+                "missing_required_count", "unknown_property_count",
+            )
+        )
+        or (input_report.get("status") == "valid" and input_report.get("error_code") is not None)
+        or (input_report.get("status") == "invalid" and not isinstance(input_report.get("error_code"), str))
+        or (input_report.get("status") == "valid" and input_report.get("error_path") is not None)
+        or (input_report.get("status") == "invalid" and not isinstance(input_report.get("error_path"), list))
+        or (input_report.get("error_code") is not None and not _is_safe_workflow_ref(input_report.get("error_code")))
+        or (
+            input_report.get("error_path") is not None
+            and (
+                not isinstance(input_report.get("error_path"), list)
+                or len(input_report.get("error_path")) > 16
+                or any(not isinstance(part, (str, int)) or isinstance(part, bool) for part in input_report.get("error_path"))
+            )
+        )
+    ):
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    summary_fields = {
+        "node_count", "connector_node_count", "side_effecting_node_count",
+        "mapping_count", "blocked_node_count", "issue_count",
+    }
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != summary_fields
+        or any(not _is_non_negative_integer(summary.get(field)) for field in summary_fields)
+    ):
+        raise ServiceActionError()
+    nodes = payload.get("nodes")
+    if not isinstance(nodes, list) or len(nodes) > MAX_WORKFLOW_PREFLIGHT_NODES:
+        raise ServiceActionError()
+    for node in nodes:
+        if (
+            not isinstance(node, dict)
+            or set(node) != {"id", "type", "connector", "input_mapping"}
+            or not _is_safe_workflow_ref(node.get("id"))
+            or not isinstance(node.get("type"), str)
+            or not node.get("type")
+        ):
+            raise ServiceActionError()
+        connector = node.get("connector")
+        if connector is not None and (
+            not isinstance(connector, dict)
+            or set(connector) != {"id", "kind", "external_side_effect", "credential_handle_count", "credentials_resolved"}
+            or not _is_safe_workflow_ref(connector.get("id"))
+            or not isinstance(connector.get("kind"), str)
+            or not isinstance(connector.get("external_side_effect"), bool)
+            or not _is_non_negative_integer(connector.get("credential_handle_count"))
+            or not isinstance(connector.get("credentials_resolved"), bool)
+            or connector.get("credentials_resolved")
+        ):
+            raise ServiceActionError()
+        mapping = node.get("input_mapping")
+        if (
+            not isinstance(mapping, dict)
+            or set(mapping) != {"status", "mapping_count", "mapped_count", "missing_required_count", "missing_optional_count"}
+            or mapping.get("status") not in {"not_applicable", "ready", "skipped", "blocked"}
+            or any(not _is_non_negative_integer(mapping.get(field)) for field in ("mapping_count", "mapped_count", "missing_required_count", "missing_optional_count"))
+            or mapping.get("mapping_count") > MAX_WORKFLOW_PREFLIGHT_MAPPINGS
+            or mapping.get("mapped_count") + mapping.get("missing_required_count") + mapping.get("missing_optional_count") != mapping.get("mapping_count")
+        ):
+            raise ServiceActionError()
+    issues = payload.get("issues")
+    if not isinstance(issues, list) or len(issues) > MAX_WORKFLOW_PREFLIGHT_ISSUES:
+        raise ServiceActionError()
+    for issue in issues:
+        if (
+            not isinstance(issue, dict)
+            or set(issue) != {"code", "severity", "node_id", "path"}
+            or issue.get("code") not in {"input_invalid", "required_mapping_input_missing"}
+            or issue.get("severity") != "error"
+            or (issue.get("node_id") is not None and not _is_safe_workflow_ref(issue.get("node_id")))
+            or not isinstance(issue.get("path"), list)
+            or len(issue.get("path")) > 16
+            or any(not isinstance(part, (str, int)) or isinstance(part, bool) for part in issue.get("path"))
+        ):
+            raise ServiceActionError()
+    safety = payload.get("safety")
+    if safety != {
+        "side_effect_free": True,
+        "connector_calls": False,
+        "credentials_resolved": False,
+        "raw_values_included": False,
+    }:
+        raise ServiceActionError()
+    if (
+        summary["node_count"] != len(nodes)
+        or summary["issue_count"] != len(issues)
+        or summary["connector_node_count"] != sum(1 for node in nodes if node["connector"] is not None)
+        or summary["side_effecting_node_count"] != sum(1 for node in nodes if node["connector"] is not None and node["connector"]["external_side_effect"])
+        or summary["mapping_count"] != sum(node["input_mapping"]["mapping_count"] for node in nodes)
+        or summary["blocked_node_count"] != sum(1 for node in nodes if node["input_mapping"]["status"] == "blocked")
+        or payload["ready"] != (input_report["status"] == "valid" and not issues)
+    ):
         raise ServiceActionError()
 
 

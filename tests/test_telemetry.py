@@ -241,7 +241,7 @@ class RuntimeTelemetryTests(TestCase):
                 "audit_consistency",
                 "support_bundle", "run_list", "run_page", "run_detail", "workflow_trigger", "run_cancel",
                 "audit_event_list",
-                "workflow_release", "workflow_promotion", "workflow_deprecation", "workflow_inventory", "workflow_diff", "workflow_explanation", "run_resume", "unknown",
+                "workflow_release", "workflow_promotion", "workflow_deprecation", "workflow_inventory", "workflow_diff", "workflow_explanation", "workflow_preflight", "run_resume", "unknown",
             },
         )
         serialized = json.dumps(aggregate, ensure_ascii=False)
