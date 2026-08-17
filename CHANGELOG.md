@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `bundle-run`: verify a portable bundle before delegating to the normal
+  local executor, with no publication, alias mutation, or second execution
+  authority.
+
 - Added value-free `bundle-diff` review for two verified Workflow DSL bundles,
   reusing the published-version structural diff semantics without exposing
   workflow values or executing either artifact.

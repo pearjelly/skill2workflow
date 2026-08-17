@@ -182,6 +182,14 @@ class PackageSmokeTests(TestCase):
                             "changes": {"sections": []},
                         }
                     )
+                if "bundle-run" in command:
+                    return json.dumps(
+                        {
+                            "run_id": "run_bundle",
+                            "workflow_id": "workflow_demo",
+                            "status": "waiting",
+                        }
+                    )
                 return "ok\n"
 
             with patch("scripts.package_smoke.venv.EnvBuilder", FakeEnvBuilder), patch(
@@ -224,6 +232,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["bundle_status"])
         self.assertTrue(result["bundle_publish_status"])
         self.assertTrue(result["bundle_diff_status"])
+        self.assertTrue(result["bundle_run_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])
         self.assertTrue(result["python_classifiers_valid"])

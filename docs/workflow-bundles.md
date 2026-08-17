@@ -70,6 +70,21 @@ or edge IDs. Titles, descriptions, connector requests, trigger inputs, and
 credentials never enter the report. Different workflow IDs fail closed rather
 than producing a misleading comparison.
 
+Run a verified bundle through the normal local executor without publishing it:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
+  /tmp/approval-flow.s2w \
+  --state-dir /tmp/skill2workflow-bundle-run \
+  --storage sqlite
+```
+
+`bundle-run` verifies the bundle before creating run state, then uses the same
+executor, storage, retry, timeout, and credential-file boundaries as `run`.
+It may execute explicitly requested connector side effects, but it does not
+create a published version, promote an alias, or introduce a second execution
+authority. Invalid bundles fail before the state directory is initialized.
+
 The successful report contains only workflow identity, status, byte counts,
 digests, member count, and fixed error fields. It does not echo workflow
 descriptions, trigger inputs, connector URLs, request bodies, credential

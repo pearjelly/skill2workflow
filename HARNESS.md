@@ -105,6 +105,13 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-create \
   --output /tmp/skill2workflow-approval.s2w
 PYTHONPATH=src python3 -m skill2workflow.cli bundle-verify \
   /tmp/skill2workflow-approval.s2w
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-diff \
+  /tmp/skill2workflow-approval-old.s2w \
+  /tmp/skill2workflow-approval-new.s2w
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
+  /tmp/skill2workflow-approval.s2w \
+  --state-dir /tmp/skill2workflow-bundle-run \
+  --storage sqlite
 PYTHONPATH=src python3 -m skill2workflow.cli bundle-publish \
   /tmp/skill2workflow-approval.s2w \
   --state-dir /tmp/skill2workflow-control \

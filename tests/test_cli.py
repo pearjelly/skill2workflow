@@ -3581,6 +3581,53 @@ class CliTests(TestCase):
         self.assertNotIn("private-value", stdout.getvalue())
         self.assertEqual(report["changes"]["nodes"]["changed"], ["start"])
 
+    def test_bundle_run_verifies_before_using_the_normal_executor(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            state_dir = root / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
+                    0,
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "bundle-run",
+                        str(bundle_path),
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+            self.assertTrue((state_dir / "runs.sqlite3").is_file())
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(result["workflow_id"], "workflow_demo")
+
+    def test_bundle_run_rejects_invalid_bundle_before_creating_state(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bundle_path = root / "invalid.s2w"
+            state_dir = root / "state"
+            bundle_path.write_bytes(b"not a zip")
+            stderr = StringIO()
+            with redirect_stdout(StringIO()), redirect_stderr(stderr):
+                exit_code = main(
+                    ["bundle-run", str(bundle_path), "--state-dir", str(state_dir)]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("verification failed", stderr.getvalue())
+        self.assertFalse(state_dir.exists())
+
     def test_bundle_verify_maps_invalid_artifact_to_nonzero_without_traceback(self):
         with TemporaryDirectory() as tmp:
             bundle_path = Path(tmp) / "invalid.s2w"

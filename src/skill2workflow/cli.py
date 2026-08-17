@@ -156,6 +156,15 @@ def _main(argv=None) -> int:
     bundle_diff_cmd.add_argument("from_bundle", type=Path)
     bundle_diff_cmd.add_argument("to_bundle", type=Path)
 
+    bundle_run_cmd = subparsers.add_parser(
+        "bundle-run",
+        help="Verify a Workflow DSL bundle, then run it through the local executor",
+    )
+    bundle_run_cmd.add_argument("bundle", type=Path)
+    bundle_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    bundle_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    bundle_run_cmd.add_argument("--credential-file", type=Path)
+
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
     visualize_cmd.add_argument("workflow", type=Path)
     visualize_cmd.add_argument("--run-state", type=Path)
@@ -939,6 +948,17 @@ def _main(argv=None) -> int:
 
     if args.command == "bundle-diff":
         _print_json(diff_workflow_bundles(args.from_bundle, args.to_bundle))
+        return 0
+
+    if args.command == "bundle-run":
+        workflow = load_verified_workflow_bundle(args.bundle)
+        _print_json(
+            LocalExecutor(
+                args.state_dir,
+                storage=args.storage,
+                credential_provider=_credential_provider(args),
+            ).run(workflow)
+        )
         return 0
 
     if args.command == "visualize":

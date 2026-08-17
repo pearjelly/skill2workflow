@@ -25,6 +25,7 @@ class WorkflowBundleDocumentationTests(TestCase):
             "bundle-verify",
             "bundle-publish",
             "bundle-diff",
+            "bundle-run",
             "deterministic ZIP",
             "never contains",
             "8 MiB",
