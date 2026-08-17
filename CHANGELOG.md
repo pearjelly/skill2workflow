@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added an explicit local `--connector-fixture` flag for `run`, `resume`, and
+  `bundle-run`, allowing reviewed external connector fixtures to participate in
+  one CLI process without changing the default registry or service boundary.
+
 - Added secret-free `operator_commands` argv arrays to the installed quickstart
   result, plus the fixed `quickstart-result-0.1.0` schema, so wrappers can
   inspect, approve, doctor, and start the generated workspace without manual

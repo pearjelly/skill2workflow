@@ -183,6 +183,7 @@ explicit connector boundaries. It currently supports:
 - List built-in connector manifests
 - Validate and inspect the minimum connector manifest contract for future extensions
 - Explicitly load one local external connector fixture through a narrow runtime registration path while keeping the default built-in registry stable
+- Run a reviewed external connector fixture from local `run`, `resume`, or `bundle-run` processes with an explicit `--connector-fixture` flag; service and remote trigger paths remain closed to dynamic code loading
 - Bound the complete normalized result returned by an explicit external connector to a strict 1 MiB JSON envelope before durable persistence
 - Audit connector execution events through the control plane
 - Audit runtime policy events such as `node_retrying`, `node_recovered`, and `node_failed` through the control plane

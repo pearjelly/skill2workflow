@@ -96,6 +96,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn('command, "--help"', text)
         self.assertIn('"--version"', text)
         self.assertIn('version_matches_metadata', text)
+        self.assertIn('"run"', text)
+        self.assertIn('"resume"', text)
         self.assertIn("validate", text)
         self.assertIn("systemd-unit", text)
         self.assertIn('"live_snapshot_status": live_snapshot_status', text)

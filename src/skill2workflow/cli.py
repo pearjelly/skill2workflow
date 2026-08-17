@@ -24,6 +24,7 @@ from .bundles import (
     verify_workflow_bundle,
 )
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
+from .connectors import ConnectorRuntime
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
 from .dashboard import build_control_snapshot, build_workflow_inventory_from_control
@@ -81,6 +82,7 @@ from .telemetry import OperationalEventLogger
 from .triggers import normalize_trigger_input
 from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 from .webhooks import serve_webhook_requests
+from .external_connectors import load_external_connector
 
 
 MAX_CLI_JSON_DOCUMENT_BYTES = 8 * 1024 * 1024
@@ -200,6 +202,11 @@ def _main(argv=None) -> int:
         help="Print a value-free run summary instead of the complete run state",
     )
     bundle_run_cmd.add_argument("--credential-file", type=Path)
+    bundle_run_cmd.add_argument(
+        "--connector-fixture",
+        type=Path,
+        help="Explicitly load one local connector fixture for this process",
+    )
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
     visualize_cmd.add_argument("workflow", type=Path)
@@ -216,6 +223,11 @@ def _main(argv=None) -> int:
     run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
     run_cmd.add_argument("--credential-file", type=Path)
+    run_cmd.add_argument(
+        "--connector-fixture",
+        type=Path,
+        help="Explicitly load one local connector fixture for this process",
+    )
 
     resume_cmd = subparsers.add_parser("resume", help="Resume a waiting run")
     resume_cmd.add_argument("run_id")
@@ -223,6 +235,11 @@ def _main(argv=None) -> int:
     resume_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
     resume_cmd.add_argument("--credential-file", type=Path)
     resume_cmd.add_argument("--reject", action="store_true")
+    resume_cmd.add_argument(
+        "--connector-fixture",
+        type=Path,
+        help="Explicitly load one local connector fixture for this process",
+    )
 
     runs_cmd = subparsers.add_parser("runs", help="List local runs")
     runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -1039,6 +1056,7 @@ def _main(argv=None) -> int:
             args.state_dir,
             storage=args.storage,
             credential_provider=_credential_provider(args),
+            connector_runtime=_connector_runtime(args),
         ).run(workflow, context=context)
         _print_json(_bundle_run_summary(result) if args.summary else result)
         return 0
@@ -1082,6 +1100,7 @@ def _main(argv=None) -> int:
                 args.state_dir,
                 storage=args.storage,
                 credential_provider=_credential_provider(args),
+                connector_runtime=_connector_runtime(args),
             ).run(workflow)
         )
         return 0
@@ -1091,6 +1110,7 @@ def _main(argv=None) -> int:
             args.state_dir,
             storage=args.storage,
             credential_provider=_credential_provider(args),
+            connector_runtime=_connector_runtime(args),
         ).resume(args.run_id, approved=not args.reject)
         _print_json(state)
         return 0
@@ -1994,6 +2014,16 @@ def _credential_provider(args):
     if path is None:
         return None
     return load_credential_file(path)
+
+
+def _connector_runtime(args):
+    """Load explicitly requested local connector code for this CLI process."""
+
+    path = getattr(args, "connector_fixture", None)
+    if path is None:
+        return None
+    connector = load_external_connector(path)
+    return ConnectorRuntime([connector])
 
 
 def _load_trigger_input(path: Path):

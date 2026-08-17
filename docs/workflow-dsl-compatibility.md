@@ -162,7 +162,7 @@ idempotency claims or execution. Removing or changing an existing contract in
 a new immutable workflow version is permitted; changing the meaning of an
 already-published version is not.
 
-Connector manifests use the minimum contract documented in `docs/connectors.md`. Workflow DSL `connector.id` and `connector.kind` identify the connector a runtime should use, but Workflow DSL remains authoritative over node identity, transitions, guards, policies, and request metadata. The current local runtime exposes built-in manifests and does not dynamically load external connector packages.
+Connector manifests use the minimum contract documented in `docs/connectors.md`. Workflow DSL `connector.id` and `connector.kind` identify the connector a runtime should use, but Workflow DSL remains authoritative over node identity, transitions, guards, policies, and request metadata. The default runtime and long-running service expose only built-in manifests; local `run`, `resume`, and `bundle-run` may load one operator-supplied fixture through the explicit `--connector-fixture` flag for that process only.
 
 Committed Workflow DSL and LiteGraph example fixtures are checked by `python3 scripts/secret_hygiene.py examples/workflows` for obvious secret-like values. See `docs/credential-boundary.md` for allowed placeholder patterns and the local credential-provider boundary.
 

@@ -40,6 +40,8 @@ REQUIRED_CONSOLE_COMMANDS = (
     "bundle-diff",
     "bundle-preflight",
     "bundle-run",
+    "run",
+    "resume",
     "publish",
     "promote",
     "workflow-diff",

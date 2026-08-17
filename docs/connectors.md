@@ -177,6 +177,32 @@ Execution handoff:
 
 Future external connectors should use `execution_contract.mode: "external"` and provide their own package entrypoint. The current runtime supports one narrow prototype path: tests or smoke helpers may explicitly load a local connector fixture file and register it with `ConnectorRuntime`. This is not a dynamic package loader, connector installer, marketplace, OAuth flow, hosted callback system, queue, or production scheduler.
 
+For local evaluation, the same explicit fixture boundary is available from the
+installed CLI. The flag loads reviewed Python code only for the current process;
+it never changes the default connector registry or persists plugin code into
+Workflow DSL or service state:
+
+```bash
+skill2workflow run /tmp/workflow.json \
+  --connector-fixture examples/connectors/local_echo_connector.py \
+  --state-dir /tmp/skill2workflow-state
+
+skill2workflow resume <run_id> \
+  --connector-fixture examples/connectors/local_echo_connector.py \
+  --state-dir /tmp/skill2workflow-state
+
+skill2workflow bundle-run /tmp/workflow.s2w \
+  --connector-fixture examples/connectors/local_echo_connector.py \
+  --allow-side-effects \
+  --state-dir /tmp/skill2workflow-bundle-state
+```
+
+This is intentionally a local, operator-supplied code-loading path. It is not
+available through the long-running service, remote trigger API, automatic
+discovery, or package installation. Only load connector files that have been
+reviewed as executable code; the existing credential, input, result-size, and
+audit-redaction boundaries still apply.
+
 Explicit local fixture loading:
 
 ```python

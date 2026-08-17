@@ -9,6 +9,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from skill2workflow.cli import MAX_CLI_JSON_DOCUMENT_BYTES, main
+from skill2workflow.external_connector_smoke import _external_connector_workflow
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.state_layout import STATE_LAYOUT_MARKER
 from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
@@ -23,6 +24,136 @@ class CliTests(TestCase):
 
         self.assertEqual(raised.exception.code, 0)
         self.assertEqual(stdout.getvalue(), "skill2workflow 0.1.0\n")
+
+    def test_explicit_connector_fixture_runs_local_and_bundle_workflows(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fixture = Path(__file__).resolve().parents[1] / "examples" / "connectors" / "local_echo_connector.py"
+            workflow = _external_connector_workflow()
+            connector = workflow["nodes"][1]["connector"]
+            connector["request"]["input_mapping"] = []
+            connector["credentials"] = []
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            workflow_path.write_text(json.dumps(workflow), encoding="utf-8")
+
+            run_stdout = StringIO()
+            with redirect_stdout(run_stdout):
+                run_exit = main(
+                    [
+                        "run",
+                        str(workflow_path),
+                        "--state-dir",
+                        str(root / "run-state"),
+                        "--storage",
+                        "sqlite",
+                        "--connector-fixture",
+                        str(fixture),
+                    ]
+                )
+
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
+                    0,
+                )
+            bundle_stdout = StringIO()
+            with redirect_stdout(bundle_stdout):
+                bundle_exit = main(
+                    [
+                        "bundle-run",
+                        str(bundle_path),
+                        "--state-dir",
+                        str(root / "bundle-state"),
+                        "--storage",
+                        "sqlite",
+                        "--allow-side-effects",
+                        "--connector-fixture",
+                        str(fixture),
+                    ]
+                )
+
+        run_result = json.loads(run_stdout.getvalue())
+        bundle_result = json.loads(bundle_stdout.getvalue())
+        self.assertEqual(run_exit, 0)
+        self.assertEqual(bundle_exit, 0)
+        self.assertEqual(run_result["status"], "completed")
+        self.assertEqual(bundle_result["status"], "completed")
+        self.assertEqual(
+            run_result["node_results"]["call_echo"]["connector"]["id"],
+            "local_echo",
+        )
+        self.assertEqual(
+            bundle_result["node_results"]["call_echo"]["connector"]["id"],
+            "local_echo",
+        )
+
+    def test_resume_accepts_explicit_connector_fixture_for_local_processes(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fixture = Path(__file__).resolve().parents[1] / "examples" / "connectors" / "local_echo_connector.py"
+            workflow = _approval_workflow()
+            workflow["nodes"].insert(
+                2,
+                {
+                    "id": "call_echo",
+                    "type": "tool_call",
+                    "title": "Call local echo",
+                    "connector": {
+                        "id": "local_echo",
+                        "kind": "local_echo",
+                        "request": {"body": {"source": "cli"}},
+                    },
+                    "on_success": "end",
+                    "on_failure": "failure",
+                },
+            )
+            workflow["nodes"][1]["on_success"] = "call_echo"
+            workflow["edges"] = [
+                edge for edge in workflow["edges"] if edge["id"] != "edge_review_end"
+            ]
+            workflow["edges"].append(
+                {"id": "edge_review_echo", "from": "review", "to": "call_echo", "label": "next"}
+            )
+            workflow["edges"].append(
+                {"id": "edge_echo_end", "from": "call_echo", "to": "end", "label": "next"}
+            )
+            workflow["edges"].append(
+                {"id": "edge_echo_failure", "from": "call_echo", "to": "failure", "label": "failure"}
+            )
+            workflow_path = root / "workflow.json"
+            state_dir = root / "state"
+            workflow_path.write_text(json.dumps(workflow), encoding="utf-8")
+            run_stdout = StringIO()
+            with redirect_stdout(run_stdout):
+                run_exit = main(
+                    [
+                        "run",
+                        str(workflow_path),
+                        "--state-dir",
+                        str(state_dir),
+                        "--connector-fixture",
+                        str(fixture),
+                    ]
+                )
+            run_id = json.loads(run_stdout.getvalue())["run_id"]
+            resume_stdout = StringIO()
+            with redirect_stdout(resume_stdout):
+                resume_exit = main(
+                    [
+                        "resume",
+                        run_id,
+                        "--state-dir",
+                        str(state_dir),
+                        "--connector-fixture",
+                        str(fixture),
+                    ]
+                )
+
+        self.assertEqual(run_exit, 0)
+        self.assertEqual(resume_exit, 0)
+        self.assertEqual(json.loads(run_stdout.getvalue())["status"], "waiting")
+        self.assertEqual(json.loads(resume_stdout.getvalue())["status"], "completed")
 
     def test_cancel_run_command_cancels_waiting_published_run(self):
         with TemporaryDirectory() as tmp:
