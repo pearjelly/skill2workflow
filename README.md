@@ -1515,7 +1515,9 @@ for execution.
 Loop 188 adds optional `bundle-run --format json` admission failures with a
 stable reason code and safety flags, while preserving the default text error.
 Loop 189 adds optional `bundle-run --summary` output for safe automation and
-handoffs without exposing the complete run state.
+handoffs without exposing the complete run state. The isolated wheel smoke
+also executes this mode through the installed CLI against SQLite and checks
+the fixed schema and Bundle fingerprint.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

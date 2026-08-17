@@ -12,6 +12,10 @@ release; Roadmap loop completion alone does not publish a new version.
   contract containing status counters and Bundle provenance without workflow,
   input, node-result, connector, or credential payloads.
 
+- Extended the isolated wheel package smoke to execute the installed
+  `bundle-run --summary` command against SQLite and verify its fixed schema,
+  waiting status, consent flag, and Bundle fingerprint.
+
 - Added optional `bundle-run --format json` output for a stable, value-free
   side-effect-consent refusal report that automation can classify without
   parsing human-readable stderr.

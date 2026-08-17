@@ -191,6 +191,24 @@ class PackageSmokeTests(TestCase):
                         }
                     )
                 if "bundle-run" in command:
+                    if "--summary" in command:
+                        return json.dumps(
+                            {
+                                "schema_version": "skill2workflow-workflow-bundle-summary-0.1.0",
+                                "run_id": "run_bundle_summary",
+                                "workflow_id": "workflow_demo",
+                                "workflow_version": "0.1.0",
+                                "status": "waiting",
+                                "current_node": "approval",
+                                "event_count": 3,
+                                "node_result_count": 1,
+                                "bundle_run": {
+                                    "bundle_verified": True,
+                                    "side_effects_authorized": False,
+                                    "bundle_sha256": "a" * 64,
+                                },
+                            }
+                        )
                     return json.dumps(
                         {
                             "run_id": "run_bundle",
@@ -242,6 +260,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["bundle_diff_status"])
         self.assertTrue(result["bundle_preflight_status"])
         self.assertTrue(result["bundle_run_status"])
+        self.assertTrue(result["bundle_summary_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])
         self.assertTrue(result["python_classifiers_valid"])

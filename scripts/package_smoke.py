@@ -371,6 +371,21 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    bundle_summary_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "bundle-run",
+                str(bundle_path),
+                "--summary",
+                "--state-dir",
+                str(isolated_dir / "bundle-summary-control"),
+                "--storage",
+                "sqlite",
+            ],
+            cwd=isolated_dir,
+        )
+    )
     if (
         bundle_create_result.get("valid") is not True
         or bundle_create_result.get("status") != "created"
@@ -379,6 +394,15 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or bundle_diff_result.get("changed") is not False
         or bundle_preflight_result.get("ready") is not True
         or bundle_run_result.get("status") != "waiting"
+        or bundle_summary_result.get("schema_version")
+        != "skill2workflow-workflow-bundle-summary-0.1.0"
+        or bundle_summary_result.get("status") != "waiting"
+        or bundle_summary_result.get("bundle_run", {}).get("bundle_verified") is not True
+        or bundle_summary_result.get("bundle_run", {}).get("side_effects_authorized")
+        is not False
+        or not _is_sha256(
+            bundle_summary_result.get("bundle_run", {}).get("bundle_sha256")
+        )
         or not bundle_path.is_file()
     ):
         raise RuntimeError("installed bundle commands did not preserve their contract")
@@ -440,6 +464,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "bundle_diff_status": True,
         "bundle_preflight_status": True,
         "bundle_run_status": True,
+        "bundle_summary_status": True,
     }
 
 
@@ -484,6 +509,13 @@ def _sbom_wheel_sha256(sbom: Dict[str, object]) -> str:
     if not comment.startswith(prefix):
         raise RuntimeError("release SBOM document comment is malformed")
     return comment[len(prefix) :]
+
+
+def _is_sha256(value: object) -> bool:
+    digest = str(value or "")
+    return len(digest) == 64 and all(
+        character in "0123456789abcdef" for character in digest
+    )
 
 
 def _qualify_live_snapshot(

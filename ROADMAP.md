@@ -4654,8 +4654,10 @@ existing default output for local debugging.
 
 **Evidence:** CLI tests cover summary shape, completed status, provenance,
 redaction, and default-output compatibility; schema/documentation tests lock
-the contract; installed command, package smoke, full-suite, secret-hygiene,
-and release-preflight checks remain green.
+the contract; the isolated wheel smoke invokes the installed `bundle-run
+--summary` command against SQLite and checks its schema, status, and Bundle
+fingerprint; full-suite, secret-hygiene, and release-preflight checks remain
+green.
 
 **Safety boundary:** `--summary` is a redacted presentation mode, not a
 retention or authorization boundary. The executor still persists its normal
