@@ -14,7 +14,8 @@ already exist:
 skill2workflow service-init \
   --root /srv/skill2workflow/team-a \
   --host 127.0.0.1 \
-  --port 8080
+  --port 8080 \
+  --http-allowed-origin https://api.example.com
 ```
 
 The command creates this layout:
@@ -40,8 +41,10 @@ The owner-only `backups/` directory is recorded as the optional
 remote backup inventory; the service never creates or deletes backup sets
 through HTTP.
 
-For a deployment that uses the built-in HTTP connector, add an owner-reviewed
-service-wide upper bound to `config/service.json` before running the Doctor:
+For a deployment that uses the built-in HTTP connector, pass one or more
+repeated `--http-allowed-origin` options during initialization. The command
+canonicalizes and writes the owner-reviewed service-wide upper bound directly
+into `config/service.json`:
 
 ```json
 {
@@ -53,8 +56,9 @@ service-wide upper bound to `config/service.json` before running the Doctor:
 }
 ```
 
-Merge that field into the generated `runtime` object; do not replace the
-required `state_dir` or `storage` fields. Each entry must be one exact
+The equivalent generated field is shown above. If editing an existing file,
+merge it into the generated `runtime` object; do not replace the required
+`state_dir` or `storage` fields. Each entry must be one exact
 `http`/`https` origin without a path, query, fragment, userinfo, or wildcard.
 The service checks this list before credentials or network access for direct
 triggers and recurring schedules. Omit it only when the deployment's network

@@ -105,7 +105,8 @@ Loop 160 adds the authenticated, read-only backup inventory route and the
 installed `service-backup-inventory` client documented in
 [`remote-backup-inventory.md`](remote-backup-inventory.md). Bootstrap records
 optional owner-only `runtime.backup_parent_dir`; deployments may also set the
-exact-origin `runtime.http_allowed_origins` service boundary; the route returns only
+exact-origin `runtime.http_allowed_origins` service boundary through repeated
+`service-init --http-allowed-origin` options; the route returns only
 bounded integrity, age, layout, and size metadata and remains available for
 diagnostics while the service is draining or on standby.
 Loop 161 adds the cursor-paged backup inventory route and installed

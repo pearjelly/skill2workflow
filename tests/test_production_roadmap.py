@@ -26,11 +26,11 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
-        self.assertIn("- Completed delivery loops: 1-200", roadmap)
-        self.assertIn("- Active loop: None; Loop 200 is complete with a service-level HTTP origin upper bound", roadmap)
+        self.assertIn("- Completed delivery loops: 1-201", roadmap)
+        self.assertIn("- Active loop: None; Loop 201 is complete with a discoverable service HTTP origin bootstrap option", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
-        self.assertIn("This rolling queue is ordered. Loop 200 is complete", roadmap)
+        self.assertIn("This rolling queue is ordered. Loop 201 is complete", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
         self.assertIn("**Status:** Achieved.", roadmap)
@@ -41,7 +41,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-200 complete, further loop numbers unassigned.",
+            "**Status:** Directional; Loops 44-201 complete, further loop numbers unassigned.",
             roadmap,
         )
 
@@ -290,6 +290,11 @@ class ProductionRoadmapTests(TestCase):
             roadmap,
         )
         self.assertIn("### Loop 200: Service-Level HTTP Origin Upper Bound", roadmap)
+        self.assertIn(
+            "| Loop 201: Discoverable Service HTTP Origin Bootstrap | Complete |",
+            roadmap,
+        )
+        self.assertIn("### Loop 201: Discoverable Service HTTP Origin Bootstrap", roadmap)
 
         self.assertIn(
             "SQLite is the minimum production persistence baseline for Self-hosted Beta. "
@@ -385,7 +390,7 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-200 are complete", readme)
+        self.assertIn("Delivery Loops 1-201 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)

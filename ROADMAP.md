@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-200
+- Completed delivery loops: 1-201
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 200 is complete with a service-level HTTP origin upper bound
+- Active loop: None; Loop 201 is complete with a discoverable service HTTP origin bootstrap option
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-200 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-201 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5080,9 +5080,44 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_service.RuntimeServiceTests.test_service_http_origin_policy_is_shared_by_http_and_scheduler_execution -v
 ```
 
+### Loop 201: Discoverable Service HTTP Origin Bootstrap
+
+**Status:** Complete.
+
+**Prior basis:** Loop 200 added a service-wide exact-origin upper bound, but a
+fresh installation still required an operator to hand-edit the generated
+`service.json`. That made the safe deployment path easy to miss and created a
+configuration-copy risk at the first-run boundary.
+
+**Outcome:** `service-init` now accepts repeatable
+`--http-allowed-origin ORIGIN` options. Initialization validates and
+canonicalizes the same bounded, duplicate-free exact-origin set used by the
+runtime, writes the canonical list into the versioned service configuration,
+and rejects invalid policy input before creating any workspace directories.
+Existing invocations that omit the option remain byte-compatible in behavior;
+the service policy itself remains optional and absent by default.
+
+**Evidence:** Bootstrap unit tests prove canonical JSON output, invalid-origin
+pre-creation failure, and repeated CLI options. The installed bootstrap and
+service configuration guides now show the safe first-run command and retain
+the manual-edit fallback. Full service, package, secret-hygiene, and release
+preflight checks remain the acceptance gates.
+
+**Safety boundary:** This is operator ergonomics for the existing exact-origin
+service policy, not a wildcard matcher, SSRF/DNS-rebinding defense, network
+firewall, secret transport, or external-connector sandbox.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_service_bootstrap.ServiceBootstrapTests.test_initialize_writes_canonical_http_origin_policy \
+  tests.test_service_bootstrap.ServiceBootstrapTests.test_service_init_cli_accepts_repeated_http_allowed_origin_options -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 200 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 201 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5249,6 +5284,7 @@ This rolling queue is ordered. Loop 200 is complete and there is no active deliv
 | Loop 198: Fixed HTTP Transport Error Redaction | Complete | Keep built-in HTTP transport and request-body failures value-free before durable connector persistence | Fixed timeout/network/serialization messages, injected leakage regressions, compatibility/docs updates, and package evidence |
 | Loop 199: External Connector Exception Boundary | Complete | Keep unexpected explicitly loaded connector exceptions inside the normalized durable failure path | Fixed unexpected-exception message, direct and SQLite leakage regressions, result-boundary docs, and package evidence |
 | Loop 200: Service-Level HTTP Origin Upper Bound | Complete | Govern built-in HTTP destinations at the self-hosted service boundary, including recurring execution, without changing Workflow DSL compatibility | Versioned exact-origin service policy, direct/scheduled propagation, pre-credential/network suppression, schema/docs, and regression evidence |
+| Loop 201: Discoverable Service HTTP Origin Bootstrap | Complete | Make the service-level HTTP origin policy safe and discoverable during first-run initialization | Repeatable CLI options, canonical config output, pre-creation validation, operator docs, and bootstrap regression evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

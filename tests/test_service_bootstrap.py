@@ -76,6 +76,41 @@ class ServiceBootstrapTests(TestCase):
                 self.assertEqual(_mode(config_path), 0o600)
                 self.assertEqual(_mode(token_path), 0o600)
 
+    def test_initialize_writes_canonical_http_origin_policy(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            initialize_service_workspace(
+                root,
+                token_factory=lambda: "t" * 48,
+                http_allowed_origins=[
+                    "HTTPS://Example.com:443",
+                    "http://api.example.com:80",
+                ],
+            )
+            config = load_service_config(root / "config" / "service.json")
+            raw_config = json.loads(
+                (root / "config" / "service.json").read_text(encoding="utf-8")
+            )
+
+        self.assertEqual(
+            config.http_allowed_origins,
+            ("https://example.com", "http://api.example.com"),
+        )
+        self.assertEqual(
+            raw_config["runtime"]["http_allowed_origins"],
+            ["https://example.com", "http://api.example.com"],
+        )
+
+    def test_initialize_rejects_invalid_http_origin_before_creating_workspace(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            with self.assertRaisesRegex(ValueError, "must not contain a path"):
+                initialize_service_workspace(
+                    root,
+                    http_allowed_origins=["https://example.com/path"],
+                )
+            self.assertFalse(root.exists())
+
     def test_initialize_rejects_relative_invalid_or_existing_targets_without_mutation(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / "runtime"
@@ -241,6 +276,36 @@ class ServiceBootstrapTests(TestCase):
         self.assertGreaterEqual(len(token.encode("utf-8")), 32)
         self.assertNotIn(token, stdout.getvalue())
         self.assertEqual(result["status"], "initialized")
+
+    def test_service_init_cli_accepts_repeated_http_allowed_origin_options(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            stdout = StringIO()
+            stderr = StringIO()
+
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "service-init",
+                        "--root",
+                        str(root),
+                        "--port",
+                        "0",
+                        "--http-allowed-origin",
+                        "HTTPS://Example.com:443",
+                        "--http-allowed-origin",
+                        "https://api.example.com",
+                    ]
+                )
+
+            config = load_service_config(root / "config" / "service.json")
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(stderr.getvalue(), "")
+        self.assertEqual(
+            config.http_allowed_origins,
+            ("https://example.com", "https://api.example.com"),
+        )
 
     def test_real_process_bootstrap_smoke_starts_an_authenticated_service(self):
         with TemporaryDirectory() as temporary:

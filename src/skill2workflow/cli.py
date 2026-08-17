@@ -400,6 +400,13 @@ def _main(argv=None) -> int:
     service_init_cmd.add_argument("--root", type=Path, required=True)
     service_init_cmd.add_argument("--host", default="127.0.0.1")
     service_init_cmd.add_argument("--port", type=int, default=8080)
+    service_init_cmd.add_argument(
+        "--http-allowed-origin",
+        dest="http_allowed_origins",
+        action="append",
+        metavar="ORIGIN",
+        help="Allow one exact built-in HTTP origin; repeat for multiple origins",
+    )
 
     service_token_rotate_cmd = subparsers.add_parser(
         "service-token-rotate",
@@ -1264,6 +1271,7 @@ def _main(argv=None) -> int:
                 args.root,
                 host=args.host,
                 port=args.port,
+                http_allowed_origins=args.http_allowed_origins,
             )
         )
 

@@ -67,6 +67,7 @@ workflow that requires a proxy must use a separately reviewed connector with an
 explicit, documented proxy boundary.
 
 The self-hosted service can add a second, service-wide upper bound through
+repeated `service-init --http-allowed-origin` options, which write
 `runtime.http_allowed_origins` in `service.json`. It accepts up to 32 exact
 origins and is shared by direct service triggers and recurring-schedule
 dispatches. When configured, a request must match both the service list and

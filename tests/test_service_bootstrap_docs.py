@@ -20,6 +20,7 @@ class ServiceBootstrapDocumentationTests(TestCase):
         self.assertIn("not included in state backups", guide)
         self.assertIn("scripts/service_bootstrap_smoke.py", guide)
         self.assertIn("service-token-rotation.md", guide)
+        self.assertIn("--http-allowed-origin", guide)
         self.assertIn("service-bootstrap.md", service)
 
     def test_roadmap_and_readme_record_completed_loop_51_without_maturity_inflation(self):
@@ -28,14 +29,14 @@ class ServiceBootstrapDocumentationTests(TestCase):
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-        self.assertIn("- Completed delivery loops: 1-200", roadmap)
+        self.assertIn("- Completed delivery loops: 1-201", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 200 is complete with a service-level HTTP origin upper bound",
+            "- Active loop: None; Loop 201 is complete with a discoverable service HTTP origin bootstrap option",
             roadmap,
         )
         self.assertIn("| Loop 51: Secure Service Bootstrap | Complete |", roadmap)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-200 are complete", readme)
+        self.assertIn("Delivery Loops 1-201 are complete", readme)
         self.assertIn("secure service bootstrap", readme)
         self.assertIn("scripts/service_bootstrap_smoke.py", harness)
         self.assertIn("Secure service bootstrap", agents)

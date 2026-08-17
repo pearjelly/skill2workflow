@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added repeatable `service-init --http-allowed-origin` options so operators
+  can configure the service-wide built-in HTTP egress policy without hand
+  editing generated JSON; initialization canonicalizes and validates origins
+  before creating the workspace.
+
 - Added optional service-wide `runtime.http_allowed_origins` governance for
   the built-in HTTP connector. Exact origins are validated at service startup
   and enforced before credential resolution or network access for direct and

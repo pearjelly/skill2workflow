@@ -19,7 +19,9 @@ loopback binding. The generated service workspace still publishes
 does not claim to establish filesystem ownership or permissions on hand-made
 configurations.
 
-The optional `runtime.http_allowed_origins` field is a service-wide upper
+The optional `runtime.http_allowed_origins` field (written by repeated
+`service-init --http-allowed-origin` options or by an owner editing the
+configuration) is a service-wide upper
 bound for the built-in HTTP connector. It accepts at most 32 exact `http` or
 `https` origins, canonicalizes the scheme/host/default port, and rejects
 userinfo, paths, queries, fragments, malformed ports, and duplicates before

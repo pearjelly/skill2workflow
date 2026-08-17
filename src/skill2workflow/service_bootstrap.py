@@ -10,6 +10,7 @@ import stat
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
+from .connectors import normalize_http_allowed_origins
 from .service import SERVICE_SCHEMA_VERSION, read_service_bearer_token
 
 
@@ -28,9 +29,14 @@ def initialize_service_workspace(
     host: str = "127.0.0.1",
     port: int = 8080,
     token_factory: Optional[Callable[[], str]] = None,
+    http_allowed_origins: object = None,
 ) -> Dict[str, object]:
     """Create one complete, non-overwriting, owner-only service workspace."""
 
+    normalized_http_allowed_origins = normalize_http_allowed_origins(
+        http_allowed_origins,
+        label="service bootstrap http_allowed_origins",
+    )
     requested_root = Path(root)
     if not requested_root.is_absolute():
         raise ValueError("service bootstrap root must be an absolute path")
@@ -68,14 +74,17 @@ def initialize_service_workspace(
         _write_private_file(token_file, token + "\n")
 
         config_file = config_dir / "service.json"
+        runtime = {
+            "state_dir": str(state_dir),
+            "storage": "sqlite",
+            "backup_parent_dir": str(backup_parent_dir),
+        }
+        if normalized_http_allowed_origins is not None:
+            runtime["http_allowed_origins"] = list(normalized_http_allowed_origins)
         config = {
             "schema_version": SERVICE_SCHEMA_VERSION,
             "service": {"host": host, "port": port},
-            "runtime": {
-                "state_dir": str(state_dir),
-                "storage": "sqlite",
-                "backup_parent_dir": str(backup_parent_dir),
-            },
+            "runtime": runtime,
             "auth": {
                 "provider": "bearer_token_file",
                 "token_file": str(token_file),
