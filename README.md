@@ -149,7 +149,7 @@ explicit connector boundaries. It currently supports:
 - Run published workflow versions and write audit events
 - Trigger published workflow versions or stable aliases through a compact local API envelope
 - Persist trigger input values in durable run context without logging full input values to audit by default
-- Map non-secret trigger input fields into HTTP connector request bodies through `connector.request.input_mapping`
+- Map non-secret trigger input fields into HTTP connector request bodies or scalar query parameters through `connector.request.input_mapping`
 - Trigger published workflow versions from local HTTP webhook POST requests
 - Run a validated loopback-only long-running service with health/readiness probes, authenticated human-gate decisions, graceful signal shutdown, and SQLite restart continuity
 - Operate remote human-gate decisions and cooperative cancellation through a protected token-file CLI client
@@ -176,7 +176,7 @@ explicit connector boundaries. It currently supports:
 - Inspect compact, bounded local schedules and dispatch history without trigger inputs or lease identities
 - Inspect compact, bounded published-workflow inventory without workflow content
 - Explain a workflow before execution with a bounded, side-effect-free, value-free plan using the fixed `skill2workflow-workflow-explanation-0.1.0` contract
-- Preflight trigger input and HTTP body mappings with a bounded, side-effect-free, value-free admission report using the fixed `skill2workflow-workflow-preflight-0.1.0` contract
+- Preflight trigger input and HTTP request mappings with a bounded, side-effect-free, value-free admission report using the fixed `skill2workflow-workflow-preflight-0.1.0` contract
 - Create, verify, structurally diff, preflight, explicitly publish, and safely run deterministic, secret-checked Workflow DSL bundles through existing local contracts with explicit side-effect consent
 - Drain due schedule work in explicitly bounded side-effect batches
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
@@ -850,7 +850,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-191 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-192 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1502,7 +1502,7 @@ operators can review topology, human gates, connector metadata, input shape,
 retry policy, and timeouts without exposing workflow values or invoking work.
 
 Loop 179 adds [side-effect-free trigger preflight](docs/workflow-preflight.md):
-operators can validate input contracts and HTTP body mappings before a real
+operators can validate input contracts and HTTP request mappings before a real
 run, while connector calls, credential reads, state writes, and input values
 remain outside the report.
 
@@ -1550,6 +1550,10 @@ connector code dynamically. See
 Loop 191 adds `connectors --connector-fixture` so operators can inspect a
 reviewed fixture manifest without creating state, resolving credentials, or
 executing a connector.
+
+Loop 192 adds bounded `/query/<name>` targets to HTTP connector input mapping,
+allowing scalar trigger fields to drive common filter and pagination parameters
+without templates, expressions, or dynamic header interpolation.
 
 The installed console script also supports `--version`, reporting the package
 version without requiring a workflow subcommand; the wheel smoke checks that

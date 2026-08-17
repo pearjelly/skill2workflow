@@ -198,7 +198,7 @@
         },
         "input_mapping": {
           "type": "array",
-          "description": "Optional body-only mapping from run context input into HTTP request body fields.",
+          "description": "Optional bounded mapping from run context input into HTTP request body fields or query parameters.",
           "items": {
             "type": "object",
             "additionalProperties": true,
@@ -210,7 +210,7 @@
               },
               "to": {
                 "type": "string",
-                "pattern": "^/body/.+"
+                "pattern": "^/(body/.+|query/[^/]+)$"
               },
               "required": {
                 "type": "boolean",

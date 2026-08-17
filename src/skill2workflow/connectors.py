@@ -10,6 +10,7 @@ import urllib.request
 from contextlib import closing
 from dataclasses import dataclass
 from typing import Callable, Dict, List
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .credentials import CredentialResolutionError
 
@@ -376,7 +377,7 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
     method = str(request_spec.get("method") or "GET").upper()
     headers = _string_map(request_spec.get("headers"))
     _apply_http_credentials(binding.get("credentials", []), headers, credential_provider)
-    body, mapping_summary = _mapped_http_body(request_spec, context)
+    url, body, mapping_summary = _mapped_http_request(request_spec, context)
     data = None
     if body is not None:
         try:
@@ -494,17 +495,31 @@ def _apply_http_credentials(credentials: object, headers: Dict[str, str], creden
         headers[name] = f"{credential.get('prefix', '') or ''}{value}"
 
 
-def _mapped_http_body(request_spec: Dict[str, object], context: object):
+def _mapped_http_request(request_spec: Dict[str, object], context: object):
     input_mapping = request_spec.get("input_mapping", [])
     if input_mapping in (None, []):
-        return request_spec.get("body"), {}
+        return str(request_spec.get("url") or ""), request_spec.get("body"), {}
 
     mappings = _normalize_input_mapping(input_mapping)
-    body = copy.deepcopy(request_spec.get("body", {}))
-    if body is None:
-        body = {}
-    if not isinstance(body, dict):
-        raise ConnectorExecutionError("http connector request.body must be an object when input_mapping is used")
+    body = copy.deepcopy(request_spec.get("body"))
+    body_mapped = any(mapping["target_kind"] == "body" for mapping in mappings)
+    if body_mapped:
+        if body is None:
+            body = {}
+        if not isinstance(body, dict):
+            raise ConnectorExecutionError(
+                "http connector request.body must be an object when body input_mapping is used"
+            )
+
+    url = str(request_spec.get("url") or "")
+    query_parts = None
+    query_url = None
+    if any(mapping["target_kind"] == "query" for mapping in mappings):
+        try:
+            query_url = urlsplit(url)
+        except ValueError as error:
+            raise ConnectorExecutionError("http connector request.url is invalid") from error
+        query_parts = parse_qsl(query_url.query, keep_blank_values=True)
 
     context_root = context if isinstance(context, dict) else {}
     mapped_keys = []
@@ -514,11 +529,30 @@ def _mapped_http_body(request_spec: Dict[str, object], context: object):
             if mapping["required"]:
                 raise ConnectorExecutionError(f"required input mapping value missing: {mapping['from']}")
             continue
-        _json_pointer_set_body(body, mapping["to"], copy.deepcopy(value))
+        if mapping["target_kind"] == "body":
+            _json_pointer_set_body(body, mapping["to"], copy.deepcopy(value))
+        else:
+            query_value = _query_string_value(value)
+            query_parts = [
+                (key, existing)
+                for key, existing in (query_parts or [])
+                if key != mapping["query_key"]
+            ]
+            query_parts.append((mapping["query_key"], query_value))
         mapped_keys.append(_input_key(mapping["from"]))
 
     mapped_keys = sorted({key for key in mapped_keys if key})
-    return body, {
+    if query_url is not None:
+        url = urlunsplit(
+            (
+                query_url.scheme,
+                query_url.netloc,
+                query_url.path,
+                urlencode(query_parts or [], doseq=True),
+                query_url.fragment,
+            )
+        )
+    return url, body, {
         "status": "applied" if mapped_keys else "skipped",
         "input_keys": mapped_keys,
     }
@@ -535,13 +569,53 @@ def _normalize_input_mapping(input_mapping: object) -> List[Dict[str, object]]:
         target = str(mapping.get("to") or "")
         if source == "/input/" or not source.startswith("/input/"):
             raise ConnectorExecutionError(f"connector.request.input_mapping[{index}].from must start with /input/")
-        if target == "/body/" or not target.startswith("/body/"):
-            raise ConnectorExecutionError(f"connector.request.input_mapping[{index}].to must start with /body/")
+        if target.startswith("/body/") and target != "/body/":
+            target_kind = "body"
+            query_key = ""
+        elif target.startswith("/query/"):
+            query_tokens = _json_pointer_tokens(target)
+            if len(query_tokens) != 2 or not query_tokens[1]:
+                raise ConnectorExecutionError(
+                    f"connector.request.input_mapping[{index}].to must be /query/<name>"
+                )
+            target_kind = "query"
+            query_key = query_tokens[1]
+        else:
+            raise ConnectorExecutionError(
+                f"connector.request.input_mapping[{index}].to must start with /body/ or /query/"
+            )
         required = mapping.get("required", True)
         if not isinstance(required, bool):
             raise ConnectorExecutionError(f"connector.request.input_mapping[{index}].required must be a boolean")
-        normalized.append({"from": source, "to": target, "required": required})
+        normalized.append(
+            {
+                "from": source,
+                "to": target,
+                "required": required,
+                "target_kind": target_kind,
+                "query_key": query_key,
+            }
+        )
     return normalized
+
+
+def _query_string_value(value: object) -> str:
+    """Convert one input value to a deterministic scalar query parameter."""
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        try:
+            encoded = json.dumps(value, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError, OverflowError):
+            encoded = None
+        if encoded is not None:
+            return encoded
+    raise ConnectorExecutionError(
+        "http connector query input mapping value must be a string, number, or boolean"
+    )
 
 
 _MISSING = object()

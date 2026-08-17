@@ -208,6 +208,7 @@ class CompilerTests(TestCase):
         workflow = _http_mapping_workflow(
             [
                 {"from": "/input/customer_id", "to": "/body/customer_id", "required": True},
+                {"from": "/input/page", "to": "/query/page", "required": False},
             ]
         )
 
@@ -222,6 +223,7 @@ class CompilerTests(TestCase):
             ([{"from": "/input/", "to": "/body/customer_id"}], "input_mapping_source_invalid"),
             ([{"from": "/input/customer_id", "to": "/headers/X-Customer"}], "input_mapping_target_invalid"),
             ([{"from": "/input/customer_id", "to": "/body/"}], "input_mapping_target_invalid"),
+            ([{"from": "/input/customer_id", "to": "/query/filter/customer_id"}], "input_mapping_target_invalid"),
             ([{"from": "/input/customer_id", "to": "/body/customer_id", "required": "yes"}], "input_mapping_required_invalid"),
         ]
 

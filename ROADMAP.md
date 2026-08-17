@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-191
+- Completed delivery loops: 1-192
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 191 is complete with explicit fixture manifest inspection
+- Active loop: None; Loop 192 is complete with bounded HTTP query mapping
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-191 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-192 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 191; the detailed
+The follow-on production hardening continues through Loop 192; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -102,7 +102,9 @@ Verified offline backup/restore, copy-on-write state migration, bounded telemetr
 Loop 190 adds a bounded, descriptor-bound explicit external connector fixture
 loader without making dynamic code loading available to the service or remote
 trigger paths. Loop 191 adds a read-only CLI manifest inspection path for an
-explicit fixture without creating state or executing connector code.
+explicit fixture without creating state or executing connector code. Loop 192
+adds bounded scalar query-parameter mapping for the built-in HTTP connector
+without enabling templates, expressions, or dynamic header mapping.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4280,14 +4282,14 @@ exactly-once effects.
 
 **Prior basis:** Loop 178 made the workflow topology and policy reviewable,
 but an operator still learned whether a trigger input satisfied its schema or
-HTTP body mappings only after starting a real run. That made a missing
+HTTP request mappings only after starting a real run. That made a missing
 required mapping an avoidable production failure and gave local and remote
 operators no common admission contract.
 
 **Outcome:** The local `preflight` command and authenticated remote
 `service-workflow-preflight` client now validate a supplied object (or an
 explicit empty-object draft) against the input contract and every built-in
-HTTP body mapping. The fixed
+HTTP request mapping. The fixed
 `skill2workflow-workflow-preflight-0.1.0` report returns only counts, stable
 issue codes, safe paths, connector/credential-handle counts, and per-node
 mapping status. It never invokes a connector, resolves a credential, writes
@@ -4742,9 +4744,43 @@ PYTHONPATH=src python3 -m skill2workflow.cli connectors \
   --connector-fixture examples/connectors/local_echo_connector.py
 ```
 
+### Loop 192: Bounded HTTP Query-Parameter Input Mapping
+
+**Status:** Complete.
+
+**Prior basis:** Loop 179 made HTTP input presence reviewable before execution,
+and the existing runtime could copy input only into JSON request bodies. Common
+list, filter, and pagination APIs still required a hand-written connector or
+unsafe URL templating.
+
+**Outcome:** `connector.request.input_mapping` now accepts `/query/<name>`
+targets in addition to existing `/body/...` targets. Query values are limited
+to strings, finite numbers, and booleans, are percent-encoded, replace an
+existing parameter with the same name, and are assembled only in a runtime URL
+copy. Published DSL, run state, and audit metadata remain value-free with
+respect to mapped values; body mappings and all existing contracts are
+unchanged.
+
+**Evidence:** Compiler and schema tests cover the additive target contract and
+invalid nested targets. HTTP connector tests cover mixed body/query execution,
+existing-query replacement, scalar conversion, non-scalar rejection before
+network access, binding immutability, full-suite checks, package smoke,
+secret-hygiene, and release-preflight evidence.
+
+**Safety boundary:** This is flat query-parameter mapping only. Header mapping,
+URL interpolation, path templates, expressions, credential/environment/file
+mapping, and provider-specific request languages remain outside the boundary.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_http_connector_maps_scalar_context_input_into_query_without_mutating_binding -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 191 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 192 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4888,7 +4924,7 @@ This rolling queue is ordered. Loop 191 is complete and there is no active deliv
 | Loop 176: Bounded SQLite Workflow Registry Records | Complete | Keep the recommended SQLite workflow registry from bypassing a fixed per-record document boundary | Fixed 2 MiB UTF-8 JSON-object bound on registry writes and reads, atomic replacement and alias-update validation, import/diagnostic coverage, and SQLite registry boundary documentation |
 | Loop 177: Bounded SQLite Trigger-Ledger Responses | Complete | Keep completed trigger idempotency rows from bypassing a fixed replay-document boundary | Fixed 64 KiB UTF-8 JSON-object bound on replay writes and reads, atomic pending-claim preservation, fail-closed corruption handling, control-plane coverage, and SQLite trigger-ledger boundary documentation |
 | Loop 178: Bounded Workflow Execution Explanations | Complete | Give local and remote operators a safe pre-execution review of topology, gates, connector side effects, input shape, retries, and timeouts without exposing values or executing work | Fixed side-effect-free explanation schema, local/remote CLI, authenticated read-only route, 64 KiB/1,000-node/2,000-edge bounds, redaction tests, and operator documentation |
-| Loop 179: Side-Effect-Free Trigger Preflight | Complete | Let operators validate trigger input and HTTP body mappings before starting a real run without exposing values or invoking providers | Fixed value-free preflight schema, local/remote CLI, authenticated POST route, 1 MiB/64 KiB bounds, stable issue codes, redaction/read-only tests, package-smoke evidence, and operator documentation |
+| Loop 179: Side-Effect-Free Trigger Preflight | Complete | Let operators validate trigger input and HTTP request mappings before starting a real run without exposing values or invoking providers | Fixed value-free preflight schema, local/remote CLI, authenticated POST route, 1 MiB/64 KiB bounds, stable issue codes, redaction/read-only tests, package-smoke evidence, and operator documentation |
 | Loop 180: Portable Workflow DSL Bundles | Complete | Share one validated Workflow DSL artifact as a deterministic, secret-checked local bundle without packaging state or credentials | Fixed two-member ZIP manifest, digest verification, 8 MiB/2 MiB/4 MiB bounds, path/read safety, local CLI, tests, docs, and package evidence |
 | Loop 181: Verified Local Workflow Bundle Publication | Complete | Move a fully verified local bundle into the normal immutable publication path without extraction, execution, or credential access | In-memory verified loader, explicit local `bundle-publish`, JSON/SQLite publication coverage, conflict/idempotency evidence, installed CLI, tests, docs, and package evidence |
 | Loop 182: Value-Free Workflow Bundle Diff Review | Complete | Compare two verified bundles before publication without exposing workflow values or requiring control-plane state | Shared structural diff helper, fixed bundle-diff schema, identity mismatch guard, redaction/read-only tests, installed CLI, docs, and package evidence |
@@ -4901,6 +4937,7 @@ This rolling queue is ordered. Loop 191 is complete and there is no active deliv
 | Loop 189: Safe Workflow Bundle Run Summaries | Complete | Expose successful Bundle runs as a value-free handoff without changing complete local output | `bundle-run --summary`, fixed summary schema, redaction tests, installed CLI, docs, and package evidence |
 | Loop 190: Bounded External Connector Fixture Loading | Complete | Bound explicit local connector source loading without widening service or remote dynamic-code paths | 2 MiB UTF-8 source bound, regular-file/no-follow checks, device/inode identity and replacement detection, focused loader tests, docs, and baseline evidence |
 | Loop 191: Explicit Connector Fixture Manifest Inspection | Complete | Let operators review an explicitly loaded connector manifest before execution without creating state or invoking a connector | `connectors --connector-fixture`, read-only CLI coverage, manifest contract assertions, docs, and package evidence |
+| Loop 192: Bounded HTTP Query-Parameter Input Mapping | Complete | Map scalar trigger input into flat HTTP query parameters without templates, expressions, or header interpolation | Additive `/query/<name>` contract, percent-encoded runtime URL copy, scalar/rejection tests, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

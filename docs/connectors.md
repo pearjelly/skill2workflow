@@ -47,7 +47,7 @@ Supported request metadata:
 | `url` | Required `http://` or `https://` URL. Other schemes fail before a network call. |
 | `headers` | Optional object. Keys and values are stringified. |
 | `body` | Optional JSON-serializable value. When present, it is encoded as UTF-8 JSON and must be at most 1 MiB. |
-| `input_mapping` | Optional body-only mapping from durable trigger input into request body fields. |
+| `input_mapping` | Optional bounded mapping from durable trigger input into request body fields or query parameters. |
 | `timeout_ms` | Optional positive millisecond timeout. Missing or invalid values default to 5000 ms. |
 
 ### HTTP Payload Boundary
@@ -71,7 +71,7 @@ If `body` is present and no case-insensitive `Content-Type` header is supplied, 
 
 ### HTTP Input Mapping
 
-The built-in HTTP connector can copy non-secret values from durable run context into request body fields at execution time:
+The built-in HTTP connector can copy non-secret values from durable run context into request body fields or query parameters at execution time:
 
 ```json
 {
@@ -89,6 +89,11 @@ The built-in HTTP connector can copy non-secret values from durable run context 
           "from": "/input/customer_id",
           "to": "/body/customer_id",
           "required": true
+        },
+        {
+          "from": "/input/page",
+          "to": "/query/page",
+          "required": false
         }
       ]
     }
@@ -101,15 +106,16 @@ Supported mapping fields:
 | Field | Behavior |
 | --- | --- |
 | `from` | Required JSON pointer under `/input/...`, resolved against `run_state.context.input`. |
-| `to` | Required JSON pointer under `/body/...`, applied to a runtime copy of `connector.request.body`. |
-| `required` | Optional boolean. Defaults to `true`; when `false`, missing input leaves the static body unchanged. |
+| `to` | Required target under `/body/...` or `/query/<name>`. Body targets are applied to a runtime copy of `connector.request.body`; query targets replace an existing parameter with the same name and are percent-encoded. |
+| `required` | Optional boolean. Defaults to `true`; when `false`, missing input leaves the static request unchanged. |
 
 Input mapping never mutates the published Workflow DSL artifact. It applies only to the outbound request copy immediately before HTTP execution. Mapped values are not written to audit events; connector audit metadata may include compact mapping status and input keys only.
 
 Current input mapping limits:
 
-- only HTTP connector request body targets are supported
-- no header, URL, path, query string, credential, environment, or file mapping
+- only HTTP connector request body fields and flat query parameter targets are supported
+- query targets accept only scalar string, number, or boolean input values
+- no header, URL interpolation, path, credential, environment, or file mapping
 - no arbitrary string templates, expression language, or script evaluation
 - trigger input must remain non-secret business metadata
 

@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added bounded HTTP connector query-parameter input mapping through
+  `/query/<name>` targets, with scalar-only values and no template or expression
+  evaluation.
+
 - Added `connectors --connector-fixture` so operators can inspect a reviewed
   external connector manifest before running it, without creating state or
   executing connector code.
@@ -78,7 +82,7 @@ release; Roadmap loop completion alone does not publish a new version.
   authority. See `docs/workflow-bundles.md`.
 
 - Added local `preflight` and authenticated `service-workflow-preflight`
-  commands for checking trigger input contracts and HTTP body mappings before
+  commands for checking trigger input contracts and HTTP request mappings before
   execution. The fixed `skill2workflow-workflow-preflight-0.1.0` report is
   bounded, side-effect free, and value free: it never calls connectors,
   resolves credentials, writes state, or echoes trigger values. See

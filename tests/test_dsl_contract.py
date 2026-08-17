@@ -27,7 +27,10 @@ class DslContractTests(TestCase):
         request_properties = schema["$defs"]["connector_request"]["properties"]
         self.assertIn("input_mapping", request_properties)
         self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["from"]["pattern"], "^/input/.+")
-        self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["to"]["pattern"], "^/body/.+")
+        self.assertEqual(
+            request_properties["input_mapping"]["items"]["properties"]["to"]["pattern"],
+            "^/(body/.+|query/[^/]+)$",
+        )
         self.assertIn("on_fallback", schema["$defs"]["node"]["properties"])
         self.assertEqual(schema["$defs"]["node"]["properties"]["timeout_ms"]["maximum"], 86400000)
         retry_policy = schema["$defs"]["retry_policy"]

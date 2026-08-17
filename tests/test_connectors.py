@@ -201,6 +201,96 @@ class ConnectorTests(TestCase):
         self.assertEqual(result["input_mapping"], {"status": "applied", "input_keys": ["account", "customer_id"]})
         self.assertEqual(node["connector"]["request"]["body"], {"source": "static"})
 
+    def test_http_connector_maps_scalar_context_input_into_query_without_mutating_binding(self):
+        server = _ConnectorTestServer()
+        node = _http_node(
+            server.url("/success?existing=1"),
+            method="GET",
+            input_mapping=[
+                {"from": "/input/existing", "to": "/query/existing", "required": True},
+                {"from": "/input/customer_id", "to": "/query/customer_id", "required": True},
+                {"from": "/input/page", "to": "/query/page", "required": True},
+                {"from": "/input/active", "to": "/query/active", "required": True},
+            ],
+        )
+
+        try:
+            result = execute_connector(
+                node,
+                context={
+                    "input": {
+                        "existing": 2,
+                        "customer_id": "customer 123",
+                        "page": 2,
+                        "active": True,
+                    }
+                },
+            )
+        finally:
+            server.close()
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(
+            server.requests[0]["path"],
+            "/success?existing=2&customer_id=customer+123&page=2&active=true",
+        )
+        self.assertEqual(
+            result["input_mapping"],
+            {"status": "applied", "input_keys": ["active", "customer_id", "existing", "page"]},
+        )
+        self.assertEqual(node["connector"]["request"]["url"], server.url("/success?existing=1"))
+
+    def test_http_connector_rejects_non_scalar_query_mapping_value_before_network_call(self):
+        server = _ConnectorTestServer()
+        try:
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                "query input mapping value must be a string, number, or boolean",
+            ):
+                execute_connector(
+                    _http_node(
+                        server.url("/success"),
+                        input_mapping=[
+                            {"from": "/input/filter", "to": "/query/filter", "required": True}
+                        ],
+                    ),
+                    context={"input": {"filter": {"status": "open"}}},
+                )
+        finally:
+            server.close()
+
+        self.assertEqual(server.requests, [])
+
+    def test_http_connector_rejects_nested_query_mapping_target(self):
+        with self.assertRaisesRegex(
+            ConnectorExecutionError,
+            "to must be /query/<name>",
+        ):
+            execute_connector(
+                _http_node(
+                    "http://127.0.0.1:1/not-called",
+                    input_mapping=[
+                        {"from": "/input/customer_id", "to": "/query/filter/customer_id", "required": True}
+                    ],
+                ),
+                context={"input": {"customer_id": "customer_123"}},
+            )
+
+    def test_http_connector_rejects_malformed_query_mapping_url(self):
+        with self.assertRaisesRegex(
+            ConnectorExecutionError,
+            "http connector request.url is invalid",
+        ):
+            execute_connector(
+                _http_node(
+                    "http://[invalid",
+                    input_mapping=[
+                        {"from": "/input/page", "to": "/query/page", "required": True}
+                    ],
+                ),
+                context={"input": {"page": 2}},
+            )
+
     def test_http_connector_missing_required_input_mapping_fails_before_network_call(self):
         server = _ConnectorTestServer()
 

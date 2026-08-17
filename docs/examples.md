@@ -68,7 +68,7 @@ This example starts with a metrics query command, checks threshold breaches, dra
 
 ### HTTP Connector
 
-This example demonstrates the built-in HTTP connector request metadata, including a body-only `input_mapping` that copies non-secret trigger input into the outbound request body at runtime.
+This example demonstrates the built-in HTTP connector request metadata, including a bounded `input_mapping` that copies non-secret trigger input into the outbound request body at runtime. Query-parameter mappings use the same contract with `/query/<name>` targets.
 
 ### Local External Connector Prototype
 
@@ -122,7 +122,7 @@ The pilot scenario pack is generated at runtime rather than committed as static 
 python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilot-pack
 ```
 
-Use it when evaluating whether trigger input, body-only connector mapping, credential handles, manual gates, audit, snapshots, and LiteGraph overlays generalize across more than one workflow shape.
+Use it when evaluating whether trigger input, body/query connector mapping, credential handles, manual gates, audit, snapshots, and LiteGraph overlays generalize across more than one workflow shape.
 
 ## Fixture Synchronization
 

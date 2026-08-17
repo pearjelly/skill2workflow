@@ -558,11 +558,11 @@ def _validate_http_connector_request(
                     mapping_path + ["from"],
                 )
             )
-        if not isinstance(target, str) or target == "/body/" or not target.startswith("/body/"):
+        if not _valid_http_input_mapping_target(target):
             errors.append(
                 _validation_error(
                     "input_mapping_target_invalid",
-                    f"{node.get('id')} connector.request.input_mapping[{mapping_index}].to must start with /body/",
+                    f"{node.get('id')} connector.request.input_mapping[{mapping_index}].to must start with /body/ or be /query/<name>",
                     mapping_path + ["to"],
                 )
             )
@@ -574,6 +574,16 @@ def _validate_http_connector_request(
                     mapping_path + ["required"],
                 )
             )
+
+
+def _valid_http_input_mapping_target(target: object) -> bool:
+    if not isinstance(target, str):
+        return False
+    if target.startswith("/body/") and target != "/body/":
+        return True
+    if not target.startswith("/query/") or target == "/query/":
+        return False
+    return len(target.split("/")) == 3 and bool(target.split("/")[-1])
 
 
 def _validation_error(code: str, message: str, path: List[object]) -> ValidationError:

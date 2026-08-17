@@ -419,7 +419,7 @@ The durable run context has two top-level fields:
 
 The context is stored with the run state in both JSON and SQLite storage modes. It does not mutate the published workflow artifact and does not change Workflow DSL `0.1.0`.
 
-Node execution code can inspect `state["context"]` while running. Trigger input is not used for connector credential resolution. The current runtime supports a constrained HTTP connector body mapping from `/input/...` to `/body/...` through `connector.request.input_mapping`; see `docs/connectors.md`.
+Node execution code can inspect `state["context"]` while running. Trigger input is not used for connector credential resolution. The current runtime supports constrained HTTP connector mapping from `/input/...` to `/body/...` fields or scalar `/query/<name>` parameters through `connector.request.input_mapping`; see `docs/connectors.md`.
 
 ## Audit Semantics
 
@@ -455,8 +455,8 @@ The trigger API intentionally does not provide:
 - automatic idempotency enforcement for JSON/local evaluation (SQLite service enforcement is documented above)
 - automatic retry of uncertain recurring effects across process restarts
 - arbitrary input templating or connector request interpolation
-- header, URL, query string, credential, environment, or file mapping
-- schema-based input mapping beyond the explicit body-only contract
+- header, URL interpolation, path, credential, environment, or file mapping
+- schema-based input mapping beyond the explicit body/query contract
 - product-specific SaaS callbacks
 
 Future hosted scheduler and integration adapters should call this trigger boundary instead of bypassing the control plane.

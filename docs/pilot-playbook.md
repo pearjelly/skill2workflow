@@ -97,7 +97,7 @@ The current local bootstrap can demonstrate:
 - compact audit metadata that exposes input keys instead of full input values
 - manual gate pause and resume
 - HTTP connector execution through a local receiver
-- body-only mapping from trigger input into HTTP request bodies
+- bounded body/query mapping from trigger input into HTTP requests
 - credential handle resolution outside Workflow DSL
 - run and connector audit events
 - read-only node overlays in snapshots and LiteGraph JSON
@@ -166,7 +166,7 @@ git diff --check
 
 ## Next Pilot Work
 
-After this playbook, the scenario pack, the local schedule boundary, and body-only input mapping, the next useful closed loops are:
+After this playbook, the scenario pack, the local schedule boundary, and bounded body/query input mapping, the next useful closed loops are:
 
 - a local connector extension prototype that proves the documented extension contract without SaaS dependencies
-- richer mapping variants beyond the current body-only contract, once pilot evidence requires them
+- header and path mapping only after a concrete pilot contract and redaction review require them

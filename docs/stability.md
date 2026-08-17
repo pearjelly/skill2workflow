@@ -203,11 +203,11 @@ These surfaces may change while the project learns from real workflows:
 - Connector manifest fields beyond the documented minimum contract
 - Dynamic connector loading, automatic connector discovery and product-specific connector packages
 - Connector package installation, marketplace indexing, OAuth, hosted callbacks, and distributed queues
-- HTTP connector request metadata beyond documented method, URL, headers, body, timeout, credential handles, and body-only input mapping
+- HTTP connector request metadata beyond documented method, URL, headers, body, timeout, credential handles, and bounded body/query input mapping
 - Credential providers beyond the documented local static file and mounted directory boundaries
 - Exponential retry strategies, provider-specific retry classification, and automatic retry of uncertain external effects beyond the documented connector-node retry and fixed backoff boundary
 - Hosted secret storage, OAuth, multi-tenant RBAC, and IAM
-- Advanced input mapping beyond the body-only contract, templating, and connector request interpolation
+- Advanced input mapping beyond the bounded body/query contract, templating, and connector request interpolation
 - Hosted webhook ingress, callback verification, distributed queues, cron/calendar scheduling, and multi-database schedulers
 - Product-specific connector packages and connector marketplaces
 - SQLite table internals beyond the published state-layout identity and supported migration path

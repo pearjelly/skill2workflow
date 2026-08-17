@@ -123,7 +123,7 @@ Built-in bindings:
 
 HTTP connector credentials may reference local handles under `connector.credentials`. Only handles belong in Workflow DSL; resolved secret values are supplied at runtime through the local credential provider and are not written to run state or audit events by the built-in runtime.
 
-HTTP connector request metadata may declare body-only `input_mapping`. The built-in runtime reads `/input/...` paths from durable run context and writes `/body/...` paths into a runtime copy of `connector.request.body`. This does not mutate the published Workflow DSL artifact. Mapping audit metadata exposes status and input keys only, not mapped values.
+HTTP connector request metadata may declare bounded `input_mapping`. The built-in runtime reads `/input/...` paths from durable run context and writes either `/body/...` fields into a runtime copy of `connector.request.body` or scalar values into `/query/<name>` URL parameters. This does not mutate the published Workflow DSL artifact. Mapping audit metadata exposes status and input keys only, not mapped values.
 
 Validation requires `tool_call` nodes to declare `connector.id`. Missing bindings produce `connector_binding_missing`.
 

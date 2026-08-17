@@ -1,8 +1,9 @@
 # Workflow trigger preflight
 
 Trigger preflight answers whether a JSON object satisfies a workflow's
-published input contract and whether HTTP body mappings have all required
-source fields. It is an admission check, not a dry-run: it never starts a run,
+published input contract and whether HTTP request mappings have all required
+source fields. Query-target scalar conversion remains an execution-time
+connector check. It is an admission check, not a dry-run: it never starts a run,
 calls a connector, resolves a credential, writes state, or includes input
 values in its result.
 
