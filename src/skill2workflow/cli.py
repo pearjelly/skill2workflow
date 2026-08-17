@@ -902,6 +902,11 @@ def _main(argv=None) -> int:
 
     connectors_cmd = subparsers.add_parser("connectors", help="List connector manifests")
     connectors_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    connectors_cmd.add_argument(
+        "--connector-fixture",
+        type=Path,
+        help="Explicitly load one local connector fixture for manifest inspection",
+    )
 
     control_snapshot_cmd = subparsers.add_parser(
         "control-snapshot",
@@ -1746,7 +1751,11 @@ def _main(argv=None) -> int:
         return 0 if result.get("status") == "valid" else 1
 
     if args.command == "connectors":
-        _print_json(LocalControlPlane(args.state_dir).list_connectors())
+        runtime = _connector_runtime(args)
+        if runtime is not None:
+            _print_json(runtime.list_connectors())
+        else:
+            _print_json(LocalControlPlane(args.state_dir).list_connectors())
         return 0
 
     if args.command == "control-snapshot":

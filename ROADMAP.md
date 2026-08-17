@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-190
+- Completed delivery loops: 1-191
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 190 is complete with a bounded external connector fixture loading boundary
+- Active loop: None; Loop 191 is complete with explicit fixture manifest inspection
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-190 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-191 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 190; the detailed
+The follow-on production hardening continues through Loop 191; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -101,7 +101,8 @@ Verified offline backup/restore, copy-on-write state migration, bounded telemetr
 
 Loop 190 adds a bounded, descriptor-bound explicit external connector fixture
 loader without making dynamic code loading available to the service or remote
-trigger paths.
+trigger paths. Loop 191 adds a read-only CLI manifest inspection path for an
+explicit fixture without creating state or executing connector code.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4711,9 +4712,39 @@ Repeatable command:
 PYTHONPATH=src python3 -m unittest tests.test_external_connectors -v
 ```
 
+### Loop 191: Explicit Connector Fixture Manifest Inspection
+
+**Status:** Complete.
+
+**Prior basis:** Loop 190 made the local fixture handoff bounded, but an
+operator still had to execute a workflow or use Python directly to see the
+manifest that would be registered.
+
+**Outcome:** `connectors --connector-fixture PATH` now loads one reviewed local
+fixture through the same bounded loader and prints the built-in plus external
+manifests without creating state, resolving credentials, or executing a
+connector. The default command keeps its existing built-in or persisted
+control-plane listing behavior.
+
+**Evidence:** CLI tests assert manifest identity and contract metadata, while
+connector documentation tests, installed command help, external connector
+smoke, full-suite, secret-hygiene, and release-preflight checks remain green.
+
+**Safety boundary:** This is a read-only inspection path, not a connector
+execution or installation permit. The fixture is still executable Python and
+must be reviewed; service, remote trigger, automatic discovery, and package
+installation paths remain closed to dynamic loading.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli connectors \
+  --connector-fixture examples/connectors/local_echo_connector.py
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 190 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 191 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4869,6 +4900,7 @@ This rolling queue is ordered. Loop 190 is complete and there is no active deliv
 | Loop 188: Structured Workflow Bundle Admission Refusals | Complete | Expose machine-readable side-effect-consent refusals without changing the default text error or creating state | `bundle-run --format json`, fixed refusal schema, safety tests, installed CLI, docs, and package evidence |
 | Loop 189: Safe Workflow Bundle Run Summaries | Complete | Expose successful Bundle runs as a value-free handoff without changing complete local output | `bundle-run --summary`, fixed summary schema, redaction tests, installed CLI, docs, and package evidence |
 | Loop 190: Bounded External Connector Fixture Loading | Complete | Bound explicit local connector source loading without widening service or remote dynamic-code paths | 2 MiB UTF-8 source bound, regular-file/no-follow checks, device/inode identity and replacement detection, focused loader tests, docs, and baseline evidence |
+| Loop 191: Explicit Connector Fixture Manifest Inspection | Complete | Let operators review an explicitly loaded connector manifest before execution without creating state or invoking a connector | `connectors --connector-fixture`, read-only CLI coverage, manifest contract assertions, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

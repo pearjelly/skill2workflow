@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `connectors --connector-fixture` so operators can inspect a reviewed
+  external connector manifest before running it, without creating state or
+  executing connector code.
+
 - Hardened explicit external connector fixture loading with a 2 MiB UTF-8
   source bound, regular-file/no-follow checks, device/inode identity checks,
   replacement detection, and in-memory compilation.

@@ -88,6 +88,24 @@ class CliTests(TestCase):
             "local_echo",
         )
 
+    def test_connectors_command_inspects_explicit_fixture_manifest(self):
+        fixture = Path(__file__).resolve().parents[1] / "examples" / "connectors" / "local_echo_connector.py"
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            exit_code = main(
+                ["connectors", "--connector-fixture", str(fixture)]
+            )
+
+        manifests = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            [manifest["id"] for manifest in manifests],
+            ["manual", "http", "local_echo"],
+        )
+        local_echo = manifests[-1]
+        self.assertEqual(local_echo["execution_contract"]["mode"], "external")
+        self.assertEqual(local_echo["node_types"], ["tool_call"])
+
     def test_resume_accepts_explicit_connector_fixture_for_local_processes(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

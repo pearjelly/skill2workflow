@@ -195,6 +195,9 @@ skill2workflow bundle-run /tmp/workflow.s2w \
   --connector-fixture examples/connectors/local_echo_connector.py \
   --allow-side-effects \
   --state-dir /tmp/skill2workflow-bundle-state
+
+skill2workflow connectors \
+  --connector-fixture examples/connectors/local_echo_connector.py
 ```
 
 This is intentionally a local, operator-supplied code-loading path. It is not
@@ -208,6 +211,11 @@ been reviewed as executable code. The existing credential, input, result-size,
 and audit-redaction boundaries still apply. See
 [`external-connector-loading-boundary.md`](external-connector-loading-boundary.md)
 for the exact contract.
+
+The `connectors` inspection command prints the built-in manifests plus the
+explicit fixture manifest without creating state or executing connector code.
+Without `--connector-fixture`, it preserves the existing built-in or persisted
+control-plane listing behavior.
 
 Explicit local fixture loading:
 

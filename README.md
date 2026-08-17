@@ -180,7 +180,7 @@ explicit connector boundaries. It currently supports:
 - Create, verify, structurally diff, preflight, explicitly publish, and safely run deterministic, secret-checked Workflow DSL bundles through existing local contracts with explicit side-effect consent
 - Drain due schedule work in explicitly bounded side-effect batches
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
-- List built-in connector manifests
+- List built-in connector manifests, or inspect one explicitly loaded local fixture manifest
 - Validate and inspect the minimum connector manifest contract for future extensions
 - Explicitly load one local external connector fixture through a narrow, bounded regular-file/no-follow runtime registration path while keeping the default built-in registry stable
 - Run a reviewed external connector fixture from local `run`, `resume`, or `bundle-run` processes with an explicit `--connector-fixture` flag; service and remote trigger paths remain closed to dynamic code loading
@@ -732,6 +732,13 @@ List connector manifests:
 PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control
 ```
 
+Inspect a reviewed local fixture before using it:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli connectors \
+  --connector-fixture examples/connectors/local_echo_connector.py
+```
+
 Export a control-plane snapshot:
 
 ```bash
@@ -843,7 +850,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-190 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-191 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1539,6 +1546,10 @@ detection, and in-memory compilation. This is a file-handoff boundary rather
 than a Python sandbox; the service and remote trigger paths still do not load
 connector code dynamically. See
 [`docs/external-connector-loading-boundary.md`](docs/external-connector-loading-boundary.md).
+
+Loop 191 adds `connectors --connector-fixture` so operators can inspect a
+reviewed fixture manifest without creating state, resolving credentials, or
+executing a connector.
 
 The installed console script also supports `--version`, reporting the package
 version without requiring a workflow subcommand; the wheel smoke checks that

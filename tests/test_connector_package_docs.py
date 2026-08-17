@@ -22,6 +22,7 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("automatic connector discovery", connectors)
         self.assertIn("--connector-fixture", connectors)
         self.assertIn("long-running service", connectors)
+        self.assertIn("connectors` inspection command", connectors)
         self.assertIn("2 MiB", connectors)
         self.assertIn("no-follow descriptor", connectors)
 
