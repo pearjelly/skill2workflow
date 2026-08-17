@@ -895,6 +895,10 @@ class RuntimeServiceTests(TestCase):
             config = _service_config(root, state_dir=state_dir)
             service = RuntimeService(config)
             store = service.scheduler.dispatcher.store
+            # This instance is used only to reach the scheduler's durable
+            # store; no serving loop owns its listener, so close it before
+            # starting the real service below.
+            service._server.server_close()
             record = {
                 "dispatch_id": "dispatch_private_001",
                 "schedule_id": "schedule_private_report",
@@ -977,6 +981,9 @@ class RuntimeServiceTests(TestCase):
             workflow = _workflow()
             workflow["workflow"]["name"] = "Private workflow title"
             service.control_plane.publish_workflow(workflow)
+            # The bootstrap instance is used for persistence setup only; its
+            # listener is never served and must be closed explicitly.
+            service._server.server_close()
             (state_dir / "workflows" / "orphan.json").write_text("{}", encoding="utf-8")
             ready = threading.Event()
             holder = {}
