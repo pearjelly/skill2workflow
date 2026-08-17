@@ -535,6 +535,51 @@ class CliTests(TestCase):
             cursor="cursor-token",
         )
 
+    def test_service_backup_retention_plan_command_prints_plan(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        policy_file = Path("/private/backup-retention.json")
+        expected = {
+            "schema_version": "skill2workflow-remote-backup-retention-plan-0.1.0",
+            "status": "blocked",
+            "storage": "filesystem",
+            "policy_sha256": "a" * 64,
+            "expire_before": "2026-08-14T00:00:03+00:00",
+            "minimum_keep": 1,
+            "inventory": {"max_items": 1000, "returned": 1000, "truncated": True},
+            "summary": {
+                "valid_backups": None,
+                "invalid_backups": None,
+                "eligible_backups": None,
+                "eligible_bytes": None,
+                "preserved_backups": None,
+                "preserved_bytes": None,
+            },
+            "blocking_reasons": ["inventory_truncated"],
+        }
+        with patch(
+            "skill2workflow.cli.fetch_backup_retention_plan", return_value=expected
+        ) as fetch, patch(
+            "skill2workflow.cli._load_json", return_value={"policy": "value"}
+        ):
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-backup-retention-plan",
+                        str(policy_file),
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with(
+            "https://service.example", token_file, {"policy": "value"}
+        )
+
     def test_service_retention_readiness_command_loads_policy_and_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

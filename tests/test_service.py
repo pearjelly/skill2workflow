@@ -1658,6 +1658,84 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(malformed, {"error": "backup inventory page cursor is invalid"})
         self.assertFalse(thread.is_alive())
 
+    def test_backup_retention_plan_is_authenticated_aggregate_and_redacted(self):
+        policy = {
+            "schema_version": "skill2workflow-backup-retention-policy-0.1.0",
+            "retention": {
+                "expire_before": "2026-08-14T00:00:03Z",
+                "minimum_keep": 1,
+            },
+        }
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            backup_parent = root / "backups"
+            config = _service_config(
+                root,
+                state_dir=state_dir,
+                backup_parent_dir=backup_parent,
+            )
+            initializer = RuntimeService(config)
+            initializer._server.server_close()
+            for name, timestamp in (
+                ("customer-private-old", "2026-08-14T00:00:01+00:00"),
+                ("customer-private-new", "2026-08-14T00:00:04+00:00"),
+            ):
+                backup_dir = backup_parent / name
+                create_state_backup(state_dir, backup_dir)
+                manifest_path = backup_dir / "manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["created_at"] = timestamp
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            url = f"http://{host}:{port}/api/v1/backup-retention-plan"
+            try:
+                denied_status, denied = _post_json(url, {"policy": policy})
+                malformed_status, malformed = _post_json(
+                    url,
+                    {"policy": {"schema_version": "unsupported"}},
+                    token=AUTH_TOKEN,
+                )
+                accepted_status, accepted = _post_json(
+                    url,
+                    {"policy": policy},
+                    token=AUTH_TOKEN,
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "backup retention plan rejected"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted["schema_version"],
+            "skill2workflow-remote-backup-retention-plan-0.1.0",
+        )
+        self.assertEqual(accepted["status"], "ready")
+        self.assertEqual(accepted["summary"]["eligible_backups"], 1)
+        serialized = json.dumps(accepted, ensure_ascii=False)
+        self.assertNotIn("customer-private", serialized)
+        self.assertNotIn(str(backup_parent), serialized)
+        self.assertFalse(thread.is_alive())
+
     def test_retention_readiness_is_authenticated_bounded_and_blocks_live_service(self):
         policy = {
             "schema_version": "skill2workflow-retention-policy-0.3.0",

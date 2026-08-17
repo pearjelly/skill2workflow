@@ -19,10 +19,12 @@ from skill2workflow.backup import (
     BACKUP_SCHEMA_VERSION,
     REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION,
     REMOTE_BACKUP_INVENTORY_PAGE_SCHEMA_VERSION,
+    REMOTE_BACKUP_RETENTION_PLAN_SCHEMA_VERSION,
     STATE_LAYOUT_VERSION,
     build_backup_retention_plan,
     build_remote_backup_inventory,
     build_remote_backup_inventory_page,
+    build_remote_backup_retention_plan,
     create_state_backup,
     inspect_state_backup_readiness,
     _iter_workflow_artifact_records,
@@ -636,6 +638,43 @@ class StateBackupTests(TestCase):
             ):
                 with self.assertRaisesRegex(ValueError, "backup retention"):
                     normalize_backup_retention_policy(invalid_policy)
+
+    def test_remote_backup_retention_plan_is_aggregate_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            parent = root / "backups"
+            parent.mkdir()
+            parent.chmod(0o700)
+            _populate_state(state_dir)
+            for name, timestamp in (
+                ("private-old", "2026-08-14T00:00:01+00:00"),
+                ("private-new", "2026-08-14T00:00:04+00:00"),
+            ):
+                backup_dir = parent / name
+                create_state_backup(state_dir, backup_dir)
+                manifest_path = backup_dir / "manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["created_at"] = timestamp
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+            policy = {
+                "schema_version": BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
+                "retention": {
+                    "expire_before": "2026-08-14T00:00:03Z",
+                    "minimum_keep": 1,
+                },
+            }
+            result = build_remote_backup_retention_plan(parent, policy)
+
+        self.assertEqual(result["schema_version"], REMOTE_BACKUP_RETENTION_PLAN_SCHEMA_VERSION)
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["summary"]["eligible_backups"], 1)
+        self.assertEqual(result["summary"]["preserved_backups"], 1)
+        self.assertNotIn("candidates", result)
+        self.assertNotIn("preserved", result)
+        self.assertNotIn("private-old", json.dumps(result))
+        self.assertNotIn("private-new", json.dumps(result))
 
 
 class _NoArtifactFetchAllCursor:

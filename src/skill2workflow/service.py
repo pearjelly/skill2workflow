@@ -24,8 +24,10 @@ from .backup import (
     MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS,
     build_remote_backup_inventory,
     build_remote_backup_inventory_page,
+    build_remote_backup_retention_plan,
     build_state_backup_readiness_report,
     inspect_state_backup_readiness,
+    normalize_backup_retention_policy,
 )
 from .control_plane import LocalControlPlane
 from .credentials import DirectoryCredentialProvider
@@ -109,6 +111,7 @@ MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_BACKUP_INVENTORY_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_BACKUP_INVENTORY_PAGE_RESPONSE_BYTES = 64 * 1024
+MAX_REMOTE_BACKUP_RETENTION_PLAN_RESPONSE_BYTES = 16 * 1024
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
@@ -790,6 +793,8 @@ def _handler_for(service: RuntimeService):
                         self._handle_backup_inventory()
                     elif self.command == "GET" and path == "/api/v1/backup-inventory-pages":
                         self._handle_backup_inventory_page()
+                    elif self.command == "POST" and path == "/api/v1/backup-retention-plan":
+                        self._handle_backup_retention_plan()
                     elif self.command == "POST" and path == "/api/v1/retention-readiness":
                         self._handle_retention_readiness()
                     elif self.command == "GET" and path == "/api/v1/operational-readiness":
@@ -2106,6 +2111,65 @@ def _handler_for(service: RuntimeService):
                 return
             self._send_json(200, report)
 
+        def _handle_backup_retention_plan(self):
+            """Serve a redacted, policy-bound backup expiration plan."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                body = read_request_body(self)
+                payload = json.loads(body.decode("utf-8"))
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != {"policy"}
+                    or not isinstance(payload.get("policy"), dict)
+                ):
+                    raise ValueError(
+                        "backup retention plan request must contain one policy object"
+                    )
+                policy = normalize_backup_retention_policy(payload["policy"])
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            except (
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+                TypeError,
+                ValueError,
+                OverflowError,
+                RecursionError,
+            ):
+                self._send_json(400, {"error": "backup retention plan rejected"})
+                return
+            parent_dir = service.config.backup_parent_dir
+            if parent_dir is None:
+                self._send_json(503, {"error": "backup retention plan unavailable"})
+                return
+            try:
+                report = build_remote_backup_retention_plan(parent_dir, policy)
+                encoded = json.dumps(report, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_REMOTE_BACKUP_RETENTION_PLAN_RESPONSE_BYTES:
+                    raise ValueError("backup retention plan exceeds response limit")
+            except (ValueError, OSError, sqlite3.Error):
+                self._send_json(503, {"error": "backup retention plan unavailable"})
+                return
+            self._send_json(200, report)
+
         def _handle_operational_readiness(self):
             """Serve one aggregate, redacted operator readiness report."""
 
@@ -2862,6 +2926,8 @@ def _request_route(method: str, path: str) -> str:
         return "backup_inventory"
     if method == "GET" and path == "/api/v1/backup-inventory-pages":
         return "backup_inventory_page"
+    if method == "POST" and path == "/api/v1/backup-retention-plan":
+        return "backup_retention_plan"
     if method == "POST" and path == "/api/v1/retention-readiness":
         return "retention_readiness"
     if method == "GET" and path == "/api/v1/operational-readiness":

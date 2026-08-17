@@ -8,6 +8,14 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added protected remote backup retention planning through
+  `POST /api/v1/backup-retention-plan` and the installed
+  `service-backup-retention-plan` CLI. The fixed redacted
+  `skill2workflow-remote-backup-retention-plan-0.1.0` contract reuses the
+  normalized local policy, blocks incomplete inventories, reports aggregate
+  eligible/preserved counts and bytes, and never deletes or exposes backup
+  names, paths, manifests, or workflow values.
+
 - Added cursor-paged protected remote backup inventory through
   `GET /api/v1/backup-inventory-pages` and the installed
   `service-backup-inventory-page` CLI. The separate redacted 100-item/64 KiB

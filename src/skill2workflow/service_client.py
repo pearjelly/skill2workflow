@@ -18,6 +18,7 @@ from .backup import (
     MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS,
     REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION,
     REMOTE_BACKUP_INVENTORY_PAGE_SCHEMA_VERSION,
+    REMOTE_BACKUP_RETENTION_PLAN_SCHEMA_VERSION,
 )
 from .retention import RETENTION_READINESS_SCHEMA_VERSION
 from .operational_readiness import OPERATIONAL_READINESS_SCHEMA_VERSION
@@ -86,6 +87,8 @@ MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_BACKUP_INVENTORY_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_BACKUP_INVENTORY_PAGE_RESPONSE_BYTES = 64 * 1024
+MAX_REMOTE_BACKUP_RETENTION_PLAN_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_REMOTE_BACKUP_RETENTION_PLAN_RESPONSE_BYTES = 16 * 1024
 MAX_RETENTION_READINESS_REQUEST_BYTES = 64 * 1024
 MAX_RETENTION_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
@@ -591,6 +594,28 @@ def fetch_retention_readiness(
         max_response_bytes=MAX_RETENTION_READINESS_RESPONSE_BYTES,
     )
     _validate_retention_readiness(payload)
+    return payload
+
+
+def fetch_backup_retention_plan(
+    service_url: str,
+    token_file: Path,
+    policy: Dict[str, object],
+) -> Dict[str, object]:
+    """Fetch a redacted, policy-bound backup expiration plan."""
+
+    if not isinstance(policy, dict):
+        raise ValueError("backup retention policy must be a JSON object")
+    payload = _post_json(
+        service_url,
+        token_file,
+        "/api/v1/backup-retention-plan",
+        {"policy": policy},
+        conflict_message="backup retention plan unavailable",
+        max_request_bytes=MAX_REMOTE_BACKUP_RETENTION_PLAN_REQUEST_BYTES,
+        max_response_bytes=MAX_REMOTE_BACKUP_RETENTION_PLAN_RESPONSE_BYTES,
+    )
+    _validate_backup_retention_plan(payload)
     return payload
 
 
@@ -1925,6 +1950,57 @@ def _validate_retention_readiness(payload: Dict[str, object]) -> None:
         raise ServiceActionError()
     values = list(eligible.values()) + list(preserved.values())
     if active:
+        if any(value is not None for value in values):
+            raise ServiceActionError()
+    elif any(not _is_non_negative_integer(value) for value in values):
+        raise ServiceActionError()
+
+
+def _validate_backup_retention_plan(payload: Dict[str, object]) -> None:
+    """Reject responses outside the redacted backup-retention contract."""
+
+    fields = {
+        "schema_version", "status", "storage", "policy_sha256", "expire_before",
+        "minimum_keep", "inventory", "summary", "blocking_reasons",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    if (
+        payload.get("schema_version") != REMOTE_BACKUP_RETENTION_PLAN_SCHEMA_VERSION
+        or payload.get("status") not in {"ready", "blocked"}
+        or payload.get("storage") != "filesystem"
+        or not _is_hex_digest(payload.get("policy_sha256"))
+        or not isinstance(payload.get("expire_before"), str)
+        or not payload.get("expire_before")
+        or not _is_non_negative_integer(payload.get("minimum_keep"))
+        or not 1 <= payload.get("minimum_keep") <= 1000
+        or not isinstance(payload.get("blocking_reasons"), list)
+        or payload.get("blocking_reasons") != (
+            ["inventory_truncated"] if payload.get("status") == "blocked" else []
+        )
+    ):
+        raise ServiceActionError()
+    inventory = payload.get("inventory")
+    if (
+        not isinstance(inventory, dict)
+        or set(inventory) != {"max_items", "returned", "truncated"}
+        or not _is_non_negative_integer(inventory.get("max_items"))
+        or not 1 <= inventory.get("max_items") <= 1000
+        or not _is_non_negative_integer(inventory.get("returned"))
+        or inventory.get("returned") > inventory.get("max_items")
+        or not isinstance(inventory.get("truncated"), bool)
+        or inventory.get("truncated") != (payload.get("status") == "blocked")
+    ):
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    summary_fields = {
+        "valid_backups", "invalid_backups", "eligible_backups", "eligible_bytes",
+        "preserved_backups", "preserved_bytes",
+    }
+    if not isinstance(summary, dict) or set(summary) != summary_fields:
+        raise ServiceActionError()
+    values = list(summary.values())
+    if payload.get("status") == "blocked":
         if any(value is not None for value in values):
             raise ServiceActionError()
     elif any(not _is_non_negative_integer(value) for value in values):

@@ -17,6 +17,7 @@ from skill2workflow.service_client import (
     MAX_BACKUP_READINESS_RESPONSE_BYTES,
     MAX_REMOTE_BACKUP_INVENTORY_RESPONSE_BYTES,
     MAX_REMOTE_BACKUP_INVENTORY_PAGE_RESPONSE_BYTES,
+    MAX_REMOTE_BACKUP_RETENTION_PLAN_RESPONSE_BYTES,
     MAX_RETENTION_READINESS_RESPONSE_BYTES,
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
     SERVICE_PROBE_SCHEMA_VERSION,
@@ -46,6 +47,7 @@ from skill2workflow.service_client import (
     fetch_backup_readiness,
     fetch_backup_inventory,
     fetch_backup_inventory_page,
+    fetch_backup_retention_plan,
     fetch_retention_readiness,
     fetch_operational_readiness,
     fetch_service_probe,
@@ -1772,6 +1774,78 @@ class ServiceClientTests(TestCase):
 
         self.assertFalse(thread.is_alive())
 
+    def test_backup_retention_plan_posts_authenticated_policy_and_validates_contract(self):
+        observed = {}
+        payload = _backup_retention_plan_payload()
+        policy = {"schema_version": "skill2workflow-backup-retention-policy-0.1.0"}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = fetch_backup_retention_plan(
+                f"http://127.0.0.1:{server.server_port}", token_file, policy
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed["path"], "/api/v1/backup-retention-plan")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(observed["body"], {"policy": policy})
+        self.assertFalse(thread.is_alive())
+
+    def test_backup_retention_plan_rejects_oversized_response(self):
+        body = b"x" * (MAX_REMOTE_BACKUP_RETENTION_PLAN_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_backup_retention_plan(
+                    f"http://127.0.0.1:{server.server_port}",
+                    token_file,
+                    {},
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
     def test_retention_readiness_posts_policy_and_validates_fixed_contract(self):
         policy = {
             "schema_version": "skill2workflow-retention-policy-0.3.0",
@@ -2961,6 +3035,27 @@ def _backup_inventory_page_payload():
             "has_more": True,
             "next_cursor": "cursor-next",
         },
+    }
+
+
+def _backup_retention_plan_payload():
+    return {
+        "schema_version": "skill2workflow-remote-backup-retention-plan-0.1.0",
+        "status": "ready",
+        "storage": "filesystem",
+        "policy_sha256": "a" * 64,
+        "expire_before": "2026-08-14T00:00:03+00:00",
+        "minimum_keep": 1,
+        "inventory": {"max_items": 1000, "returned": 2, "truncated": False},
+        "summary": {
+            "valid_backups": 2,
+            "invalid_backups": 0,
+            "eligible_backups": 1,
+            "eligible_bytes": 4096,
+            "preserved_backups": 1,
+            "preserved_bytes": 4096,
+        },
+        "blocking_reasons": [],
     }
 
 

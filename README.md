@@ -756,7 +756,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-161 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-162 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1306,6 +1306,12 @@ the separate authenticated page route and installed
 an opaque continuation cursor while preserving the exact Loop 160 compatibility
 route.
 
+Loop 162 adds [protected remote backup retention planning](docs/remote-backup-retention-plan.md):
+the authenticated policy route and installed `service-backup-retention-plan`
+client report complete-inventory status, eligible counts, and byte totals
+without exposing backup names, paths, or per-set reasons. The endpoint is
+read-only and blocks truncated inventories.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1336,6 +1342,7 @@ See:
 - `docs/remote-backup-readiness.md`
 - `docs/remote-backup-inventory.md`
 - `docs/remote-backup-inventory-pages.md`
+- `docs/remote-backup-retention-plan.md`
 - `docs/remote-audit-integrity.md`
 - `docs/remote-runtime-info.md`
 - `docs/remote-trigger.md`

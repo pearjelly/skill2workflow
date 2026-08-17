@@ -40,6 +40,7 @@ from .service_client import (
     fetch_backup_readiness,
     fetch_backup_inventory,
     fetch_backup_inventory_page,
+    fetch_backup_retention_plan,
     fetch_retention_readiness,
     fetch_operational_readiness,
     fetch_service_probe,
@@ -486,6 +487,14 @@ def main(argv=None) -> int:
     service_retention_cmd.add_argument("policy", type=Path)
     service_retention_cmd.add_argument("--service-url", required=True)
     service_retention_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_backup_retention_cmd = subparsers.add_parser(
+        "service-backup-retention-plan",
+        help="Plan bounded remote backup expiration without deleting backups",
+    )
+    service_backup_retention_cmd.add_argument("policy", type=Path)
+    service_backup_retention_cmd.add_argument("--service-url", required=True)
+    service_backup_retention_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_operational_cmd = subparsers.add_parser(
         "service-operational-readiness",
@@ -1200,6 +1209,15 @@ def main(argv=None) -> int:
     if args.command == "service-retention-readiness":
         return _service_action(
             lambda: fetch_retention_readiness(
+                args.service_url,
+                args.auth_token_file,
+                _load_json(args.policy),
+            )
+        )
+
+    if args.command == "service-backup-retention-plan":
+        return _service_action(
+            lambda: fetch_backup_retention_plan(
                 args.service_url,
                 args.auth_token_file,
                 _load_json(args.policy),

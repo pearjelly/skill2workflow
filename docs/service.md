@@ -105,6 +105,12 @@ Loop 161 adds the cursor-paged backup inventory route and installed
 [`remote-backup-inventory-pages.md`](remote-backup-inventory-pages.md). The
 separate redacted page contract walks older backup evidence with an opaque
 continuation cursor while preserving the exact Loop 160 recent-window route.
+Loop 162 adds the authenticated, read-only backup retention plan route and
+installed `service-backup-retention-plan` client documented in
+[`remote-backup-retention-plan.md`](remote-backup-retention-plan.md). It reuses
+the local policy and complete-inventory check while returning only aggregate
+counts and byte totals; truncated inventories are blocked and no backup is
+mutated.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 
@@ -246,6 +252,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli service \
 | `GET /api/v1/backup-readiness` | Requires Bearer authentication and returns the fixed offline-backup preflight with layout, artifact-count, and active-lease metadata within 16 KiB; it does not create or upload a backup. |
 | `GET /api/v1/backup-inventory` | Requires Bearer authentication and an empty body. Returns at most 100 redacted configured-backup integrity/age/layout/size entries within 64 KiB; it never exposes backup names or paths and does not mutate backups. See [`remote-backup-inventory.md`](remote-backup-inventory.md). |
 | `GET /api/v1/backup-inventory-pages` | Requires Bearer authentication and an empty body. Returns one newest-first, at-most-100 redacted backup page within 64 KiB; `window.next_cursor` continues toward older entries without exposing names or paths. Malformed cursors return fixed `400`; missing or unsafe backup configuration returns fixed `503`. See [`remote-backup-inventory-pages.md`](remote-backup-inventory-pages.md). |
+| `POST /api/v1/backup-retention-plan` | Requires Bearer authentication and exactly `{"policy": <backup retention policy>}`. Returns the fixed redacted aggregate plan within 16 KiB; incomplete inventories return `blocked` with null summary values, while ready plans report eligible/preserved counts and bytes. It never deletes or exposes backup names, paths, manifests, or workflow values. See [`remote-backup-retention-plan.md`](remote-backup-retention-plan.md). |
 | `POST /api/v1/retention-readiness` | Requires Bearer authentication and exactly `{"policy": <retention policy>}`. Returns the fixed retention preflight within 16 KiB; an active lease blocks the plan and counts remain null, while a quiesced current-layout read returns aggregate eligibility only. It never applies retention or mutates state. See [`remote-retention-readiness.md`](remote-retention-readiness.md). |
 | `GET /api/v1/operational-readiness` | Requires Bearer authentication and no body. Returns the fixed aggregate service/artifact/audit/backup readiness report within 16 KiB; it does not mutate lifecycle or state and does not claim an atomic cross-database snapshot. See [`remote-operational-readiness.md`](remote-operational-readiness.md). |
 | `GET /api/v1/audit-integrity` | Requires Bearer authentication and returns the fixed payload-free SQLite audit-chain verification result within 16 KiB; it does not repair or rewrite audit state. |

@@ -407,6 +407,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-backup-readiness"', package_smoke)
         self.assertIn('"service-backup-inventory"', package_smoke)
         self.assertIn('"service-backup-inventory-page"', package_smoke)
+        self.assertIn('"service-backup-retention-plan"', package_smoke)
         self.assertIn('"service-retention-readiness"', package_smoke)
         self.assertIn('"service-operational-readiness"', package_smoke)
         self.assertIn('"service-audit-integrity"', package_smoke)

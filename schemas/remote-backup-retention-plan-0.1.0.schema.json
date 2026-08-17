@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/remote-backup-retention-plan-0.1.0.schema.json",
+  "title": "skill2workflow redacted remote backup retention plan 0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "storage",
+    "policy_sha256",
+    "expire_before",
+    "minimum_keep",
+    "inventory",
+    "summary",
+    "blocking_reasons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-remote-backup-retention-plan-0.1.0"
+    },
+    "status": {"enum": ["ready", "blocked"]},
+    "storage": {"const": "filesystem"},
+    "policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "expire_before": {"type": "string", "format": "date-time"},
+    "minimum_keep": {"type": "integer", "minimum": 1, "maximum": 1000},
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_items", "returned", "truncated"],
+      "properties": {
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "returned": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "truncated": {"type": "boolean"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "valid_backups",
+        "invalid_backups",
+        "eligible_backups",
+        "eligible_bytes",
+        "preserved_backups",
+        "preserved_bytes"
+      ],
+      "properties": {
+        "valid_backups": {"type": ["integer", "null"], "minimum": 0},
+        "invalid_backups": {"type": ["integer", "null"], "minimum": 0},
+        "eligible_backups": {"type": ["integer", "null"], "minimum": 0},
+        "eligible_bytes": {"type": ["integer", "null"], "minimum": 0},
+        "preserved_backups": {"type": ["integer", "null"], "minimum": 0},
+        "preserved_bytes": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "blocking_reasons": {
+      "type": "array",
+      "items": {"enum": ["inventory_truncated"]},
+      "maxItems": 1
+    }
+  }
+}

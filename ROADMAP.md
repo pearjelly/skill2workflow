@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-161
+- Completed delivery loops: 1-162
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 161 is complete with cursor-paged protected remote backup inventory
+- Active loop: None; Loop 162 is complete with protected remote backup retention planning
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-161 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-162 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -3804,9 +3804,39 @@ It does not create, delete, upload, restore, encrypt, sign, schedule, or expire
 backups; expose names or paths; or claim disaster-recovery, multi-tenant, or
 exactly-once provider guarantees.
 
+### Loop 162: Protected Remote Backup Retention Planning
+
+**Status:** Complete.
+
+**Prior basis:** Loop 161 let remote operators inspect every configured backup
+set through cursor-paged redacted inventory, but it still required shell access
+to determine whether a fixed expiration policy was complete and how many bytes
+were eligible beyond the minimum-valid-backup floor.
+
+**Outcome:** The authenticated `POST /api/v1/backup-retention-plan` route and
+installed `service-backup-retention-plan` client reuse the local normalized
+backup-retention policy and bounded complete-inventory check. The response is
+the fixed `skill2workflow-remote-backup-retention-plan-0.1.0` aggregate: it
+reports policy binding, completeness, counts, and eligible/preserved byte
+totals, while never exporting backup names, paths, per-set reasons, manifests,
+workflow values, or credentials. Incomplete inventories fail closed as
+`blocked` with null summary values; the route never mutates backups.
+
+**Evidence:** [`docs/remote-backup-retention-plan.md`](docs/remote-backup-retention-plan.md)
+defines the exact policy envelope, redaction, fixed errors, request/response
+bounds, and operator sequence. Backup, service, client, CLI, telemetry,
+schema, documentation, package, and full-suite tests cover authentication,
+normalization, aggregate output, truncation blocking, response limits,
+private-value exclusion, and read-only behavior.
+
+**Safety boundary:** This is a read-only single-tenant review aid. It does not
+delete, rename, upload, restore, encrypt, sign, schedule, replicate, or
+automatically expire backups; the local complete-inventory plan remains the
+authoritative pre-action check.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 161 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 162 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -3933,6 +3963,7 @@ This rolling queue is ordered. Loop 161 is complete and there is no active deliv
 | Loop 159: Cursor-Paged Remote Recurring-Schedule Dispatch Diagnostics | Complete | Let remote operators inspect older dispatch evidence after the fixed recent tail is exhausted | Separate redacted page schema, opaque SQLite ordering cursor, global/targeted authenticated routes, installed CLI, source-bounded reads, compatibility preservation, tests, and documentation |
 | Loop 160: Protected Redacted Remote Backup Inventory | Complete | Let remote operators inspect configured backup integrity, age, and size without shell access or private names | Optional owner-only backup parent, redacted 100-item/64 KiB route and CLI, bootstrap/systemd wiring, schema, authentication/bounds/redaction tests, and documentation |
 | Loop 161: Cursor-Paged Protected Remote Backup Inventory | Complete | Let remote operators inspect older configured backup evidence beyond the fixed recent window | Separate redacted 100-item/64 KiB page route and CLI, URL-safe opaque continuation cursor, compatibility-preserving contract, authentication/bounds/redaction tests, and documentation |
+| Loop 162: Protected Remote Backup Retention Planning | Complete | Let remote operators review a complete expiration policy and aggregate eligible bytes without exposing backup names | Authenticated 64 KiB policy request/16 KiB redacted aggregate plan, truncation blocking, client/CLI/schema/docs, and authentication/redaction/read-only tests |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

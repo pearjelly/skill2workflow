@@ -233,6 +233,7 @@ class RuntimeTelemetryTests(TestCase):
                 "backup_readiness",
                 "backup_inventory",
                 "backup_inventory_page",
+                "backup_retention_plan",
                 "retention_readiness",
                 "operational_readiness",
                 "audit_integrity",

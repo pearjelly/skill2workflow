@@ -94,6 +94,33 @@ class BackupDocumentationTests(TestCase):
         )
         self.assertNotIn("delete", plan["properties"])
 
+    def test_remote_retention_plan_schema_and_guide_match_redacted_contract(self):
+        schema = json.loads(
+            (ROOT / "schemas" / "remote-backup-retention-plan-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        guide = (ROOT / "docs" / "remote-backup-retention-plan.md").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-remote-backup-retention-plan-0.1.0",
+        )
+        self.assertEqual(
+            schema["properties"]["blocking_reasons"]["items"]["enum"],
+            ["inventory_truncated"],
+        )
+        self.assertNotIn("name", schema["properties"])
+        for text in (
+            "POST /api/v1/backup-retention-plan",
+            "service-backup-retention-plan",
+            "inventory_truncated",
+            "never performs deletion",
+            "Backup\nnames",
+        ):
+            self.assertIn(text, guide)
+
     def test_operator_guide_defines_offline_security_and_recovery_drill(self):
         guide = (ROOT / "docs" / "backup-restore.md").read_text(encoding="utf-8")
 
@@ -134,6 +161,10 @@ class BackupDocumentationTests(TestCase):
 
         for document in (readme, stability, changelog, package_smoke):
             self.assertIn("backup-list", document)
+        self.assertIn("service-backup-retention-plan", readme)
+        self.assertIn("service-backup-retention-plan", stability)
+        self.assertIn("service-backup-retention-plan", changelog)
+        self.assertIn('"service-backup-retention-plan"', package_smoke)
         self.assertIn("1-1000", stability)
         self.assertIn("does not delete, upload, or rewrite", guide)
         self.assertIn('"backup-list"', package_smoke)
@@ -142,10 +173,10 @@ class BackupDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-161 are complete", readme)
+        self.assertIn("Delivery Loops 1-162 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("docs/backup-restore.md", readme)
-        self.assertIn("- Completed delivery loops: 1-161", roadmap)
+        self.assertIn("- Completed delivery loops: 1-162", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 44: Verified Backup And Restore | Complete |", roadmap)
         self.assertIn("Production Baseline remains directional", roadmap)

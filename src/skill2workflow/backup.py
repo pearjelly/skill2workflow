@@ -32,6 +32,9 @@ BACKUP_READINESS_SCHEMA_VERSION = "skill2workflow-backup-readiness-0.1.0"
 BACKUP_LIST_SCHEMA_VERSION = "skill2workflow-state-backup-list-0.1.0"
 BACKUP_RETENTION_POLICY_SCHEMA_VERSION = "skill2workflow-backup-retention-policy-0.1.0"
 BACKUP_RETENTION_PLAN_SCHEMA_VERSION = "skill2workflow-backup-retention-plan-0.1.0"
+REMOTE_BACKUP_RETENTION_PLAN_SCHEMA_VERSION = (
+    "skill2workflow-remote-backup-retention-plan-0.1.0"
+)
 REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION = (
     "skill2workflow-remote-backup-inventory-0.1.0"
 )
@@ -702,6 +705,49 @@ def build_backup_retention_plan(
         },
         "candidates": candidates,
         "preserved": preserved,
+    }
+
+
+def build_remote_backup_retention_plan(
+    parent_dir: Path,
+    policy: object,
+    limit: int = MAX_BACKUP_LIST_ITEMS,
+) -> Dict[str, object]:
+    """Return a redacted aggregate backup-expiration plan for remote operators.
+
+    The local plan intentionally includes operator-chosen backup names so a
+    shell operator can act on a specific set.  The service projection keeps
+    only policy, completeness, counts, and byte totals; names, paths, and
+    per-backup reasons never cross the authenticated service boundary.
+    """
+
+    plan = build_backup_retention_plan(parent_dir, policy, limit=limit)
+    inventory = dict(plan["inventory"])
+    inventory.pop("backups", None)
+    summary = dict(plan["summary"])
+    return {
+        "schema_version": REMOTE_BACKUP_RETENTION_PLAN_SCHEMA_VERSION,
+        "status": str(plan["status"]),
+        "storage": "filesystem",
+        "policy_sha256": str(plan["policy_sha256"]),
+        "expire_before": str(plan["expire_before"]),
+        "minimum_keep": int(plan["minimum_keep"]),
+        "inventory": {
+            "max_items": int(inventory["max_items"]),
+            "returned": int(inventory["returned"]),
+            "truncated": bool(inventory["truncated"]),
+        },
+        "summary": {
+            "valid_backups": summary["valid_backups"],
+            "invalid_backups": summary["invalid_backups"],
+            "eligible_backups": summary["eligible_backups"],
+            "eligible_bytes": summary["eligible_bytes"],
+            "preserved_backups": summary["preserved_backups"],
+            "preserved_bytes": summary["preserved_bytes"],
+        },
+        "blocking_reasons": [
+            str(reason) for reason in plan.get("blocking_reasons", [])
+        ],
     }
 
 
