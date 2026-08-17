@@ -3616,6 +3616,10 @@ class CliTests(TestCase):
         self.assertEqual(result["status"], "completed")
         self.assertEqual(result["workflow_id"], "workflow_demo")
         self.assertEqual(result["context"]["input"], {"customer_id": "customer_123"})
+        self.assertEqual(
+            result["context"]["bundle_run"],
+            {"bundle_verified": True, "side_effects_authorized": False},
+        )
 
     def test_bundle_preflight_is_value_free_and_does_not_create_state(self):
         with TemporaryDirectory() as tmp:
@@ -3759,6 +3763,7 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(result["status"], "completed")
         self.assertEqual(server.requests[0]["body"]["customer_id"], "customer_123")
+        self.assertEqual(result["context"]["bundle_run"]["side_effects_authorized"], True)
 
     def test_bundle_run_rejects_invalid_bundle_before_creating_state(self):
         with TemporaryDirectory() as tmp:

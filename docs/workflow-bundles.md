@@ -106,6 +106,13 @@ run may execute explicitly requested connector side effects, but it does not
 create a published version, promote an alias, or introduce a second execution
 authority. Invalid bundles fail before the state directory is initialized.
 
+Every successful `bundle-run` also stores a compact `context.bundle_run`
+metadata object with `bundle_verified` and `side_effects_authorized` booleans.
+This helps an operator distinguish an explicitly authorized local execution
+from a side-effect guard rejection without recording bundle values, credentials,
+or provider payloads. It is run-state evidence, not a signed approval record
+or a replacement for the control-plane audit boundary.
+
 The successful bundle verification report contains only workflow identity,
 status, byte counts, digests, member count, and fixed error fields. The
 preflight report likewise exposes only bounded structural metadata and input

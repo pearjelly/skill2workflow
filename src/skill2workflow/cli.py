@@ -999,9 +999,14 @@ def _main(argv=None) -> int:
                 file=sys.stderr,
             )
             return 1
-        context = None
+        context = {
+            "bundle_run": {
+                "bundle_verified": True,
+                "side_effects_authorized": bool(args.allow_side_effects),
+            }
+        }
         if args.input is not None:
-            context = {"input": input_value}
+            context["input"] = input_value
         _print_json(
             LocalExecutor(
                 args.state_dir,
