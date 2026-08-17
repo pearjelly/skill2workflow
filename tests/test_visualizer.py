@@ -232,6 +232,7 @@ class VisualizerTests(TestCase):
         api["properties"]["connector"]["request"]["headers"] = {"X-Workflow": "approval"}
         api["properties"]["connector"]["request"]["body"] = {"approved": True}
         api["properties"]["connector"]["request"]["timeout_ms"] = 1000
+        api["properties"]["connector"]["request"]["response_mode"] = "metadata"
         api["properties"]["timeout_ms"] = 1500
 
         updated = apply_litegraph_edits_to_workflow(workflow, graph)
@@ -254,6 +255,7 @@ class VisualizerTests(TestCase):
                     "headers": {"X-Workflow": "approval"},
                     "body": {"approved": True},
                     "timeout_ms": 1000,
+                    "response_mode": "metadata",
                 },
             },
         )

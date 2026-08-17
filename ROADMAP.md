@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-192
+- Completed delivery loops: 1-193
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 192 is complete with bounded HTTP query mapping
+- Active loop: None; Loop 193 is complete with metadata-only HTTP response retention
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-192 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-193 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 192; the detailed
+The follow-on production hardening continues through Loop 193; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -104,7 +104,9 @@ loader without making dynamic code loading available to the service or remote
 trigger paths. Loop 191 adds a read-only CLI manifest inspection path for an
 explicit fixture without creating state or executing connector code. Loop 192
 adds bounded scalar query-parameter mapping for the built-in HTTP connector
-without enabling templates, expressions, or dynamic header mapping.
+without enabling templates, expressions, or dynamic header mapping. Loop 193
+adds an opt-in metadata-only response projection that discards raw HTTP
+response headers and bodies after bounded reading.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4778,9 +4780,40 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_connectors.ConnectorTests.test_http_connector_maps_scalar_context_input_into_query_without_mutating_binding -v
 ```
 
+### Loop 193: Metadata-Only HTTP Response Retention
+
+**Status:** Complete.
+
+**Prior basis:** The built-in HTTP connector bounded response size, but its
+backward-compatible result always retained decoded response headers and body in
+the node result. Enterprise workflows that only need delivery status had no
+declarative way to avoid durable provider-response values.
+
+**Outcome:** `connector.request.response_mode` now accepts `full` (the default)
+or `metadata`. Metadata mode reads and validates the same fixed 1 MiB UTF-8
+boundary, then retains only `status_code`, `header_count`, `body_bytes`, and
+`body_discarded: true` for both successful and HTTP error responses. It does
+not alter request, retry, credential, or audit contracts.
+
+**Evidence:** Runtime tests cover successful and failed metadata projections,
+raw-body absence, invalid-mode rejection before network access, compiler
+validation, schema contract, full-suite, package, secret-hygiene, and
+production-baseline evidence.
+
+**Safety boundary:** This is response retention control, not provider-side
+redaction, encryption, forceful cancellation, or a guarantee that a provider
+never received the request. The default `full` result shape remains compatible.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_http_connector_metadata_response_discards_body_and_headers -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 192 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 193 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4938,6 +4971,7 @@ This rolling queue is ordered. Loop 192 is complete and there is no active deliv
 | Loop 190: Bounded External Connector Fixture Loading | Complete | Bound explicit local connector source loading without widening service or remote dynamic-code paths | 2 MiB UTF-8 source bound, regular-file/no-follow checks, device/inode identity and replacement detection, focused loader tests, docs, and baseline evidence |
 | Loop 191: Explicit Connector Fixture Manifest Inspection | Complete | Let operators review an explicitly loaded connector manifest before execution without creating state or invoking a connector | `connectors --connector-fixture`, read-only CLI coverage, manifest contract assertions, docs, and package evidence |
 | Loop 192: Bounded HTTP Query-Parameter Input Mapping | Complete | Map scalar trigger input into flat HTTP query parameters without templates, expressions, or header interpolation | Additive `/query/<name>` contract, percent-encoded runtime URL copy, scalar/rejection tests, docs, and package evidence |
+| Loop 193: Metadata-Only HTTP Response Retention | Complete | Let workflows discard raw HTTP response values while preserving bounded delivery metadata | Additive `response_mode` contract, success/error projections, raw-value absence and invalid-mode tests, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

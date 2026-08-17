@@ -196,6 +196,12 @@
         "timeout_ms": {
           "type": "integer"
         },
+        "response_mode": {
+          "type": "string",
+          "enum": ["full", "metadata"],
+          "default": "full",
+          "description": "Response retention mode. full preserves the legacy body/headers projection; metadata discards raw response values after bounded reading."
+        },
         "input_mapping": {
           "type": "array",
           "description": "Optional bounded mapping from run context input into HTTP request body fields or query parameters.",

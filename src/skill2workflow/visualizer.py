@@ -335,6 +335,13 @@ def _apply_connector_edits(node: Dict[str, object], graph_connector: object) -> 
             graph_request["timeout_ms"],
             f"{node['id']} connector.request.timeout_ms",
         )
+    if "response_mode" in graph_request:
+        response_mode = graph_request.get("response_mode")
+        if not isinstance(response_mode, str) or response_mode not in {"full", "metadata"}:
+            raise ValueError(
+                f"{node['id']} connector.request.response_mode must be full or metadata"
+            )
+        request["response_mode"] = response_mode
 
 
 def _non_negative_int(value: object, label: str) -> int:

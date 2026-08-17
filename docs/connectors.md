@@ -47,6 +47,7 @@ Supported request metadata:
 | `url` | Required `http://` or `https://` URL. Other schemes fail before a network call. |
 | `headers` | Optional object. Keys and values are stringified. |
 | `body` | Optional JSON-serializable value. When present, it is encoded as UTF-8 JSON and must be at most 1 MiB. |
+| `response_mode` | Optional response retention mode: `full` (default) keeps the legacy headers/body projection; `metadata` discards raw response headers and body after bounded reading. |
 | `input_mapping` | Optional bounded mapping from durable trigger input into request body fields or query parameters. |
 | `timeout_ms` | Optional positive millisecond timeout. Missing or invalid values default to 5000 ms. |
 
@@ -61,6 +62,28 @@ produce the fixed connector error `http connector response body must be valid
 UTF-8`. Oversized bodies produce the fixed request/response errors and never
 return a partial payload. This is a memory and state-size boundary, not a
 content-redaction or provider-side cancellation guarantee.
+
+Set `response_mode` to `metadata` when a workflow only needs completion status
+and must not retain provider response values in run state:
+
+```json
+{
+  "connector": {
+    "id": "http",
+    "kind": "http",
+    "request": {
+      "url": "http://127.0.0.1:8080/example",
+      "response_mode": "metadata"
+    }
+  }
+}
+```
+
+Metadata mode still reads the response through the fixed 1 MiB UTF-8 boundary,
+then returns only `status_code`, `header_count`, `body_bytes`, and
+`body_discarded: true`. It applies to successful and HTTP error responses and
+does not alter the request or retry contract. The default `full` mode remains
+backward compatible.
 
 External connector packages own their provider-specific I/O limits, but their
 normalized result still crosses the runtime's fixed 1 MiB persistence

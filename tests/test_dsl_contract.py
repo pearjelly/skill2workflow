@@ -26,6 +26,7 @@ class DslContractTests(TestCase):
         self.assertIn("credentials", connector_properties)
         request_properties = schema["$defs"]["connector_request"]["properties"]
         self.assertIn("input_mapping", request_properties)
+        self.assertEqual(request_properties["response_mode"]["enum"], ["full", "metadata"])
         self.assertEqual(request_properties["input_mapping"]["items"]["properties"]["from"]["pattern"], "^/input/.+")
         self.assertEqual(
             request_properties["input_mapping"]["items"]["properties"]["to"]["pattern"],

@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added opt-in HTTP `response_mode: "metadata"` to discard raw response headers
+  and bodies after bounded reading while preserving status and size metadata;
+  `full` remains the backward-compatible default.
+
 - Added bounded HTTP connector query-parameter input mapping through
   `/query/<name>` targets, with scalar-only values and no template or expression
   evaluation.

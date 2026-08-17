@@ -524,6 +524,16 @@ def _validate_http_connector_request(
     request = connector.get("request")
     if not isinstance(request, dict):
         return
+    if "response_mode" in request:
+        response_mode = request.get("response_mode")
+        if not isinstance(response_mode, str) or response_mode not in {"full", "metadata"}:
+            errors.append(
+                _validation_error(
+                    "response_mode_invalid",
+                    f"{node.get('id')} connector.request.response_mode must be full or metadata",
+                    ["nodes", index, "connector", "request", "response_mode"],
+                )
+            )
     if "input_mapping" not in request:
         return
     input_mapping = request.get("input_mapping")

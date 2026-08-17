@@ -107,7 +107,7 @@ Visual write-back is allowlisted. The editor may update:
 - Node active timeout (`timeout_ms`, bounded to `0..86400000` milliseconds)
 - Retry max attempts
 - Fixed connector retry backoff in the bounded `0..60000` millisecond range
-- Built-in HTTP connector request method, URL, headers, body, bounded body/query input mapping, and timeout
+- Built-in HTTP connector request method, URL, headers, body, bounded body/query input mapping, response retention mode, and timeout
 
 The editor must not change:
 
@@ -121,7 +121,14 @@ The editor must not change:
 
 ## Connector Runtime Boundary
 
-Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on `tool_call` nodes. The current local runtime supports method, URL, headers, body, per-request timeout metadata, optional bounded body/query `input_mapping` metadata, and optional credential handle metadata as documented in `docs/connectors.md`. Built-in HTTP request and UTF-8 response bodies are bounded to 1 MiB at execution time; the bound is runtime safety metadata and does not change the DSL shape.
+Workflow DSL `0.1.0` can carry built-in HTTP connector request metadata on
+`tool_call` nodes. The current local runtime supports method, URL, headers,
+body, per-request timeout metadata, optional bounded body/query `input_mapping`,
+optional `response_mode` (`full` or `metadata`), and optional credential handle
+metadata as documented in `docs/connectors.md`. Built-in HTTP request and
+UTF-8 response bodies are bounded to 1 MiB at execution time; metadata mode
+prevents the response projection from retaining raw headers or body, while the
+default full mode preserves the legacy result shape.
 
 `retry.max_attempts`, optional fixed `retry.backoff_ms`, and their
 `policies.default_retry` counterparts are policy metadata honored by the
@@ -152,7 +159,15 @@ deadlines from the active scheduler lease; standalone executors remain
 safe-point only. See `docs/recurring-scheduling.md` for the bounded expiry and
 audit-reconciliation boundary.
 
-HTTP `connector.request.input_mapping` is a constrained runtime-copy mapping contract. It reads only `/input/...` paths from durable run context and writes either `/body/...` paths into the outbound HTTP request body copy or scalar values into flat `/query/<name>` URL parameters. Header mapping, URL interpolation, expression syntax, credential mapping, and product-specific connector packages are outside the current compatibility boundary.
+HTTP `connector.request.input_mapping` is a constrained runtime-copy mapping
+contract. It reads only `/input/...` paths from durable run context and writes
+either `/body/...` paths into the outbound HTTP request body copy or scalar
+values into flat `/query/<name>` URL parameters. `connector.request.response_mode`
+is an additive `full`/`metadata` retention choice; metadata mode omits raw
+response headers and body from the node result after bounded reading. Header
+mapping, URL interpolation, expression syntax, credential mapping, and
+product-specific connector packages are outside the current compatibility
+boundary.
 
 `input_schema` is a constrained trigger-input contract, not full JSON Schema.
 Its root is an object; supported nested types and keywords are documented in
@@ -168,7 +183,12 @@ Committed Workflow DSL and LiteGraph example fixtures are checked by `python3 sc
 
 ## Connector Package Compatibility
 
-Workflow DSL `0.1.0` compatibility is separate from connector package conventions. Workflow DSL stores connector bindings such as `connector.id`, `connector.kind`, request metadata, credential handles, retry policy, and bounded body/query input mapping. A connector package supplies executable code and a connector manifest version outside the Workflow DSL schema.
+Workflow DSL `0.1.0` compatibility is separate from connector package
+conventions. Workflow DSL stores connector bindings such as `connector.id`,
+`connector.kind`, request metadata, response retention mode, credential handles,
+retry policy, and bounded body/query input mapping. A connector package supplies
+executable code and a connector manifest version outside the Workflow DSL
+schema.
 
 Current connector package conventions use:
 

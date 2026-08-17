@@ -98,6 +98,7 @@ The current local bootstrap can demonstrate:
 - manual gate pause and resume
 - HTTP connector execution through a local receiver
 - bounded body/query mapping from trigger input into HTTP requests
+- opt-in metadata-only HTTP response retention for workflows that do not need provider response values
 - credential handle resolution outside Workflow DSL
 - run and connector audit events
 - read-only node overlays in snapshots and LiteGraph JSON

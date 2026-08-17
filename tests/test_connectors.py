@@ -164,6 +164,58 @@ class ConnectorTests(TestCase):
         self.assertEqual(request["headers"]["X-Attempt"], "3")
         self.assertEqual(request["headers"]["Content-Type"], "application/json")
 
+    def test_http_connector_metadata_response_discards_body_and_headers(self):
+        server = _ConnectorTestServer()
+
+        try:
+            result = execute_connector(
+                _http_node(server.url("/success"), response_mode="metadata")
+            )
+        finally:
+            server.close()
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(
+            result["output"],
+            {
+                "status_code": 201,
+                "header_count": 4,
+                "body_bytes": len(json.dumps({"ok": True}).encode("utf-8")),
+                "body_discarded": True,
+            },
+        )
+        self.assertNotIn("ok", json.dumps(result))
+
+    def test_http_connector_metadata_response_preserves_error_status_without_body(self):
+        server = _ConnectorTestServer()
+
+        try:
+            result = execute_connector(
+                _http_node(server.url("/fail"), response_mode="metadata")
+            )
+        finally:
+            server.close()
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["error"], "HTTP 503")
+        self.assertEqual(result["output"]["status_code"], 503)
+        self.assertTrue(result["output"]["body_discarded"])
+        self.assertNotIn("unavailable", json.dumps(result))
+
+    def test_http_connector_rejects_unknown_response_mode_before_network_call(self):
+        with patch("skill2workflow.connectors.urllib.request.urlopen") as urlopen:
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                "request.response_mode must be full or metadata",
+            ):
+                execute_connector(
+                    _http_node(
+                        "http://127.0.0.1:1/not-called",
+                        response_mode="raw",
+                    )
+                )
+        urlopen.assert_not_called()
+
     def test_http_connector_maps_context_input_into_body_without_mutating_binding(self):
         server = _ConnectorTestServer()
         node = _http_node(
@@ -494,7 +546,15 @@ class ConnectorTests(TestCase):
         self.assertEqual(_timeout_seconds("2000"), 5.0)
 
 
-def _http_node(url, method="GET", headers=None, body=None, timeout_ms=500, input_mapping=None):
+def _http_node(
+    url,
+    method="GET",
+    headers=None,
+    body=None,
+    timeout_ms=500,
+    input_mapping=None,
+    response_mode=None,
+):
     request = {
         "method": method,
         "url": url,
@@ -505,6 +565,8 @@ def _http_node(url, method="GET", headers=None, body=None, timeout_ms=500, input
         request["body"] = body
     if input_mapping is not None:
         request["input_mapping"] = input_mapping
+    if response_mode is not None:
+        request["response_mode"] = response_mode
     return {
         "id": "call_api",
         "type": "tool_call",

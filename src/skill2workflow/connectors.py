@@ -23,6 +23,7 @@ ExternalConnectorPreflight = Callable[..., ConnectorResult]
 CONNECTOR_MANIFEST_VERSION = "skill2workflow-connector-0.1.0"
 CONNECTOR_EXECUTION_CONTRACT_VERSION = "skill2workflow-connector-execution-0.1.0"
 MAX_HTTP_PAYLOAD_BYTES = 1_048_576
+HTTP_RESPONSE_MODES = ("full", "metadata")
 # External connector code is explicitly loaded, but its normalized result still
 # crosses the durable executor boundary. Keep that handoff bounded independently
 # of whatever I/O policy the extension chose internally.
@@ -76,6 +77,7 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
                         "body": {},
                         "input_mapping": {"type": "array"},
                         "timeout_ms": {"type": "integer"},
+                        "response_mode": {"type": "string", "enum": list(HTTP_RESPONSE_MODES)},
                     },
                     "required": ["url"],
                 }
@@ -375,6 +377,7 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
         raise ConnectorExecutionError("http connector request.url must be http:// or https://")
 
     method = str(request_spec.get("method") or "GET").upper()
+    response_mode = _http_response_mode(request_spec.get("response_mode"))
     headers = _string_map(request_spec.get("headers"))
     _apply_http_credentials(binding.get("credentials", []), headers, credential_provider)
     url, body, mapping_summary = _mapped_http_request(request_spec, context)
@@ -401,11 +404,7 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
             return {
                 "status": "completed",
                 "connector": {"id": "http", "kind": "http"},
-                "output": {
-                    "status_code": int(response.status),
-                    "headers": dict(response.headers.items()),
-                    "body": payload,
-                },
+                "output": _http_response_output(response, int(response.status), payload, response_mode),
                 "input_mapping": mapping_summary,
             }
     except urllib.error.HTTPError as error:
@@ -414,11 +413,7 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
             return {
                 "status": "failed",
                 "connector": {"id": "http", "kind": "http"},
-                "output": {
-                    "status_code": int(error.code),
-                    "headers": dict(error.headers.items()),
-                    "body": payload,
-                },
+                "output": _http_response_output(error, int(error.code), payload, response_mode),
                 "error": f"HTTP {error.code}",
                 "input_mapping": mapping_summary,
             }
@@ -428,6 +423,35 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
         if isinstance(error.reason, (TimeoutError, socket.timeout)):
             raise ConnectorExecutionError(f"http connector timed out: {error.reason}")
         raise ConnectorExecutionError(str(error.reason))
+
+
+def _http_response_mode(value: object) -> str:
+    """Normalize the bounded response retention policy."""
+
+    if value is None:
+        return "full"
+    if isinstance(value, str) and value in HTTP_RESPONSE_MODES:
+        return value
+    raise ConnectorExecutionError(
+        "http connector request.response_mode must be full or metadata"
+    )
+
+
+def _http_response_output(response: object, status_code: int, payload: str, mode: str) -> Dict[str, object]:
+    """Return a full or metadata-only response projection."""
+
+    if mode == "metadata":
+        return {
+            "status_code": status_code,
+            "header_count": len(dict(response.headers.items())),
+            "body_bytes": len(payload.encode("utf-8")),
+            "body_discarded": True,
+        }
+    return {
+        "status_code": status_code,
+        "headers": dict(response.headers.items()),
+        "body": payload,
+    }
 
 
 def _read_http_payload(response: object, kind: str) -> str:

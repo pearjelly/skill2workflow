@@ -216,6 +216,12 @@ class CompilerTests(TestCase):
 
         self.assertEqual(errors, [])
 
+    def test_validate_accepts_metadata_http_response_mode(self):
+        workflow = _http_mapping_workflow([])
+        workflow["nodes"][1]["connector"]["request"]["response_mode"] = "metadata"
+
+        self.assertEqual(validate_workflow_structured(workflow), [])
+
     def test_validate_rejects_invalid_http_input_mapping_contract(self):
         cases = [
             ("not-list", "input_mapping_invalid"),
@@ -234,6 +240,12 @@ class CompilerTests(TestCase):
                 errors = validate_workflow_structured(workflow)
 
                 self.assertTrue(any(error["code"] == code for error in errors), errors)
+
+        workflow = _http_mapping_workflow([])
+        workflow["nodes"][1]["connector"]["request"]["response_mode"] = "raw"
+        self.assertTrue(
+            any(error["code"] == "response_mode_invalid" for error in validate_workflow_structured(workflow))
+        )
 
     def test_default_timeout_policy_has_a_bounded_contract(self):
         root = Path(__file__).resolve().parents[1]

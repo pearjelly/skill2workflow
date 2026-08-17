@@ -149,7 +149,7 @@ explicit connector boundaries. It currently supports:
 - Run published workflow versions and write audit events
 - Trigger published workflow versions or stable aliases through a compact local API envelope
 - Persist trigger input values in durable run context without logging full input values to audit by default
-- Map non-secret trigger input fields into HTTP connector request bodies or scalar query parameters through `connector.request.input_mapping`
+- Map non-secret trigger input fields into HTTP connector request bodies or scalar query parameters through `connector.request.input_mapping`, with opt-in metadata-only response retention
 - Trigger published workflow versions from local HTTP webhook POST requests
 - Run a validated loopback-only long-running service with health/readiness probes, authenticated human-gate decisions, graceful signal shutdown, and SQLite restart continuity
 - Operate remote human-gate decisions and cooperative cancellation through a protected token-file CLI client
@@ -850,7 +850,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-192 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-193 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1554,6 +1554,10 @@ executing a connector.
 Loop 192 adds bounded `/query/<name>` targets to HTTP connector input mapping,
 allowing scalar trigger fields to drive common filter and pagination parameters
 without templates, expressions, or dynamic header interpolation.
+
+Loop 193 adds an opt-in HTTP `response_mode: "metadata"` that keeps status and
+bounded size facts while discarding raw response headers and bodies from the
+durable node result; the legacy `full` mode remains the default.
 
 The installed console script also supports `--version`, reporting the package
 version without requiring a workflow subcommand; the wheel smoke checks that

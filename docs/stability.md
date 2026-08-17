@@ -110,6 +110,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
 - Built-in HTTP connector request/response payloads are bounded to 1 MiB with fixed overflow and invalid-UTF-8 failures, as documented in `docs/connectors.md`
+- Built-in HTTP `response_mode` accepts `full` or `metadata`; metadata mode retains only status and bounded size facts after reading, while `full` preserves the legacy headers/body projection
 - Fresh SQLite state-layout markers are atomically published without replacing a concurrent marker; startup remains single-directory and non-distributed
 - Credential placeholder and fixture hygiene boundary documented in `docs/credential-boundary.md`
 - Local credential handle boundary documented in `docs/credential-boundary.md`
@@ -183,7 +184,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Bounded one-shot due discovery lazily enumerates schedule files, retains at most the requested full-definition window, and selects earliest normalized `(run_at, schedule.id)` records; compact `schedules --limit` likewise avoids materializing the full path list
 - The long-running SQLite service scheduler uses a fixed 100-dispatch batch per polling pass, leaving remaining due schedules for later passes without changing lease, claim, or uncertain-outcome semantics
 - State layout marker `skill2workflow-state-layout-marker-0.1.0`, fail-closed compatibility preflight, and legacy-to-current copy-on-write migration documented in `docs/upgrade-migration.md`
-- Body-only HTTP connector input mapping documented in `docs/connectors.md`
+- Bounded body/query HTTP connector input mapping and response retention mode documented in `docs/connectors.md`
 - Minimum connector manifest contract documented in `docs/connectors.md`
 - explicit local connector fixture loading for examples, using `load_external_connector(path)` plus `ConnectorRuntime([external_connector])`; the loader accepts only a regular non-symlink file, reads at most 2 MiB of UTF-8 source through a device/inode-bound no-follow descriptor, and detects replacement or growth before compiling
 - Connector package layout expectations documented in `docs/connectors.md`
@@ -203,7 +204,7 @@ These surfaces may change while the project learns from real workflows:
 - Connector manifest fields beyond the documented minimum contract
 - Dynamic connector loading, automatic connector discovery and product-specific connector packages
 - Connector package installation, marketplace indexing, OAuth, hosted callbacks, and distributed queues
-- HTTP connector request metadata beyond documented method, URL, headers, body, timeout, credential handles, and bounded body/query input mapping
+- HTTP connector request metadata beyond documented method, URL, headers, body, timeout, response mode, credential handles, and bounded body/query input mapping
 - Credential providers beyond the documented local static file and mounted directory boundaries
 - Exponential retry strategies, provider-specific retry classification, and automatic retry of uncertain external effects beyond the documented connector-node retry and fixed backoff boundary
 - Hosted secret storage, OAuth, multi-tenant RBAC, and IAM

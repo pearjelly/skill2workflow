@@ -31,7 +31,7 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("runtime-generated smoke artifacts", examples)
 
         self.assertIn("Connector Package Compatibility", compatibility)
-        self.assertIn("Workflow DSL `0.1.0` compatibility is separate from connector package conventions", compatibility)
+        self.assertIn("Workflow DSL `0.1.0` compatibility is separate from connector package", compatibility)
         self.assertIn("connector manifest version", compatibility)
         self.assertIn("run`, `resume`, and `bundle-run`", compatibility)
         self.assertIn("external-connector-loading-boundary.md", compatibility)
@@ -55,7 +55,11 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("1,048,576`-byte (`1 MiB`)", connectors)
         self.assertIn("http connector response body must be valid", connectors)
         self.assertIn("UTF-8", connectors)
-        self.assertIn("Built-in HTTP request and UTF-8 response bodies are bounded to 1 MiB", compatibility)
+        self.assertIn('response_mode` to `metadata`', connectors)
+        self.assertIn('body_discarded: true', connectors)
+        self.assertIn("Built-in HTTP request and", compatibility)
+        self.assertIn("UTF-8 response bodies are bounded to 1 MiB", compatibility)
+        self.assertIn("response_mode` (`full` or `metadata`)", compatibility)
         self.assertIn("Built-in HTTP connector request/response payloads are bounded to 1 MiB", stability)
 
 

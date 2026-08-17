@@ -73,6 +73,7 @@ Allowlisted fields:
 - HTTP `connector.request.url`
 - HTTP `connector.request.headers`
 - HTTP `connector.request.body`
+- HTTP `connector.request.response_mode` (`full` or `metadata`)
 - HTTP `connector.request.timeout_ms`
 - Node active timeout `timeout_ms` (0..86400000 milliseconds)
 
