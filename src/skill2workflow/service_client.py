@@ -15,7 +15,9 @@ from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 from .backup import (
     BACKUP_READINESS_SCHEMA_VERSION,
     MAX_REMOTE_BACKUP_INVENTORY_ITEMS,
+    MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS,
     REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION,
+    REMOTE_BACKUP_INVENTORY_PAGE_SCHEMA_VERSION,
 )
 from .retention import RETENTION_READINESS_SCHEMA_VERSION
 from .operational_readiness import OPERATIONAL_READINESS_SCHEMA_VERSION
@@ -83,6 +85,7 @@ MAX_RECURRING_SCHEDULE_DELETE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_BACKUP_INVENTORY_RESPONSE_BYTES = 64 * 1024
+MAX_REMOTE_BACKUP_INVENTORY_PAGE_RESPONSE_BYTES = 64 * 1024
 MAX_RETENTION_READINESS_REQUEST_BYTES = 64 * 1024
 MAX_RETENTION_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
@@ -532,6 +535,40 @@ def fetch_backup_inventory(
         max_response_bytes=MAX_REMOTE_BACKUP_INVENTORY_RESPONSE_BYTES,
     )
     _validate_backup_inventory(payload)
+    return payload
+
+
+def fetch_backup_inventory_page(
+    service_url: str,
+    token_file: Path,
+    *,
+    max_items: int = MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS,
+    cursor: str = "",
+) -> Dict[str, object]:
+    """Fetch one cursor-paged, redacted inventory of configured backups."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or not 1 <= max_items <= MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS
+    ):
+        raise ValueError("max_items must be an integer from 1 through 100")
+    if not isinstance(cursor, str) or len(cursor) > 512 or any(
+        character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for character in cursor
+    ):
+        raise ValueError("cursor must be a safe remote backup inventory page cursor")
+    params = {"max_items": str(max_items)}
+    if cursor:
+        params["cursor"] = cursor
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/backup-inventory-pages?" + urlencode(params),
+        conflict_message="backup inventory page unavailable",
+        max_response_bytes=MAX_REMOTE_BACKUP_INVENTORY_PAGE_RESPONSE_BYTES,
+    )
+    _validate_backup_inventory_page(payload)
     return payload
 
 
@@ -1777,6 +1814,69 @@ def _validate_backup_inventory(payload: Dict[str, object]) -> None:
         or window.get("returned") > window.get("max_items")
         or not isinstance(window.get("truncated"), bool)
         or window.get("truncated") != (window.get("returned") < payload.get("total"))
+    ):
+        raise ServiceActionError()
+
+
+def _validate_backup_inventory_page(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed cursor-paged backup contract."""
+
+    if set(payload) != {"schema_version", "status", "total", "backups", "window"}:
+        raise ServiceActionError()
+    if (
+        payload.get("schema_version") != REMOTE_BACKUP_INVENTORY_PAGE_SCHEMA_VERSION
+        or payload.get("status") != "ok"
+        or not _is_non_negative_integer(payload.get("total"))
+    ):
+        raise ServiceActionError()
+    backups = payload.get("backups")
+    fields = {
+        "status",
+        "created_at",
+        "state_layout_version",
+        "workflow_artifact_count",
+        "file_count",
+        "total_bytes",
+    }
+    if not isinstance(backups, list) or len(backups) > MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS:
+        raise ServiceActionError()
+    for backup in backups:
+        if (
+            not isinstance(backup, dict)
+            or set(backup) != fields
+            or backup.get("status") not in {"valid", "invalid"}
+            or not isinstance(backup.get("created_at"), str)
+            or not isinstance(backup.get("state_layout_version"), str)
+            or backup.get("state_layout_version") not in {
+                "",
+                "skill2workflow-sqlite-layout-legacy-unversioned",
+                "skill2workflow-sqlite-layout-0.1.0",
+            }
+            or not _is_non_negative_integer(backup.get("workflow_artifact_count"))
+            or not _is_non_negative_integer(backup.get("file_count"))
+            or not _is_non_negative_integer(backup.get("total_bytes"))
+        ):
+            raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_items", "total", "returned", "has_more", "next_cursor"}
+        or not _is_non_negative_integer(window.get("max_items"))
+        or not 1 <= window.get("max_items") <= MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS
+        or not _is_non_negative_integer(window.get("total"))
+        or window.get("total") != payload.get("total")
+        or not _is_non_negative_integer(window.get("returned"))
+        or window.get("returned") != len(backups)
+        or window.get("returned") > window.get("total")
+        or window.get("returned") > window.get("max_items")
+        or not isinstance(window.get("has_more"), bool)
+        or not isinstance(window.get("next_cursor"), str)
+        or len(window.get("next_cursor")) > 512
+        or any(
+            character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+            for character in window.get("next_cursor")
+        )
+        or window.get("has_more") != bool(window.get("next_cursor"))
     ):
         raise ServiceActionError()
 

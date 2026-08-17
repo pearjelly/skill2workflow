@@ -1580,6 +1580,84 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(malformed, {"error": "backup inventory max_items must be an integer from 1 through 100"})
         self.assertFalse(thread.is_alive())
 
+    def test_backup_inventory_page_is_authenticated_redacted_and_cursor_paged(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            backup_parent = root / "backups"
+            config = _service_config(
+                root,
+                state_dir=state_dir,
+                backup_parent_dir=backup_parent,
+            )
+            initializer = RuntimeService(config)
+            initializer._server.server_close()
+            for name, timestamp in (
+                ("customer-private-old", "2026-08-14T00:00:01+00:00"),
+                ("customer-private-middle", "2026-08-14T00:00:02+00:00"),
+                ("customer-private-new", "2026-08-14T00:00:03+00:00"),
+            ):
+                backup_dir = backup_parent / name
+                create_state_backup(state_dir, backup_dir)
+                manifest_path = backup_dir / "manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["created_at"] = timestamp
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            try:
+                denied_status, denied = _get_json(
+                    f"{base_url}/api/v1/backup-inventory-pages?max_items=2"
+                )
+                first_status, first = _get_json(
+                    f"{base_url}/api/v1/backup-inventory-pages?max_items=2",
+                    token=AUTH_TOKEN,
+                )
+                cursor = first["window"]["next_cursor"]
+                second_status, second = _get_json(
+                    f"{base_url}/api/v1/backup-inventory-pages?max_items=2&cursor={cursor}",
+                    token=AUTH_TOKEN,
+                )
+                malformed_status, malformed = _get_json(
+                    f"{base_url}/api/v1/backup-inventory-pages?cursor=not-a-valid-cursor",
+                    token=AUTH_TOKEN,
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(first_status, 200)
+        self.assertEqual(first["schema_version"], "skill2workflow-remote-backup-inventory-page-0.1.0")
+        self.assertEqual(first["total"], 3)
+        self.assertEqual(first["window"]["returned"], 2)
+        self.assertTrue(first["window"]["has_more"])
+        self.assertEqual(second_status, 200)
+        self.assertEqual(second["window"]["returned"], 1)
+        self.assertFalse(second["window"]["has_more"])
+        serialized = json.dumps({"first": first, "second": second}, ensure_ascii=False)
+        self.assertNotIn("customer-private", serialized)
+        self.assertNotIn(str(backup_parent), serialized)
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "backup inventory page cursor is invalid"})
+        self.assertFalse(thread.is_alive())
+
     def test_retention_readiness_is_authenticated_bounded_and_blocks_live_service(self):
         policy = {
             "schema_version": "skill2workflow-retention-policy-0.3.0",

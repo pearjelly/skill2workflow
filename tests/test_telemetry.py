@@ -232,6 +232,7 @@ class RuntimeTelemetryTests(TestCase):
                 "workflow_artifact_report",
                 "backup_readiness",
                 "backup_inventory",
+                "backup_inventory_page",
                 "retention_readiness",
                 "operational_readiness",
                 "audit_integrity",

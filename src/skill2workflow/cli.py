@@ -39,6 +39,7 @@ from .service_client import (
     fetch_workflow_inventory,
     fetch_backup_readiness,
     fetch_backup_inventory,
+    fetch_backup_inventory_page,
     fetch_retention_readiness,
     fetch_operational_readiness,
     fetch_service_probe,
@@ -468,6 +469,15 @@ def main(argv=None) -> int:
     service_backup_inventory_cmd.add_argument("--service-url", required=True)
     service_backup_inventory_cmd.add_argument("--auth-token-file", type=Path, required=True)
     service_backup_inventory_cmd.add_argument("--max-items", type=int, default=100)
+
+    service_backup_inventory_page_cmd = subparsers.add_parser(
+        "service-backup-inventory-page",
+        help="Page redacted offline backups through the authenticated service",
+    )
+    service_backup_inventory_page_cmd.add_argument("--service-url", required=True)
+    service_backup_inventory_page_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_backup_inventory_page_cmd.add_argument("--cursor", default="")
+    service_backup_inventory_page_cmd.add_argument("--max-items", type=int, default=100)
 
     service_retention_cmd = subparsers.add_parser(
         "service-retention-readiness",
@@ -1174,6 +1184,16 @@ def main(argv=None) -> int:
                 args.service_url,
                 args.auth_token_file,
                 max_items=args.max_items,
+            )
+        )
+
+    if args.command == "service-backup-inventory-page":
+        return _service_action(
+            lambda: fetch_backup_inventory_page(
+                args.service_url,
+                args.auth_token_file,
+                max_items=args.max_items,
+                cursor=args.cursor,
             )
         )
 

@@ -39,9 +39,13 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("service-recurring-schedule-patch", guide)
         self.assertIn("Loop 159 adds a separate cursor-paged", guide)
         self.assertIn("Loop 160 adds the authenticated, read-only backup inventory", guide)
+        self.assertIn("Loop 161 adds the cursor-paged backup inventory", guide)
         self.assertIn("GET /api/v1/backup-inventory", guide)
+        self.assertIn("GET /api/v1/backup-inventory-pages", guide)
         self.assertIn("remote-backup-inventory.md", guide)
+        self.assertIn("remote-backup-inventory-pages.md", guide)
         self.assertIn("service-backup-inventory", guide)
+        self.assertIn("service-backup-inventory-page", guide)
         self.assertIn("Loop 157 hardens the existing enable/disable actions", guide)
         self.assertIn("expected_next_run_at", guide)
         self.assertIn("GET /api/v1/workflow-artifacts", guide)
@@ -116,6 +120,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-160 are complete", readme)
+        self.assertIn("Delivery Loops 1-161 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

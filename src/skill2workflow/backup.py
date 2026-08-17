@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
 import heapq
 import json
@@ -13,7 +15,7 @@ import time
 from contextlib import ExitStack, closing
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .state_layout import (
     CURRENT_STATE_LAYOUT_VERSION,
@@ -33,8 +35,12 @@ BACKUP_RETENTION_PLAN_SCHEMA_VERSION = "skill2workflow-backup-retention-plan-0.1
 REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION = (
     "skill2workflow-remote-backup-inventory-0.1.0"
 )
+REMOTE_BACKUP_INVENTORY_PAGE_SCHEMA_VERSION = (
+    "skill2workflow-remote-backup-inventory-page-0.1.0"
+)
 MAX_BACKUP_LIST_ITEMS = 1000
 MAX_REMOTE_BACKUP_INVENTORY_ITEMS = 100
+MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS = 100
 STATE_LAYOUT_VERSION = CURRENT_STATE_LAYOUT_VERSION
 _DATABASES = ("control.sqlite3", "runs.sqlite3", "scheduler.sqlite3")
 _REQUIRED_TABLES = {
@@ -416,6 +422,156 @@ def build_remote_backup_inventory(
             "truncated": bool(inventory["window"]["truncated"]),
         },
     }
+
+
+def build_remote_backup_inventory_page(
+    parent_dir: Path,
+    max_items: int = MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS,
+    cursor: str = "",
+) -> Dict[str, object]:
+    """Return one newest-first, redacted page of configured backup sets.
+
+    The cursor contains only a normalized ordering timestamp/fallback and a
+    digest of the private directory name.  It never carries a backup name or
+    filesystem path across the service boundary.
+    """
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or not 1 <= max_items <= MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS
+    ):
+        raise ValueError(
+            "remote backup inventory page max_items must be an integer from 1 through "
+            f"{MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS}"
+        )
+    cursor_key = _decode_remote_backup_inventory_cursor(cursor)
+    parent = _existing_directory(parent_dir, "backup parent directory")
+    _require_owner_only_directory(parent, "backup parent directory")
+
+    selected = []
+    total = 0
+    for candidate in parent.iterdir():
+        if candidate.is_symlink() or not candidate.is_dir():
+            continue
+        total += 1
+        metadata, sort_key = _backup_inventory_metadata(candidate)
+        order_key = _remote_backup_inventory_order_key(candidate, sort_key)
+        if cursor_key is not None and order_key >= cursor_key:
+            continue
+        item = (order_key, candidate.name, metadata, candidate)
+        if len(selected) < max_items + 1:
+            heapq.heappush(selected, item)
+        elif (order_key, candidate.name) > (selected[0][0], selected[0][1]):
+            heapq.heapreplace(selected, item)
+
+    has_more = len(selected) > max_items
+    selected = sorted(selected, key=lambda item: (item[0], item[1]), reverse=True)
+    selected = selected[:max_items]
+    backups = [
+        _redacted_remote_backup_item(candidate, metadata)
+        for _, _, metadata, candidate in selected
+    ]
+    next_cursor = ""
+    if has_more and selected:
+        next_cursor = _encode_remote_backup_inventory_cursor(selected[-1][0])
+    return {
+        "schema_version": REMOTE_BACKUP_INVENTORY_PAGE_SCHEMA_VERSION,
+        "status": "ok",
+        "total": total,
+        "backups": backups,
+        "window": {
+            "max_items": max_items,
+            "total": total,
+            "returned": len(backups),
+            "has_more": has_more,
+            "next_cursor": next_cursor,
+        },
+    }
+
+
+def _redacted_remote_backup_item(
+    candidate: Path, metadata: Dict[str, object]
+) -> Dict[str, object]:
+    item = dict(metadata)
+    try:
+        manifest = _verify_backup_directory(candidate)
+        item.update(_backup_inventory_summary(manifest))
+        item["status"] = "valid"
+    except (OSError, sqlite3.Error, ValueError):
+        item["status"] = "invalid"
+    return {
+        "status": str(item["status"]),
+        "created_at": str(item["created_at"]),
+        "state_layout_version": str(item["state_layout_version"]),
+        "workflow_artifact_count": int(item["workflow_artifact_count"]),
+        "file_count": int(item["file_count"]),
+        "total_bytes": int(item["total_bytes"]),
+    }
+
+
+def _remote_backup_inventory_order_key(
+    candidate: Path, sort_key: Tuple[object, object, str]
+) -> Tuple[int, str, str]:
+    rank = int(sort_key[0])
+    value = sort_key[1]
+    if rank == 1 and isinstance(value, datetime):
+        sort_value = value.astimezone(timezone.utc).isoformat()
+    else:
+        sort_value = str(value)
+    name_digest = hashlib.sha256(candidate.name.encode("utf-8")).hexdigest()
+    return rank, sort_value, name_digest
+
+
+def _encode_remote_backup_inventory_cursor(
+    value: Tuple[int, str, str]
+) -> str:
+    rank, sort_value, name_digest = value
+    raw = json.dumps(
+        {"rank": rank, "sort_value": sort_value, "name_digest": name_digest},
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_remote_backup_inventory_cursor(
+    cursor: str,
+) -> Optional[Tuple[int, str, str]]:
+    if not isinstance(cursor, str):
+        raise ValueError("remote backup inventory cursor is invalid")
+    normalized = cursor
+    if not normalized:
+        return None
+    if len(normalized) > 512 or any(
+        character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for character in normalized
+    ):
+        raise ValueError("remote backup inventory cursor is invalid")
+    try:
+        raw = base64.urlsafe_b64decode(normalized + "=" * (-len(normalized) % 4))
+        value = json.loads(raw.decode("utf-8"))
+    except (binascii.Error, UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError("remote backup inventory cursor is invalid") from error
+    if not isinstance(value, dict) or set(value) != {"rank", "sort_value", "name_digest"}:
+        raise ValueError("remote backup inventory cursor is invalid")
+    rank = value.get("rank")
+    sort_value = value.get("sort_value")
+    name_digest = value.get("name_digest")
+    if (
+        isinstance(rank, bool)
+        or not isinstance(rank, int)
+        or rank not in {0, 1}
+        or not isinstance(sort_value, str)
+        or not sort_value
+        or len(sort_value) > 128
+        or not isinstance(name_digest, str)
+        or len(name_digest) != 64
+        or any(character not in "0123456789abcdef" for character in name_digest)
+    ):
+        raise ValueError("remote backup inventory cursor is invalid")
+    return rank, sort_value, name_digest
 
 
 def normalize_backup_retention_policy(policy: object) -> Dict[str, object]:

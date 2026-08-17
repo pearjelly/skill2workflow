@@ -36,3 +36,22 @@ class RemoteBackupInventoryDocumentationTests(TestCase):
         runtime = schema["properties"]["runtime"]
         self.assertNotIn("backup_parent_dir", runtime["required"])
         self.assertEqual(runtime["properties"]["backup_parent_dir"]["type"], "string")
+
+    def test_cursor_paged_remote_backup_inventory_contract_is_documented_and_schema_bound(self):
+        guide = (ROOT / "docs" / "remote-backup-inventory-pages.md").read_text(
+            encoding="utf-8"
+        )
+        schema = json.loads(
+            (ROOT / "schemas" / "remote-backup-inventory-page-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertIn("GET /api/v1/backup-inventory-pages", guide)
+        self.assertIn("service-backup-inventory-page", guide)
+        self.assertIn("opaque continuation token", guide)
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-remote-backup-inventory-page-0.1.0",
+        )
+        self.assertEqual(schema["properties"]["backups"]["maxItems"], 100)
+        self.assertEqual(schema["properties"]["window"]["$ref"], "#/$defs/window")

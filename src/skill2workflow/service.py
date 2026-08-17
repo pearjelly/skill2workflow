@@ -21,7 +21,9 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from . import __version__
 from .backup import (
     MAX_REMOTE_BACKUP_INVENTORY_ITEMS,
+    MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS,
     build_remote_backup_inventory,
+    build_remote_backup_inventory_page,
     build_state_backup_readiness_report,
     inspect_state_backup_readiness,
 )
@@ -106,6 +108,7 @@ MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_BACKUP_INVENTORY_RESPONSE_BYTES = 64 * 1024
+MAX_REMOTE_BACKUP_INVENTORY_PAGE_RESPONSE_BYTES = 64 * 1024
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
 MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
@@ -785,6 +788,8 @@ def _handler_for(service: RuntimeService):
                         self._handle_backup_readiness()
                     elif self.command == "GET" and path == "/api/v1/backup-inventory":
                         self._handle_backup_inventory()
+                    elif self.command == "GET" and path == "/api/v1/backup-inventory-pages":
+                        self._handle_backup_inventory_page()
                     elif self.command == "POST" and path == "/api/v1/retention-readiness":
                         self._handle_retention_readiness()
                     elif self.command == "GET" and path == "/api/v1/operational-readiness":
@@ -1984,6 +1989,65 @@ def _handler_for(service: RuntimeService):
                 return
             self._send_json(200, payload)
 
+        def _handle_backup_inventory_page(self):
+            """Serve one cursor-paged, redacted inventory of configured backups."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+                query = _backup_inventory_page_query(self.path)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            except ValueError as error:
+                self._send_json(400, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "backup inventory page request must not include a body"},
+                )
+                return
+            parent_dir = service.config.backup_parent_dir
+            if parent_dir is None:
+                self._send_json(503, {"error": "backup inventory page unavailable"})
+                return
+            try:
+                payload = build_remote_backup_inventory_page(
+                    parent_dir,
+                    max_items=query["max_items"],
+                    cursor=query["cursor"],
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_REMOTE_BACKUP_INVENTORY_PAGE_RESPONSE_BYTES:
+                    raise ValueError("backup inventory page exceeds response limit")
+            except ValueError as error:
+                if "cursor is invalid" in str(error):
+                    self._send_json(400, {"error": "backup inventory page cursor is invalid"})
+                else:
+                    self._send_json(503, {"error": "backup inventory page unavailable"})
+                return
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "backup inventory page unavailable"})
+                return
+            self._send_json(200, payload)
+
         def _handle_retention_readiness(self):
             """Serve a policy-bound, read-only retention preflight."""
 
@@ -2796,6 +2860,8 @@ def _request_route(method: str, path: str) -> str:
         return "backup_readiness"
     if method == "GET" and path == "/api/v1/backup-inventory":
         return "backup_inventory"
+    if method == "GET" and path == "/api/v1/backup-inventory-pages":
+        return "backup_inventory_page"
     if method == "POST" and path == "/api/v1/retention-readiness":
         return "retention_readiness"
     if method == "GET" and path == "/api/v1/operational-readiness":
@@ -3127,6 +3193,46 @@ def _backup_inventory_query(request_path: str) -> Dict[str, object]:
             f"{MAX_REMOTE_BACKUP_INVENTORY_ITEMS}"
         )
     return {"max_items": max_items}
+
+
+def _backup_inventory_page_query(request_path: str) -> Dict[str, object]:
+    """Parse the bounded query contract for cursor-paged backup inventory."""
+
+    try:
+        query = parse_qs(
+            urlsplit(str(request_path)).query,
+            keep_blank_values=True,
+            max_num_fields=3,
+        )
+    except ValueError as error:
+        raise ValueError("backup inventory page query is invalid") from error
+    allowed = {"max_items", "cursor"}
+    if any(key not in allowed for key in query):
+        raise ValueError("backup inventory page query contains an unsupported field")
+
+    def one(key: str) -> str:
+        values = query.get(key, [""])
+        if len(values) != 1:
+            raise ValueError(f"backup inventory page query field {key} must appear once")
+        return str(values[0])
+
+    raw_limit = one("max_items") or str(MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS)
+    try:
+        max_items = int(raw_limit)
+    except (TypeError, ValueError) as error:
+        raise ValueError("backup inventory page max_items must be an integer") from error
+    if not 1 <= max_items <= MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS:
+        raise ValueError(
+            "backup inventory page max_items must be an integer from 1 through "
+            f"{MAX_REMOTE_BACKUP_INVENTORY_PAGE_ITEMS}"
+        )
+    cursor = one("cursor")
+    if len(cursor) > 512 or any(
+        character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for character in cursor
+    ):
+        raise ValueError("backup inventory page cursor is invalid")
+    return {"max_items": max_items, "cursor": cursor}
 
 
 def _audit_consistency_run_id(path: str) -> str:

@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added cursor-paged protected remote backup inventory through
+  `GET /api/v1/backup-inventory-pages` and the installed
+  `service-backup-inventory-page` CLI. The separate redacted 100-item/64 KiB
+  contract walks older evidence with an opaque continuation cursor while
+  preserving the exact recent-window inventory route.
 - Added protected remote backup inventory through
   `GET /api/v1/backup-inventory` and the installed
   `service-backup-inventory` CLI. The optional owner-only backup parent is

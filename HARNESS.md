@@ -188,6 +188,12 @@ skill2workflow service-backup-inventory \
   --auth-token-file /run/secrets/skill2workflow-ingress-token \
   --max-items 25
 
+skill2workflow service-backup-inventory-page \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token \
+  --max-items 25 \
+  --cursor <next_cursor-from-the-previous-page>
+
 skill2workflow service-retention-readiness /etc/skill2workflow/retention.json \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
