@@ -13,6 +13,10 @@ release; Roadmap loop completion alone does not publish a new version.
   headers from being replayed to another target; non-redirect behavior is
   unchanged.
 
+- Added a direct-egress boundary to the built-in HTTP connector. Ambient
+  `http_proxy`, `https_proxy`, and `ALL_PROXY` settings are ignored so
+  resolved credentials cannot be routed through an unreviewed process proxy.
+
 - Added opt-in HTTP `response_mode: "metadata"` to discard raw response headers
   and bodies after bounded reading while preserving status and size metadata;
   `full` remains the backward-compatible default.

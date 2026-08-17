@@ -27,6 +27,9 @@ These surfaces should remain compatible during the `0.1.x` line:
   request, so resolved credential headers cannot be replayed to a redirect
   target; normal non-redirect response handling remains compatible, as
   documented in [`connectors.md`](connectors.md)
+- The built-in HTTP connector ignores ambient proxy environment variables and
+  opens configured URLs directly; proxy-based egress requires an explicit
+  reviewed connector, as documented in [`connectors.md`](connectors.md)
 - SQLite run-state documents use the same fixed 8 MiB UTF-8 persistence bound
   as the JSON backend across save, load, recovery, cancellation, deadline
   expiry, and startup summary repair, documented in

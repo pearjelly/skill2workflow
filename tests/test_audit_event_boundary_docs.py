@@ -26,8 +26,8 @@ class AuditEventBoundaryDocsTests(TestCase):
     def test_roadmap_and_readme_promote_loop_175(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Completed delivery loops: 1-194", roadmap)
+        self.assertIn("Completed delivery loops: 1-195", roadmap)
         self.assertIn(
-            "Loop 194 is complete with a fixed HTTP no-redirect credential boundary", roadmap
+            "Loop 195 is complete with a fixed HTTP direct-egress boundary", roadmap
         )
-        self.assertIn("Delivery Loops 1-194 are complete", readme)
+        self.assertIn("Delivery Loops 1-195 are complete", readme)

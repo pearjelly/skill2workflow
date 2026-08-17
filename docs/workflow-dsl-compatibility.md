@@ -68,6 +68,11 @@ follow-up request. This is an additive runtime safety boundary that prevents
 credential-header replay; existing non-redirect response and error contracts
 remain unchanged.
 
+The built-in HTTP connector also ignores ambient proxy environment variables
+and opens the configured URL directly. This keeps proxy routing out of the
+implicit Workflow DSL execution contract; an explicit reviewed connector is
+required for proxy-based egress.
+
 SQLite publication and deprecation likewise mutate one registry record and its
 audit row atomically. Concurrent publication of distinct immutable versions is
 additive; a same-version checksum mismatch remains an immutable-version error.

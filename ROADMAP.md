@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-194
+- Completed delivery loops: 1-195
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 194 is complete with a fixed HTTP no-redirect credential boundary
+- Active loop: None; Loop 195 is complete with a fixed HTTP direct-egress boundary
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-194 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-195 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -110,6 +110,9 @@ response headers and bodies after bounded reading.
 
 Loop 194 adds a fixed no-redirect boundary to the built-in HTTP connector after
 reproducing credential-header replay across two local HTTP servers.
+
+Loop 195 adds a direct-egress boundary after reproducing ambient proxy routing
+of a credentialed HTTP request through a local proxy server.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4847,9 +4850,42 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_connectors.ConnectorTests.test_http_connector_rejects_redirect_before_replaying_credentials -v
 ```
 
+### Loop 195: Fixed HTTP Direct-Egress Boundary
+
+**Status:** Complete.
+
+**Prior basis:** Loop 194 stopped redirect replay, but Python's default opener
+still honored ambient `http_proxy`, `https_proxy`, and `ALL_PROXY` environment
+settings. A local reproduction showed a credentialed workflow request being
+received by a proxy server instead of its configured target.
+
+**Outcome:** The built-in HTTP connector now installs an empty `ProxyHandler`
+alongside its no-redirect handler. It opens the configured URL directly and
+does not inherit proxy routing from the process environment. Existing direct
+HTTP success/error behavior remains unchanged.
+
+**Evidence:** A real target-plus-proxy regression sets all common proxy
+environment variables and proves the target receives the request with its
+credential header while the proxy receives none. Redirect, credential,
+payload-boundary, metadata, full-suite, package, secret-hygiene, and
+Production Baseline checks remain green. The direct-egress contract is
+documented in [`docs/connectors.md`](docs/connectors.md), compatibility, and
+stability boundaries.
+
+**Safety boundary:** This is direct egress, not an SSRF defense, DNS-rebinding
+defense, network firewall, or proxy implementation. Workflows that require a
+proxy need a separately reviewed connector with an explicit route.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_http_connector_ignores_ambient_proxy_for_credentialed_request -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 194 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 195 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -5009,6 +5045,7 @@ This rolling queue is ordered. Loop 194 is complete and there is no active deliv
 | Loop 192: Bounded HTTP Query-Parameter Input Mapping | Complete | Map scalar trigger input into flat HTTP query parameters without templates, expressions, or header interpolation | Additive `/query/<name>` contract, percent-encoded runtime URL copy, scalar/rejection tests, docs, and package evidence |
 | Loop 193: Metadata-Only HTTP Response Retention | Complete | Let workflows discard raw HTTP response values while preserving bounded delivery metadata | Additive `response_mode` contract, success/error projections, raw-value absence and invalid-mode tests, docs, and package evidence |
 | Loop 194: Fixed HTTP No-Redirect Credential Boundary | Complete | Reject HTTP redirects before credential headers can be replayed to a second target | Dedicated no-redirect opener, real dual-server credential regression, unchanged non-redirect contract tests, docs, and package evidence |
+| Loop 195: Fixed HTTP Direct-Egress Boundary | Complete | Prevent ambient process proxy settings from rerouting credentialed HTTP requests | Empty proxy handler, real target-plus-proxy regression, unchanged direct HTTP contract tests, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

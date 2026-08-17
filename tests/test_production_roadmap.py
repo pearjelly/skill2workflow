@@ -26,11 +26,11 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
-        self.assertIn("- Completed delivery loops: 1-194", roadmap)
-        self.assertIn("- Active loop: None; Loop 194 is complete with a fixed HTTP no-redirect credential boundary", roadmap)
+        self.assertIn("- Completed delivery loops: 1-195", roadmap)
+        self.assertIn("- Active loop: None; Loop 195 is complete with a fixed HTTP direct-egress boundary", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
-        self.assertIn("This rolling queue is ordered. Loop 194 is complete", roadmap)
+        self.assertIn("This rolling queue is ordered. Loop 195 is complete", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
         self.assertIn("**Status:** Achieved.", roadmap)
@@ -41,7 +41,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-194 complete, further loop numbers unassigned.",
+            "**Status:** Directional; Loops 44-195 complete, further loop numbers unassigned.",
             roadmap,
         )
 
@@ -271,10 +271,10 @@ class ProductionRoadmapTests(TestCase):
         )
         self.assertIn("### Loop 191: Explicit Connector Fixture Manifest Inspection", roadmap)
         self.assertIn(
-            "| Loop 194: Fixed HTTP No-Redirect Credential Boundary | Complete |",
+            "| Loop 195: Fixed HTTP Direct-Egress Boundary | Complete |",
             roadmap,
         )
-        self.assertIn("### Loop 194: Fixed HTTP No-Redirect Credential Boundary", roadmap)
+        self.assertIn("### Loop 195: Fixed HTTP Direct-Egress Boundary", roadmap)
 
         self.assertIn(
             "SQLite is the minimum production persistence baseline for Self-hosted Beta. "
@@ -370,7 +370,7 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-194 are complete", readme)
+        self.assertIn("Delivery Loops 1-195 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)

@@ -1,5 +1,6 @@
 import json
 import importlib.util
+import os
 import threading
 import time
 import urllib.error
@@ -544,6 +545,36 @@ class ConnectorTests(TestCase):
 
         self.assertEqual(target.requests, [])
 
+    def test_http_connector_ignores_ambient_proxy_for_credentialed_request(self):
+        target = _ConnectorTestServer()
+        proxy = _ProxyConnectorTestServer()
+        proxy_url = proxy.url()
+        proxy_environment = {
+            "http_proxy": proxy_url,
+            "https_proxy": proxy_url,
+            "HTTP_PROXY": proxy_url,
+            "HTTPS_PROXY": proxy_url,
+            "all_proxy": proxy_url,
+            "ALL_PROXY": proxy_url,
+            "no_proxy": "",
+            "NO_PROXY": "",
+        }
+
+        try:
+            with patch.dict(os.environ, proxy_environment):
+                result = execute_connector(
+                    _credential_http_node(target.url("/success")),
+                    credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+                )
+        finally:
+            proxy.close()
+            target.close()
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(len(target.requests), 1)
+        self.assertEqual(target.requests[0]["headers"]["Authorization"], "Bearer secret-token")
+        self.assertEqual(proxy.requests, [])
+
     def test_http_connector_missing_credential_fails_before_network_call(self):
         with self.assertRaisesRegex(ConnectorExecutionError, "credential handle not found: missing_token"):
             execute_connector(_credential_http_node("http://127.0.0.1:1/not-called", handle="missing_token"))
@@ -729,6 +760,41 @@ class _RedirectConnectorTestServer:
     def url(self):
         host, port = self._server.server_address
         return f"http://{host}:{port}/redirect"
+
+    def close(self):
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=2)
+
+
+class _ProxyConnectorRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.server.requests.append({"method": self.command, "path": self.path})
+        raw = b"ambient proxy should not receive connector requests"
+        self.send_response(502)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def log_message(self, format, *args):
+        return
+
+
+class _ProxyConnectorTestServer:
+    def __init__(self):
+        self._server = HTTPServer(("127.0.0.1", 0), _ProxyConnectorRequestHandler)
+        self._server.requests = []
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    def url(self):
+        host, port = self._server.server_address
+        return f"http://{host}:{port}"
+
+    @property
+    def requests(self):
+        return self._server.requests
 
     def close(self):
         self._server.shutdown()

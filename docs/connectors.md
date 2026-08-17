@@ -59,6 +59,12 @@ being replayed to a redirect target. Normal non-redirect `2xx`, `4xx`, and
 provider-specific redirect policy must use an explicitly reviewed connector
 boundary rather than enabling automatic follow-up requests here.
 
+The connector also ignores ambient `http_proxy`, `https_proxy`, and
+`ALL_PROXY` environment settings. Requests go directly to the configured URL;
+there is no implicit proxy route that can receive resolved credentials. A
+workflow that requires a proxy must use a separately reviewed connector with an
+explicit, documented proxy boundary.
+
 ### HTTP Payload Boundary
 
 The built-in HTTP connector applies one fixed `1,048,576`-byte (`1 MiB`) bound

@@ -447,9 +447,12 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
 
 
 def _open_http_request(request: urllib.request.Request, timeout: float):
-    """Open one HTTP request without urllib's automatic redirect replay."""
+    """Open one direct HTTP request without proxy or redirect replay."""
 
-    opener = urllib.request.build_opener(_NoRedirectHandler())
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        _NoRedirectHandler(),
+    )
     return opener.open(request, timeout=timeout)
 
 
