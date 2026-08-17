@@ -56,6 +56,12 @@ from .control_plane import (
     WORKFLOW_ARTIFACT_REPORT_SCHEMA_VERSION,
     WORKFLOW_DIFF_SCHEMA_VERSION,
 )
+from .explain import (
+    MAX_WORKFLOW_EXPLANATION_EDGES,
+    MAX_WORKFLOW_EXPLANATION_INPUT_PROPERTIES,
+    MAX_WORKFLOW_EXPLANATION_NODES,
+    WORKFLOW_EXPLANATION_SCHEMA_VERSION,
+)
 from .service import (
     RUNTIME_INFO_SCHEMA_VERSION,
     SERVICE_SCHEMA_VERSION,
@@ -110,6 +116,7 @@ MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES = 64 * 1024
+MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES = 64 * 1024
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 
@@ -496,6 +503,35 @@ def fetch_workflow_inventory(
         max_response_bytes=MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
     )
     _validate_workflow_inventory(payload)
+    return payload
+
+
+def fetch_workflow_explanation(
+    service_url: str,
+    token_file: Path,
+    workflow_id: str,
+    version: str,
+) -> Dict[str, object]:
+    """Fetch a bounded, value-free execution explanation for one version."""
+
+    normalized_workflow_id = _validate_workflow_ref(workflow_id, "workflow_id")
+    normalized_version = _validate_workflow_ref(version, "version")
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/workflow-explanations/{}/{}".format(
+            quote(normalized_workflow_id, safe=""),
+            quote(normalized_version, safe=""),
+        ),
+        conflict_message="workflow explanation unavailable",
+        not_found_message="workflow version not found",
+        max_response_bytes=MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
+    )
+    _validate_workflow_explanation_response(
+        payload,
+        workflow_id=normalized_workflow_id,
+        version=normalized_version,
+    )
     return payload
 
 
@@ -1688,6 +1724,197 @@ def _validate_workflow_artifact_report(payload: Dict[str, object]) -> None:
         raise ServiceActionError()
     if summary["truncated"] != (len(issues) < summary["issue_count"]):
         raise ServiceActionError()
+
+
+def _validate_workflow_explanation_response(
+    payload: Dict[str, object],
+    *,
+    workflow_id: str,
+    version: str,
+) -> None:
+    """Reject responses outside the fixed redacted explanation contract."""
+
+    fields = {
+        "schema_version",
+        "workflow",
+        "entry",
+        "summary",
+        "nodes",
+        "edges",
+        "input_contract",
+        "policies",
+        "safety",
+    }
+    if set(payload) != fields or payload.get("schema_version") != WORKFLOW_EXPLANATION_SCHEMA_VERSION:
+        raise ServiceActionError()
+    metadata = payload.get("workflow")
+    if (
+        not isinstance(metadata, dict)
+        or set(metadata) != {"id", "version", "status"}
+        or metadata.get("id") != workflow_id
+        or metadata.get("version") != version
+        or metadata.get("status") not in {"published", "deprecated"}
+    ):
+        raise ServiceActionError()
+    if not _is_safe_workflow_ref(payload.get("entry")):
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    summary_fields = {
+        "node_count",
+        "edge_count",
+        "human_gate_count",
+        "connector_node_count",
+        "side_effecting_node_count",
+        "terminal_node_count",
+        "retrying_node_count",
+        "timed_node_count",
+        "input_property_count",
+        "required_input_count",
+    }
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != summary_fields
+        or any(not _is_non_negative_integer(summary.get(field)) for field in summary_fields)
+    ):
+        raise ServiceActionError()
+    nodes = payload.get("nodes")
+    if not isinstance(nodes, list) or len(nodes) > MAX_WORKFLOW_EXPLANATION_NODES:
+        raise ServiceActionError()
+    for node in nodes:
+        if (
+            not isinstance(node, dict)
+            or set(node)
+            != {
+                "id",
+                "type",
+                "transitions",
+                "connector",
+                "external_side_effect",
+                "retry",
+                "timeout_ms",
+            }
+            or not _is_safe_workflow_ref(node.get("id"))
+            or not isinstance(node.get("type"), str)
+            or not node.get("type")
+            or not isinstance(node.get("external_side_effect"), bool)
+        ):
+            raise ServiceActionError()
+        transitions = node.get("transitions")
+        if (
+            not isinstance(transitions, dict)
+            or set(transitions) != {"success", "failure", "fallback"}
+            or any(
+                value is not None and not _is_safe_workflow_ref(value)
+                for value in transitions.values()
+            )
+        ):
+            raise ServiceActionError()
+        retry = node.get("retry")
+        if (
+            not isinstance(retry, dict)
+            or set(retry) != {"max_attempts", "backoff_ms"}
+            or not _is_non_negative_integer(retry.get("max_attempts"))
+            or not _is_non_negative_integer(retry.get("backoff_ms"))
+        ):
+            raise ServiceActionError()
+        timeout = node.get("timeout_ms")
+        if timeout is not None and not _is_non_negative_integer(timeout):
+            raise ServiceActionError()
+        connector = node.get("connector")
+        if connector is not None:
+            if (
+                not isinstance(connector, dict)
+                or set(connector)
+                != {
+                    "id",
+                    "kind",
+                    "method",
+                    "credential_handle_count",
+                    "input_mapping_count",
+                    "external_side_effect",
+                }
+                or not isinstance(connector.get("id"), str)
+                or not isinstance(connector.get("kind"), str)
+                or not isinstance(connector.get("method"), str)
+                or not _is_non_negative_integer(connector.get("credential_handle_count"))
+                or not _is_non_negative_integer(connector.get("input_mapping_count"))
+                or not isinstance(connector.get("external_side_effect"), bool)
+            ):
+                raise ServiceActionError()
+    edges = payload.get("edges")
+    if not isinstance(edges, list) or len(edges) > MAX_WORKFLOW_EXPLANATION_EDGES:
+        raise ServiceActionError()
+    for edge in edges:
+        if (
+            not isinstance(edge, dict)
+            or set(edge) != {"from", "to", "label", "conditioned"}
+            or not _is_safe_workflow_ref(edge.get("from"))
+            or not _is_safe_workflow_ref(edge.get("to"))
+            or edge.get("label") not in {None, "next", "failure", "fallback", "custom"}
+            or not isinstance(edge.get("conditioned"), bool)
+        ):
+            raise ServiceActionError()
+    contract = payload.get("input_contract")
+    if (
+        not isinstance(contract, dict)
+        or set(contract)
+        != {"present", "type", "required", "properties", "additional_properties"}
+        or not isinstance(contract.get("present"), bool)
+        or not isinstance(contract.get("type"), str)
+        or not isinstance(contract.get("additional_properties"), bool)
+        or not isinstance(contract.get("required"), list)
+        or len(contract.get("required")) > MAX_WORKFLOW_EXPLANATION_INPUT_PROPERTIES
+        or any(not isinstance(value, str) or not value for value in contract.get("required"))
+        or contract.get("required") != sorted(set(contract.get("required")))
+    ):
+        raise ServiceActionError()
+    properties = contract.get("properties")
+    if not isinstance(properties, list) or len(properties) > MAX_WORKFLOW_EXPLANATION_INPUT_PROPERTIES:
+        raise ServiceActionError()
+    for property_info in properties:
+        if (
+            not isinstance(property_info, dict)
+            or set(property_info) != {"name", "type", "required", "nested"}
+            or not isinstance(property_info.get("name"), str)
+            or not property_info.get("name")
+            or not isinstance(property_info.get("type"), str)
+            or not isinstance(property_info.get("required"), bool)
+            or not isinstance(property_info.get("nested"), bool)
+        ):
+            raise ServiceActionError()
+    policies = payload.get("policies")
+    if (
+        not isinstance(policies, dict)
+        or set(policies) != {"default_retry", "default_timeout_ms", "workflow_timeout_ms"}
+        or not isinstance(policies.get("default_retry"), dict)
+        or set(policies["default_retry"]) != {"max_attempts", "backoff_ms"}
+        or not _is_non_negative_integer(policies["default_retry"].get("max_attempts"))
+        or not _is_non_negative_integer(policies["default_retry"].get("backoff_ms"))
+    ):
+        raise ServiceActionError()
+    for key in ("default_timeout_ms", "workflow_timeout_ms"):
+        value = policies.get(key)
+        if value is not None and not _is_non_negative_integer(value):
+            raise ServiceActionError()
+    safety = payload.get("safety")
+    if safety != {
+        "side_effect_free": True,
+        "connector_calls": False,
+        "credentials_resolved": False,
+        "raw_values_included": False,
+    }:
+        raise ServiceActionError()
+    if summary["node_count"] != len(nodes) or summary["edge_count"] != len(edges):
+        raise ServiceActionError()
+
+
+def _is_safe_workflow_ref(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and bool(value)
+        and len(value) <= 128
+        and not any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+    )
 
 
 def _validate_workflow_inventory(payload: Dict[str, object]) -> None:

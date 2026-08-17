@@ -8,6 +8,14 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `explain` and authenticated `service-workflow-explain` execution-plan
+  views for Workflow DSL artifacts. The fixed
+  `skill2workflow-workflow-explanation-0.1.0` contract is bounded to 64 KiB,
+  reports topology, human gates, connector metadata, input shape, retries, and
+  timeouts, and excludes connector request values, instructions, credentials,
+  and trigger inputs. The plan is strictly read-only and side-effect free;
+  see `docs/workflow-explanation.md`.
+
 - Bounded SQLite trigger-ledger `response_json` values to 64 KiB UTF-8 JSON
   objects. Completed-row writes validate before advancing the pending claim;
   oversized, malformed, empty, or non-object replay rows fail closed as

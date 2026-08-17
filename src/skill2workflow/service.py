@@ -31,6 +31,10 @@ from .backup import (
 )
 from .control_plane import LocalControlPlane
 from .credentials import DirectoryCredentialProvider
+from .explain import (
+    MAX_WORKFLOW_EXPLANATION_BYTES,
+    build_workflow_explanation,
+)
 from .dashboard import (
     MAX_LIVE_SNAPSHOT_BYTES,
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
@@ -120,6 +124,7 @@ MAX_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_INVENTORY_RESPONSE_BYTES = 64 * 1024
+MAX_WORKFLOW_EXPLANATION_RESPONSE_BYTES = MAX_WORKFLOW_EXPLANATION_BYTES
 MAX_RETENTION_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_OPERATIONAL_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_ACTION_RESPONSE_BYTES = 16 * 1024
@@ -860,6 +865,8 @@ def _handler_for(service: RuntimeService):
                         self._handle_runtime_info()
                     elif self.command == "GET" and path == "/api/v1/workflows":
                         self._handle_workflow_inventory()
+                    elif self.command == "GET" and _workflow_explanation_parts(path) is not None:
+                        self._handle_workflow_explanation(_workflow_explanation_parts(path))
                     elif self.command == "POST" and path == "/api/v1/workflow-releases":
                         self._handle_workflow_release()
                     elif self.command == "POST" and path == "/api/v1/workflow-promotions":
@@ -1956,6 +1963,59 @@ def _handler_for(service: RuntimeService):
                 return
             self._send_json(200, payload)
 
+        def _handle_workflow_explanation(self, parts):
+            """Serve a bounded, side-effect-free explanation of one version."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "workflow explanation request must not include a body"},
+                )
+                return
+            workflow_id, version = parts
+            try:
+                payload = build_workflow_explanation(
+                    service.control_plane.get_workflow(workflow_id, version)
+                )
+                encoded = json.dumps(
+                    payload, ensure_ascii=False, indent=2
+                ).encode("utf-8")
+                if len(encoded) > MAX_WORKFLOW_EXPLANATION_RESPONSE_BYTES:
+                    raise ValueError("workflow explanation exceeds response limit")
+            except ValueError as error:
+                message = str(error).lower()
+                if "version not found" in message:
+                    self._send_json(404, {"error": "workflow version not found"})
+                else:
+                    self._send_json(503, {"error": "workflow explanation unavailable"})
+                return
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "workflow explanation unavailable"})
+                return
+            self._send_json(200, payload)
+
         def _handle_backup_readiness(self):
             """Serve fixed read-only preflight data for an offline backup."""
 
@@ -2993,6 +3053,8 @@ def _request_route(method: str, path: str) -> str:
         return "runtime_info"
     if method == "GET" and path == "/api/v1/workflows":
         return "workflow_inventory"
+    if method == "GET" and _workflow_explanation_parts(path) is not None:
+        return "workflow_explanation"
     if method == "POST" and path == "/api/v1/workflow-releases":
         return "workflow_release"
     if method == "POST" and path == "/api/v1/workflow-promotions":
@@ -3373,6 +3435,21 @@ def _audit_consistency_run_id(path: str) -> str:
 def _workflow_diff_parts(path: str):
     parts = path.split("/")
     if len(parts) != 7 or parts[:4] != ["", "api", "v1", "workflow-diffs"]:
+        return None
+    values = tuple(unquote(value) for value in parts[4:])
+    if any(not value or len(value) > 128 for value in values):
+        return None
+    if any(
+        any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+        for value in values
+    ):
+        return None
+    return values
+
+
+def _workflow_explanation_parts(path: str):
+    parts = path.split("/")
+    if len(parts) != 6 or parts[:4] != ["", "api", "v1", "workflow-explanations"]:
         return None
     values = tuple(unquote(value) for value in parts[4:])
     if any(not value or len(value) > 128 for value in values):

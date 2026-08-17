@@ -19,6 +19,7 @@ from .compiler import compile_ir_to_workflow, validate_workflow, validate_workfl
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
 from .dashboard import build_control_snapshot, build_workflow_inventory_from_control
+from .explain import build_workflow_explanation, render_workflow_explanation_text
 from .executor import LocalExecutor
 from .live_snapshot import fetch_live_control_snapshot, write_private_snapshot
 from .migration import inspect_state_upgrade, upgrade_state
@@ -48,6 +49,7 @@ from .service_client import (
     fetch_audit_integrity,
     fetch_runtime_info,
     fetch_workflow_diff,
+    fetch_workflow_explanation,
     fetch_run_detail,
     fetch_run_list,
     fetch_run_page,
@@ -97,6 +99,13 @@ def _main(argv=None) -> int:
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
     validate_cmd.add_argument("workflow", type=Path)
     validate_cmd.add_argument("--format", choices=["text", "json"], default="text")
+
+    explain_cmd = subparsers.add_parser(
+        "explain",
+        help="Show a bounded, side-effect-free execution plan for a Workflow DSL file",
+    )
+    explain_cmd.add_argument("workflow", type=Path)
+    explain_cmd.add_argument("--format", choices=["json", "text"], default="json")
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
     visualize_cmd.add_argument("workflow", type=Path)
@@ -571,6 +580,15 @@ def _main(argv=None) -> int:
     service_diff_cmd.add_argument("--service-url", required=True)
     service_diff_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
+    service_explain_cmd = subparsers.add_parser(
+        "service-workflow-explain",
+        help="Show a bounded, value-free execution plan through the authenticated service",
+    )
+    service_explain_cmd.add_argument("workflow_id")
+    service_explain_cmd.add_argument("--version", required=True)
+    service_explain_cmd.add_argument("--service-url", required=True)
+    service_explain_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
     service_release_cmd = subparsers.add_parser(
         "service-workflow-publish",
         help="Publish one Workflow DSL document through the authenticated service",
@@ -812,6 +830,15 @@ def _main(argv=None) -> int:
                 print(error, file=sys.stderr)
             return 1
         print("valid")
+        return 0
+
+    if args.command == "explain":
+        workflow = _load_json(args.workflow)
+        explanation = build_workflow_explanation(workflow)
+        if args.format == "text":
+            print(render_workflow_explanation_text(explanation), end="")
+        else:
+            _print_json(explanation)
         return 0
 
     if args.command == "visualize":
@@ -1287,6 +1314,16 @@ def _main(argv=None) -> int:
                 args.workflow_id,
                 args.from_version,
                 args.to_version,
+            )
+        )
+
+    if args.command == "service-workflow-explain":
+        return _service_action(
+            lambda: fetch_workflow_explanation(
+                args.service_url,
+                args.auth_token_file,
+                args.workflow_id,
+                args.version,
             )
         )
 

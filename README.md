@@ -172,6 +172,7 @@ explicit connector boundaries. It currently supports:
 - Produce a bounded, read-only backup expiration plan with a minimum-valid-backup floor
 - Inspect compact, bounded local schedules and dispatch history without trigger inputs or lease identities
 - Inspect compact, bounded published-workflow inventory without workflow content
+- Explain a workflow before execution with a bounded, side-effect-free, value-free plan using the fixed `skill2workflow-workflow-explanation-0.1.0` contract
 - Drain due schedule work in explicitly bounded side-effect batches
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
@@ -519,6 +520,19 @@ PYTHONPATH=src python3 -m skill2workflow.cli promote workflow_approval_flow \
 See [`docs/workflow-releases.md`](docs/workflow-releases.md) for the bounded
 diff and compare-and-swap contract.
 
+Inspect the execution plan before triggering a local workflow:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli explain \
+  examples/workflows/http-connector.workflow.json --format text
+```
+
+For a published version on a self-hosted service, use the authenticated
+`service-workflow-explain` command. The plan shows topology, human gates,
+connector metadata, input-contract shape, retries, and timeouts without
+calling a connector or copying credentials, instructions, URLs, headers,
+bodies, or trigger values. See [`docs/workflow-explanation.md`](docs/workflow-explanation.md).
+
 Use `--version production` with `trigger`, webhook paths, or schedule
 definitions. The response reports the resolved immutable version; SQLite
 idempotency retries keep the original alias scope across later promotions.
@@ -766,7 +780,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-177 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-178 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1461,6 +1475,7 @@ See:
 - `docs/remote-workflow-release.md`
 - `docs/remote-workflow-promotion.md`
 - `docs/remote-workflow-diff.md`
+- `docs/workflow-explanation.md`
 - `docs/remote-workflow-deprecation.md`
 - `docs/remote-workflow-inventory.md`
 - `docs/remote-retention-readiness.md`

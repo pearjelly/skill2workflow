@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-177
+- Completed delivery loops: 1-178
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 177 is complete with bounded SQLite trigger-ledger responses
+- Active loop: None; Loop 178 is complete with bounded, side-effect-free workflow explanations
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-177 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-178 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 177; the detailed
+The follow-on production hardening continues through Loop 178; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4238,9 +4238,40 @@ with stability, README, and changelog links kept aligned.
 not cap trigger inputs, connector payloads, total database size, retention, or
 external side effects, and it does not claim exactly-once execution.
 
+### Loop 178: Bounded Workflow Execution Explanations
+
+**Status:** Complete.
+
+**Prior basis:** Operators could validate, diff, publish, and trigger a
+workflow, but there was no fixed pre-execution view of the graph's human gates,
+connector side effects, input shape, retry policy, and timeout policy. Remote
+operators therefore had to inspect full artifacts or rely on release metadata
+before approving a real trigger.
+
+**Outcome:** The local `explain` command and authenticated remote
+`service-workflow-explain` client expose the fixed
+`skill2workflow-workflow-explanation-0.1.0` contract. It reports only bounded
+topology and policy metadata: node/edge counts, transitions, human gates,
+connector id/kind/method and counts, input-property shape, retries, and
+timeouts. It excludes titles, descriptions, instructions, connector URLs,
+headers, bodies, mapping values, conditions, credentials, and trigger inputs.
+The result is explicitly side-effect free and never invokes a connector.
+
+**Evidence:** [`docs/workflow-explanation.md`](docs/workflow-explanation.md)
+defines the local and remote contracts, fixed redaction, 64 KiB/1,000-node/
+2,000-edge/128-property bounds, and operator sequence. Builder, CLI, client,
+service, telemetry, schema, package-smoke, and full-suite tests cover
+determinism, authentication, empty-body enforcement, redaction, bounded
+responses, and read-only behavior.
+
+**Safety boundary:** This is a review aid, not a second execution authority.
+Workflow DSL remains authoritative. The plan does not validate provider
+availability, resolve credentials, predict external outcomes, or claim
+exactly-once effects.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 177 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 178 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4383,6 +4414,7 @@ This rolling queue is ordered. Loop 177 is complete and there is no active deliv
 | Loop 175: Bounded Audit Event Documents | Complete | Keep local JSONL and SQLite control-plane audit persistence from bypassing a fixed per-event document boundary | Fixed 1 MiB UTF-8 JSON-object bound on writes and bounded reads, atomic batch validation, import/integrity coverage, and audit-event boundary documentation |
 | Loop 176: Bounded SQLite Workflow Registry Records | Complete | Keep the recommended SQLite workflow registry from bypassing a fixed per-record document boundary | Fixed 2 MiB UTF-8 JSON-object bound on registry writes and reads, atomic replacement and alias-update validation, import/diagnostic coverage, and SQLite registry boundary documentation |
 | Loop 177: Bounded SQLite Trigger-Ledger Responses | Complete | Keep completed trigger idempotency rows from bypassing a fixed replay-document boundary | Fixed 64 KiB UTF-8 JSON-object bound on replay writes and reads, atomic pending-claim preservation, fail-closed corruption handling, control-plane coverage, and SQLite trigger-ledger boundary documentation |
+| Loop 178: Bounded Workflow Execution Explanations | Complete | Give local and remote operators a safe pre-execution review of topology, gates, connector side effects, input shape, retries, and timeouts without exposing values or executing work | Fixed side-effect-free explanation schema, local/remote CLI, authenticated read-only route, 64 KiB/1,000-node/2,000-edge bounds, redaction tests, and operator documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -84,6 +84,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-runtime-info",
     "service-workflows",
     "service-workflow-diff",
+    "service-workflow-explain",
     "service-workflow-publish",
     "service-workflow-promote",
     "service-workflow-deprecate",

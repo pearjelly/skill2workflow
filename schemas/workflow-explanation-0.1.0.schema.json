@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/workflow-explanation-0.1.0.json",
+  "title": "skill2workflow Workflow Explanation",
+  "description": "Bounded, value-free execution plan for one Workflow DSL version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "workflow",
+    "entry",
+    "summary",
+    "nodes",
+    "edges",
+    "input_contract",
+    "policies",
+    "safety"
+  ],
+  "properties": {
+    "schema_version": {"const": "skill2workflow-workflow-explanation-0.1.0"},
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "status"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "status": {"enum": ["published", "deprecated"]}
+      }
+    },
+    "entry": {"type": "string", "minLength": 1, "maxLength": 128},
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node_count",
+        "edge_count",
+        "human_gate_count",
+        "connector_node_count",
+        "side_effecting_node_count",
+        "terminal_node_count",
+        "retrying_node_count",
+        "timed_node_count",
+        "input_property_count",
+        "required_input_count"
+      ],
+      "properties": {
+        "node_count": {"type": "integer", "minimum": 0, "maximum": 1000},
+        "edge_count": {"type": "integer", "minimum": 0, "maximum": 2000},
+        "human_gate_count": {"type": "integer", "minimum": 0},
+        "connector_node_count": {"type": "integer", "minimum": 0},
+        "side_effecting_node_count": {"type": "integer", "minimum": 0},
+        "terminal_node_count": {"type": "integer", "minimum": 0},
+        "retrying_node_count": {"type": "integer", "minimum": 0},
+        "timed_node_count": {"type": "integer", "minimum": 0},
+        "input_property_count": {"type": "integer", "minimum": 0, "maximum": 128},
+        "required_input_count": {"type": "integer", "minimum": 0, "maximum": 128}
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {"$ref": "#/$defs/node"}
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 2000,
+      "items": {"$ref": "#/$defs/edge"}
+    },
+    "input_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "type", "required", "properties", "additional_properties"],
+      "properties": {
+        "present": {"type": "boolean"},
+        "type": {"type": "string"},
+        "required": {"type": "array", "maxItems": 128, "items": {"type": "string", "minLength": 1}},
+        "properties": {"type": "array", "maxItems": 128, "items": {"$ref": "#/$defs/input_property"}},
+        "additional_properties": {"type": "boolean"}
+      }
+    },
+    "policies": {"$ref": "#/$defs/policies"},
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["side_effect_free", "connector_calls", "credentials_resolved", "raw_values_included"],
+      "properties": {
+        "side_effect_free": {"const": true},
+        "connector_calls": {"const": false},
+        "credentials_resolved": {"const": false},
+        "raw_values_included": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["success", "failure", "fallback"],
+      "properties": {
+        "success": {"type": ["string", "null"], "maxLength": 128},
+        "failure": {"type": ["string", "null"], "maxLength": 128},
+        "fallback": {"type": ["string", "null"], "maxLength": 128}
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_attempts", "backoff_ms"],
+      "properties": {
+        "max_attempts": {"type": "integer", "minimum": 0},
+        "backoff_ms": {"type": "integer", "minimum": 0}
+      }
+    },
+    "connector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "method", "credential_handle_count", "input_mapping_count", "external_side_effect"],
+      "properties": {
+        "id": {"type": "string"},
+        "kind": {"type": "string"},
+        "method": {"type": "string"},
+        "credential_handle_count": {"type": "integer", "minimum": 0},
+        "input_mapping_count": {"type": "integer", "minimum": 0},
+        "external_side_effect": {"type": "boolean"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "transitions", "connector", "external_side_effect", "retry", "timeout_ms"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "type": {"type": "string", "minLength": 1},
+        "transitions": {"$ref": "#/$defs/transition"},
+        "connector": {"anyOf": [{"$ref": "#/$defs/connector"}, {"type": "null"}]},
+        "external_side_effect": {"type": "boolean"},
+        "retry": {"$ref": "#/$defs/retry"},
+        "timeout_ms": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to", "label", "conditioned"],
+      "properties": {
+        "from": {"type": "string", "minLength": 1, "maxLength": 128},
+        "to": {"type": "string", "minLength": 1, "maxLength": 128},
+        "label": {"enum": [null, "next", "failure", "fallback", "custom"]},
+        "conditioned": {"type": "boolean"}
+      }
+    },
+    "input_property": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type", "required", "nested"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "type": {"type": "string"},
+        "required": {"type": "boolean"},
+        "nested": {"type": "boolean"}
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["default_retry", "default_timeout_ms", "workflow_timeout_ms"],
+      "properties": {
+        "default_retry": {"$ref": "#/$defs/retry"},
+        "default_timeout_ms": {"type": ["integer", "null"], "minimum": 0},
+        "workflow_timeout_ms": {"type": ["integer", "null"], "minimum": 0}
+      }
+    }
+  }
+}

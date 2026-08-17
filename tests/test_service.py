@@ -43,6 +43,7 @@ from skill2workflow.service_client import (
     fetch_workflow_inventory,
     fetch_operational_readiness,
     fetch_workflow_diff,
+    fetch_workflow_explanation,
     post_workflow_trigger,
 )
 from skill2workflow.service_bootstrap import rotate_service_token
@@ -3530,6 +3531,72 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(diff["changes"]["nodes"]["changed"], ["start"])
         serialized = json.dumps(diff, ensure_ascii=False)
         self.assertNotIn("Private customer review title", serialized)
+        self.assertNotIn("artifact", serialized)
+        self.assertEqual(audit_after, audit_count)
+        self.assertFalse(thread.is_alive())
+
+    def test_remote_workflow_explanation_is_authenticated_bounded_and_value_free(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            workflow = _workflow()
+            workflow["workflow"]["name"] = "private workflow name"
+            workflow["nodes"][0]["title"] = "private title"
+            control.publish_workflow(workflow)
+            audit_count = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            url = f"{base_url}/api/v1/workflow-explanations/workflow_service/0.1.0"
+            try:
+                denied_status, denied = _get_json(url)
+                malformed_status, malformed = _get_raw_get(
+                    url,
+                    token=AUTH_TOKEN,
+                    body=b"{}",
+                )
+                explanation = fetch_workflow_explanation(
+                    base_url,
+                    config.auth_token_file,
+                    "workflow_service",
+                    "0.1.0",
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            audit_after = len(LocalControlPlane(state_dir, storage="sqlite").list_audit_events())
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(
+            malformed,
+            {"error": "workflow explanation request must not include a body"},
+        )
+        self.assertEqual(
+            explanation["schema_version"],
+            "skill2workflow-workflow-explanation-0.1.0",
+        )
+        self.assertEqual(explanation["workflow"]["status"], "published")
+        serialized = json.dumps(explanation, ensure_ascii=False)
+        self.assertNotIn("private workflow name", serialized)
+        self.assertNotIn("private title", serialized)
         self.assertNotIn("artifact", serialized)
         self.assertEqual(audit_after, audit_count)
         self.assertFalse(thread.is_alive())
