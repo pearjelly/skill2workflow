@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-193
+- Completed delivery loops: 1-194
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 193 is complete with metadata-only HTTP response retention
+- Active loop: None; Loop 194 is complete with a fixed HTTP no-redirect credential boundary
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-193 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-194 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -107,6 +107,9 @@ adds bounded scalar query-parameter mapping for the built-in HTTP connector
 without enabling templates, expressions, or dynamic header mapping. Loop 193
 adds an opt-in metadata-only response projection that discards raw HTTP
 response headers and bodies after bounded reading.
+
+Loop 194 adds a fixed no-redirect boundary to the built-in HTTP connector after
+reproducing credential-header replay across two local HTTP servers.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4811,9 +4814,42 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_connectors.ConnectorTests.test_http_connector_metadata_response_discards_body_and_headers -v
 ```
 
+### Loop 194: Fixed HTTP No-Redirect Credential Boundary
+
+**Status:** Complete.
+
+**Prior basis:** The built-in HTTP connector resolved credential handles into
+request headers, but Python's default opener followed `3xx` responses and
+replayed those headers to the redirect target. A two-server local drill
+confirmed that this could move an `Authorization` value across host/port
+boundaries.
+
+**Outcome:** The connector now uses a dedicated opener that rejects every
+redirect before issuing a follow-up request, returning the fixed error
+`http connector redirects are disabled`. Existing non-redirect `2xx`, `4xx`,
+and `5xx` result contracts remain unchanged.
+
+**Evidence:** A real dual-server regression proves the target receives no
+request and no credential header. Existing HTTP success/error, credential,
+payload-boundary, metadata, full-suite, package, secret-hygiene, and
+Production Baseline checks remain green. The behavior is documented in
+[`docs/connectors.md`](docs/connectors.md), the compatibility contract, and
+the stability boundaries.
+
+**Safety boundary:** This is a fixed no-redirect rule, not an SSRF defense,
+provider-side cancellation guarantee, or allowlist. Provider-specific
+follow-up behavior requires a separately reviewed connector boundary.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_http_connector_rejects_redirect_before_replaying_credentials -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 193 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 194 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4972,6 +5008,7 @@ This rolling queue is ordered. Loop 193 is complete and there is no active deliv
 | Loop 191: Explicit Connector Fixture Manifest Inspection | Complete | Let operators review an explicitly loaded connector manifest before execution without creating state or invoking a connector | `connectors --connector-fixture`, read-only CLI coverage, manifest contract assertions, docs, and package evidence |
 | Loop 192: Bounded HTTP Query-Parameter Input Mapping | Complete | Map scalar trigger input into flat HTTP query parameters without templates, expressions, or header interpolation | Additive `/query/<name>` contract, percent-encoded runtime URL copy, scalar/rejection tests, docs, and package evidence |
 | Loop 193: Metadata-Only HTTP Response Retention | Complete | Let workflows discard raw HTTP response values while preserving bounded delivery metadata | Additive `response_mode` contract, success/error projections, raw-value absence and invalid-mode tests, docs, and package evidence |
+| Loop 194: Fixed HTTP No-Redirect Credential Boundary | Complete | Reject HTTP redirects before credential headers can be replayed to a second target | Dedicated no-redirect opener, real dual-server credential regression, unchanged non-redirect contract tests, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

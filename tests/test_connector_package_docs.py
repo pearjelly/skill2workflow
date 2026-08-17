@@ -57,10 +57,13 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("UTF-8", connectors)
         self.assertIn('response_mode` to `metadata`', connectors)
         self.assertIn('body_discarded: true', connectors)
+        self.assertIn("http connector redirects are disabled", connectors)
+        self.assertIn("rejects all `3xx` redirects", compatibility)
         self.assertIn("Built-in HTTP request and", compatibility)
         self.assertIn("UTF-8 response bodies are bounded to 1 MiB", compatibility)
         self.assertIn("response_mode` (`full` or `metadata`)", compatibility)
         self.assertIn("Built-in HTTP connector request/response payloads are bounded to 1 MiB", stability)
+        self.assertIn("rejects every `3xx` redirect", stability)
 
 
 def _read(path: str) -> str:

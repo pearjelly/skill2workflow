@@ -63,6 +63,11 @@ When SQLite is the control-plane backend, the promotion guard, alias metadata
 update, and promotion audit append commit in one transaction. This hardening
 does not change the artifact contract or add fields to Workflow DSL.
 
+The built-in HTTP connector rejects all `3xx` redirects before issuing a
+follow-up request. This is an additive runtime safety boundary that prevents
+credential-header replay; existing non-redirect response and error contracts
+remain unchanged.
+
 SQLite publication and deprecation likewise mutate one registry record and its
 audit row atomically. Concurrent publication of distinct immutable versions is
 additive; a same-version checksum mismatch remains an immutable-version error.

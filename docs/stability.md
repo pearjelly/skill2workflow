@@ -23,6 +23,10 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Explicit external connector results use a fixed 1 MiB normalized JSON
   envelope and strict JSON round-trip before entering durable run state,
   documented in [`external-connector-result-boundary.md`](external-connector-result-boundary.md)
+- The built-in HTTP connector rejects every `3xx` redirect before a follow-up
+  request, so resolved credential headers cannot be replayed to a redirect
+  target; normal non-redirect response handling remains compatible, as
+  documented in [`connectors.md`](connectors.md)
 - SQLite run-state documents use the same fixed 8 MiB UTF-8 persistence bound
   as the JSON backend across save, load, recovery, cancellation, deadline
   expiry, and startup summary repair, documented in

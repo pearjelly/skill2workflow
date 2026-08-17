@@ -107,6 +107,25 @@ class ConnectorExecutionError(Exception):
     """Raised when a connector binding cannot be executed."""
 
 
+class _HTTPRedirectRejected(Exception):
+    """Internal signal raised when an HTTP response attempts a redirect."""
+
+    def __init__(self, code: int):
+        self.code = code
+        super().__init__(f"HTTP redirect {code}")
+
+
+class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Reject all HTTP redirects before urllib can replay a request."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        try:
+            fp.close()
+        except (AttributeError, OSError):
+            pass
+        raise _HTTPRedirectRejected(int(code))
+
+
 @dataclass(frozen=True)
 class ExternalConnector:
     """Explicitly registered external connector fixture."""
@@ -399,7 +418,7 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
     request = urllib.request.Request(url, data=data, headers=headers, method=method)
 
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
+        with _open_http_request(request, timeout=timeout) as response:
             payload = _read_http_payload(response, "response")
             return {
                 "status": "completed",
@@ -407,6 +426,8 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
                 "output": _http_response_output(response, int(response.status), payload, response_mode),
                 "input_mapping": mapping_summary,
             }
+    except _HTTPRedirectRejected as error:
+        raise ConnectorExecutionError("http connector redirects are disabled") from error
     except urllib.error.HTTPError as error:
         with closing(error):
             payload = _read_http_payload(error, "response")
@@ -423,6 +444,13 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
         if isinstance(error.reason, (TimeoutError, socket.timeout)):
             raise ConnectorExecutionError(f"http connector timed out: {error.reason}")
         raise ConnectorExecutionError(str(error.reason))
+
+
+def _open_http_request(request: urllib.request.Request, timeout: float):
+    """Open one HTTP request without urllib's automatic redirect replay."""
+
+    opener = urllib.request.build_opener(_NoRedirectHandler())
+    return opener.open(request, timeout=timeout)
 
 
 def _http_response_mode(value: object) -> str:

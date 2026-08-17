@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a fixed no-redirect boundary to the built-in HTTP connector. `3xx`
+  responses now fail before any follow-up request, preventing credential
+  headers from being replayed to another target; non-redirect behavior is
+  unchanged.
+
 - Added opt-in HTTP `response_mode: "metadata"` to discard raw response headers
   and bodies after bounded reading while preserving status and size metadata;
   `full` remains the backward-compatible default.

@@ -26,6 +26,6 @@ class SqliteRunStateBoundaryDocsTests(TestCase):
     def test_roadmap_and_readme_promote_loop_174(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Completed delivery loops: 1-193", roadmap)
-        self.assertIn("Loop 193 is complete with metadata-only HTTP response retention", roadmap)
-        self.assertIn("Delivery Loops 1-193 are complete", readme)
+        self.assertIn("Completed delivery loops: 1-194", roadmap)
+        self.assertIn("Loop 194 is complete with a fixed HTTP no-redirect credential boundary", roadmap)
+        self.assertIn("Delivery Loops 1-194 are complete", readme)

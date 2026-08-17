@@ -51,6 +51,14 @@ Supported request metadata:
 | `input_mapping` | Optional bounded mapping from durable trigger input into request body fields or query parameters. |
 | `timeout_ms` | Optional positive millisecond timeout. Missing or invalid values default to 5000 ms. |
 
+The built-in connector never follows HTTP redirects. Any `3xx` response is
+rejected before a second request with the fixed error
+`http connector redirects are disabled`. This prevents credential headers from
+being replayed to a redirect target. Normal non-redirect `2xx`, `4xx`, and
+`5xx` responses keep their existing result contract. Workflows that need a
+provider-specific redirect policy must use an explicitly reviewed connector
+boundary rather than enabling automatic follow-up requests here.
+
 ### HTTP Payload Boundary
 
 The built-in HTTP connector applies one fixed `1,048,576`-byte (`1 MiB`) bound

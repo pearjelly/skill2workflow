@@ -203,7 +203,7 @@ class ConnectorTests(TestCase):
         self.assertNotIn("unavailable", json.dumps(result))
 
     def test_http_connector_rejects_unknown_response_mode_before_network_call(self):
-        with patch("skill2workflow.connectors.urllib.request.urlopen") as urlopen:
+        with patch("skill2workflow.connectors._open_http_request") as urlopen:
             with self.assertRaisesRegex(
                 ConnectorExecutionError,
                 "request.response_mode must be full or metadata",
@@ -411,7 +411,7 @@ class ConnectorTests(TestCase):
         )
 
         with patch(
-            "skill2workflow.connectors.urllib.request.urlopen",
+            "skill2workflow.connectors._open_http_request",
             side_effect=error,
         ):
             result = execute_connector(
@@ -467,7 +467,7 @@ class ConnectorTests(TestCase):
     def test_http_connector_rejects_oversized_success_response_before_persisting_it(self):
         response = _FakeHTTPResponse(200, b"x" * (MAX_HTTP_PAYLOAD_BYTES + 1))
 
-        with patch("skill2workflow.connectors.urllib.request.urlopen", return_value=response):
+        with patch("skill2workflow.connectors._open_http_request", return_value=response):
             with self.assertRaisesRegex(
                 ConnectorExecutionError,
                 f"http connector response body exceeds {MAX_HTTP_PAYLOAD_BYTES} bytes",
@@ -487,7 +487,7 @@ class ConnectorTests(TestCase):
         )
 
         with patch(
-            "skill2workflow.connectors.urllib.request.urlopen",
+            "skill2workflow.connectors._open_http_request",
             side_effect=error,
         ):
             with self.assertRaisesRegex(
@@ -501,7 +501,7 @@ class ConnectorTests(TestCase):
     def test_http_connector_normalizes_invalid_utf8_response(self):
         response = _FakeHTTPResponse(200, b"\xff\xfe")
 
-        with patch("skill2workflow.connectors.urllib.request.urlopen", return_value=response):
+        with patch("skill2workflow.connectors._open_http_request", return_value=response):
             with self.assertRaisesRegex(
                 ConnectorExecutionError,
                 "http connector response body must be valid UTF-8",
@@ -524,6 +524,25 @@ class ConnectorTests(TestCase):
         self.assertEqual(result["status"], "completed")
         self.assertEqual(server.requests[0]["headers"]["Authorization"], "Bearer secret-token")
         self.assertNotIn("secret-token", json.dumps(result))
+
+    def test_http_connector_rejects_redirect_before_replaying_credentials(self):
+        target = _ConnectorTestServer()
+        redirect = _RedirectConnectorTestServer(target.url("/success"))
+
+        try:
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                "http connector redirects are disabled",
+            ):
+                execute_connector(
+                    _credential_http_node(redirect.url()),
+                    credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+                )
+        finally:
+            redirect.close()
+            target.close()
+
+        self.assertEqual(target.requests, [])
 
     def test_http_connector_missing_credential_fails_before_network_call(self):
         with self.assertRaisesRegex(ConnectorExecutionError, "credential handle not found: missing_token"):
@@ -683,6 +702,33 @@ class _ConnectorTestServer:
     @property
     def requests(self):
         return self._server.requests
+
+    def close(self):
+        self._server.shutdown()
+        self._server.server_close()
+        self._thread.join(timeout=2)
+
+
+class _RedirectConnectorRequestHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(302)
+        self.send_header("Location", self.server.target_url)
+        self.end_headers()
+
+    def log_message(self, format, *args):
+        return
+
+
+class _RedirectConnectorTestServer:
+    def __init__(self, target_url):
+        self._server = HTTPServer(("127.0.0.1", 0), _RedirectConnectorRequestHandler)
+        self._server.target_url = target_url
+        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
+        self._thread.start()
+
+    def url(self):
+        host, port = self._server.server_address
+        return f"http://{host}:{port}/redirect"
 
     def close(self):
         self._server.shutdown()
