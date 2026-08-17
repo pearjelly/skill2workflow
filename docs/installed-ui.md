@@ -38,6 +38,12 @@ paths are not proxied. Live responses remain read-only, `no-store`, and subject
 to the service's bounded snapshot window. If either option is omitted, the live
 route is unavailable and static/example/file loading continues to work.
 
+The scope bar also reports the fixed live service probe: `ready`, `not ready`,
+`unavailable`, or `static mode`. That badge comes from the UI's
+same-origin `/api/v1/service-probe` route, which only composes the existing
+`/healthz` and `/readyz` endpoints. It is diagnostic only; the ingress token is
+used for the snapshot route and never sent to the browser.
+
 The live mode does not add TLS, public ingress, RBAC, mutations, or provider
 reconciliation. Keep the UI on loopback or place it behind an operator-managed
 HTTPS boundary when serving a wider network.

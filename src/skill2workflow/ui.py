@@ -12,13 +12,19 @@ from typing import Callable, Optional
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
 from .service import read_service_bearer_token
-from .service_client import service_endpoint
+from .service_client import (
+    MAX_SERVICE_PROBE_RESPONSE_BYTES,
+    fetch_service_probe,
+    service_endpoint,
+)
 
 
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _DATA_ROOT = Path("share") / "skill2workflow"
 _LIVE_SNAPSHOT_PATH = "/api/v1/control-snapshot"
 _LIVE_SNAPSHOT_MAX_RESPONSE_BYTES = MAX_LIVE_SNAPSHOT_BYTES
+_SERVICE_PROBE_PATH = "/api/v1/service-probe"
+_SERVICE_PROBE_MAX_RESPONSE_BYTES = MAX_SERVICE_PROBE_RESPONSE_BYTES
 
 
 def find_ui_root() -> Path:
@@ -89,6 +95,15 @@ def serve_ui(
                     {"error": "live control snapshot path does not accept query parameters"},
                 )
                 return
+            if self.path == _SERVICE_PROBE_PATH:
+                self._serve_service_probe()
+                return
+            if self.path.startswith(_SERVICE_PROBE_PATH + "?"):
+                self._write_json(
+                    404,
+                    {"error": "service probe path does not accept query parameters"},
+                )
+                return
             super().do_GET()
 
         def _serve_live_snapshot(self):
@@ -111,6 +126,25 @@ def serve_ui(
                     raise ValueError("live control snapshot unavailable")
             except Exception:
                 self._write_json(503, {"error": "live control snapshot unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
+        def _serve_service_probe(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            if configured_service_url is None:
+                self._write_json(404, {"error": "service probe is not configured"})
+                return
+            try:
+                probe = fetch_service_probe(configured_service_url)
+                body = json.dumps(
+                    probe,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _SERVICE_PROBE_MAX_RESPONSE_BYTES:
+                    raise ValueError("service probe unavailable")
+            except Exception:
+                self._write_json(503, {"error": "service probe unavailable"})
                 return
             self._write_json(200, body, content_type="application/json")
 

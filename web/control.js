@@ -1,6 +1,8 @@
 (function () {
   const EXAMPLE_URL = "../examples/control-plane-snapshot.json";
   const LIVE_SNAPSHOT_URL = "/api/v1/control-snapshot";
+  const SERVICE_PROBE_URL = "/api/v1/service-probe";
+  const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
   const state = {
     snapshot: null,
     view: "operator",
@@ -16,6 +18,7 @@
   function init() {
     cacheElements();
     bindEvents();
+    loadServiceProbe();
     loadExample();
   }
 
@@ -28,6 +31,7 @@
     els.snapshotScope = document.getElementById("snapshot-scope");
     els.snapshotScopeTitle = document.getElementById("snapshot-scope-title");
     els.snapshotScopeDetail = document.getElementById("snapshot-scope-detail");
+    els.serviceStatus = document.getElementById("service-status");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -80,6 +84,7 @@
 
   async function loadLiveSnapshot() {
     setStatus("Loading", "");
+    loadServiceProbe();
     try {
       const response = await fetch(LIVE_SNAPSHOT_URL, { cache: "no-store" });
       if (!response.ok) {
@@ -89,6 +94,45 @@
     } catch (error) {
       rejectSnapshot("Live Service Snapshot", { error: "live snapshot unavailable" });
     }
+  }
+
+  async function loadServiceProbe() {
+    setServiceStatus("Live service: checking", "");
+    try {
+      const response = await fetch(SERVICE_PROBE_URL, { cache: "no-store" });
+      if (response.status === 404) {
+        setServiceStatus("Live service: static mode", "");
+        return;
+      }
+      if (!response.ok) {
+        throw new Error("service probe unavailable");
+      }
+      const probe = await response.json();
+      if (!validateServiceProbe(probe)) {
+        throw new Error("service probe unavailable");
+      }
+      const labels = {
+        ready: ["Live service: ready", "is-valid"],
+        not_ready: ["Live service: not ready", "is-invalid"],
+        unavailable: ["Live service: unavailable", "is-invalid"],
+      };
+      setServiceStatus(labels[probe.status][0], labels[probe.status][1]);
+    } catch (error) {
+      setServiceStatus("Live service: unavailable", "is-invalid");
+    }
+  }
+
+  function validateServiceProbe(probe) {
+    return Boolean(
+      probe &&
+      typeof probe === "object" &&
+      probe.schema_version === SERVICE_PROBE_SCHEMA &&
+      ["ready", "not_ready", "unavailable"].indexOf(probe.status) !== -1 &&
+      probe.health &&
+      typeof probe.health === "object" &&
+      probe.readiness &&
+      typeof probe.readiness === "object",
+    );
   }
 
   async function loadSelectedFile(event) {
@@ -560,6 +604,11 @@
   function setStatus(text, className) {
     els.status.textContent = text;
     els.status.className = "status-pill" + (className ? " " + className : "");
+  }
+
+  function setServiceStatus(text, className) {
+    els.serviceStatus.textContent = text;
+    els.serviceStatus.className = "service-status" + (className ? " " + className : "");
   }
 
   function emptySnapshot() {

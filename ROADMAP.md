@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-207
+- Completed delivery loops: 1-208
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 207 is complete with an authenticated live control-plane UI
+- Active loop: None; Loop 208 is complete with an authenticated live control-plane UI and readiness badge
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-207 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-208 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5340,9 +5340,41 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 208: Live Service Readiness Badge
+
+**Status:** Complete.
+
+**Prior basis:** Loop 207 made the installed control-plane page able to fetch
+one bounded live snapshot, but a failed fetch did not distinguish static mode,
+a standby or draining service, and an unavailable process.
+
+**Outcome:** The UI process now exposes a second fixed same-origin route,
+`/api/v1/service-probe`, that composes the existing unauthenticated `/healthz`
+and `/readyz` contract through the bounded `service-probe` client. The scope
+bar reports `ready`, `not ready`, `unavailable`, or `static mode`; the probe is
+read-only, `no-store`, capped at the existing 8 KiB contract, and never proxies
+arbitrary paths. Snapshot authentication and token handling remain unchanged.
+
+**Evidence:** UI tests cover the installed proxy's fixed probe schema and
+response headers. Control UI contract tests cover the readiness badge and
+status mapping. The installed UI, package, reproducible-build, secret-hygiene,
+full-suite, external-connector, and Production Baseline gates remain the
+release checks.
+
+**Safety boundary:** This is an operator diagnostic only. It does not add
+browser credential storage, service mutations, CORS, RBAC, arbitrary proxying,
+or hosted TLS. Operators must keep the launcher on loopback or provide their
+own HTTPS boundary for wider access.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 207 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 208 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5516,6 +5548,7 @@ This rolling queue is ordered. Loop 207 is complete and there is no active deliv
 | Loop 205: Protected Uncertain-Dispatch Reviews | Complete | Let operators persist a bounded, compare-and-swap review of uncertain recurring effects without replaying or changing dispatch state | Fixed review schema, authenticated/local CLI and service routes, idempotent/conflict-safe SQLite evidence, redacted audit, package/docs/full-suite gates |
 | Loop 206: Installed Static UI Launcher | Complete | Let wheel users launch the editor and control-plane inspector without a source checkout or ad hoc server command | Loopback-only `ui` CLI, packaged static/example assets, isolated wheel serving evidence, docs, and full gates |
 | Loop 207: Authenticated Live Control-Plane UI | Complete | Let an explicitly configured installed UI inspect one running service without exposing the ingress token to the browser | Fixed same-origin snapshot proxy, server-side token reads, fail-closed path/schema/response boundary, UI/CLI tests, docs, and full gates |
+| Loop 208: Live Service Readiness Badge | Complete | Let operators distinguish static mode, a ready service, a not-ready standby/draining service, and an unavailable process in the installed UI | Fixed service-probe proxy, bounded readiness schema, status badge, UI tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

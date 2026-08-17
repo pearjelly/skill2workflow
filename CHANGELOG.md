@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded service-readiness badge to the installed live control-plane
+  UI. It composes the existing health/readiness probe contract through a fixed
+  same-origin route and distinguishes static mode from a not-ready or
+  unavailable service without exposing credentials.
+
 - Added an opt-in live control-plane view to the installed `skill2workflow ui`
   launcher. With an exact service origin and owner-only ingress token file,
   **Load Live Snapshot** uses a fixed same-origin read-only proxy; the browser

@@ -12,6 +12,7 @@ class ControlUiContractTests(TestCase):
         css = (ROOT / "web" / "control.css").read_text(encoding="utf-8")
 
         self.assertIn('id="snapshot-scope"', html)
+        self.assertIn('id="service-status"', html)
         self.assertIn('id="load-live"', html)
         self.assertIn('aria-live="polite"', html)
         self.assertIn("validateSnapshotWindow", javascript)
@@ -21,8 +22,12 @@ class ControlUiContractTests(TestCase):
         self.assertIn("collection is truncated", javascript)
         self.assertIn("/api/v1/control-snapshot", javascript)
         self.assertIn("loadLiveSnapshot", javascript)
+        self.assertIn("/api/v1/service-probe", javascript)
+        self.assertIn("validateServiceProbe", javascript)
+        self.assertIn("Live service: ready", javascript)
         self.assertIn(".snapshot-scope.is-bounded", css)
         self.assertIn(".snapshot-scope.is-truncated", css)
+        self.assertIn(".service-status.is-valid", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):
         guide = (ROOT / "docs" / "live-control-snapshot.md").read_text(

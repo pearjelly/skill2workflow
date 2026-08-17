@@ -182,3 +182,81 @@ class UiTests(TestCase):
                 once=True,
                 service_url="https://service.example.test",
             )
+
+    def test_live_proxy_exposes_only_the_fixed_service_probe_contract(self):
+        responses = {
+            "/healthz": {"service": "skill2workflow", "status": "ok"},
+            "/readyz": {
+                "service": "skill2workflow",
+                "status": "ready",
+                "storage": "sqlite",
+            },
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                payload = responses.get(self.path)
+                if payload is None:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text(
+                    "ui-test-token-012345678901234567890123456789\n",
+                    encoding="utf-8",
+                )
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+
+                def ready(server):
+                    ui_port["value"] = server.server_port
+
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1",
+                        "port": 0,
+                        "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file,
+                        "ready_callback": ready,
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{ui_port['value']}/api/v1/service-probe",
+                    timeout=2,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(payload["schema_version"], "skill2workflow-service-probe-0.1.0")
+                    self.assertEqual(payload["status"], "ready")
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)

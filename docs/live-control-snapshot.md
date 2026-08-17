@@ -111,6 +111,10 @@ token in browser state. Start it with both `--service-url` and
 use **Load Live Snapshot**. This is a fixed, read-only same-origin proxy for
 `GET /api/v1/control-snapshot`; it does not proxy arbitrary paths or expose the
 token. Without both options, the button reports that live mode is unavailable.
+The scope bar separately shows the fixed `service-probe` result so a standby,
+draining, or unavailable service is distinguishable from static mode; that
+diagnostic route only calls `/healthz` and `/readyz` and returns the existing
+value-free probe schema.
 
 ## Verification
 

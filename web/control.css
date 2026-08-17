@@ -63,6 +63,24 @@ input {
   white-space: nowrap;
 }
 
+.service-status {
+  margin-left: auto;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.service-status.is-valid {
+  color: var(--green);
+}
+
+.service-status.is-invalid {
+  color: var(--red);
+}
+
 .snapshot-scope.is-bounded {
   background: var(--blue-soft);
   color: var(--blue);
