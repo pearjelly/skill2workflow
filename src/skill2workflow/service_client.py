@@ -18,6 +18,7 @@ from .operational_readiness import OPERATIONAL_READINESS_SCHEMA_VERSION
 from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
+    MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS,
     RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION,
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION,
@@ -30,6 +31,7 @@ from .dashboard import (
     MAX_WORKFLOW_INVENTORY_ITEMS,
     WORKFLOW_INVENTORY_SCHEMA_VERSION,
     RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION,
+    RECURRING_SCHEDULE_DISPATCH_PAGE_SCHEMA_VERSION,
     RUN_DETAIL_SCHEMA_VERSION,
     RUN_LIST_SCHEMA_VERSION,
     RUN_PAGE_SCHEMA_VERSION,
@@ -69,6 +71,7 @@ MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_CREATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_RECURRING_SCHEDULE_UPDATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_RECURRING_SCHEDULE_PATCH_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
@@ -979,6 +982,45 @@ def fetch_recurring_schedule_dispatches(
         max_response_bytes=MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES,
     )
     _validate_recurring_schedule_dispatch_list(payload, normalized_schedule_id)
+    return payload
+
+
+def fetch_recurring_schedule_dispatch_page(
+    service_url: str,
+    token_file: Path,
+    *,
+    schedule_id: str = "",
+    max_items: int = MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS,
+    cursor: str = "",
+) -> Dict[str, object]:
+    """Fetch one cursor-paged recurring dispatch evidence window."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or not 1 <= max_items <= MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS
+    ):
+        raise ValueError("max_items must be an integer from 1 through 100")
+    normalized_schedule_id = _validate_schedule_id(schedule_id) if schedule_id else ""
+    if not isinstance(cursor, str) or len(cursor) > 512 or any(
+        char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for char in cursor
+    ):
+        raise ValueError("cursor must be a safe recurring dispatch page cursor")
+    params = {"max_items": str(max_items)}
+    if cursor:
+        params["cursor"] = cursor
+    path = "/api/v1/recurring-schedule-dispatch-pages"
+    if normalized_schedule_id:
+        path = f"/api/v1/recurring-schedules/{normalized_schedule_id}/dispatch-pages"
+    payload = _get_json(
+        service_url,
+        token_file,
+        path + "?" + urlencode(params),
+        conflict_message="recurring schedule dispatch page unavailable",
+        max_response_bytes=MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_dispatch_page(payload, normalized_schedule_id)
     return payload
 
 
@@ -2178,6 +2220,80 @@ def _validate_recurring_schedule_dispatch_list(
         or window.get("returned") > window.get("max_items")
         or not isinstance(window.get("truncated"), bool)
         or window.get("truncated") != (window.get("returned") < window.get("total"))
+        or window.get("total") != summary.get("total")
+    ):
+        raise ServiceActionError()
+
+
+def _validate_recurring_schedule_dispatch_page(
+    payload: Dict[str, object], schedule_id: str
+) -> None:
+    _validate_recurring_schedule_dispatch_list_page_shape(payload, schedule_id)
+
+
+def _validate_recurring_schedule_dispatch_list_page_shape(
+    payload: Dict[str, object], schedule_id: str
+) -> None:
+    statuses = {"claimed", "completed", "failed", "skipped", "uncertain", "other"}
+    if set(payload) != {"schema_version", "schedule_id", "summary", "dispatches", "window"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RECURRING_SCHEDULE_DISPATCH_PAGE_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if payload.get("schedule_id") != schedule_id:
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != {"total", "status_counts"}
+        or not _is_non_negative_integer(summary.get("total"))
+        or not isinstance(summary.get("status_counts"), dict)
+        or set(summary["status_counts"]) != statuses
+        or any(not _is_non_negative_integer(value) for value in summary["status_counts"].values())
+        or sum(summary["status_counts"].values()) != summary["total"]
+    ):
+        raise ServiceActionError()
+    dispatches = payload.get("dispatches")
+    fields = {
+        "dispatch_id", "schedule_id", "scheduled_for", "status",
+        "coalesced_occurrences", "run_id", "trigger_id", "error_type", "completed_at",
+    }
+    if not isinstance(dispatches, list) or len(dispatches) > MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS:
+        raise ServiceActionError()
+    for dispatch in dispatches:
+        if (
+            not isinstance(dispatch, dict)
+            or set(dispatch) != fields
+            or not isinstance(dispatch.get("dispatch_id"), str)
+            or not dispatch.get("dispatch_id")
+            or len(dispatch.get("dispatch_id")) > 128
+            or not isinstance(dispatch.get("schedule_id"), str)
+            or not dispatch.get("schedule_id")
+            or len(dispatch.get("schedule_id")) > 128
+            or (schedule_id and dispatch.get("schedule_id") != schedule_id)
+            or dispatch.get("status") not in statuses
+            or any(not isinstance(dispatch.get(field), str) for field in (
+                "scheduled_for", "run_id", "trigger_id", "error_type", "completed_at"
+            ))
+            or len(dispatch.get("error_type", "")) > 64
+            or not _is_non_negative_integer(dispatch.get("coalesced_occurrences"))
+        ):
+            raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_items", "total", "returned", "has_more", "next_cursor"}
+        or not _is_non_negative_integer(window.get("max_items"))
+        or window.get("max_items") < 1
+        or window.get("max_items") > MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS
+        or not _is_non_negative_integer(window.get("total"))
+        or not _is_non_negative_integer(window.get("returned"))
+        or window.get("returned") != len(dispatches)
+        or window.get("returned") > window.get("total")
+        or window.get("returned") > window.get("max_items")
+        or not isinstance(window.get("has_more"), bool)
+        or not isinstance(window.get("next_cursor"), str)
+        or len(window.get("next_cursor", "")) > 512
+        or window.get("has_more") != bool(window.get("next_cursor"))
         or window.get("total") != summary.get("total")
     ):
         raise ServiceActionError()

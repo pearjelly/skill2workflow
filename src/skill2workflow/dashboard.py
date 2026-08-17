@@ -30,6 +30,7 @@ RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-up
 RECURRING_SCHEDULE_PATCH_SCHEMA_VERSION = "skill2workflow-recurring-schedule-patch-0.1.0"
 RECURRING_SCHEDULE_DELETE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-delete-0.1.0"
 RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
+RECURRING_SCHEDULE_DISPATCH_PAGE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-page-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 MAX_OFFLINE_SNAPSHOT_ITEMS = 1000
@@ -39,6 +40,7 @@ MAX_RUN_PAGE_ITEMS = 100
 MAX_AUDIT_EVENT_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
+MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS = 100
 MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_PATCH_RESPONSE_BYTES = 16 * 1024
@@ -557,6 +559,90 @@ def build_recurring_schedule_dispatch_list_from_store(
     }
 
 
+def build_recurring_schedule_dispatch_page_from_store(
+    schedule_store,
+    *,
+    schedule_id: str = "",
+    max_items: int = MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS,
+    cursor: str = "",
+) -> Dict[str, object]:
+    """Project one cursor-paged dispatch window without trigger payloads."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or max_items <= 0
+        or max_items > MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS
+    ):
+        raise ValueError("max_items must be a positive bounded integer")
+    normalized_schedule_id = _safe_string(schedule_id)
+    before_scheduled_for, before_dispatch_id = _decode_dispatch_page_cursor(cursor)
+    reader = getattr(schedule_store, "list_dispatches_page", None)
+    if not callable(reader):
+        raise ValueError("dispatch pages require sqlite storage")
+    page = reader(
+        max_items,
+        before_scheduled_for=before_scheduled_for,
+        before_dispatch_id=before_dispatch_id,
+        schedule_id=normalized_schedule_id,
+    )
+    selected = page.get("items", []) if isinstance(page, dict) else []
+    if not isinstance(selected, list):
+        raise ValueError("dispatch page is invalid")
+    projected = [_safe_dispatch_summary(record) for record in selected if isinstance(record, dict)]
+    total = _safe_non_negative_int(page.get("total", 0))
+    has_more = bool(page.get("has_more"))
+    next_cursor = ""
+    if has_more:
+        next_cursor = _encode_dispatch_page_cursor(page.get("next_cursor"))
+    return {
+        "schema_version": RECURRING_SCHEDULE_DISPATCH_PAGE_SCHEMA_VERSION,
+        "schedule_id": normalized_schedule_id,
+        "summary": {
+            "total": total,
+            "status_counts": _fixed_dispatch_status_counts(page.get("status_counts", {})),
+        },
+        "dispatches": projected,
+        "window": {
+            "max_items": max_items,
+            "total": total,
+            "returned": len(projected),
+            "has_more": has_more,
+            "next_cursor": next_cursor,
+        },
+    }
+
+
+def _safe_dispatch_summary(record: Dict[str, object]) -> Dict[str, object]:
+    status = _safe_string(record.get("status", ""))
+    normalized_status = status if status in {
+        "claimed", "completed", "failed", "skipped", "uncertain"
+    } else "other"
+    return {
+        "dispatch_id": _safe_string(record.get("dispatch_id", "")),
+        "schedule_id": _safe_string(record.get("schedule_id", "")),
+        "scheduled_for": _safe_string(record.get("scheduled_for", "")),
+        "status": normalized_status,
+        "coalesced_occurrences": _safe_non_negative_int(
+            record.get("coalesced_occurrences", 0)
+        ),
+        "run_id": _safe_string(record.get("run_id", "")),
+        "trigger_id": _safe_string(record.get("trigger_id", "")),
+        "error_type": _safe_dispatch_error_type(record.get("error_type", "")),
+        "completed_at": _safe_string(record.get("completed_at", "")),
+    }
+
+
+def _fixed_dispatch_status_counts(value: object) -> Dict[str, int]:
+    statuses = ("claimed", "completed", "failed", "skipped", "uncertain", "other")
+    counts = {status: 0 for status in statuses}
+    if isinstance(value, dict):
+        for status, count in value.items():
+            normalized = str(status) if str(status) in statuses else "other"
+            counts[normalized] += _safe_non_negative_int(count)
+    return counts
+
+
 def build_workflow_artifact_report_from_control(
     control: LocalControlPlane,
     max_issues: int = MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
@@ -723,6 +809,7 @@ def build_support_bundle_from_control(
     http_requests.pop("recurring_schedule_patch", None)
     http_requests.pop("recurring_schedule_delete", None)
     http_requests.pop("recurring_schedule_dispatch_list", None)
+    http_requests.pop("recurring_schedule_dispatch_page", None)
     http_requests.pop("workflow_artifact_report", None)
     http_requests.pop("backup_readiness", None)
     http_requests.pop("retention_readiness", None)
@@ -849,6 +936,59 @@ def _encode_audit_page_cursor(sequence: object) -> str:
         raise ValueError("audit event cursor is invalid")
     raw = json.dumps({"sequence": sequence}, separators=(",", ":"), sort_keys=True).encode("ascii")
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _encode_dispatch_page_cursor(value: object) -> str:
+    if not isinstance(value, dict) or set(value) != {"scheduled_for", "dispatch_id"}:
+        raise ValueError("dispatch page cursor is invalid")
+    scheduled_for = str(value.get("scheduled_for", ""))
+    dispatch_id = str(value.get("dispatch_id", ""))
+    _validate_dispatch_page_cursor_parts(scheduled_for, dispatch_id)
+    raw = json.dumps(
+        {"scheduled_for": scheduled_for, "dispatch_id": dispatch_id},
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_dispatch_page_cursor(cursor: str):
+    normalized = str(cursor or "")
+    if not normalized:
+        return "", ""
+    if len(normalized) > 512 or any(
+        character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for character in normalized
+    ):
+        raise ValueError("dispatch page cursor is invalid")
+    try:
+        raw = base64.urlsafe_b64decode(normalized + "=" * (-len(normalized) % 4))
+        value = json.loads(raw.decode("utf-8"))
+    except (binascii.Error, UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError("dispatch page cursor is invalid") from error
+    if not isinstance(value, dict) or set(value) != {"scheduled_for", "dispatch_id"}:
+        raise ValueError("dispatch page cursor is invalid")
+    scheduled_for = str(value.get("scheduled_for", ""))
+    dispatch_id = str(value.get("dispatch_id", ""))
+    _validate_dispatch_page_cursor_parts(scheduled_for, dispatch_id)
+    return scheduled_for, dispatch_id
+
+
+def _validate_dispatch_page_cursor_parts(scheduled_for: str, dispatch_id: str) -> None:
+    try:
+        parsed = datetime.fromisoformat(scheduled_for.replace("Z", "+00:00"))
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError("dispatch page cursor is invalid") from error
+    if parsed.tzinfo is None:
+        raise ValueError("dispatch page cursor is invalid")
+    if not dispatch_id.startswith("dispatch_") or len(dispatch_id) > 128:
+        raise ValueError("dispatch page cursor is invalid")
+    if any(
+        character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+        for character in dispatch_id
+    ):
+        raise ValueError("dispatch page cursor is invalid")
 
 
 def _decode_audit_page_cursor(cursor: str) -> int:

@@ -167,6 +167,12 @@ the flag is omitted. Their schemas are
 [`local-schedule-list-0.1.0.schema.json`](../schemas/local-schedule-list-0.1.0.schema.json)
 and [`local-schedule-dispatch-list-0.1.0.schema.json`](../schemas/local-schedule-dispatch-list-0.1.0.schema.json).
 
+The fixed remote `service-recurring-dispatches` tail remains available for a
+quick recent view. For older evidence, use the separate cursor-paged
+`service-recurring-dispatch-page` route and contract documented in
+[`remote-schedule-dispatch-pages.md`](remote-schedule-dispatch-pages.md); its
+opaque cursor is source-bounded by SQLite and never exposes trigger input.
+
 For SQLite recurring schedules, the bounded inventory reads a transactional
 `recurring_schedule_summaries` projection containing only scheduling metadata.
 It does not parse complete definitions or trigger input for every historical

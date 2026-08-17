@@ -332,6 +332,56 @@ class CliTests(TestCase):
             "https://service.example", token_file, "schedule_hourly_report"
         )
 
+    def test_service_recurring_dispatch_page_command_supports_cursor(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-recurring-schedule-dispatch-page-0.1.0",
+            "schedule_id": "schedule_hourly_report",
+            "summary": {
+                "total": 1,
+                "status_counts": {
+                    "claimed": 0, "completed": 1, "failed": 0,
+                    "skipped": 0, "uncertain": 0, "other": 0,
+                },
+            },
+            "dispatches": [],
+            "window": {
+                "max_items": 1, "total": 1, "returned": 0,
+                "has_more": True, "next_cursor": "next-page",
+            },
+        }
+        with patch(
+            "skill2workflow.cli.fetch_recurring_schedule_dispatch_page",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-recurring-dispatch-page",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                        "--schedule-id",
+                        "schedule_hourly_report",
+                        "--cursor",
+                        "cursor-token",
+                        "--max-items",
+                        "1",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            schedule_id="schedule_hourly_report",
+            max_items=1,
+            cursor="cursor-token",
+        )
+
     def test_service_workflow_artifacts_command_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

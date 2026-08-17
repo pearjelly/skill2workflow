@@ -98,6 +98,9 @@ class WorkflowReleaseDocumentationTests(TestCase):
         dispatch_guide = (ROOT / "docs" / "remote-schedule-dispatches.md").read_text(
             encoding="utf-8"
         )
+        dispatch_page_guide = (
+            ROOT / "docs" / "remote-schedule-dispatch-pages.md"
+        ).read_text(encoding="utf-8")
         dispatch_plan = (
             ROOT
             / "docs"
@@ -110,6 +113,13 @@ class WorkflowReleaseDocumentationTests(TestCase):
                 ROOT
                 / "schemas"
                 / "recurring-schedule-dispatch-list-0.1.0.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+        dispatch_page_schema = json.loads(
+            (
+                ROOT
+                / "schemas"
+                / "recurring-schedule-dispatch-page-0.1.0.schema.json"
             ).read_text(encoding="utf-8")
         )
         artifact_remote_guide = (
@@ -292,6 +302,13 @@ class WorkflowReleaseDocumentationTests(TestCase):
         )
         self.assertIn("Loop 79: Protected Remote Recurring-Schedule Actions", roadmap)
         self.assertIn("GET /api/v1/recurring-schedule-dispatches", dispatch_guide)
+        self.assertIn("GET /api/v1/recurring-schedule-dispatch-pages", dispatch_page_guide)
+        self.assertIn("service-recurring-dispatch-page", dispatch_page_guide)
+        self.assertEqual(
+            dispatch_page_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-recurring-schedule-dispatch-page-0.1.0",
+        )
+        self.assertFalse(dispatch_page_schema["additionalProperties"])
         self.assertIn("uncertain", dispatch_guide)
         self.assertIn("64 KiB", dispatch_plan)
         self.assertEqual(
@@ -362,6 +379,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-recurring-schedule-patch"', cli)
         self.assertIn('"service-recurring-schedule-delete"', cli)
         self.assertIn('"service-recurring-dispatches"', cli)
+        self.assertIn('"service-recurring-dispatch-page"', cli)
         self.assertIn('"service-workflow-artifacts"', cli)
         self.assertIn('"service-backup-readiness"', cli)
         self.assertIn('"service-retention-readiness"', cli)
@@ -382,6 +400,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn('"service-recurring-schedule-patch"', package_smoke)
         self.assertIn('"service-recurring-schedule-delete"', package_smoke)
         self.assertIn('"service-recurring-dispatches"', package_smoke)
+        self.assertIn('"service-recurring-dispatch-page"', package_smoke)
         self.assertIn('"service-workflow-artifacts"', package_smoke)
         self.assertIn('"service-backup-readiness"', package_smoke)
         self.assertIn('"service-retention-readiness"', package_smoke)

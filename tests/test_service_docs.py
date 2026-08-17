@@ -26,6 +26,9 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("PUT /api/v1/recurring-schedules/{schedule_id}", guide)
         self.assertIn("DELETE /api/v1/recurring-schedules/{schedule_id}", guide)
         self.assertIn("PATCH /api/v1/recurring-schedules/{schedule_id}", guide)
+        self.assertIn("GET /api/v1/recurring-schedule-dispatch-pages", guide)
+        self.assertIn("remote-schedule-dispatch-pages.md", guide)
+        self.assertIn("service-recurring-dispatch-page", guide)
         self.assertIn("remote-schedule-create.md", guide)
         self.assertIn("remote-schedule-update.md", guide)
         self.assertIn("service-recurring-schedule-add", guide)
@@ -34,6 +37,7 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("service-recurring-schedule-delete", guide)
         self.assertIn("remote-schedule-patch.md", guide)
         self.assertIn("service-recurring-schedule-patch", guide)
+        self.assertIn("Loop 159 adds a separate cursor-paged", guide)
         self.assertIn("Loop 157 hardens the existing enable/disable actions", guide)
         self.assertIn("expected_next_run_at", guide)
         self.assertIn("GET /api/v1/workflow-artifacts", guide)
@@ -108,6 +112,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-158 are complete", readme)
+        self.assertIn("Delivery Loops 1-159 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

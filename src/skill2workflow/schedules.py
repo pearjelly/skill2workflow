@@ -998,6 +998,88 @@ class RecurringScheduleStore:
             "status_counts": status_counts,
         }
 
+    def list_dispatches_page(
+        self,
+        max_items: int,
+        *,
+        before_scheduled_for: str = "",
+        before_dispatch_id: str = "",
+        schedule_id: str = "",
+    ) -> Dict[str, object]:
+        """Read one bounded, newest-first dispatch page without full history."""
+
+        if isinstance(max_items, bool) or not isinstance(max_items, int) or max_items <= 0:
+            raise ValueError("max_items must be a positive integer")
+        before_scheduled_for = str(before_scheduled_for or "")
+        before_dispatch_id = str(before_dispatch_id or "")
+        if bool(before_scheduled_for) != bool(before_dispatch_id):
+            raise ValueError("dispatch page cursor must contain scheduled_for and dispatch_id")
+        normalized_schedule_id = str(schedule_id or "")
+        filter_clauses = []
+        filter_values = []
+        if normalized_schedule_id:
+            filter_clauses.append("schedule_id = ?")
+            filter_values.append(normalized_schedule_id)
+        clauses = list(filter_clauses)
+        values = list(filter_values)
+        if before_scheduled_for:
+            clauses.append(
+                "(scheduled_for < ? or "
+                "(scheduled_for = ? and dispatch_id < ?))"
+            )
+            values.extend([before_scheduled_for, before_scheduled_for, before_dispatch_id])
+        filter_where = " where " + " and ".join(filter_clauses) if filter_clauses else ""
+        where = " where " + " and ".join(clauses) if clauses else ""
+        status_counts = {
+            "claimed": 0,
+            "completed": 0,
+            "failed": 0,
+            "skipped": 0,
+            "uncertain": 0,
+            "other": 0,
+        }
+        with self._connection() as connection:
+            total = int(
+                connection.execute(
+                    f"select count(*) from schedule_dispatches{filter_where}",
+                    filter_values,
+                ).fetchone()[0]
+            )
+            status_rows = connection.execute(
+                f"select status, count(*) from schedule_dispatches{filter_where} group by status",
+                filter_values,
+            ).fetchall()
+            for status, count in status_rows:
+                normalized_status = str(status)
+                if normalized_status not in status_counts:
+                    normalized_status = "other"
+                status_counts[normalized_status] += int(count)
+            rows = connection.execute(
+                f"""
+                select dispatch_id, scheduled_for, record_json
+                from schedule_dispatches{where}
+                order by scheduled_for desc, dispatch_id desc
+                limit ?
+                """,
+                values + [max_items + 1],
+            ).fetchall()
+        has_more = len(rows) > max_items
+        selected = rows[:max_items]
+        records = [json.loads(str(row[2])) for row in reversed(selected)]
+        next_cursor = None
+        if has_more and selected:
+            next_cursor = {
+                "scheduled_for": str(selected[-1][1]),
+                "dispatch_id": str(selected[-1][0]),
+            }
+        return {
+            "items": records,
+            "total": total,
+            "status_counts": status_counts,
+            "has_more": has_more,
+            "next_cursor": next_cursor,
+        }
+
     def _initialize(self) -> None:
         with self._connection() as connection:
             connection.execute(

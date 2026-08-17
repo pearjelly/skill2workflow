@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-158
+- Completed delivery loops: 1-159
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 158 is complete with safe, CAS-protected remote recurring-schedule patches
+- Active loop: None; Loop 159 is complete with cursor-paged remote recurring-schedule dispatch diagnostics
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-158 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-159 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -3718,9 +3718,36 @@ responses.
 patch. It does not export trigger input, reset progress, add bulk mutation,
 RBAC, distributed locking, provider cancellation, or exactly-once execution.
 
+### Loop 159: Cursor-Paged Remote Recurring-Schedule Dispatch Diagnostics
+
+**Status:** Complete.
+
+**Prior basis:** Loop 80 provided a fixed recent-tail dispatch projection, but
+its 100-record bound meant an operator could not inspect older failure or
+uncertain evidence remotely once the dispatch table grew.
+
+**Outcome:** The separate authenticated `GET
+/api/v1/recurring-schedule-dispatch-pages` and targeted `dispatch-pages` route,
+plus the installed `service-recurring-dispatch-page` client, expose a bounded
+cursor page with a fixed redacted response contract. SQLite orders by
+`(scheduled_for, dispatch_id)`, reads at most `max_items + 1`, and returns an
+opaque cursor that walks toward older records. The original 0.1.0 recent-tail
+route remains unchanged for compatibility.
+
+**Evidence:** [`docs/remote-schedule-dispatch-pages.md`](docs/remote-schedule-dispatch-pages.md)
+defines the separate schema, cursor, query, redaction, and failure contracts.
+Storage, dashboard, service, client, CLI, telemetry, packaging, schema,
+documentation, and full-suite tests cover global and targeted pages,
+authentication, cursor continuation, bounds, and private-value exclusion.
+
+**Safety boundary:** This is a read-only single-tenant diagnostic projection.
+It does not claim scheduler ownership, export trigger input, replay or retry a
+dispatch, reconcile uncertain provider effects, add bulk mutation, RBAC,
+distributed locking, or exactly-once execution.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 158 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 159 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -3844,6 +3871,7 @@ This rolling queue is ordered. Loop 158 is complete and there is no active deliv
 | Loop 156: Protected Remote Recurring-Schedule Retirement | Complete | Let remote operators safely retire a disabled recurring schedule without losing dispatch evidence or deleting a reused ID | Exact confirmed DELETE with `next_run_at` CAS, disabled/no-claim guard, tombstone replay, retained dispatch history, redacted response schema, audit evidence, and documentation |
 | Loop 157: CAS-Protected Remote Recurring-Schedule State Actions | Complete | Let remote enable/disable operations reject stale inventory intent without breaking legacy callers | Optional `next_run_at` CAS body, serialized state mutation, fixed `409`, installed CLI flag, compatibility tests, and documentation |
 | Loop 158: Safe Remote Recurring-Schedule Patches | Complete | Let remote operators update non-sensitive schedule fields without re-supplying or exposing trigger input | Safe-field-only PATCH, `next_run_at` CAS, trigger/progress preservation, redacted response schema, installed CLI, audit/telemetry, tests, and documentation |
+| Loop 159: Cursor-Paged Remote Recurring-Schedule Dispatch Diagnostics | Complete | Let remote operators inspect older dispatch evidence after the fixed recent tail is exhausted | Separate redacted page schema, opaque SQLite ordering cursor, global/targeted authenticated routes, installed CLI, source-bounded reads, compatibility preservation, tests, and documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

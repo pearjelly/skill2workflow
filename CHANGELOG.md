@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a separate cursor-paged recurring-schedule dispatch diagnostics
+  surface at `GET /api/v1/recurring-schedule-dispatch-pages` (and its targeted
+  schedule route), plus the installed `service-recurring-dispatch-page` CLI.
+  The new redacted 100-item/64 KiB contract walks older evidence with an
+  opaque SQLite ordering cursor while preserving the exact recent-tail route.
 - Added protected remote recurring-schedule patches through
   `PATCH /api/v1/recurring-schedules/{schedule_id}` and the installed
   `service-recurring-schedule-patch` CLI. Operators can update only safe

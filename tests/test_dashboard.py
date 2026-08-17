@@ -12,6 +12,7 @@ from skill2workflow.dashboard import (
     build_control_snapshot_from_control,
     build_recurring_schedule_list_from_store,
     build_recurring_schedule_dispatch_list_from_store,
+    build_recurring_schedule_dispatch_page_from_store,
     build_workflow_artifact_report_from_control,
     build_workflow_inventory_from_control,
     build_run_detail,
@@ -573,6 +574,41 @@ class DashboardTests(TestCase):
         )
         serialized = json.dumps(projected, ensure_ascii=False)
         self.assertNotIn("private-dispatch-input", serialized)
+
+    def test_recurring_dispatch_page_is_cursor_paged_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="1.0.0", node_title="Start"))
+            store = RecurringScheduleStore(state_dir)
+            for schedule_id in ("schedule_page_a", "schedule_page_b", "schedule_page_c"):
+                store.add(
+                    _recurring_schedule_definition(
+                        schedule_id, enabled=True, input_value="private-page-input"
+                    )
+                )
+            dispatcher = RecurringScheduleDispatcher(
+                state_dir, owner_id="private-page-owner", lease_seconds=30
+            )
+            self.assertTrue(dispatcher.try_acquire(now_epoch=1000))
+            dispatcher.dispatch_due("2026-08-11T00:01:00Z", now_epoch=1001)
+            first = build_recurring_schedule_dispatch_page_from_store(store, max_items=2)
+            second = build_recurring_schedule_dispatch_page_from_store(
+                store, max_items=2, cursor=first["window"]["next_cursor"]
+            )
+
+        self.assertEqual(
+            first["schema_version"],
+            "skill2workflow-recurring-schedule-dispatch-page-0.1.0",
+        )
+        self.assertEqual(first["summary"]["total"], 3)
+        self.assertEqual(first["window"]["returned"], 2)
+        self.assertTrue(first["window"]["has_more"])
+        self.assertTrue(first["window"]["next_cursor"])
+        self.assertEqual(second["window"]["returned"], 1)
+        self.assertFalse(second["window"]["has_more"])
+        serialized = json.dumps(first, ensure_ascii=False)
+        self.assertNotIn("private-page-input", serialized)
         self.assertNotIn("private-dispatch-owner", serialized)
         self.assertNotIn("claim_expires_at", serialized)
 

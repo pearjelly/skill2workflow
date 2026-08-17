@@ -34,6 +34,7 @@ from .service_client import (
     fetch_audit_events,
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
+    fetch_recurring_schedule_dispatch_page,
     fetch_workflow_artifact_report,
     fetch_workflow_inventory,
     fetch_backup_readiness,
@@ -434,6 +435,16 @@ def main(argv=None) -> int:
     service_dispatches_cmd.add_argument("--service-url", required=True)
     service_dispatches_cmd.add_argument("--auth-token-file", type=Path, required=True)
     service_dispatches_cmd.add_argument("--schedule-id", default="")
+
+    service_dispatch_page_cmd = subparsers.add_parser(
+        "service-recurring-dispatch-page",
+        help="Page recurring dispatch evidence through the authenticated service",
+    )
+    service_dispatch_page_cmd.add_argument("--service-url", required=True)
+    service_dispatch_page_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_dispatch_page_cmd.add_argument("--schedule-id", default="")
+    service_dispatch_page_cmd.add_argument("--cursor", default="")
+    service_dispatch_page_cmd.add_argument("--max-items", type=int, default=100)
 
     service_artifacts_cmd = subparsers.add_parser(
         "service-workflow-artifacts",
@@ -1118,6 +1129,17 @@ def main(argv=None) -> int:
                 args.service_url,
                 args.auth_token_file,
                 args.schedule_id,
+            )
+        )
+
+    if args.command == "service-recurring-dispatch-page":
+        return _service_action(
+            lambda: fetch_recurring_schedule_dispatch_page(
+                args.service_url,
+                args.auth_token_file,
+                schedule_id=args.schedule_id,
+                max_items=args.max_items,
+                cursor=args.cursor,
             )
         )
 

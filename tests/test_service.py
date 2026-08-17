@@ -1340,20 +1340,28 @@ class RuntimeServiceTests(TestCase):
                 "completed_at": "2026-08-11T00:01:00+00:00",
                 "input": "private-dispatch-input",
             }
+            older_record = dict(record)
+            older_record.update(
+                {
+                    "dispatch_id": "dispatch_private_000",
+                    "scheduled_for": "2026-08-10T00:00:00+00:00",
+                }
+            )
             with store._connection() as connection:
-                connection.execute(
-                    """
-                    insert into schedule_dispatches (
-                        dispatch_id, schedule_id, scheduled_for, status,
-                        owner_id, claim_expires_at, record_json
-                    ) values (?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        record["dispatch_id"], record["schedule_id"], record["scheduled_for"],
-                        record["status"], record["owner_id"], record["claim_expires_at"],
-                        json.dumps(record),
-                    ),
-                )
+                for item in (record, older_record):
+                    connection.execute(
+                        """
+                        insert into schedule_dispatches (
+                            dispatch_id, schedule_id, scheduled_for, status,
+                            owner_id, claim_expires_at, record_json
+                        ) values (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            item["dispatch_id"], item["schedule_id"], item["scheduled_for"],
+                            item["status"], item["owner_id"], item["claim_expires_at"],
+                            json.dumps(item),
+                        ),
+                    )
             ready = threading.Event()
             holder = {}
             thread = threading.Thread(
@@ -1378,6 +1386,14 @@ class RuntimeServiceTests(TestCase):
                 f"http://{host}:{port}/api/v1/recurring-schedules/schedule_private_report/dispatches",
                 token=AUTH_TOKEN,
             )
+            page_status, page = _get_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_private_report/dispatch-pages?max_items=1",
+                token=AUTH_TOKEN,
+            )
+            page_next_status, page_next = _get_json(
+                f"http://{host}:{port}/api/v1/recurring-schedules/schedule_private_report/dispatch-pages?max_items=1&cursor={page['window']['next_cursor']}",
+                token=AUTH_TOKEN,
+            )
             holder["service"].begin_shutdown()
             thread.join(timeout=3)
 
@@ -1388,15 +1404,26 @@ class RuntimeServiceTests(TestCase):
             accepted["schema_version"],
             "skill2workflow-recurring-schedule-dispatch-list-0.1.0",
         )
-        self.assertEqual(accepted["summary"]["status_counts"]["uncertain"], 1)
+        self.assertEqual(accepted["summary"]["status_counts"]["uncertain"], 2)
         self.assertEqual(targeted_status, 200)
         self.assertEqual(targeted["schedule_id"], "schedule_private_report")
         self.assertEqual(targeted["dispatches"][0]["status"], "uncertain")
         self.assertEqual(targeted["dispatches"][0]["error_type"], "ProviderPrivateError")
+        self.assertEqual(page_status, 200)
+        self.assertEqual(page["schema_version"], "skill2workflow-recurring-schedule-dispatch-page-0.1.0")
+        self.assertEqual(page["window"]["returned"], 1)
+        self.assertTrue(page["window"]["has_more"])
+        self.assertEqual(page_next_status, 200)
+        self.assertEqual(page_next["window"]["returned"], 1)
+        self.assertFalse(page_next["window"]["has_more"])
         serialized = json.dumps(accepted, ensure_ascii=False)
+        page_serialized = json.dumps(page, ensure_ascii=False)
         self.assertNotIn("private-dispatch-owner", serialized)
         self.assertNotIn("private-dispatch-input", serialized)
         self.assertNotIn("claim_expires_at", serialized)
+        self.assertNotIn("private-dispatch-owner", page_serialized)
+        self.assertNotIn("private-dispatch-input", page_serialized)
+        self.assertNotIn("claim_expires_at", page_serialized)
         self.assertFalse(thread.is_alive())
 
     def test_workflow_artifact_report_is_authenticated_bounded_and_value_free(self):

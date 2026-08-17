@@ -755,7 +755,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-158 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-159 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1288,6 +1288,11 @@ fields without requiring or returning the existing trigger input. The server
 preserves dispatch progress and rejects stale inventory intent with the same
 `next_run_at` compare-and-swap boundary.
 
+Loop 159 adds [cursor-paged remote recurring-schedule dispatch diagnostics](docs/remote-schedule-dispatch-pages.md):
+the separate `service-recurring-dispatch-page` client walks older redacted
+dispatch evidence with an opaque SQLite ordering cursor, while preserving the
+fixed recent-tail route and its exact 0.1.0 response contract.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1313,6 +1318,7 @@ See:
 - `docs/remote-schedule-update.md`
 - `docs/remote-schedule-delete.md`
 - `docs/remote-schedule-dispatches.md`
+- `docs/remote-schedule-dispatch-pages.md`
 - `docs/remote-workflow-artifacts.md`
 - `docs/remote-backup-readiness.md`
 - `docs/remote-audit-integrity.md`

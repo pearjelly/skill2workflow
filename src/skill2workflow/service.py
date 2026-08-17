@@ -29,6 +29,7 @@ from .dashboard import (
     MAX_LIVE_SNAPSHOT_BYTES,
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
+    MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS,
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_PATCH_RESPONSE_BYTES,
@@ -45,6 +46,7 @@ from .dashboard import (
     build_control_snapshot_from_control,
     build_recurring_schedule_list_from_store,
     build_recurring_schedule_dispatch_list_from_store,
+    build_recurring_schedule_dispatch_page_from_store,
     build_workflow_artifact_report_from_control,
     build_workflow_inventory_from_control,
     build_run_detail_from_control,
@@ -98,6 +100,7 @@ MAX_AUDIT_EVENT_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
+MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_AUDIT_INTEGRITY_RESPONSE_BYTES = 16 * 1024
@@ -809,6 +812,10 @@ def _handler_for(service: RuntimeService):
                     elif self.command == "GET" and _recurring_schedule_dispatch_list(path) is not None:
                         self._handle_recurring_schedule_dispatch_list(
                             _recurring_schedule_dispatch_list(path)
+                        )
+                    elif self.command == "GET" and _recurring_schedule_dispatch_page(path) is not None:
+                        self._handle_recurring_schedule_dispatch_page(
+                            _recurring_schedule_dispatch_page(path)
                         )
                     elif self.command == "GET" and (
                         path == "/api/v1/audit-consistency"
@@ -1727,6 +1734,56 @@ def _handler_for(service: RuntimeService):
                     raise ValueError("recurring schedule dispatch list exceeds response limit")
             except (ValueError, OSError, sqlite3.Error):
                 self._send_json(503, {"error": "recurring schedule dispatch list unavailable"})
+                return
+            self._send_json(200, payload)
+
+        def _handle_recurring_schedule_dispatch_page(self, schedule_id: str):
+            """Serve a cursor-paged, redacted recurring dispatch projection."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "recurring schedule dispatch page request must not include a body"},
+                )
+                return
+            try:
+                query = _recurring_schedule_dispatch_page_query(self.path)
+                payload = build_recurring_schedule_dispatch_page_from_store(
+                    service.scheduler.dispatcher.store,
+                    schedule_id=schedule_id,
+                    max_items=query["max_items"],
+                    cursor=query["cursor"],
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES:
+                    raise ValueError("recurring schedule dispatch page exceeds response limit")
+            except ValueError as error:
+                self._send_json(400, {"error": str(error)})
+                return
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "recurring schedule dispatch page unavailable"})
                 return
             self._send_json(200, payload)
 
@@ -2699,6 +2756,8 @@ def _request_route(method: str, path: str) -> str:
         return "recurring_schedule_delete"
     if method == "GET" and _recurring_schedule_dispatch_list(path) is not None:
         return "recurring_schedule_dispatch_list"
+    if method == "GET" and _recurring_schedule_dispatch_page(path) is not None:
+        return "recurring_schedule_dispatch_page"
     if method == "POST" and _recurring_schedule_action(path):
         return "recurring_schedule_action"
     if method == "GET" and path == "/api/v1/audit-consistency":
@@ -2828,6 +2887,26 @@ def _recurring_schedule_dispatch_list(path: str):
     return schedule_id
 
 
+def _recurring_schedule_dispatch_page(path: str):
+    if path == "/api/v1/recurring-schedule-dispatch-pages":
+        return ""
+    parts = path.split("/")
+    if (
+        len(parts) != 6
+        or parts[:4] != ["", "api", "v1", "recurring-schedules"]
+        or parts[5] != "dispatch-pages"
+    ):
+        return None
+    schedule_id = parts[4]
+    if (
+        not schedule_id
+        or len(schedule_id) > 128
+        or any(not (char.isalnum() or char in {"-", "_", "."}) for char in schedule_id)
+    ):
+        return None
+    return schedule_id
+
+
 def _cancel_run_id(path: str) -> str:
     return _run_action_id(path, "cancel")
 
@@ -2920,6 +2999,35 @@ def _audit_event_page_query(request_path: str) -> Dict[str, object]:
         "run_id": one("run_id"),
         "event_type": one("event_type"),
     }
+
+
+def _recurring_schedule_dispatch_page_query(request_path: str) -> Dict[str, object]:
+    """Parse the bounded query contract for cursor-paged dispatch evidence."""
+
+    try:
+        query = parse_qs(
+            urlsplit(str(request_path)).query,
+            keep_blank_values=True,
+            max_num_fields=4,
+        )
+    except ValueError as error:
+        raise ValueError("recurring schedule dispatch page query is invalid") from error
+    allowed = {"cursor", "max_items"}
+    if any(key not in allowed for key in query):
+        raise ValueError("recurring schedule dispatch page query contains an unsupported field")
+
+    def one(key: str) -> str:
+        values = query.get(key, [""])
+        if len(values) != 1:
+            raise ValueError(f"recurring schedule dispatch page query field {key} must appear once")
+        return str(values[0])
+
+    raw_limit = one("max_items") or str(MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS)
+    try:
+        max_items = int(raw_limit)
+    except (TypeError, ValueError) as error:
+        raise ValueError("recurring schedule dispatch page max_items must be an integer") from error
+    return {"cursor": one("cursor"), "max_items": max_items}
 
 
 def _audit_consistency_run_id(path: str) -> str:
