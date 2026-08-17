@@ -57,6 +57,15 @@ Dispatch uses claim-before-execute inside a SQLite transaction. The scheduler fi
 
 On restart, an expired `claimed` record becomes `uncertain`. It is not retried automatically because the external effect might already have happened. An operator must inspect the workflow or connector result before deciding on a new manual action.
 
+After that inspection, an operator may persist one explicit review without
+changing the dispatch status. The review outcome is one of
+`effect_confirmed`, `effect_not_observed`, or `no_conclusion`; it is an
+operator assertion, not provider reconciliation. The status remains
+`uncertain`, a later contradictory conclusion is rejected, and no outcome
+authorizes automatic replay. The write uses the observed `completed_at` value
+as a compare-and-swap token, so a stale console cannot annotate a different
+record.
+
 Stale-claim recovery reads eligible dispatch rows through the SQLite cursor and
 updates each claim as it is read. The long-running service takeover applies a
 fixed 100-row batch boundary, renews the lease between full batches, and keeps
@@ -133,6 +142,17 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches \
 PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatches \
   --state-dir /var/lib/skill2workflow --storage sqlite \
   --schedule-id schedule_hourly_report --limit 100
+
+# After inspecting an uncertain record, persist the operator's conclusion:
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatch-review \
+  dispatch_0123456789abcdef \
+  --expected-completed-at 2026-08-11T00:01:00+00:00 \
+  --outcome effect_not_observed \
+  --state-dir /var/lib/skill2workflow --storage sqlite
+
+PYTHONPATH=src python3 -m skill2workflow.cli schedule-dispatch-review-get \
+  dispatch_0123456789abcdef \
+  --state-dir /var/lib/skill2workflow --storage sqlite
 ```
 
 Remote operators can update an existing recurring definition through the
@@ -172,6 +192,15 @@ quick recent view. For older evidence, use the separate cursor-paged
 `service-recurring-dispatch-page` route and contract documented in
 [`remote-schedule-dispatch-pages.md`](remote-schedule-dispatch-pages.md); its
 opaque cursor is source-bounded by SQLite and never exposes trigger input.
+
+The authenticated `POST /api/v1/recurring-schedule-dispatches/{dispatch_id}/review`
+route and `service-recurring-dispatch-review` command persist the same explicit
+review remotely. Supply the `completed_at` copied from a redacted dispatch
+page as `--expected-completed-at`; a stale value returns `409`. Read the
+durable projection later with
+`GET /api/v1/recurring-schedule-dispatches/{dispatch_id}/review` or
+`service-recurring-dispatch-review-get`. The fixed contract is documented in
+[`remote-schedule-dispatch-reviews.md`](remote-schedule-dispatch-reviews.md).
 
 For SQLite recurring schedules, the bounded inventory reads a transactional
 `recurring_schedule_summaries` projection containing only scheduling metadata.

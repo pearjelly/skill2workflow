@@ -540,6 +540,71 @@ class CliTests(TestCase):
             cursor="cursor-token",
         )
 
+    def test_service_recurring_dispatch_review_commands_preserve_cas_and_outcome(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-recurring-schedule-dispatch-review-0.1.0",
+            "dispatch_id": "dispatch_001",
+            "schedule_id": "schedule_hourly_report",
+            "scheduled_for": "2026-08-11T00:00:00+00:00",
+            "status": "uncertain",
+            "expected_completed_at": "2026-08-11T00:01:00+00:00",
+            "outcome": "effect_not_observed",
+            "reviewed_at": "2026-08-11T00:02:00+00:00",
+            "changed": True,
+        }
+        with patch(
+            "skill2workflow.cli.post_recurring_schedule_dispatch_review",
+            return_value=expected,
+        ) as review:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-recurring-dispatch-review",
+                        "dispatch_001",
+                        "--expected-completed-at",
+                        "2026-08-11T00:01:00+00:00",
+                        "--outcome",
+                        "effect_not_observed",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        review.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            "dispatch_001",
+            expected_completed_at="2026-08-11T00:01:00+00:00",
+            outcome="effect_not_observed",
+        )
+
+        stdout = StringIO()
+        expected["changed"] = False
+        with patch(
+            "skill2workflow.cli.fetch_recurring_schedule_dispatch_review",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-recurring-dispatch-review-get",
+                        "dispatch_001",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                    ]
+                )
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with("https://service.example", token_file, "dispatch_001")
+
     def test_service_workflow_artifacts_command_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

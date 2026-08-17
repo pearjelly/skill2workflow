@@ -13,6 +13,7 @@ from skill2workflow.service_client import (
     MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES,
+    MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES,
     MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES,
     MAX_BACKUP_READINESS_RESPONSE_BYTES,
     MAX_REMOTE_BACKUP_INVENTORY_RESPONSE_BYTES,
@@ -42,6 +43,8 @@ from skill2workflow.service_client import (
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
     fetch_recurring_schedule_dispatch_page,
+    fetch_recurring_schedule_dispatch_review,
+    post_recurring_schedule_dispatch_review,
     fetch_workflow_artifact_report,
     fetch_workflow_inventory,
     fetch_backup_readiness,
@@ -2362,6 +2365,123 @@ class ServiceClientTests(TestCase):
 
         self.assertFalse(thread.is_alive())
 
+    def test_recurring_dispatch_review_posts_cas_payload_and_fetches_projection(self):
+        observed = []
+        posted = _recurring_schedule_dispatch_review_payload(changed=True)
+        fetched = _recurring_schedule_dispatch_review_payload(changed=False)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed.append(
+                    {
+                        "method": "POST",
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                        "body": json.loads(
+                            self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                        ),
+                    }
+                )
+                _send_json(self, 200, posted)
+
+            def do_GET(self):
+                observed.append(
+                    {
+                        "method": "GET",
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                    }
+                )
+                _send_json(self, 200, fetched)
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            post_thread = threading.Thread(target=server.handle_request, daemon=True)
+            post_thread.start()
+            result = post_recurring_schedule_dispatch_review(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "dispatch_001",
+                expected_completed_at="2026-08-11T00:01:00+00:00",
+                outcome="effect_not_observed",
+            )
+            post_thread.join(timeout=2)
+            get_thread = threading.Thread(target=server.handle_request, daemon=True)
+            get_thread.start()
+            fetched_result = fetch_recurring_schedule_dispatch_review(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "dispatch_001",
+            )
+            get_thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(result, posted)
+        self.assertEqual(fetched_result, fetched)
+        self.assertEqual(
+            observed,
+            [
+                {
+                    "method": "POST",
+                    "path": "/api/v1/recurring-schedule-dispatches/dispatch_001/review",
+                    "authorization": f"Bearer {AUTH_TOKEN}",
+                    "body": {
+                        "expected_completed_at": "2026-08-11T00:01:00+00:00",
+                        "outcome": "effect_not_observed",
+                    },
+                },
+                {
+                    "method": "GET",
+                    "path": "/api/v1/recurring-schedule-dispatches/dispatch_001/review",
+                    "authorization": f"Bearer {AUTH_TOKEN}",
+                },
+            ],
+        )
+        self.assertFalse(post_thread.is_alive())
+        self.assertFalse(get_thread.is_alive())
+
+    def test_recurring_dispatch_review_rejects_oversized_response(self):
+        body = b"x" * (MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES + 1)
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                try:
+                    self.wfile.write(body)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            with self.assertRaises(ServiceActionError):
+                fetch_recurring_schedule_dispatch_review(
+                    f"http://127.0.0.1:{server.server_port}",
+                    token_file,
+                    "dispatch_001",
+                )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertFalse(thread.is_alive())
+
     def test_recurring_schedule_state_posts_authenticated_empty_object_and_validates_contract(self):
         observed = []
         payload = {
@@ -2968,6 +3088,20 @@ def _recurring_schedule_dispatch_page_payload(schedule_id="", next_cursor=""):
             "has_more": bool(next_cursor),
             "next_cursor": next_cursor,
         },
+    }
+
+
+def _recurring_schedule_dispatch_review_payload(changed=False):
+    return {
+        "schema_version": "skill2workflow-recurring-schedule-dispatch-review-0.1.0",
+        "dispatch_id": "dispatch_001",
+        "schedule_id": "schedule_hourly_report",
+        "scheduled_for": "2026-08-11T00:00:00+00:00",
+        "status": "uncertain",
+        "expected_completed_at": "2026-08-11T00:01:00+00:00",
+        "outcome": "effect_not_observed",
+        "reviewed_at": "2026-08-11T00:02:00+00:00",
+        "changed": changed,
     }
 
 

@@ -123,6 +123,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry.observe_http("audit_consistency", 200)
             telemetry.observe_http("recurring_schedule_dispatch_list", 200)
             telemetry.observe_http("recurring_schedule_dispatch_page", 200)
+            telemetry.observe_http("recurring_schedule_dispatch_review", 200)
             telemetry.observe_http("recurring_schedule_update", 200)
             telemetry.observe_http("recurring_schedule_patch", 200)
             telemetry.observe_http("recurring_schedule_delete", 200)
@@ -166,6 +167,7 @@ class RuntimeTelemetryTests(TestCase):
             'skill2workflow_http_requests_total{route="recurring_schedule_delete",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="recurring_schedule_dispatch_list",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="recurring_schedule_dispatch_page",status_class="2xx"} 1',
+            'skill2workflow_http_requests_total{route="recurring_schedule_dispatch_review",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_artifact_report",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="backup_readiness",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="retention_readiness",status_class="2xx"} 1',
@@ -228,7 +230,7 @@ class RuntimeTelemetryTests(TestCase):
             set(aggregate["http_requests"]),
             {
                 "health", "readiness", "metrics", "control_snapshot", "recurring_schedule_list",
-                "recurring_schedule_create", "recurring_schedule_action", "recurring_schedule_update", "recurring_schedule_patch", "recurring_schedule_delete", "recurring_schedule_dispatch_list", "recurring_schedule_dispatch_page",
+                "recurring_schedule_create", "recurring_schedule_action", "recurring_schedule_update", "recurring_schedule_patch", "recurring_schedule_delete", "recurring_schedule_dispatch_list", "recurring_schedule_dispatch_page", "recurring_schedule_dispatch_review",
                 "workflow_artifact_report",
                 "backup_readiness",
                 "backup_inventory",

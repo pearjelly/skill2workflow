@@ -850,7 +850,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-204 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-205 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -878,6 +878,12 @@ Loop 204 lets an explicitly loaded external connector declare an additional
 bounded durable metadata vocabulary in its manifest: finite string enums,
 booleans, and identifier lists. The runtime validates the declaration before
 registration and still drops undeclared or invalid values before persistence.
+
+Loop 205 adds [protected uncertain-dispatch reviews](docs/remote-schedule-dispatch-reviews.md):
+operators can persist one compare-and-swap guarded conclusion about a recovered
+dispatch through the local or authenticated service CLI. The dispatch remains
+`uncertain`, no review triggers replay, and the redacted review is retained in
+SQLite and the audit chain.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

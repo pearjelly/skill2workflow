@@ -46,6 +46,7 @@ from .service_client import (
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
     fetch_recurring_schedule_dispatch_page,
+    fetch_recurring_schedule_dispatch_review,
     fetch_workflow_artifact_report,
     fetch_workflow_inventory,
     fetch_backup_readiness,
@@ -67,6 +68,7 @@ from .service_client import (
     fetch_support_bundle,
     post_recurring_schedule_state,
     post_recurring_schedule_create,
+    post_recurring_schedule_dispatch_review,
     put_recurring_schedule_update,
     patch_recurring_schedule,
     delete_recurring_schedule,
@@ -347,6 +349,28 @@ def _main(argv=None) -> int:
     schedule_dispatches_cmd.add_argument("--schedule-id", default="")
     schedule_dispatches_cmd.add_argument("--limit", type=int, help="Return a compact newest window (1-1000)")
 
+    schedule_dispatch_review_cmd = subparsers.add_parser(
+        "schedule-dispatch-review",
+        help="Record an explicit review of one uncertain recurring dispatch",
+    )
+    schedule_dispatch_review_cmd.add_argument("dispatch_id")
+    schedule_dispatch_review_cmd.add_argument("--expected-completed-at", required=True)
+    schedule_dispatch_review_cmd.add_argument(
+        "--outcome",
+        required=True,
+        choices=["effect_confirmed", "effect_not_observed", "no_conclusion"],
+    )
+    schedule_dispatch_review_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedule_dispatch_review_cmd.add_argument("--storage", choices=["sqlite"], default="sqlite")
+
+    schedule_dispatch_review_get_cmd = subparsers.add_parser(
+        "schedule-dispatch-review-get",
+        help="Read one persisted uncertain recurring dispatch review",
+    )
+    schedule_dispatch_review_get_cmd.add_argument("dispatch_id")
+    schedule_dispatch_review_get_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    schedule_dispatch_review_get_cmd.add_argument("--storage", choices=["sqlite"], default="sqlite")
+
     for command, help_text in (
         ("schedule-enable", "Enable a durable recurring schedule"),
         ("schedule-disable", "Disable a durable recurring schedule"),
@@ -588,6 +612,28 @@ def _main(argv=None) -> int:
     service_dispatch_page_cmd.add_argument("--schedule-id", default="")
     service_dispatch_page_cmd.add_argument("--cursor", default="")
     service_dispatch_page_cmd.add_argument("--max-items", type=int, default=100)
+
+    service_dispatch_review_cmd = subparsers.add_parser(
+        "service-recurring-dispatch-review",
+        help="Record an explicit review of one uncertain recurring dispatch through the authenticated service",
+    )
+    service_dispatch_review_cmd.add_argument("dispatch_id")
+    service_dispatch_review_cmd.add_argument("--expected-completed-at", required=True)
+    service_dispatch_review_cmd.add_argument(
+        "--outcome",
+        required=True,
+        choices=["effect_confirmed", "effect_not_observed", "no_conclusion"],
+    )
+    service_dispatch_review_cmd.add_argument("--service-url", required=True)
+    service_dispatch_review_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_dispatch_review_get_cmd = subparsers.add_parser(
+        "service-recurring-dispatch-review-get",
+        help="Read one persisted uncertain recurring dispatch review through the authenticated service",
+    )
+    service_dispatch_review_get_cmd.add_argument("dispatch_id")
+    service_dispatch_review_get_cmd.add_argument("--service-url", required=True)
+    service_dispatch_review_get_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_artifacts_cmd = subparsers.add_parser(
         "service-workflow-artifacts",
@@ -1234,6 +1280,26 @@ def _main(argv=None) -> int:
             )
         )
 
+    if args.command == "schedule-dispatch-review":
+        return _control_action(
+            lambda: LocalScheduleRunner(
+                args.state_dir,
+                storage=args.storage,
+            ).review_uncertain_dispatch(
+                args.dispatch_id,
+                expected_completed_at=args.expected_completed_at,
+                outcome=args.outcome,
+            )
+        )
+
+    if args.command == "schedule-dispatch-review-get":
+        return _control_action(
+            lambda: LocalScheduleRunner(
+                args.state_dir,
+                storage=args.storage,
+            ).get_dispatch_review(args.dispatch_id)
+        )
+
     if args.command in {"schedule-enable", "schedule-disable"}:
         return _control_action(
             lambda: LocalScheduleRunner(
@@ -1443,6 +1509,26 @@ def _main(argv=None) -> int:
                 schedule_id=args.schedule_id,
                 max_items=args.max_items,
                 cursor=args.cursor,
+            )
+        )
+
+    if args.command == "service-recurring-dispatch-review":
+        return _service_action(
+            lambda: post_recurring_schedule_dispatch_review(
+                args.service_url,
+                args.auth_token_file,
+                args.dispatch_id,
+                expected_completed_at=args.expected_completed_at,
+                outcome=args.outcome,
+            )
+        )
+
+    if args.command == "service-recurring-dispatch-review-get":
+        return _service_action(
+            lambda: fetch_recurring_schedule_dispatch_review(
+                args.service_url,
+                args.auth_token_file,
+                args.dispatch_id,
             )
         )
 

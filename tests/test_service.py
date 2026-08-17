@@ -1590,6 +1590,120 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("claim_expires_at", page_serialized)
         self.assertFalse(thread.is_alive())
 
+    def test_uncertain_dispatch_review_is_authenticated_cas_and_durable(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            service = RuntimeService(config)
+            service._server.server_close()
+            store = service.scheduler.dispatcher.store
+            record = {
+                "dispatch_id": "dispatch_review_001",
+                "schedule_id": "schedule_review_report",
+                "scheduled_for": "2026-08-11T00:00:00+00:00",
+                "status": "uncertain",
+                "owner_id": "private-review-owner",
+                "claim_expires_at": 1234.0,
+                "coalesced_occurrences": 1,
+                "run_id": "",
+                "trigger_id": "",
+                "error_type": "",
+                "completed_at": "2026-08-11T00:01:00+00:00",
+                "input": "private-review-input",
+            }
+            with store._connection() as connection:
+                connection.execute(
+                    """
+                    insert into schedule_dispatches (
+                        dispatch_id, schedule_id, scheduled_for, status,
+                        owner_id, claim_expires_at, record_json
+                    ) values (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        record["dispatch_id"], record["schedule_id"], record["scheduled_for"],
+                        record["status"], record["owner_id"], record["claim_expires_at"],
+                        json.dumps(record),
+                    ),
+                )
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base = f"http://{host}:{port}/api/v1/recurring-schedule-dispatches/dispatch_review_001/review"
+            denied_status, denied = _post_json(
+                base,
+                {
+                    "expected_completed_at": record["completed_at"],
+                    "outcome": "effect_not_observed",
+                },
+            )
+            accepted_status, accepted = _post_json(
+                base,
+                {
+                    "expected_completed_at": record["completed_at"],
+                    "outcome": "effect_not_observed",
+                },
+                token=AUTH_TOKEN,
+            )
+            replay_status, replay = _post_json(
+                base,
+                {
+                    "expected_completed_at": record["completed_at"],
+                    "outcome": "effect_not_observed",
+                },
+                token=AUTH_TOKEN,
+            )
+            conflict_status, conflict = _post_json(
+                base,
+                {
+                    "expected_completed_at": record["completed_at"],
+                    "outcome": "effect_confirmed",
+                },
+                token=AUTH_TOKEN,
+            )
+            get_status, fetched = _get_json(base, token=AUTH_TOKEN)
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+            persisted = RecurringScheduleStore(state_dir).list_dispatches()[0]
+            audit_events = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertTrue(accepted["changed"])
+        self.assertEqual(accepted["status"], "uncertain")
+        self.assertEqual(accepted["outcome"], "effect_not_observed")
+        self.assertEqual(replay_status, 200)
+        self.assertFalse(replay["changed"])
+        self.assertEqual(conflict_status, 409)
+        self.assertEqual(conflict, {"error": "recurring dispatch review conflict"})
+        self.assertEqual(get_status, 200)
+        self.assertFalse(fetched["changed"])
+        self.assertEqual(fetched["reviewed_at"], accepted["reviewed_at"])
+        self.assertEqual(persisted["status"], "uncertain")
+        self.assertNotIn("private-review-input", json.dumps(fetched, ensure_ascii=False))
+        review_events = [
+            event for event in audit_events
+            if event.get("type") == "recurring_schedule_dispatch_reviewed"
+        ]
+        self.assertEqual(len(review_events), 2)
+        self.assertEqual(review_events[0]["outcome"], "effect_not_observed")
+        self.assertTrue(review_events[0]["changed"])
+        self.assertFalse(review_events[1]["changed"])
+        self.assertFalse(thread.is_alive())
+
     def test_workflow_artifact_report_is_authenticated_bounded_and_value_free(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

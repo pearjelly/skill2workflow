@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/recurring-schedule-dispatch-review-0.1.0.json",
+  "title": "skill2workflow uncertain recurring dispatch operator review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dispatch_id",
+    "schedule_id",
+    "scheduled_for",
+    "status",
+    "expected_completed_at",
+    "outcome",
+    "reviewed_at",
+    "changed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-recurring-schedule-dispatch-review-0.1.0"
+    },
+    "dispatch_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "schedule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_.-]+$"
+    },
+    "scheduled_for": {"type": "string", "minLength": 1, "maxLength": 64},
+    "status": {"const": "uncertain"},
+    "expected_completed_at": {"type": "string", "minLength": 1, "maxLength": 64},
+    "outcome": {
+      "enum": ["effect_confirmed", "effect_not_observed", "no_conclusion"]
+    },
+    "reviewed_at": {"type": "string", "minLength": 1, "maxLength": 64},
+    "changed": {"type": "boolean"}
+  }
+}

@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a protected, compare-and-swap uncertain-dispatch review action. Operators
+  can persist one of three fixed conclusions and read it back through the
+  authenticated service or installed CLI without changing `uncertain` status,
+  replaying work, or exposing provider data.
+
 - Added an optional manifest-declared durable metadata vocabulary for explicit
   external connectors. Reviewed finite string enums, booleans, and bounded
   identifier lists can now survive the executor projection; malformed or

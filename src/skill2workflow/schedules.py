@@ -27,6 +27,14 @@ LOCAL_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-local-schedule-dis
 MAX_LOCAL_SCHEDULE_LIST_ITEMS = 1000
 MAX_LOCAL_SCHEDULE_DISPATCH_LIST_ITEMS = 1000
 MAX_SCHEDULE_RUN_DUE_ITEMS = 100
+# An uncertain dispatch is never replayed automatically.  These fixed labels
+# let an operator persist what they learned while keeping the scheduler state
+# explicitly uncertain and requiring any follow-up action to remain manual.
+DISPATCH_REVIEW_OUTCOMES = frozenset(
+    {"effect_confirmed", "effect_not_observed", "no_conclusion"}
+)
+MAX_DISPATCH_REVIEW_OUTCOME_BYTES = 32
+MAX_DISPATCH_REVIEW_TIMESTAMP_BYTES = 64
 # One-shot files are local state, but every operator/read path still needs a
 # finite parser boundary.  The trigger input itself is capped at 1 MiB; this
 # larger envelope leaves room for the schedule metadata and canonical JSON
@@ -219,6 +227,31 @@ class LocalScheduleRunner:
                 "truncated": len(dispatches) < int(bounded["total"]),
             },
         }
+
+    def review_uncertain_dispatch(
+        self,
+        dispatch_id: str,
+        *,
+        expected_completed_at: str,
+        outcome: str,
+    ) -> Dict[str, object]:
+        """Record one local operator review while preserving uncertain status."""
+
+        if self.recurring_store is None:
+            raise ValueError("recurring dispatch reviews require sqlite storage")
+        review, _changed = self.recurring_store.review_uncertain_dispatch_with_result(
+            dispatch_id,
+            expected_completed_at=expected_completed_at,
+            outcome=outcome,
+        )
+        return review
+
+    def get_dispatch_review(self, dispatch_id: str) -> Dict[str, object]:
+        """Read one local operator review from the recurring dispatch ledger."""
+
+        if self.recurring_store is None:
+            raise ValueError("recurring dispatch reviews require sqlite storage")
+        return self.recurring_store.get_dispatch_review(dispatch_id)
 
     def set_recurring_enabled(self, schedule_id: str, enabled: bool) -> Schedule:
         if self.recurring_store is None:
@@ -603,6 +636,77 @@ def _optional_text(mapping: Dict[str, object], key: str) -> str:
     if value is None:
         return ""
     return str(value)
+
+
+def _safe_dispatch_id(dispatch_id: str) -> str:
+    value = str(dispatch_id)
+    if (
+        not value
+        or len(value) > 128
+        or any(not (char.isalnum() or char in {"-", "_", "."}) for char in value)
+    ):
+        raise ValueError("dispatch_id must be a safe dispatch identifier")
+    return value
+
+
+def _validate_dispatch_review_outcome(outcome: str) -> str:
+    if not isinstance(outcome, str) or outcome not in DISPATCH_REVIEW_OUTCOMES:
+        raise ValueError(
+            "outcome must be effect_confirmed, effect_not_observed, or no_conclusion"
+        )
+    if len(outcome.encode("utf-8")) > MAX_DISPATCH_REVIEW_OUTCOME_BYTES:
+        raise ValueError("outcome is too large")
+    return outcome
+
+
+def _validate_dispatch_review_timestamp(value: str, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value.encode("utf-8")) > MAX_DISPATCH_REVIEW_TIMESTAMP_BYTES
+        or any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+    ):
+        raise ValueError(f"{field} must be a non-empty timestamp")
+    try:
+        _parse_timestamp(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"{field} must be an ISO-8601 timestamp") from error
+    return value
+
+
+def _dispatch_review_projection(
+    record: Dict[str, object],
+    *,
+    changed: bool,
+) -> Dict[str, object]:
+    review = record.get("review")
+    if not isinstance(review, dict):
+        raise ValueError("recurring dispatch review is invalid")
+    outcome = _validate_dispatch_review_outcome(str(review.get("outcome", "")))
+    expected_completed_at = _validate_dispatch_review_timestamp(
+        str(review.get("expected_completed_at", "")),
+        "expected_completed_at",
+    )
+    reviewed_at = _validate_dispatch_review_timestamp(
+        str(review.get("reviewed_at", "")),
+        "reviewed_at",
+    )
+    dispatch_id = _safe_dispatch_id(str(record.get("dispatch_id", "")))
+    schedule_id = _safe_schedule_id(str(record.get("schedule_id", "")))
+    if str(record.get("status", "")) != "uncertain":
+        raise ValueError("recurring dispatch review status is invalid")
+    if not isinstance(changed, bool):
+        raise ValueError("recurring dispatch review change state must be boolean")
+    return {
+        "dispatch_id": dispatch_id,
+        "schedule_id": schedule_id,
+        "scheduled_for": str(record.get("scheduled_for", "")),
+        "status": "uncertain",
+        "expected_completed_at": expected_completed_at,
+        "outcome": outcome,
+        "reviewed_at": reviewed_at,
+        "changed": changed,
+    }
 
 
 def _safe_schedule_id(schedule_id: str) -> str:
@@ -1138,6 +1242,84 @@ class RecurringScheduleStore:
             "has_more": has_more,
             "next_cursor": next_cursor,
         }
+
+    def review_uncertain_dispatch_with_result(
+        self,
+        dispatch_id: str,
+        *,
+        expected_completed_at: str,
+        outcome: str,
+    ) -> Tuple[Dict[str, object], bool]:
+        """Persist one explicit operator review without changing dispatch state.
+
+        The completed timestamp is a compare-and-swap token copied from the
+        uncertain dispatch projection.  A review is durable and idempotent for
+        the same outcome, but a different later conclusion is rejected so the
+        evidence cannot be silently rewritten.  This method never retries,
+        completes, or otherwise mutates the uncertain dispatch status.
+        """
+
+        normalized_id = _safe_dispatch_id(dispatch_id)
+        normalized_expected = _validate_dispatch_review_timestamp(
+            expected_completed_at, "expected_completed_at"
+        )
+        normalized_outcome = _validate_dispatch_review_outcome(outcome)
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            row = connection.execute(
+                "select record_json from schedule_dispatches where dispatch_id = ?",
+                (normalized_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"recurring dispatch not found: {normalized_id}")
+            record = json.loads(str(row[0]))
+            if not isinstance(record, dict):
+                raise ValueError("recurring dispatch record is invalid")
+            if str(record.get("status", "")) != "uncertain":
+                raise ValueError("recurring dispatch is not uncertain")
+            current_completed_at = str(record.get("completed_at", ""))
+            if current_completed_at != normalized_expected:
+                raise ValueError("recurring dispatch review precondition failed")
+            existing = record.get("review")
+            if existing is not None:
+                if (
+                    isinstance(existing, dict)
+                    and str(existing.get("expected_completed_at", ""))
+                    == normalized_expected
+                    and str(existing.get("outcome", "")) == normalized_outcome
+                    and isinstance(existing.get("reviewed_at"), str)
+                    and existing.get("reviewed_at")
+                ):
+                    return _dispatch_review_projection(record, changed=False), False
+                raise ValueError("recurring dispatch review already exists")
+            record["review"] = {
+                "expected_completed_at": normalized_expected,
+                "outcome": normalized_outcome,
+                "reviewed_at": _utc_now(),
+            }
+            connection.execute(
+                "update schedule_dispatches set record_json = ? where dispatch_id = ?",
+                (_json_text(record), normalized_id),
+            )
+        return _dispatch_review_projection(record, changed=True), True
+
+    def get_dispatch_review(self, dispatch_id: str) -> Dict[str, object]:
+        """Read one persisted operator review without exposing raw record data."""
+
+        normalized_id = _safe_dispatch_id(dispatch_id)
+        with self._connection() as connection:
+            row = connection.execute(
+                "select record_json from schedule_dispatches where dispatch_id = ?",
+                (normalized_id,),
+            ).fetchone()
+        if row is None:
+            raise ValueError(f"recurring dispatch not found: {normalized_id}")
+        record = json.loads(str(row[0]))
+        if not isinstance(record, dict):
+            raise ValueError("recurring dispatch record is invalid")
+        if not isinstance(record.get("review"), dict):
+            raise ValueError("recurring dispatch review not found")
+        return _dispatch_review_projection(record, changed=False)
 
     def _initialize(self) -> None:
         with self._connection() as connection:

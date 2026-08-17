@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-204
+- Completed delivery loops: 1-205
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 204 is complete with a manifest-declared external connector metadata policy
+- Active loop: None; Loop 205 is complete with a protected uncertain-dispatch review action
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-202 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-205 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5229,9 +5229,50 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_executor.ExecutorTests.test_manifest_declared_external_metadata_is_projected_without_raw_values -v
 ```
 
+### Loop 205: Protected Uncertain-Dispatch Reviews
+
+**Status:** Complete.
+
+**Prior basis:** Loop 159 gave remote operators a bounded, redacted dispatch
+diagnostic surface, while Loop 43 deliberately kept recovered effects in the
+`uncertain` state and refused automatic replay. Operators could inspect the
+evidence, but there was no durable way to record the conclusion they reached
+or to distinguish a reviewed incident from an unattended one.
+
+**Outcome:** The SQLite dispatch ledger now accepts one explicit operator
+review for an `uncertain` record, guarded by the observed `completed_at` value.
+The fixed outcomes are `effect_confirmed`, `effect_not_observed`, and
+`no_conclusion`. Repeating the same outcome is idempotent; a stale token or a
+contradictory conclusion returns a conflict. The dispatch status remains
+`uncertain`, and no review can retry, complete, cancel, or replay work. An
+authenticated service route, installed local/remote CLI commands, fixed
+redacted schema, bounded audit event, backup-compatible record, documentation,
+and regression evidence make the human review durable without claiming
+provider reconciliation or exactly-once execution.
+
+**Evidence:** Recurring-store tests cover CAS, idempotency, contradictory
+reviews, SQLite reload, and unchanged status. Service tests cover
+authentication, redaction, remote persistence, replay, conflict, and audit
+evidence; service-client and CLI/package checks cover the fixed contract and
+installed commands. The focused design is
+[`docs/remote-schedule-dispatch-reviews.md`](docs/remote-schedule-dispatch-reviews.md).
+
+**Safety boundary:** This records operator evidence only. It does not infer
+provider state, automatically retry uncertain effects, alter dispatch claims,
+write trigger inputs, expose credentials, or introduce exactly-once execution.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_recurring_schedules.RecurringSchedulePersistenceTests.test_uncertain_dispatch_review_is_cas_idempotent_and_preserves_status \
+  tests.test_service.RuntimeServiceTests.test_uncertain_dispatch_review_is_authenticated_cas_and_durable \
+  tests.test_service_client.ServiceClientTests.test_recurring_dispatch_review_posts_cas_payload_and_fetches_projection -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 204 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 205 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5402,6 +5443,7 @@ This rolling queue is ordered. Loop 204 is complete and there is no active deliv
 | Loop 202: Durable External Connector Failure Boundary | Complete | Keep provider-authored external connector failure text out of durable run and audit projections without breaking immediate callers | Fixed durable failure message, returned/raised/retry coverage, SQLite reload evidence, docs, and production gates |
 | Loop 203: Durable External Connector Metadata Boundary | Complete | Keep arbitrary external connector output, audit, input-mapping, and credential strings out of durable state without breaking immediate callers | Fixed value-free durable projection, direct-result compatibility, SQLite reload evidence, docs, and production gates |
 | Loop 204: Manifest-Declared External Connector Metadata Policy | Complete | Let reviewed external connectors retain safe connector-specific finite metadata without widening durable state to arbitrary provider values | Strict manifest policy validation, JSON/SQLite custom-vocabulary projection evidence, docs, and production gates |
+| Loop 205: Protected Uncertain-Dispatch Reviews | Complete | Let operators persist a bounded, compare-and-swap review of uncertain recurring effects without replaying or changing dispatch state | Fixed review schema, authenticated/local CLI and service routes, idempotent/conflict-safe SQLite evidence, redacted audit, package/docs/full-suite gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -26,6 +26,6 @@ class SqliteRunStateBoundaryDocsTests(TestCase):
     def test_roadmap_and_readme_promote_loop_174(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Completed delivery loops: 1-204", roadmap)
-        self.assertIn("Loop 204 is complete with a manifest-declared external connector metadata policy", roadmap)
-        self.assertIn("Delivery Loops 1-204 are complete", readme)
+        self.assertIn("Completed delivery loops: 1-205", roadmap)
+        self.assertIn("Loop 205 is complete with a protected uncertain-dispatch review action", roadmap)
+        self.assertIn("Delivery Loops 1-205 are complete", readme)

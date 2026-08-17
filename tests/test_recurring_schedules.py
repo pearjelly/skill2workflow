@@ -596,6 +596,74 @@ class RecurringSchedulePersistenceTests(TestCase):
         self.assertEqual(rerun["count"], 0)
         self.assertEqual(records[0]["status"], "uncertain")
 
+    def test_uncertain_dispatch_review_is_cas_idempotent_and_preserves_status(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = RecurringScheduleStore(state_dir)
+            store.add(_recurring_definition())
+            first = RecurringScheduleDispatcher(state_dir, owner_id="owner-a", lease_seconds=5)
+            self.assertTrue(first.try_acquire(now_epoch=1000))
+            first.claim_due("2026-08-11T00:00:00Z", now_epoch=1001)
+            second = RecurringScheduleDispatcher(state_dir, owner_id="owner-b", lease_seconds=5)
+            self.assertTrue(second.try_acquire(now_epoch=1007))
+            self.assertEqual(second.recover_stale_claims(now_epoch=1007), 1)
+            uncertain = RecurringScheduleStore(state_dir).list_dispatches()[0]
+
+            reviewed, changed = store.review_uncertain_dispatch_with_result(
+                uncertain["dispatch_id"],
+                expected_completed_at=uncertain["completed_at"],
+                outcome="effect_not_observed",
+            )
+            replayed, replay_changed = store.review_uncertain_dispatch_with_result(
+                uncertain["dispatch_id"],
+                expected_completed_at=uncertain["completed_at"],
+                outcome="effect_not_observed",
+            )
+            persisted = RecurringScheduleStore(state_dir).get_dispatch_review(
+                uncertain["dispatch_id"]
+            )
+            records = RecurringScheduleStore(state_dir).list_dispatches()
+
+        self.assertTrue(changed)
+        self.assertFalse(replay_changed)
+        self.assertEqual(reviewed["outcome"], "effect_not_observed")
+        self.assertEqual(replayed["reviewed_at"], reviewed["reviewed_at"])
+        self.assertEqual(persisted["status"], "uncertain")
+        self.assertEqual(persisted["changed"], False)
+        self.assertEqual(records[0]["status"], "uncertain")
+        self.assertEqual(records[0]["review"]["outcome"], "effect_not_observed")
+
+    def test_uncertain_dispatch_review_rejects_stale_or_conflicting_conclusions(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = RecurringScheduleStore(state_dir)
+            store.add(_recurring_definition())
+            first = RecurringScheduleDispatcher(state_dir, owner_id="owner-a", lease_seconds=5)
+            self.assertTrue(first.try_acquire(now_epoch=1000))
+            first.claim_due("2026-08-11T00:00:00Z", now_epoch=1001)
+            second = RecurringScheduleDispatcher(state_dir, owner_id="owner-b", lease_seconds=5)
+            self.assertTrue(second.try_acquire(now_epoch=1007))
+            second.recover_stale_claims(now_epoch=1007)
+            uncertain = RecurringScheduleStore(state_dir).list_dispatches()[0]
+
+            with self.assertRaisesRegex(ValueError, "precondition failed"):
+                store.review_uncertain_dispatch_with_result(
+                    uncertain["dispatch_id"],
+                    expected_completed_at="2026-08-11T00:00:00+00:00",
+                    outcome="no_conclusion",
+                )
+            store.review_uncertain_dispatch_with_result(
+                uncertain["dispatch_id"],
+                expected_completed_at=uncertain["completed_at"],
+                outcome="effect_confirmed",
+            )
+            with self.assertRaisesRegex(ValueError, "already exists"):
+                store.review_uncertain_dispatch_with_result(
+                    uncertain["dispatch_id"],
+                    expected_completed_at=uncertain["completed_at"],
+                    outcome="effect_not_observed",
+                )
+
     def test_stale_claim_rows_stream_without_fetchall(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

@@ -55,6 +55,24 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("PUT /api/v1/recurring-schedules/{schedule_id}", guide)
         self.assertIn("compare-and-swap token", guide)
         self.assertIn("fixed 2 MiB UTF-8 envelope", guide)
+        self.assertIn("schedule-dispatch-review", guide)
+        self.assertIn("effect_not_observed", guide)
+
+        review_guide = (ROOT / "docs" / "remote-schedule-dispatch-reviews.md").read_text(
+            encoding="utf-8"
+        )
+        review_schema = json.loads(
+            (ROOT / "schemas" / "recurring-schedule-dispatch-review-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            review_schema["properties"]["schema_version"]["const"],
+            "skill2workflow-recurring-schedule-dispatch-review-0.1.0",
+        )
+        self.assertFalse(review_schema["additionalProperties"])
+        self.assertIn("POST /api/v1/recurring-schedule-dispatches/{dispatch_id}/review", review_guide)
+        self.assertIn("does not complete", review_guide)
 
     def test_bounded_local_schedule_schemas_fix_the_redacted_window_contract(self):
         schedule_schema = json.loads(
@@ -98,7 +116,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-204 are complete", readme)
+        self.assertIn("Delivery Loops 1-205 are complete", readme)
         self.assertIn("Loop 165 adds a fixed 2 MiB UTF-8 document bound", readme)
         self.assertIn("Loop 146 adds a compact SQLite recurring-schedule projection", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)

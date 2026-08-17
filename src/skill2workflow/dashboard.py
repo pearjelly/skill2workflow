@@ -31,6 +31,7 @@ RECURRING_SCHEDULE_PATCH_SCHEMA_VERSION = "skill2workflow-recurring-schedule-pat
 RECURRING_SCHEDULE_DELETE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-delete-0.1.0"
 RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
 RECURRING_SCHEDULE_DISPATCH_PAGE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-page-0.1.0"
+RECURRING_SCHEDULE_DISPATCH_REVIEW_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-review-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
 MAX_OFFLINE_SNAPSHOT_ITEMS = 1000
@@ -41,6 +42,7 @@ MAX_AUDIT_EVENT_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS = 100
+MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_PATCH_RESPONSE_BYTES = 16 * 1024
@@ -48,6 +50,58 @@ MAX_RECURRING_SCHEDULE_DELETE_RESPONSE_BYTES = 16 * 1024
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
 MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES = 64
 MAX_WORKFLOW_INVENTORY_ITEMS = 100
+
+
+def build_recurring_schedule_dispatch_review_response(
+    review: Dict[str, object],
+    *,
+    changed: bool = False,
+) -> Dict[str, object]:
+    """Project one bounded operator review without raw dispatch metadata."""
+
+    if not isinstance(review, dict):
+        raise ValueError("recurring dispatch review must be an object")
+    fields = {
+        "dispatch_id",
+        "schedule_id",
+        "scheduled_for",
+        "status",
+        "expected_completed_at",
+        "outcome",
+        "reviewed_at",
+        "changed",
+    }
+    if set(review) - fields:
+        raise ValueError("recurring dispatch review contains unknown fields")
+    if not isinstance(changed, bool):
+        raise ValueError("recurring dispatch review change state must be boolean")
+    if "changed" in review and not isinstance(review.get("changed"), bool):
+        raise ValueError("recurring dispatch review change state must be boolean")
+    dispatch_id = _safe_string(review.get("dispatch_id", ""))
+    schedule_id = _safe_string(review.get("schedule_id", ""))
+    if not dispatch_id or not schedule_id:
+        raise ValueError("recurring dispatch review identifiers must be non-empty")
+    if review.get("status") != "uncertain":
+        raise ValueError("recurring dispatch review status must remain uncertain")
+    outcome = review.get("outcome")
+    if outcome not in {"effect_confirmed", "effect_not_observed", "no_conclusion"}:
+        raise ValueError("recurring dispatch review outcome is invalid")
+    if any(
+        not isinstance(review.get(field), str) or not review.get(field)
+        for field in ("scheduled_for", "expected_completed_at", "reviewed_at")
+    ):
+        raise ValueError("recurring dispatch review timestamps must be non-empty")
+    return {
+        "schema_version": RECURRING_SCHEDULE_DISPATCH_REVIEW_SCHEMA_VERSION,
+        "dispatch_id": dispatch_id,
+        "schedule_id": schedule_id,
+        "scheduled_for": str(review["scheduled_for"]),
+        "status": "uncertain",
+        "expected_completed_at": str(review["expected_completed_at"]),
+        "outcome": str(outcome),
+        "reviewed_at": str(review["reviewed_at"]),
+        "changed": changed,
+    }
 
 
 def build_recurring_schedule_create_response(
@@ -810,6 +864,7 @@ def build_support_bundle_from_control(
     http_requests.pop("recurring_schedule_delete", None)
     http_requests.pop("recurring_schedule_dispatch_list", None)
     http_requests.pop("recurring_schedule_dispatch_page", None)
+    http_requests.pop("recurring_schedule_dispatch_review", None)
     http_requests.pop("workflow_artifact_report", None)
     http_requests.pop("backup_readiness", None)
     http_requests.pop("backup_inventory", None)

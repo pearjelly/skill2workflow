@@ -26,6 +26,7 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS,
+    MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES,
     RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION,
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION,
@@ -39,6 +40,7 @@ from .dashboard import (
     WORKFLOW_INVENTORY_SCHEMA_VERSION,
     RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION,
     RECURRING_SCHEDULE_DISPATCH_PAGE_SCHEMA_VERSION,
+    RECURRING_SCHEDULE_DISPATCH_REVIEW_SCHEMA_VERSION,
     RUN_DETAIL_SCHEMA_VERSION,
     RUN_LIST_SCHEMA_VERSION,
     RUN_PAGE_SCHEMA_VERSION,
@@ -92,6 +94,7 @@ MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES = 64 * 1024
+MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_RECURRING_SCHEDULE_CREATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_RECURRING_SCHEDULE_UPDATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_RECURRING_SCHEDULE_PATCH_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
@@ -1197,6 +1200,76 @@ def fetch_recurring_schedule_dispatch_page(
         max_response_bytes=MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES,
     )
     _validate_recurring_schedule_dispatch_page(payload, normalized_schedule_id)
+    return payload
+
+
+def post_recurring_schedule_dispatch_review(
+    service_url: str,
+    token_file: Path,
+    dispatch_id: str,
+    *,
+    expected_completed_at: str,
+    outcome: str,
+) -> Dict[str, object]:
+    """Persist one explicit review of an uncertain recurring dispatch."""
+
+    normalized_dispatch_id = _validate_dispatch_id(dispatch_id)
+    if (
+        not isinstance(expected_completed_at, str)
+        or not expected_completed_at
+        or len(expected_completed_at) > 64
+        or any(ord(char) < 0x20 or ord(char) == 0x7F for char in expected_completed_at)
+    ):
+        raise ValueError("expected_completed_at must be a non-empty timestamp")
+    if not isinstance(outcome, str) or outcome not in {
+        "effect_confirmed", "effect_not_observed", "no_conclusion"
+    }:
+        raise ValueError(
+            "outcome must be effect_confirmed, effect_not_observed, or no_conclusion"
+        )
+    body = json.dumps(
+        {
+            "expected_completed_at": expected_completed_at,
+            "outcome": outcome,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if len(body) > MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_REQUEST_BYTES:
+        raise ServiceActionError("service action body is too large", status_code=413)
+    payload = _request_json(
+        service_url,
+        token_file,
+        f"/api/v1/recurring-schedule-dispatches/{normalized_dispatch_id}/review",
+        method="POST",
+        body=body,
+        conflict_message="recurring dispatch review conflict",
+        not_found_message="recurring dispatch review not found",
+        max_response_bytes=MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_dispatch_review(payload, normalized_dispatch_id)
+    if payload.get("outcome") != outcome:
+        raise ServiceActionError()
+    return payload
+
+
+def fetch_recurring_schedule_dispatch_review(
+    service_url: str,
+    token_file: Path,
+    dispatch_id: str,
+) -> Dict[str, object]:
+    """Fetch one persisted uncertain-dispatch review."""
+
+    normalized_dispatch_id = _validate_dispatch_id(dispatch_id)
+    payload = _get_json(
+        service_url,
+        token_file,
+        f"/api/v1/recurring-schedule-dispatches/{normalized_dispatch_id}/review",
+        conflict_message="recurring dispatch review unavailable",
+        not_found_message="recurring dispatch review not found",
+        max_response_bytes=MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_dispatch_review(payload, normalized_dispatch_id)
     return payload
 
 
@@ -2902,6 +2975,40 @@ def _validate_recurring_schedule_dispatch_page(
     _validate_recurring_schedule_dispatch_list_page_shape(payload, schedule_id)
 
 
+def _validate_recurring_schedule_dispatch_review(
+    payload: Dict[str, object], dispatch_id: str
+) -> None:
+    fields = {
+        "schema_version",
+        "dispatch_id",
+        "schedule_id",
+        "scheduled_for",
+        "status",
+        "expected_completed_at",
+        "outcome",
+        "reviewed_at",
+        "changed",
+    }
+    if set(payload) != fields:
+        raise ServiceActionError()
+    if (
+        payload.get("schema_version") != RECURRING_SCHEDULE_DISPATCH_REVIEW_SCHEMA_VERSION
+        or payload.get("dispatch_id") != dispatch_id
+        or not isinstance(payload.get("schedule_id"), str)
+        or not payload.get("schedule_id")
+        or len(payload.get("schedule_id")) > 128
+        or any(
+            not isinstance(payload.get(field), str) or not payload.get(field)
+            for field in ("scheduled_for", "expected_completed_at", "reviewed_at")
+        )
+        or payload.get("status") != "uncertain"
+        or payload.get("outcome")
+        not in {"effect_confirmed", "effect_not_observed", "no_conclusion"}
+        or not isinstance(payload.get("changed"), bool)
+    ):
+        raise ServiceActionError()
+
+
 def _validate_recurring_schedule_dispatch_list_page_shape(
     payload: Dict[str, object], schedule_id: str
 ) -> None:
@@ -3420,6 +3527,17 @@ def _validate_schedule_id(schedule_id: str) -> str:
         or any(not (char.isalnum() or char in {"-", "_", "."}) for char in value)
     ):
         raise ValueError("schedule_id must be a safe schedule identifier")
+    return value
+
+
+def _validate_dispatch_id(dispatch_id: str) -> str:
+    value = str(dispatch_id)
+    if (
+        not value
+        or len(value) > 128
+        or any(not (char.isalnum() or char in {"-", "_", "."}) for char in value)
+    ):
+        raise ValueError("dispatch_id must be a safe dispatch identifier")
     return value
 
 

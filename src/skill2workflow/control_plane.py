@@ -1021,6 +1021,7 @@ class LocalControlPlane:
             "recurring_schedule_update",
             "recurring_schedule_patch",
             "recurring_schedule_delete",
+            "recurring_schedule_dispatch_review",
             "workflow_release",
             "workflow_promotion",
             "workflow_deprecation",
@@ -1163,6 +1164,44 @@ class LocalControlPlane:
                 "type": "recurring_schedule_deleted",
                 "schedule_id": normalized_id,
                 "deleted": deleted,
+                "timestamp": _now(),
+            }
+        )
+
+    def record_recurring_schedule_dispatch_review(
+        self,
+        dispatch_id: str,
+        schedule_id: str,
+        outcome: str,
+        changed: bool,
+    ) -> None:
+        """Persist bounded evidence for an explicit uncertain-dispatch review."""
+
+        normalized_dispatch_id = str(dispatch_id)
+        normalized_schedule_id = str(schedule_id)
+        for value, label in (
+            (normalized_dispatch_id, "dispatch_id"),
+            (normalized_schedule_id, "schedule_id"),
+        ):
+            if (
+                not value
+                or len(value) > 128
+                or any(not (char.isalnum() or char in {"-", "_", "."}) for char in value)
+            ):
+                raise ValueError(f"{label} must be a safe identifier")
+        if not isinstance(outcome, str) or outcome not in {
+            "effect_confirmed", "effect_not_observed", "no_conclusion"
+        }:
+            raise ValueError("recurring dispatch review outcome is invalid")
+        if not isinstance(changed, bool):
+            raise ValueError("recurring dispatch review state must be boolean")
+        self._append_audit(
+            {
+                "type": "recurring_schedule_dispatch_reviewed",
+                "dispatch_id": normalized_dispatch_id,
+                "schedule_id": normalized_schedule_id,
+                "outcome": outcome,
+                "changed": changed,
                 "timestamp": _now(),
             }
         )

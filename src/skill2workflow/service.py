@@ -46,6 +46,7 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS,
+    MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_PATCH_RESPONSE_BYTES,
@@ -63,6 +64,7 @@ from .dashboard import (
     build_recurring_schedule_list_from_store,
     build_recurring_schedule_dispatch_list_from_store,
     build_recurring_schedule_dispatch_page_from_store,
+    build_recurring_schedule_dispatch_review_response,
     build_workflow_artifact_report_from_control,
     build_workflow_inventory_from_control,
     build_run_detail_from_control,
@@ -926,6 +928,11 @@ def _handler_for(service: RuntimeService):
                         self._handle_recurring_schedule_action(
                             schedule_id,
                             enabled=action == "enable",
+                        )
+                    elif self.command in {"GET", "POST"} and _recurring_schedule_dispatch_review(path):
+                        self._handle_recurring_schedule_dispatch_review(
+                            _recurring_schedule_dispatch_review(path),
+                            write=self.command == "POST",
                         )
                     elif self.command == "GET" and _recurring_schedule_dispatch_list(path) is not None:
                         self._handle_recurring_schedule_dispatch_list(
@@ -1809,6 +1816,123 @@ def _handler_for(service: RuntimeService):
                     self._send_json(503, {"error": "recurring schedule action unavailable"})
             except (OSError, sqlite3.Error):
                 self._send_json(503, {"error": "recurring schedule action unavailable"})
+
+        def _handle_recurring_schedule_dispatch_review(
+            self,
+            dispatch_id: str,
+            *,
+            write: bool,
+        ):
+            """Read or persist one explicit review of an uncertain dispatch."""
+
+            if write:
+                readiness_status, _ = service.readiness()
+                if readiness_status != 200:
+                    self._send_json(503, {"error": "service is not ready"})
+                    return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                service.control_plane.record_ingress_authentication(
+                    False,
+                    self.command,
+                    "recurring_schedule_dispatch_review",
+                    reason=reason,
+                )
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            service.control_plane.record_ingress_authentication(
+                True,
+                self.command,
+                "recurring_schedule_dispatch_review",
+            )
+            try:
+                if write:
+                    body = read_request_body(self)
+                    if not body:
+                        raise ValueError(
+                            "recurring dispatch review body must contain expected_completed_at and outcome"
+                        )
+                    payload = json.loads(body.decode("utf-8"))
+                    if (
+                        not isinstance(payload, dict)
+                        or set(payload) != {"expected_completed_at", "outcome"}
+                        or not isinstance(payload.get("expected_completed_at"), str)
+                        or not isinstance(payload.get("outcome"), str)
+                    ):
+                        raise ValueError(
+                            "recurring dispatch review body must contain expected_completed_at and outcome"
+                        )
+                    review, changed = (
+                        service.scheduler.dispatcher.store.review_uncertain_dispatch_with_result(
+                            dispatch_id,
+                            expected_completed_at=payload["expected_completed_at"],
+                            outcome=payload["outcome"],
+                        )
+                    )
+                    service.control_plane.record_recurring_schedule_dispatch_review(
+                        dispatch_id,
+                        str(review["schedule_id"]),
+                        str(review["outcome"]),
+                        changed,
+                    )
+                else:
+                    content_length = _content_length(self)
+                    if content_length != 0:
+                        self._send_json(
+                            400,
+                            {
+                                "error": "recurring dispatch review request must not include a body"
+                            },
+                        )
+                        return
+                    review = service.scheduler.dispatcher.store.get_dispatch_review(
+                        dispatch_id
+                    )
+                    changed = False
+                response = build_recurring_schedule_dispatch_review_response(
+                    review,
+                    changed=changed,
+                )
+                encoded = json.dumps(response, ensure_ascii=False).encode("utf-8")
+                if len(encoded) > MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES:
+                    raise ValueError("recurring dispatch review exceeds response limit")
+                self._send_json(200, response)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._send_json(
+                    400,
+                    {"error": "recurring dispatch review body must be valid JSON"},
+                )
+            except ValueError as error:
+                message = str(error)
+                if "not found" in message:
+                    self._send_json(404, {"error": "recurring dispatch review not found"})
+                elif (
+                    "precondition failed" in message
+                    or "not uncertain" in message
+                    or "already exists" in message
+                ):
+                    self._send_json(409, {"error": "recurring dispatch review conflict"})
+                elif "body must" in message or "outcome must" in message or "timestamp" in message:
+                    self._send_json(400, {"error": message})
+                else:
+                    self._send_json(503, {"error": "recurring dispatch review unavailable"})
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "recurring dispatch review unavailable"})
 
         def _handle_recurring_schedule_dispatch_list(self, schedule_id: str):
             """Serve bounded, redacted recurring dispatch evidence."""
@@ -3167,6 +3291,8 @@ def _request_route(method: str, path: str) -> str:
         return "recurring_schedule_dispatch_list"
     if method == "GET" and _recurring_schedule_dispatch_page(path) is not None:
         return "recurring_schedule_dispatch_page"
+    if method in {"GET", "POST"} and _recurring_schedule_dispatch_review(path):
+        return "recurring_schedule_dispatch_review"
     if method == "POST" and _recurring_schedule_action(path):
         return "recurring_schedule_action"
     if method == "GET" and path == "/api/v1/audit-consistency":
@@ -3314,6 +3440,26 @@ def _recurring_schedule_dispatch_page(path: str):
     ):
         return None
     return schedule_id
+
+
+def _recurring_schedule_dispatch_review(path: str):
+    """Return a safe dispatch id for the explicit uncertain-review route."""
+
+    parts = path.split("/")
+    if (
+        len(parts) != 6
+        or parts[:4] != ["", "api", "v1", "recurring-schedule-dispatches"]
+        or parts[5] != "review"
+    ):
+        return None
+    dispatch_id = parts[4]
+    if (
+        not dispatch_id
+        or len(dispatch_id) > 128
+        or any(not (char.isalnum() or char in {"-", "_", "."}) for char in dispatch_id)
+    ):
+        return None
+    return dispatch_id
 
 
 def _cancel_run_id(path: str) -> str:
