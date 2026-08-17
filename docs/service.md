@@ -114,6 +114,10 @@ mutated. Loop 163 stops that preflight after the first over-budget directory,
 so a remote request cannot traverse an arbitrarily large backup parent before
 returning the already-determined block. The existing inventory and page routes
 retain their complete-count and paging semantics.
+Loop 164 applies the same source-boundary discipline to bounded local
+one-shot schedule discovery: `schedule-run-due --max-items` retains only the
+earliest normalized records, while the complete due-run and complete-list
+compatibility paths remain unchanged.
 
 The `service` command is the long-running, single-tenant runtime boundary delivered by Loop 41. It serves health, readiness, authenticated aggregate metrics, a bounded live Operator snapshot, a redacted recurring-schedule inventory, redacted run discovery and detail views, a redacted support bundle, published-workflow triggers, protected Workflow DSL publication, authenticated human-gate decisions, and durable cooperative run cancellation. SQLite service triggers enforce durable idempotency before execution; see [`triggers.md`](triggers.md). Workflow DSL remains the execution source of truth. Loop 49 adds execution ownership and fail-closed interrupted-run recovery; see [`interrupted-recovery.md`](interrupted-recovery.md). Loop 68 adds fixed concurrent business-request admission so slow or retried requests cannot consume an unbounded amount of active service work. Loop 69 adds explicit stable workflow version aliases; service triggers resolve them through the same control-plane boundary.
 

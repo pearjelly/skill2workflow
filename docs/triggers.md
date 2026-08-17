@@ -346,8 +346,12 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due \
 The bounded form processes at most that many one-shot or recurring schedule
 records in one invocation and returns a `window` with `max_items`,
 `processed`, and `budget_exhausted`. Unclaimed due schedules remain eligible
-for the next invocation. Omitting `--max-items` preserves the historical
-complete due-run behavior.
+for the next invocation. For one-shot schedules, the bounded selector reads
+schedule files lazily, retains at most the requested number of full
+definitions, and chooses the earliest normalized `(run_at, schedule.id)`
+records. The compact `schedules --limit` projection likewise does not
+materialize the whole schedule-directory path list. Omitting `--max-items`
+preserves the historical complete due-run behavior and filename ordering.
 
 The scheduled trigger response uses the same compact trigger response shape plus `schedule_id`. The `run_started` audit event records the schedule identity through `trigger_source`, for example `local-schedule:schedule_approval_flow_daily`.
 

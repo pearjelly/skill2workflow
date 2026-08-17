@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-163
+- Completed delivery loops: 1-164
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 163 is complete with bounded remote backup retention scanning
+- Active loop: None; Loop 164 is complete with lazy bounded one-shot schedule discovery
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 163; the detailed
+The follow-on production hardening continues through Loop 164; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -3861,9 +3861,37 @@ after the first over-budget directory. The existing `inventory_truncated`
  paging, expiration, deletion, upload, replication, or disaster-recovery
  guarantees.
 
+### Loop 164: Lazy Bounded One-Shot Schedule Discovery
+
+**Status:** Complete.
+
+**Prior basis:** Loop 129 bounded the number of one-shot and recurring side
+ effects per manual drain, and Loop 126 added a compact local schedule
+ inventory. The one-shot implementation still sorted the complete schedule
+ directory before applying a batch limit, so a large local directory could
+ materialize every path even when the operator requested one record.
+
+**Outcome:** Bounded one-shot due selection now enumerates schedule files
+ lazily, retains at most the requested number of full definitions, and returns
+ the earliest normalized `(run_at, schedule.id)` records. The compact
+ `schedules --limit` projection also avoids materializing the complete path
+ list. Complete `schedules`, unbounded due-run behavior, and all recurring
+ SQLite dispatch semantics remain unchanged.
+
+**Evidence:** Schedule regression coverage rejects path sorting during bounded
+ due discovery and compact inventory, proves timestamp/id ordering, and keeps
+ the existing due-run budget and value-free projection contracts. Full suite,
+ package, production-baseline, and secret-hygiene evidence retain the public
+ CLI and documentation boundaries.
+
+**Safety boundary:** This bounds local schedule-discovery memory only. It does
+ not change workflow execution, trigger input limits, recurring schedule
+ leases, dispatch claims, distributed scheduling, or complete-list
+ compatibility paths.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 163 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 164 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -3992,6 +4020,7 @@ This rolling queue is ordered. Loop 163 is complete and there is no active deliv
 | Loop 161: Cursor-Paged Protected Remote Backup Inventory | Complete | Let remote operators inspect older configured backup evidence beyond the fixed recent window | Separate redacted 100-item/64 KiB page route and CLI, URL-safe opaque continuation cursor, compatibility-preserving contract, authentication/bounds/redaction tests, and documentation |
 | Loop 162: Protected Remote Backup Retention Planning | Complete | Let remote operators review a complete expiration policy and aggregate eligible bytes without exposing backup names | Authenticated 64 KiB policy request/16 KiB redacted aggregate plan, truncation blocking, client/CLI/schema/docs, and authentication/redaction/read-only tests |
 | Loop 163: Bounded Remote Backup Retention Scanning | Complete | Keep over-budget retention preflights from traversing an unbounded backup parent before failing closed | Fixed `limit + 1` scan guard, lower-bound truncation semantics, regression coverage, and aligned backup/remote-retention documentation |
+| Loop 164: Lazy Bounded One-Shot Schedule Discovery | Complete | Keep bounded local due batches and compact schedule inventories from materializing every schedule-directory path | Lazy file enumeration, deterministic `(run_at, schedule.id)` selection, bounded full-definition retention, compatibility tests, and aligned trigger documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -70,7 +70,10 @@ class LocalScheduleStore:
         selected = []
         total = 0
         status_counts = _empty_schedule_status_counts()
-        for path in sorted(self.schedules_dir.glob("*.json")):
+        # The bounded projection already retains its selected window in a
+        # heap, so materializing and sorting every directory entry only adds
+        # avoidable memory pressure on large local schedule directories.
+        for path in self.schedules_dir.glob("*.json"):
             schedule = normalize_schedule_definition(
                 json.loads(path.read_text(encoding="utf-8"))
             )
@@ -214,6 +217,35 @@ class LocalScheduleRunner:
         now_at = _normalize_timestamp(now, "now")
         if max_items is not None:
             _validate_dispatch_limit(max_items)
+        if max_items is not None:
+            # Keep the bounded batch deterministic by selecting the earliest
+            # due records by their normalized run timestamp and id while
+            # retaining at most ``max_items`` full definitions.  Iterating
+            # the glob lazily avoids materializing every path before the
+            # bounded window is known.
+            selected = []
+            for path in self.store.schedules_dir.glob("*.json"):
+                schedule = normalize_schedule_definition(
+                    json.loads(path.read_text(encoding="utf-8"))
+                )
+                if not _is_due(schedule, now_at):
+                    continue
+                schedule_section = schedule["schedule"]
+                key = (
+                    str(schedule_section["run_at"]),
+                    str(schedule_section["id"]),
+                )
+                item = (key, schedule)
+                if len(selected) < max_items:
+                    selected.append(item)
+                    continue
+                worst_index = max(
+                    range(len(selected)), key=lambda index: selected[index][0]
+                )
+                if key < selected[worst_index][0]:
+                    selected[worst_index] = item
+            selected.sort(key=lambda item: item[0])
+            return [schedule for _, schedule in selected]
         due = []
         for path in sorted(self.store.schedules_dir.glob("*.json")):
             schedule = normalize_schedule_definition(

@@ -131,6 +131,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - SQLite `workflow-artifacts` streams registry rows and checks filesystem artifacts by exact reference instead of materializing the full registry/path set; JSON keeps its dependency-light compatibility path
 - SQLite audit-chain verification counts events and streams the ordered rows; legacy-chain rebuilds use the same cursor path without changing the fixed result contract
 - Local `schedule-run-due --max-items` accepts a 1-100 side-effect batch budget and leaves unclaimed due schedules for later invocations; omission preserves complete-batch compatibility
+- Bounded one-shot due discovery lazily enumerates schedule files, retains at most the requested full-definition window, and selects earliest normalized `(run_at, schedule.id)` records; compact `schedules --limit` likewise avoids materializing the full path list
 - The long-running SQLite service scheduler uses a fixed 100-dispatch batch per polling pass, leaving remaining due schedules for later passes without changing lease, claim, or uncertain-outcome semantics
 - State layout marker `skill2workflow-state-layout-marker-0.1.0`, fail-closed compatibility preflight, and legacy-to-current copy-on-write migration documented in `docs/upgrade-migration.md`
 - Body-only HTTP connector input mapping documented in `docs/connectors.md`

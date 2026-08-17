@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded one-shot schedule discovery now lazily enumerates local schedule
+  files. `schedule-run-due --max-items` retains only the requested number of
+  earliest `(run_at, schedule.id)` definitions, and `schedules --limit` no
+  longer materializes the complete directory path list; complete-list and
+  complete due-run compatibility paths are unchanged.
+
 - Bounded remote backup retention-plan directory scanning. The local and
   authenticated remote preflight stops after the first over-budget backup set,
   preserving the fixed `inventory_truncated` contract while preventing an

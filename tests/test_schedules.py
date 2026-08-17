@@ -4,6 +4,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.schedules import (
@@ -209,6 +210,59 @@ class ScheduleTests(TestCase):
         for invalid in (0, -1, 101, True, "1"):
             with self.assertRaisesRegex(ValueError, "schedule run limit"):
                 runner.run_due("2026-07-06T00:00:00Z", max_items=invalid)
+
+    def test_bounded_due_selection_is_timestamp_ordered_without_materializing_paths(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            runner = LocalScheduleRunner(state_dir)
+            runner.add_schedule(
+                _schedule_definition(
+                    schedule_id="schedule_later",
+                    run_at="2026-07-06T00:00:02Z",
+                )
+            )
+            runner.add_schedule(
+                _schedule_definition(
+                    schedule_id="schedule_earlier",
+                    run_at="2026-07-06T00:00:01Z",
+                )
+            )
+
+            with patch(
+                "builtins.sorted",
+                side_effect=AssertionError("bounded due discovery materialized paths"),
+            ):
+                due = runner.list_due_schedules(
+                    "2026-07-06T00:00:02Z", max_items=1
+                )
+
+        self.assertEqual([item["schedule"]["id"] for item in due], ["schedule_earlier"])
+
+    def test_bounded_schedule_inventory_does_not_sort_directory_entries(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            runner = LocalScheduleRunner(state_dir)
+            runner.add_schedule(_schedule_definition(schedule_id="schedule_a"))
+            runner.add_schedule(_schedule_definition(schedule_id="schedule_b"))
+
+            import builtins
+
+            original_sorted = builtins.sorted
+
+            def reject_path_sort(iterable, *args, **kwargs):
+                values = list(iterable)
+                if values and isinstance(values[0], Path):
+                    raise AssertionError("bounded schedule inventory sorted paths")
+                return original_sorted(values, *args, **kwargs)
+
+            with patch(
+                "builtins.sorted",
+                side_effect=reject_path_sort,
+            ):
+                inventory = runner.list_schedules_bounded(1)
+
+        self.assertEqual(inventory["summary"]["total"], 2)
+        self.assertEqual(inventory["window"]["returned"], 1)
 
     def test_runner_resolves_a_promoted_version_alias(self):
         with TemporaryDirectory() as tmp:
