@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added protected remote recurring-schedule retirement through
+  `DELETE /api/v1/recurring-schedules/{schedule_id}` and the installed
+  `service-recurring-schedule-delete` CLI. Deletion requires explicit
+  confirmation, a disabled schedule, and a `next_run_at` compare-and-swap;
+  it retains dispatch history and makes ambiguous retries safe with a durable
+  tombstone.
 - Added protected remote recurring-schedule updates through
   `PUT /api/v1/recurring-schedules/{schedule_id}` and the installed
   `service-recurring-schedule-update` CLI. The request carries the last

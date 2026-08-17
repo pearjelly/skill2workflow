@@ -27,6 +27,7 @@ RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list
 RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION = "skill2workflow-recurring-schedule-action-0.1.0"
 RECURRING_SCHEDULE_CREATE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-create-0.1.0"
 RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-update-0.1.0"
+RECURRING_SCHEDULE_DELETE_SCHEMA_VERSION = "skill2workflow-recurring-schedule-delete-0.1.0"
 RECURRING_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-dispatch-list-0.1.0"
 MAX_RECENT_EVENTS = 5
 MAX_LIVE_SNAPSHOT_BYTES = 1024 * 1024
@@ -39,6 +40,7 @@ MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES = 16 * 1024
 MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES = 16 * 1024
+MAX_RECURRING_SCHEDULE_DELETE_RESPONSE_BYTES = 16 * 1024
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
 MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES = 64
 MAX_WORKFLOW_INVENTORY_ITEMS = 100
@@ -99,6 +101,25 @@ def build_recurring_schedule_update_response(
         "interval_seconds": int(schedule.get("interval_seconds", 0)),
         "missed_run_policy": str(schedule.get("missed_run_policy", "")),
         "changed": changed,
+    }
+
+
+def build_recurring_schedule_delete_response(
+    schedule_id: str,
+    *,
+    deleted: bool,
+) -> Dict[str, object]:
+    """Project one schedule retirement without returning definition data."""
+
+    normalized_id = str(schedule_id)
+    if not normalized_id:
+        raise ValueError("recurring schedule id must be non-empty")
+    if not isinstance(deleted, bool):
+        raise ValueError("recurring schedule deletion state must be boolean")
+    return {
+        "schema_version": RECURRING_SCHEDULE_DELETE_SCHEMA_VERSION,
+        "schedule_id": normalized_id,
+        "deleted": deleted,
     }
 
 
@@ -668,6 +689,7 @@ def build_support_bundle_from_control(
     http_requests.pop("recurring_schedule_create", None)
     http_requests.pop("recurring_schedule_action", None)
     http_requests.pop("recurring_schedule_update", None)
+    http_requests.pop("recurring_schedule_delete", None)
     http_requests.pop("recurring_schedule_dispatch_list", None)
     http_requests.pop("workflow_artifact_report", None)
     http_requests.pop("backup_readiness", None)

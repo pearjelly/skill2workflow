@@ -27,6 +27,7 @@ from skill2workflow.service_client import (
     post_recurring_schedule_state,
     post_recurring_schedule_create,
     put_recurring_schedule_update,
+    delete_recurring_schedule,
     post_run_cancel,
     post_run_resume,
     fetch_run_detail,
@@ -59,6 +60,75 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_recurring_schedule_delete_uses_authenticated_delete_and_validates_contract(self):
+        observed = {}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_DELETE(self):
+                observed["path"] = self.path
+                observed["method"] = self.command
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(
+                    self,
+                    200,
+                    {
+                        "schema_version": "skill2workflow-recurring-schedule-delete-0.1.0",
+                        "schedule_id": "schedule_hourly_report",
+                        "deleted": True,
+                    },
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            result = delete_recurring_schedule(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                "schedule_hourly_report",
+                expected_next_run_at="2026-08-11T00:00:00+00:00",
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertTrue(result["deleted"])
+        self.assertEqual(observed["method"], "DELETE")
+        self.assertEqual(
+            observed["path"],
+            "/api/v1/recurring-schedules/schedule_hourly_report",
+        )
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(
+            observed["body"],
+            {
+                "expected_next_run_at": "2026-08-11T00:00:00+00:00",
+                "confirm": True,
+            },
+        )
+        self.assertFalse(thread.is_alive())
+
+    def test_recurring_schedule_delete_rejects_missing_precondition_before_network(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaises(ValueError):
+                delete_recurring_schedule(
+                    "https://service.example",
+                    token_file,
+                    "schedule_hourly_report",
+                    expected_next_run_at="",
+                )
+
     def test_recurring_schedule_update_uses_authenticated_put_and_validates_redacted_contract(self):
         observed = {}
         definition = _recurring_definition()

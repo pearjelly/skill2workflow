@@ -32,6 +32,7 @@ _ROUTES = (
     "recurring_schedule_create",
     "recurring_schedule_action",
     "recurring_schedule_update",
+    "recurring_schedule_delete",
     "recurring_schedule_dispatch_list",
     "audit_consistency",
     "support_bundle",

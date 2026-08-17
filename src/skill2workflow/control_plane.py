@@ -1006,6 +1006,7 @@ class LocalControlPlane:
             "recurring_schedule_create",
             "recurring_schedule_action",
             "recurring_schedule_update",
+            "recurring_schedule_delete",
             "workflow_release",
             "workflow_promotion",
             "workflow_deprecation",
@@ -1098,6 +1099,31 @@ class LocalControlPlane:
                 "type": "recurring_schedule_definition_updated",
                 "schedule_id": normalized_id,
                 "changed": changed,
+                "timestamp": _now(),
+            }
+        )
+
+    def record_recurring_schedule_deleted(
+        self,
+        schedule_id: str,
+        deleted: bool,
+    ) -> None:
+        """Persist value-free evidence for a remote schedule retirement."""
+
+        normalized_id = str(schedule_id)
+        if (
+            not normalized_id
+            or len(normalized_id) > 128
+            or any(not (char.isalnum() or char in {"-", "_", "."}) for char in normalized_id)
+        ):
+            raise ValueError("schedule_id must be a safe schedule identifier")
+        if not isinstance(deleted, bool):
+            raise ValueError("schedule deletion state must be boolean")
+        self._append_audit(
+            {
+                "type": "recurring_schedule_deleted",
+                "schedule_id": normalized_id,
+                "deleted": deleted,
                 "timestamp": _now(),
             }
         )

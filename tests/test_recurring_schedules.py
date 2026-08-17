@@ -136,6 +136,75 @@ class RecurringSchedulePersistenceTests(TestCase):
                     _recurring_definition(extra_schedule={"enabled": True}),
                     expected_next_run_at="2026-08-11T00:00:00+00:00",
                 )
+
+    def test_delete_with_result_requires_disabled_cas_preserves_history_and_tombstones_id(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            store.add(_recurring_definition())
+            with self.assertRaisesRegex(ValueError, "must be disabled"):
+                store.delete_with_result(
+                    "schedule_hourly_report",
+                    expected_next_run_at="2026-08-11T00:00:00+00:00",
+                )
+            store.set_enabled_with_result("schedule_hourly_report", False)
+            with store._connection() as connection:
+                connection.execute(
+                    "insert into schedule_dispatches (dispatch_id, schedule_id, scheduled_for, status, owner_id, claim_expires_at, record_json) values (?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        "dispatch_history",
+                        "schedule_hourly_report",
+                        "2026-08-11T00:00:00+00:00",
+                        "completed",
+                        "owner",
+                        0.0,
+                        "{}",
+                    ),
+                )
+            self.assertTrue(
+                store.delete_with_result(
+                    "schedule_hourly_report",
+                    expected_next_run_at="2026-08-11T00:00:00+00:00",
+                )
+            )
+            self.assertFalse(
+                store.delete_with_result(
+                    "schedule_hourly_report",
+                    expected_next_run_at="2026-08-11T00:00:00+00:00",
+                )
+            )
+            with self.assertRaisesRegex(ValueError, "not found"):
+                store.get("schedule_hourly_report")
+            with store._connection() as connection:
+                self.assertIsNotNone(
+                    connection.execute(
+                        "select 1 from schedule_dispatches where dispatch_id = ?",
+                        ("dispatch_history",),
+                    ).fetchone()
+                )
+            with self.assertRaisesRegex(ValueError, "retired"):
+                store.add(_recurring_definition())
+
+    def test_delete_with_result_rejects_stale_token_and_active_claim(self):
+        with TemporaryDirectory() as tmp:
+            store = RecurringScheduleStore(Path(tmp))
+            store.add(_recurring_definition())
+            store.set_enabled_with_result("schedule_hourly_report", False)
+            with self.assertRaisesRegex(ValueError, "precondition failed"):
+                store.delete_with_result(
+                    "schedule_hourly_report",
+                    expected_next_run_at="2026-08-11T00:01:00+00:00",
+                )
+            store.set_enabled_with_result("schedule_hourly_report", True)
+            dispatcher = RecurringScheduleDispatcher(Path(tmp), owner_id="owner-delete", lease_seconds=30)
+            self.assertTrue(dispatcher.try_acquire(now_epoch=1000))
+            dispatcher.claim_due("2026-08-11T00:00:00Z", now_epoch=1001)
+            store.set_enabled_with_result("schedule_hourly_report", False)
+            current = store.get("schedule_hourly_report")
+            with self.assertRaisesRegex(ValueError, "active dispatch"):
+                store.delete_with_result(
+                    "schedule_hourly_report",
+                    expected_next_run_at=current["schedule"]["next_run_at"],
+                )
             with self.assertRaisesRegex(ValueError, "not found"):
                 store.update_with_result(
                     "schedule_missing",

@@ -22,6 +22,8 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     RECURRING_SCHEDULE_UPDATE_SCHEMA_VERSION,
     MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
+    RECURRING_SCHEDULE_DELETE_SCHEMA_VERSION,
+    MAX_RECURRING_SCHEDULE_DELETE_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
     MAX_WORKFLOW_INVENTORY_ITEMS,
     WORKFLOW_INVENTORY_SCHEMA_VERSION,
@@ -67,6 +69,7 @@ MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_CREATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_RECURRING_SCHEDULE_UPDATE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_RECURRING_SCHEDULE_DELETE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_WORKFLOW_ARTIFACT_REPORT_RESPONSE_BYTES = 64 * 1024
 MAX_BACKUP_READINESS_RESPONSE_BYTES = 16 * 1024
 MAX_RETENTION_READINESS_REQUEST_BYTES = 64 * 1024
@@ -848,6 +851,41 @@ def put_recurring_schedule_update(
         max_response_bytes=MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
     )
     _validate_recurring_schedule_update(payload, normalized)
+    return payload
+
+
+def delete_recurring_schedule(
+    service_url: str,
+    token_file: Path,
+    schedule_id: str,
+    *,
+    expected_next_run_at: str,
+) -> Dict[str, object]:
+    """Retire one disabled recurring schedule through the service boundary."""
+
+    normalized_schedule_id = _validate_schedule_id(schedule_id)
+    if not isinstance(expected_next_run_at, str) or not 1 <= len(expected_next_run_at) <= 64:
+        raise ValueError("expected_next_run_at must be a non-empty timestamp")
+    if any(ord(char) < 0x20 or ord(char) == 0x7F for char in expected_next_run_at):
+        raise ValueError("expected_next_run_at must be a non-empty timestamp")
+    body = json.dumps(
+        {"expected_next_run_at": expected_next_run_at, "confirm": True},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    if len(body) > MAX_RECURRING_SCHEDULE_DELETE_REQUEST_BYTES:
+        raise ServiceActionError("service action body is too large", status_code=413)
+    payload = _request_json(
+        service_url,
+        token_file,
+        f"/api/v1/recurring-schedules/{normalized_schedule_id}",
+        method="DELETE",
+        body=body,
+        conflict_message="recurring schedule deletion conflict",
+        not_found_message="recurring schedule not found",
+        max_response_bytes=MAX_RECURRING_SCHEDULE_DELETE_RESPONSE_BYTES,
+    )
+    _validate_recurring_schedule_delete(payload, normalized_schedule_id)
     return payload
 
 
@@ -1943,6 +1981,22 @@ def _validate_recurring_schedule_update(
         or not payload.get("next_run_at")
         or not isinstance(payload.get("changed"), bool)
     ):
+        raise ServiceActionError()
+
+
+def _validate_recurring_schedule_delete(
+    payload: Dict[str, object],
+    schedule_id: str,
+) -> None:
+    """Validate the fixed redacted recurring schedule deletion response."""
+
+    if set(payload) != {"schema_version", "schedule_id", "deleted"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != RECURRING_SCHEDULE_DELETE_SCHEMA_VERSION:
+        raise ServiceActionError()
+    if payload.get("schedule_id") != schedule_id:
+        raise ServiceActionError()
+    if not isinstance(payload.get("deleted"), bool):
         raise ServiceActionError()
 
 

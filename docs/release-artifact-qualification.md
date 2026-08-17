@@ -40,7 +40,8 @@ The installed command set also includes the protected `service-resume`,
 `service-workflow-deprecate`, protected
 `service-trigger`, protected
 `service-schedule-enable`, `service-schedule-disable`,
-`service-recurring-schedule-add`, `service-recurring-schedule-update`, and
+`service-recurring-schedule-add`, `service-recurring-schedule-update`,
+`service-recurring-schedule-delete`, and
 owner-only `service-support-bundle` operator
 clients.
 

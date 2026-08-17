@@ -51,6 +51,7 @@ from .service_client import (
     post_recurring_schedule_state,
     post_recurring_schedule_create,
     put_recurring_schedule_update,
+    delete_recurring_schedule,
     post_run_cancel,
     post_run_resume,
     post_workflow_release,
@@ -599,6 +600,19 @@ def main(argv=None) -> int:
     )
     service_schedule_update_cmd.add_argument("--service-url", required=True)
     service_schedule_update_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_schedule_delete_cmd = subparsers.add_parser(
+        "service-recurring-schedule-delete",
+        help="Retire one disabled recurring schedule through the authenticated service",
+    )
+    service_schedule_delete_cmd.add_argument("schedule_id")
+    service_schedule_delete_cmd.add_argument(
+        "--expected-next-run-at",
+        required=True,
+        help="Last observed next_run_at; prevents stale deletion from removing a changed schedule",
+    )
+    service_schedule_delete_cmd.add_argument("--service-url", required=True)
+    service_schedule_delete_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_support_cmd = subparsers.add_parser(
         "service-support-bundle",
@@ -1232,6 +1246,16 @@ def main(argv=None) -> int:
                 args.auth_token_file,
                 args.schedule_id,
                 _load_json(args.schedule),
+                expected_next_run_at=args.expected_next_run_at,
+            )
+        )
+
+    if args.command == "service-recurring-schedule-delete":
+        return _service_action(
+            lambda: delete_recurring_schedule(
+                args.service_url,
+                args.auth_token_file,
+                args.schedule_id,
                 expected_next_run_at=args.expected_next_run_at,
             )
         )

@@ -172,6 +172,22 @@ class ControlPlaneTests(TestCase):
         self.assertFalse(event["enabled"])
         self.assertTrue(event["changed"])
 
+    def test_recurring_schedule_delete_audit_is_bounded_and_allowlisted(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            control.record_recurring_schedule_deleted(
+                "schedule_hourly_report",
+                deleted=False,
+            )
+            event = control.list_audit_events()[0]
+
+        self.assertEqual(
+            set(event), {"type", "schedule_id", "deleted", "timestamp"}
+        )
+        self.assertEqual(event["type"], "recurring_schedule_deleted")
+        self.assertEqual(event["schedule_id"], "schedule_hourly_report")
+        self.assertFalse(event["deleted"])
+
     def test_publish_workflow_persists_immutable_version_and_audit(self):
         workflow = _workflow(version="1.0.0")
 

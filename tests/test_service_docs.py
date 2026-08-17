@@ -24,10 +24,13 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("GET /api/v1/recurring-schedules", guide)
         self.assertIn("POST /api/v1/recurring-schedules", guide)
         self.assertIn("PUT /api/v1/recurring-schedules/{schedule_id}", guide)
+        self.assertIn("DELETE /api/v1/recurring-schedules/{schedule_id}", guide)
         self.assertIn("remote-schedule-create.md", guide)
         self.assertIn("remote-schedule-update.md", guide)
         self.assertIn("service-recurring-schedule-add", guide)
         self.assertIn("service-recurring-schedule-update", guide)
+        self.assertIn("remote-schedule-delete.md", guide)
+        self.assertIn("service-recurring-schedule-delete", guide)
         self.assertIn("GET /api/v1/workflow-artifacts", guide)
         self.assertIn("GET /api/v1/backup-readiness", guide)
         self.assertIn("POST /api/v1/retention-readiness", guide)
@@ -99,6 +102,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-155 are complete", readme)
+        self.assertIn("Delivery Loops 1-156 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

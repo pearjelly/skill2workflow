@@ -1101,6 +1101,123 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("must-not-leak", json.dumps(audit, ensure_ascii=False))
         self.assertFalse(serve_thread.is_alive())
 
+    def test_recurring_schedule_delete_requires_disabled_cas_and_preserves_history(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            service = RuntimeService(config)
+            definition = {
+                "schema_version": "skill2workflow-schedule-0.2.0",
+                "schedule": {
+                    "id": "schedule_remote_delete",
+                    "workflow_id": "workflow_service",
+                    "version": "0.1.0",
+                    "starts_at": "2099-08-11T00:00:00Z",
+                    "interval_seconds": 60,
+                    "missed_run_policy": "latest",
+                    "enabled": True,
+                },
+                "trigger": {"input": {"private": "must-not-leak"}},
+            }
+            store = service.scheduler.dispatcher.store
+            store.add(definition)
+            store.set_enabled_with_result("schedule_remote_delete", False)
+            ready = threading.Event()
+            serve_thread = threading.Thread(
+                target=service.serve,
+                kwargs={"ready_callback": lambda _service: ready.set()},
+                daemon=True,
+            )
+            serve_thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = service.server_address
+            url = f"http://{host}:{port}/api/v1/recurring-schedules/schedule_remote_delete"
+            denied_status, denied = _delete_json(
+                url,
+                {
+                    "expected_next_run_at": "2099-08-11T00:00:00+00:00",
+                    "confirm": True,
+                },
+            )
+            invalid_status, invalid = _delete_json(
+                url,
+                {"expected_next_run_at": "2099-08-11T00:00:00+00:00"},
+                token=AUTH_TOKEN,
+            )
+            stale_status, stale = _delete_json(
+                url,
+                {
+                    "expected_next_run_at": "2099-08-11T00:01:00+00:00",
+                    "confirm": True,
+                },
+                token=AUTH_TOKEN,
+            )
+            deleted_status, deleted = _delete_json(
+                url,
+                {
+                    "expected_next_run_at": "2099-08-11T00:00:00+00:00",
+                    "confirm": True,
+                },
+                token=AUTH_TOKEN,
+            )
+            replay_status, replay = _delete_json(
+                url,
+                {
+                    "expected_next_run_at": "2099-08-11T00:00:00+00:00",
+                    "confirm": True,
+                },
+                token=AUTH_TOKEN,
+            )
+            service.begin_shutdown()
+            serve_thread.join(timeout=3)
+            audit = LocalControlPlane(state_dir, storage="sqlite").list_audit_events()
+            with store._connection() as connection:
+                dispatch_count = connection.execute(
+                    "select count(*) from schedule_dispatches where schedule_id = ?",
+                    ("schedule_remote_delete",),
+                ).fetchone()[0]
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(invalid_status, 400)
+        self.assertEqual(
+            invalid,
+            {
+                "error": "recurring schedule delete body must contain expected_next_run_at and confirm"
+            },
+        )
+        self.assertEqual(stale_status, 409)
+        self.assertEqual(stale, {"error": "recurring schedule delete precondition failed"})
+        self.assertEqual(deleted_status, 200)
+        self.assertEqual(
+            deleted,
+            {
+                "schema_version": "skill2workflow-recurring-schedule-delete-0.1.0",
+                "schedule_id": "schedule_remote_delete",
+                "deleted": True,
+            },
+        )
+        self.assertEqual(replay_status, 200)
+        self.assertEqual(replay["deleted"], False)
+        self.assertEqual(dispatch_count, 0)
+        self.assertEqual(
+            [event["type"] for event in audit if event.get("route") == "recurring_schedule_delete"],
+            [
+                "ingress_authentication_denied",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+                "ingress_authenticated",
+            ],
+        )
+        deleted_events = [
+            event for event in audit if event.get("type") == "recurring_schedule_deleted"
+        ]
+        self.assertEqual([event["deleted"] for event in deleted_events], [True, False])
+        self.assertNotIn("must-not-leak", json.dumps(audit, ensure_ascii=False))
+        self.assertFalse(serve_thread.is_alive())
+
     def test_recurring_schedule_dispatch_list_is_authenticated_bounded_and_redacted(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -3685,6 +3802,26 @@ def _put_json(url: str, payload, token=None):
         data=json.dumps(payload).encode("utf-8"),
         headers=headers,
         method="PUT",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.loads(error.read().decode("utf-8"))
+        finally:
+            error.close()
+
+
+def _delete_json(url: str, payload, token=None):
+    headers = {"Content-Type": "application/json"}
+    if token is not None:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="DELETE",
     )
     try:
         with urllib.request.urlopen(request, timeout=2) as response:

@@ -583,6 +583,12 @@ class RecurringScheduleStore:
         schedule_id = str(normalized["schedule"]["id"])
         with self._connection() as connection:
             connection.execute("begin immediate")
+            retired = connection.execute(
+                "select 1 from recurring_schedule_tombstones where schedule_id = ?",
+                (schedule_id,),
+            ).fetchone()
+            if retired is not None:
+                raise ValueError(f"recurring schedule id was retired: {schedule_id}")
             row = connection.execute(
                 "select definition_json from recurring_schedules where schedule_id = ?",
                 (schedule_id,),
@@ -663,6 +669,71 @@ class RecurringScheduleStore:
                 )
                 _upsert_recurring_schedule_summary(connection, effective)
         return effective, changed
+
+    def delete_with_result(
+        self,
+        schedule_id: str,
+        *,
+        expected_next_run_at: str,
+    ) -> bool:
+        """Retire one disabled schedule without deleting dispatch history.
+
+        The compare-and-swap token and ``BEGIN IMMEDIATE`` transaction serialize
+        deletion with dispatcher claims.  A schedule must already be disabled
+        and have no in-flight claim.  A tombstone makes a retry after an
+        ambiguous audit failure a durable no-op while preventing unsafe ID
+        reuse.
+        """
+
+        normalized_id = str(schedule_id)
+        _safe_schedule_id(normalized_id)
+        if not isinstance(expected_next_run_at, str) or not expected_next_run_at:
+            raise ValueError("expected_next_run_at must be an ISO-8601 timestamp")
+        expected = _normalize_aware_timestamp(
+            expected_next_run_at,
+            "expected_next_run_at",
+        )
+        with self._connection() as connection:
+            connection.execute("begin immediate")
+            tombstone = connection.execute(
+                "select 1 from recurring_schedule_tombstones where schedule_id = ?",
+                (normalized_id,),
+            ).fetchone()
+            if tombstone is not None:
+                return False
+            row = connection.execute(
+                "select definition_json from recurring_schedules where schedule_id = ?",
+                (normalized_id,),
+            ).fetchone()
+            if row is None:
+                raise ValueError(f"recurring schedule not found: {normalized_id}")
+            existing = _load_recurring_definition(row[0])
+            current_schedule = existing["schedule"]
+            if str(current_schedule["next_run_at"]) != expected:
+                raise ValueError("recurring schedule delete precondition failed")
+            if bool(current_schedule.get("enabled")) or str(
+                current_schedule.get("status", "")
+            ) != "disabled":
+                raise ValueError("recurring schedule must be disabled before deletion")
+            active_claim = connection.execute(
+                "select 1 from schedule_dispatches where schedule_id = ? and status = 'claimed' limit 1",
+                (normalized_id,),
+            ).fetchone()
+            if active_claim is not None:
+                raise ValueError("recurring schedule has active dispatch")
+            connection.execute(
+                "insert into recurring_schedule_tombstones (schedule_id, deleted_at) values (?, ?)",
+                (normalized_id, _utc_now()),
+            )
+            connection.execute(
+                "delete from recurring_schedule_summaries where schedule_id = ?",
+                (normalized_id,),
+            )
+            connection.execute(
+                "delete from recurring_schedules where schedule_id = ?",
+                (normalized_id,),
+            )
+        return True
 
     def get(self, schedule_id: str) -> Schedule:
         with self._connection() as connection:
@@ -843,6 +914,14 @@ class RecurringScheduleStore:
                     schedule_id text primary key,
                     definition_json text not null,
                     updated_at text not null
+                )
+                """
+            )
+            connection.execute(
+                """
+                create table if not exists recurring_schedule_tombstones (
+                    schedule_id text primary key,
+                    deleted_at text not null
                 )
                 """
             )

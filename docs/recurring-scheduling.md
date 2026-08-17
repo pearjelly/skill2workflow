@@ -142,6 +142,21 @@ observed `next_run_at` value as a compare-and-swap token, so a concurrent
 dispatch produces a safe `409` instead of silently resetting progress. See
 [`remote-schedule-update.md`](remote-schedule-update.md).
 
+Retire a schedule only after disabling it and confirming the latest
+`next_run_at`:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli service-recurring-schedule-delete \
+  schedule_hourly_report \
+  --expected-next-run-at 2026-08-11T01:00:00+00:00 \
+  --service-url http://127.0.0.1:8080 \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+```
+
+The protected delete route rejects enabled schedules and active claims,
+retains dispatch history, and uses a durable tombstone for safe replay. See
+[`remote-schedule-delete.md`](remote-schedule-delete.md).
+
 The optional local `--limit` windows accept `1` through `1000`. Bounded
 schedule output uses `skill2workflow-local-schedule-list-0.1.0` and omits
 trigger inputs; bounded dispatch output uses

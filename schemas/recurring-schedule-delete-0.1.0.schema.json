@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/recurring-schedule-delete-0.1.0.schema.json",
+  "title": "skill2workflow recurring schedule deletion response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "schedule_id",
+    "deleted"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-recurring-schedule-delete-0.1.0"
+    },
+    "schedule_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "deleted": {
+      "type": "boolean"
+    }
+  }
+}

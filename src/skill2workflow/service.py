@@ -31,8 +31,10 @@ from .dashboard import (
     MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS,
     MAX_RECURRING_SCHEDULE_CREATE_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_UPDATE_RESPONSE_BYTES,
+    MAX_RECURRING_SCHEDULE_DELETE_RESPONSE_BYTES,
     build_recurring_schedule_create_response,
     build_recurring_schedule_update_response,
+    build_recurring_schedule_delete_response,
     MAX_REMOTE_WORKFLOW_ARTIFACT_REPORT_ISSUES,
     MAX_WORKFLOW_INVENTORY_ITEMS,
     MAX_RUN_DETAIL_EVENTS,
@@ -119,6 +121,7 @@ _MUTATING_REQUEST_ROUTES = frozenset(
         "recurring_schedule_action",
         "recurring_schedule_create",
         "recurring_schedule_update",
+        "recurring_schedule_delete",
         "run_resume",
         "run_cancel",
     }
@@ -783,6 +786,10 @@ def _handler_for(service: RuntimeService):
                         self._handle_recurring_schedule_update(
                             _recurring_schedule_update(path)
                         )
+                    elif self.command == "DELETE" and _recurring_schedule_delete(path):
+                        self._handle_recurring_schedule_delete(
+                            _recurring_schedule_delete(path)
+                        )
                     elif self.command == "POST" and _recurring_schedule_action(path):
                         schedule_id, action = _recurring_schedule_action(path)
                         self._handle_recurring_schedule_action(
@@ -1357,6 +1364,110 @@ def _handler_for(service: RuntimeService):
                     )
             except (OSError, sqlite3.Error):
                 self._send_json(503, {"error": "recurring schedule update unavailable"})
+
+        def _handle_recurring_schedule_delete(self, schedule_id: str):
+            """Retire one authenticated recurring schedule safely."""
+
+            readiness_status, _ = service.readiness()
+            if readiness_status != 200:
+                self._send_json(503, {"error": "service is not ready"})
+                return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                service.control_plane.record_ingress_authentication(
+                    False,
+                    self.command,
+                    "recurring_schedule_delete",
+                    reason=reason,
+                )
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            service.control_plane.record_ingress_authentication(
+                True,
+                self.command,
+                "recurring_schedule_delete",
+            )
+            try:
+                body = read_request_body(self)
+                if not body:
+                    raise ValueError(
+                        "recurring schedule delete body must contain expected_next_run_at and confirm"
+                    )
+                payload = json.loads(body.decode("utf-8"))
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != {"expected_next_run_at", "confirm"}
+                    or not isinstance(payload.get("expected_next_run_at"), str)
+                    or not payload.get("expected_next_run_at")
+                    or payload.get("confirm") is not True
+                ):
+                    raise ValueError(
+                        "recurring schedule delete body must contain expected_next_run_at and confirm"
+                    )
+                deleted = service.scheduler.dispatcher.store.delete_with_result(
+                    schedule_id,
+                    expected_next_run_at=payload["expected_next_run_at"],
+                )
+                service.control_plane.record_recurring_schedule_deleted(
+                    schedule_id,
+                    deleted,
+                )
+                response = build_recurring_schedule_delete_response(
+                    schedule_id,
+                    deleted=deleted,
+                )
+                encoded = json.dumps(response, ensure_ascii=False).encode("utf-8")
+                if len(encoded) > MAX_RECURRING_SCHEDULE_DELETE_RESPONSE_BYTES:
+                    raise ValueError("recurring schedule delete exceeds response limit")
+                self._send_json(200, response)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                self._send_json(
+                    400,
+                    {"error": "recurring schedule delete body must be valid JSON"},
+                )
+            except ValueError as error:
+                message = str(error)
+                if "not found" in message:
+                    self._send_json(404, {"error": "recurring schedule not found"})
+                elif "precondition failed" in message:
+                    self._send_json(
+                        409,
+                        {"error": "recurring schedule delete precondition failed"},
+                    )
+                elif "must be disabled" in message:
+                    self._send_json(
+                        409,
+                        {"error": "recurring schedule must be disabled before deletion"},
+                    )
+                elif "active dispatch" in message:
+                    self._send_json(
+                        409,
+                        {"error": "recurring schedule has active dispatch"},
+                    )
+                elif "body must" in message:
+                    self._send_json(400, {"error": message})
+                else:
+                    self._send_json(
+                        400,
+                        {"error": "recurring schedule deletion rejected"},
+                    )
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "recurring schedule delete unavailable"})
 
         def _handle_recurring_schedule_action(self, schedule_id: str, enabled: bool):
             """Apply one authenticated, idempotent recurring-schedule state change."""
@@ -2451,6 +2562,8 @@ def _request_route(method: str, path: str) -> str:
         return "recurring_schedule_create"
     if method == "PUT" and _recurring_schedule_update(path):
         return "recurring_schedule_update"
+    if method == "DELETE" and _recurring_schedule_delete(path):
+        return "recurring_schedule_delete"
     if method == "GET" and _recurring_schedule_dispatch_list(path) is not None:
         return "recurring_schedule_dispatch_list"
     if method == "POST" and _recurring_schedule_action(path):
@@ -2510,6 +2623,23 @@ def _recurring_schedule_action(path: str):
 
 
 def _recurring_schedule_update(path: str):
+    parts = path.split("/")
+    if (
+        len(parts) != 5
+        or parts[:4] != ["", "api", "v1", "recurring-schedules"]
+    ):
+        return ""
+    schedule_id = parts[4]
+    if (
+        not schedule_id
+        or len(schedule_id) > 128
+        or any(not (char.isalnum() or char in {"-", "_", "."}) for char in schedule_id)
+    ):
+        return ""
+    return schedule_id
+
+
+def _recurring_schedule_delete(path: str):
     parts = path.split("/")
     if (
         len(parts) != 5
