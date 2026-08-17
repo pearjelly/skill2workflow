@@ -605,12 +605,18 @@ class LocalControlPlane:
             )
         request_fingerprint = trigger_request_fingerprint(trigger)
         idempotency_version = str(trigger.get("idempotency_version", workflow_version))
-        claim = self.store.claim_trigger_idempotency(
-            workflow_id,
-            idempotency_version,
-            idempotency_key,
-            request_fingerprint,
-        )
+        try:
+            claim = self.store.claim_trigger_idempotency(
+                workflow_id,
+                idempotency_version,
+                idempotency_key,
+                request_fingerprint,
+            )
+        except (TypeError, ValueError, json.JSONDecodeError) as error:
+            # A completed ledger row with an invalid replay document is not
+            # safe to execute again. Keep the public idempotency contract
+            # fail-closed instead of exposing a storage/parser traceback.
+            raise TriggerIdempotencyError("unresolved") from error
         if str(claim.get("request_fingerprint", "")) != request_fingerprint:
             raise TriggerIdempotencyError("conflict")
         status = str(claim.get("status", ""))

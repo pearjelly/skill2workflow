@@ -8,6 +8,13 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded SQLite trigger-ledger `response_json` values to 64 KiB UTF-8 JSON
+  objects. Completed-row writes validate before advancing the pending claim;
+  oversized, malformed, empty, or non-object replay rows fail closed as
+  unresolved idempotency outcomes without changing trigger keys, fingerprints,
+  replay fields, or the public response schema. See
+  `docs/sqlite-trigger-ledger-boundary.md`.
+
 - Bounded SQLite workflow registry `record_json` values to 2 MiB UTF-8 JSON
   objects across publication, direct/complete reads, alias resolution,
   snapshots, diagnostics, deprecation, promotion, and JSON-to-SQLite import.

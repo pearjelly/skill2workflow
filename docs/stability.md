@@ -36,6 +36,11 @@ These surfaces should remain compatible during the `0.1.x` line:
   diagnostics, deprecation, promotion, and JSON-to-SQLite import; replacement
   and alias-update batches validate before mutation, documented in
   [`sqlite-workflow-record-boundary.md`](sqlite-workflow-record-boundary.md)
+- SQLite trigger-ledger responses use a fixed 64 KiB UTF-8 JSON-object envelope
+  across completed-row writes and replay reads; rejected writes leave the
+  pending claim unchanged, and corrupt completed rows fail closed as
+  unresolved outcomes, documented in
+  [`sqlite-trigger-ledger-boundary.md`](sqlite-trigger-ledger-boundary.md)
 - Release manifest schema `skill2workflow-release-artifact-manifest-0.1.0`, including archive/member SHA-256 hashes, fixed package metadata, and rejection of private/state wheel content, documented in [`release-artifact-manifest.md`](release-artifact-manifest.md)
 - Release SBOM schema `skill2workflow-release-sbom-0.1.0`, using SPDX JSON 2.3 with one checksum entry per qualified wheel member and a package-to-file relationship set, documented in [`release-artifact-sbom.md`](release-artifact-sbom.md)
 - Reproducible release evidence schema `skill2workflow-reproducible-build-0.1.0`, recording two byte-identical fixed-epoch wheel builds for one checkout and toolchain, documented in [`reproducible-builds.md`](reproducible-builds.md)

@@ -13,6 +13,7 @@ from skill2workflow.storage import (
     MAX_AUDIT_EVENT_BYTES,
     MAX_JSON_CONTROL_INDEX_BYTES,
     MAX_JSON_RUN_STATE_BYTES,
+    MAX_SQLITE_TRIGGER_RESPONSE_BYTES,
     MAX_SQLITE_WORKFLOW_RECORD_BYTES,
     MAX_SQLITE_RUN_STATE_BYTES,
     SqliteControlStore,
@@ -24,6 +25,72 @@ from skill2workflow.storage import (
 
 
 class StorageTests(TestCase):
+    def test_sqlite_trigger_response_rejects_oversized_write_before_commit(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "sqlite")
+            store.claim_trigger_idempotency(
+                "workflow_storage", "1.0.0", "event-001", "fingerprint-001"
+            )
+            oversized = {"run_id": "x" * MAX_SQLITE_TRIGGER_RESPONSE_BYTES}
+
+            with self.assertRaisesRegex(
+                ValueError,
+                f"SQLite trigger response exceeds {MAX_SQLITE_TRIGGER_RESPONSE_BYTES} bytes",
+            ):
+                store.complete_trigger_idempotency(
+                    "workflow_storage",
+                    "1.0.0",
+                    "event-001",
+                    "fingerprint-001",
+                    oversized,
+                )
+
+            with closing(sqlite3.connect(Path(tmp) / "sqlite" / "control.sqlite3")) as connection:
+                row = connection.execute(
+                    "select status, response_json from trigger_idempotency"
+                ).fetchone()
+        self.assertEqual(row, ("pending", ""))
+
+    def test_sqlite_trigger_response_read_rejects_oversized_document(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "sqlite")
+            store.claim_trigger_idempotency(
+                "workflow_storage", "1.0.0", "event-002", "fingerprint-002"
+            )
+            oversized = '{"run_id":"' + "x" * MAX_SQLITE_TRIGGER_RESPONSE_BYTES + '"}'
+            with store._connection() as connection:
+                connection.execute(
+                    "update trigger_idempotency set status = 'completed', response_json = ?",
+                    (oversized,),
+                )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                f"SQLite trigger response exceeds {MAX_SQLITE_TRIGGER_RESPONSE_BYTES} bytes",
+            ):
+                store.claim_trigger_idempotency(
+                    "workflow_storage", "1.0.0", "event-002", "fingerprint-002"
+                )
+
+    def test_sqlite_trigger_response_read_rejects_malformed_document(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp) / "sqlite")
+            store.claim_trigger_idempotency(
+                "workflow_storage", "1.0.0", "event-003", "fingerprint-003"
+            )
+            with store._connection() as connection:
+                connection.execute(
+                    "update trigger_idempotency set status = 'completed', response_json = ?",
+                    ("not-json",),
+                )
+
+            with self.assertRaisesRegex(
+                ValueError, "SQLite trigger response is not valid JSON"
+            ):
+                store.claim_trigger_idempotency(
+                    "workflow_storage", "1.0.0", "event-003", "fingerprint-003"
+                )
+
     def test_audit_event_writes_reject_oversized_payloads_before_commit(self):
         event = {
             "type": "connector_failed",

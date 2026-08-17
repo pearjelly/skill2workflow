@@ -26,8 +26,8 @@ class AuditEventBoundaryDocsTests(TestCase):
     def test_roadmap_and_readme_promote_loop_175(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Completed delivery loops: 1-176", roadmap)
+        self.assertIn("Completed delivery loops: 1-177", roadmap)
         self.assertIn(
-            "Loop 176 is complete with bounded SQLite workflow registry records", roadmap
+            "Loop 177 is complete with bounded SQLite trigger-ledger responses", roadmap
         )
-        self.assertIn("Delivery Loops 1-176 are complete", readme)
+        self.assertIn("Delivery Loops 1-177 are complete", readme)

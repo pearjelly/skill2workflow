@@ -15,6 +15,7 @@ from skill2workflow.connectors import ConnectorRuntime, ExternalConnector
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.credentials import StaticCredentialProvider
 from skill2workflow.artifact_io import MAX_WORKFLOW_ARTIFACT_BYTES
+from skill2workflow.storage import MAX_SQLITE_TRIGGER_RESPONSE_BYTES
 from skill2workflow.triggers import TriggerIdempotencyError
 
 
@@ -1304,6 +1305,30 @@ class ControlPlaneTests(TestCase):
             with patch.object(control, "run_published_workflow", side_effect=RuntimeError("private failure")):
                 with self.assertRaisesRegex(RuntimeError, "private failure"):
                     control.trigger_workflow(request)
+            with self.assertRaises(TriggerIdempotencyError) as raised:
+                control.trigger_workflow(request)
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertEqual(str(raised.exception), "idempotency key has an unresolved outcome; use a new key")
+
+    def test_sqlite_trigger_idempotency_rejects_corrupt_replay_document_fail_closed(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            control.publish_workflow(_workflow(version="10.3.1"))
+            request = {
+                "workflow_id": "workflow_control",
+                "version": "10.3.1",
+                "idempotency_key": "event-003-corrupt",
+            }
+            control.trigger_workflow(request)
+            oversized = '{"run_id":"' + "x" * MAX_SQLITE_TRIGGER_RESPONSE_BYTES + '"}'
+            with closing(sqlite3.connect(state_dir / "control.sqlite3")) as connection, connection:
+                connection.execute(
+                    "update trigger_idempotency set status = 'completed', response_json = ?",
+                    (oversized,),
+                )
+
             with self.assertRaises(TriggerIdempotencyError) as raised:
                 control.trigger_workflow(request)
 

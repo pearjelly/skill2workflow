@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-176
+- Completed delivery loops: 1-177
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 176 is complete with bounded SQLite workflow registry records
+- Active loop: None; Loop 177 is complete with bounded SQLite trigger-ledger responses
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-176 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-177 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 176; the detailed
+The follow-on production hardening continues through Loop 177; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4210,9 +4210,37 @@ with stability, README, and changelog links kept aligned.
 cap total database size, change the Workflow DSL or artifact checksum
 contract, redact metadata, add signatures, or claim exactly-once publication.
 
+### Loop 177: Bounded SQLite Trigger-Ledger Responses
+
+**Status:** Complete.
+
+**Prior basis:** SQLite run state, audit events, workflow registry records, and
+published artifacts had fixed persistence boundaries, but completed trigger
+idempotency rows still decoded `trigger_idempotency.response_json` without a
+per-response limit. A malformed or oversized replay row could bypass the other
+local document ceilings and destabilize idempotency recovery.
+
+**Outcome:** Completed SQLite trigger-ledger responses now serialize as compact
+JSON objects within a fixed 64 KiB UTF-8 envelope. Claim reads validate the
+stored response before returning it, and corrupt, oversized, empty, or
+non-object completed rows fail closed as unresolved outcomes. Response writes
+validate before the pending claim advances, so rejected documents leave the
+ledger pending. Existing trigger keys, fingerprints, replay fields, and public
+response schemas remain unchanged.
+
+**Evidence:** Storage and control-plane regression tests prove oversized write
+rejection before mutation, fail-closed oversized/malformed replay reads, and
+stable unresolved idempotency errors. The fixed contract is documented in
+[`docs/sqlite-trigger-ledger-boundary.md`](docs/sqlite-trigger-ledger-boundary.md),
+with stability, README, and changelog links kept aligned.
+
+**Safety boundary:** This caps one SQLite trigger-ledger response only. It does
+not cap trigger inputs, connector payloads, total database size, retention, or
+external side effects, and it does not claim exactly-once execution.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 176 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 177 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4354,6 +4382,7 @@ This rolling queue is ordered. Loop 176 is complete and there is no active deliv
 | Loop 174: Bounded SQLite Run-State Documents | Complete | Keep the recommended SQLite production backend from bypassing the complete run-state persistence boundary through oversized or malformed documents | Fixed 8 MiB UTF-8 state bound on writes and full-state decodes, recovery/cancellation/startup coverage, and SQLite run-state boundary documentation |
 | Loop 175: Bounded Audit Event Documents | Complete | Keep local JSONL and SQLite control-plane audit persistence from bypassing a fixed per-event document boundary | Fixed 1 MiB UTF-8 JSON-object bound on writes and bounded reads, atomic batch validation, import/integrity coverage, and audit-event boundary documentation |
 | Loop 176: Bounded SQLite Workflow Registry Records | Complete | Keep the recommended SQLite workflow registry from bypassing a fixed per-record document boundary | Fixed 2 MiB UTF-8 JSON-object bound on registry writes and reads, atomic replacement and alias-update validation, import/diagnostic coverage, and SQLite registry boundary documentation |
+| Loop 177: Bounded SQLite Trigger-Ledger Responses | Complete | Keep completed trigger idempotency rows from bypassing a fixed replay-document boundary | Fixed 64 KiB UTF-8 JSON-object bound on replay writes and reads, atomic pending-claim preservation, fail-closed corruption handling, control-plane coverage, and SQLite trigger-ledger boundary documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

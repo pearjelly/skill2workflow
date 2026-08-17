@@ -38,6 +38,10 @@ MAX_JSON_CONTROL_INDEX_BYTES = 8 * 1024 * 1024
 # durable SQLite document. Keep one row below the published-artifact ceiling so
 # metadata cannot become an unbounded side channel or a decode-time allocation.
 MAX_SQLITE_WORKFLOW_RECORD_BYTES = 2 * 1024 * 1024
+# Trigger responses are compact replay metadata, never the trigger input or
+# provider payload. Keep the SQLite idempotency ledger on a small fixed UTF-8
+# envelope so completed rows cannot become an unbounded control-plane sink.
+MAX_SQLITE_TRIGGER_RESPONSE_BYTES = 64 * 1024
 # Audit events are compact metadata by contract. Keep both local backends on
 # one fixed UTF-8 envelope so JSONL and SQLite cannot become unbounded sinks.
 MAX_AUDIT_EVENT_BYTES = 1 * 1024 * 1024
@@ -1617,10 +1621,15 @@ class SqliteControlStore:
                     "request_fingerprint": request_fingerprint,
                     "response_json": "",
                 }
+            response_json = str(row[2])
+            if response_json:
+                _decode_sqlite_trigger_response(response_json)
+            elif str(row[1]) == "completed":
+                raise ValueError("SQLite trigger response is empty")
             return {
                 "status": str(row[1]),
                 "request_fingerprint": str(row[0]),
-                "response_json": str(row[2]),
+                "response_json": response_json,
             }
 
     def complete_trigger_idempotency(
@@ -1633,12 +1642,7 @@ class SqliteControlStore:
     ) -> None:
         """Persist only the compact trigger response after execution completes."""
 
-        response_json = json.dumps(
-            response,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
+        response_json = _encode_sqlite_trigger_response(response)
         with self._connection() as connection:
             updated = connection.execute(
                 """
@@ -2425,6 +2429,34 @@ def _encode_sqlite_workflow_record(record: WorkflowRecord) -> str:
     return raw.decode("utf-8")
 
 
+def _encode_sqlite_trigger_response(response: Dict[str, object]) -> str:
+    """Serialize one replay response within the durable byte boundary."""
+
+    if not isinstance(response, dict):
+        raise ValueError("SQLite trigger response must be an object")
+    try:
+        raw = json.dumps(
+            response,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (
+        TypeError,
+        ValueError,
+        OverflowError,
+        RecursionError,
+        UnicodeError,
+    ) as error:
+        raise ValueError("SQLite trigger response is not JSON serializable") from error
+    if len(raw) > MAX_SQLITE_TRIGGER_RESPONSE_BYTES:
+        raise ValueError(
+            "SQLite trigger response exceeds "
+            f"{MAX_SQLITE_TRIGGER_RESPONSE_BYTES} bytes"
+        )
+    return raw.decode("utf-8")
+
+
 def _encode_audit_event(event: AuditEvent) -> str:
     """Serialize one audit object within the shared UTF-8 event boundary."""
 
@@ -2538,6 +2570,38 @@ def _decode_sqlite_workflow_record(raw_record: object) -> WorkflowRecord:
     if not isinstance(record, dict):
         raise ValueError("SQLite workflow record must be an object")
     return record
+
+
+def _decode_sqlite_trigger_response(raw_response: object) -> Dict[str, object]:
+    """Decode one replay response only after checking its UTF-8 byte bound."""
+
+    try:
+        text = (
+            raw_response.decode("utf-8")
+            if isinstance(raw_response, bytes)
+            else str(raw_response)
+        )
+        encoded = text.encode("utf-8")
+    except (TypeError, UnicodeError) as error:
+        raise ValueError("SQLite trigger response is not valid UTF-8") from error
+    if len(encoded) > MAX_SQLITE_TRIGGER_RESPONSE_BYTES:
+        raise ValueError(
+            "SQLite trigger response exceeds "
+            f"{MAX_SQLITE_TRIGGER_RESPONSE_BYTES} bytes"
+        )
+    try:
+        response = json.loads(text)
+    except (
+        TypeError,
+        ValueError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+    ) as error:
+        raise ValueError("SQLite trigger response is not valid JSON") from error
+    if not isinstance(response, dict):
+        raise ValueError("SQLite trigger response must be an object")
+    return response
 
 
 def _read_bounded_json_document(path: Path, max_bytes: int, label: str):

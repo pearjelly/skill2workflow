@@ -766,7 +766,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-176 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-177 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1406,6 +1406,13 @@ changed record before mutation. Workflow version, alias, checksum, and
 artifact semantics remain unchanged. See
 [`docs/sqlite-workflow-record-boundary.md`](docs/sqlite-workflow-record-boundary.md).
 
+Loop 177 hardens the SQLite trigger ledger: each completed `response_json`
+value is a bounded 64 KiB UTF-8 JSON object, writes validate before the pending
+claim advances, and oversized or malformed replay documents fail closed as an
+unresolved idempotency outcome. Trigger keys, fingerprints, replay fields, and
+the public response schema remain unchanged. See
+[`docs/sqlite-trigger-ledger-boundary.md`](docs/sqlite-trigger-ledger-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1423,6 +1430,7 @@ See:
 - `docs/json-run-state-boundary.md`
 - `docs/audit-event-boundary.md`
 - `docs/sqlite-workflow-record-boundary.md`
+- `docs/sqlite-trigger-ledger-boundary.md`
 - `docs/service-config-boundary.md`
 - `docs/credential-file-boundary.md`
 - `docs/skill-input-boundary.md`
