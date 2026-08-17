@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a standard installed-console `skill2workflow --version` identity
+  check, with wheel qualification proving it matches distribution metadata.
+
 - Added optional `bundle-run --summary` output for a value-free successful-run
   contract containing status counters and Bundle provenance without workflow,
   input, node-result, connector, or credential payloads.

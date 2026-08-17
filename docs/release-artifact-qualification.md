@@ -47,6 +47,11 @@ The installed command set also includes the protected `service-resume`,
 owner-only `service-support-bundle` operator
 clients.
 
+Before the command checks, the smoke runs the installed console script's
+`--version` flag and requires an exact match with the wheel metadata. This
+keeps support reports and upgrade checks tied to the artifact that is actually
+being executed.
+
 The installed command set also includes local `service-token-rotate`; package
 qualification runs it against the generated bootstrap workspace and verifies
 that the new token is usable while neither token value appears in command

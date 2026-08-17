@@ -201,6 +201,11 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     help_output = _run([str(console_script), "--help"], cwd=isolated_dir)
     if "usage:" not in help_output:
         raise RuntimeError("installed skill2workflow --help did not print usage text")
+    version_output = _run([str(console_script), "--version"], cwd=isolated_dir).strip()
+    if version_output != f"skill2workflow {version}":
+        raise RuntimeError(
+            "installed skill2workflow --version did not match wheel metadata"
+        )
     for command in REQUIRED_CONSOLE_COMMANDS:
         command_help = _run(
             [str(console_script), command, "--help"], cwd=isolated_dir
@@ -457,6 +462,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "build_command": build.splitlines()[-1] if build.splitlines() else "",
         "install_command": install.splitlines()[-1] if install.splitlines() else "",
         "help_contains_usage": True,
+        "version_matches_metadata": True,
         "required_command_help_contains_usage": True,
         "validate_status": True,
         "bundle_status": True,

@@ -8,6 +8,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
+from . import __version__
 from .backup import (
     build_backup_retention_plan,
     create_state_backup,
@@ -99,6 +100,12 @@ def main(argv=None) -> int:
 
 def _main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="skill2workflow")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Print the installed package version and exit",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     parse_cmd = subparsers.add_parser("parse", help="Parse SKILL.md into Skill IR")

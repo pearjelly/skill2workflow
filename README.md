@@ -377,6 +377,16 @@ python3 -m venv /tmp/skill2workflow-venv
 /tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json
 ```
 
+Confirm which installed package a script is invoking:
+
+```bash
+/tmp/skill2workflow-venv/bin/skill2workflow --version
+# skill2workflow 0.1.0
+```
+
+The version output comes from the installed package, so it is a safe first
+check when diagnosing PATH, virtual-environment, or upgrade mismatches.
+
 The `PYTHONPATH=src python3 -m skill2workflow.cli ...` commands below remain the no-install source-checkout path.
 
 Run tests:
@@ -1518,6 +1528,10 @@ Loop 189 adds optional `bundle-run --summary` output for safe automation and
 handoffs without exposing the complete run state. The isolated wheel smoke
 also executes this mode through the installed CLI against SQLite and checks
 the fixed schema and Bundle fingerprint.
+
+The installed console script also supports `--version`, reporting the package
+version without requiring a workflow subcommand; the wheel smoke checks that
+it matches the installed distribution metadata.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

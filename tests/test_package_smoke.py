@@ -63,6 +63,8 @@ class PackageSmokeTests(TestCase):
                     return "usage: skill2workflow\n" + "\n".join(
                         REQUIRED_CONSOLE_COMMANDS
                     )
+                if command[-1:] == ["--version"]:
+                    return "skill2workflow 0.1.0\n"
                 if "service-init" in command:
                     bootstrap_root = Path(command[command.index("--root") + 1])
                     secret_path = bootstrap_root / "secrets" / "ingress-token"
@@ -231,6 +233,7 @@ class PackageSmokeTests(TestCase):
         self.assertIn("wheel", flattened)
         self.assertEqual(result["install_mode"], "wheel")
         self.assertTrue(result["isolated_from_source"])
+        self.assertTrue(result["version_matches_metadata"])
         self.assertTrue(result["service_bootstrap_status"])
         self.assertTrue(result["service_token_rotation_status"])
         self.assertTrue(result["service_doctor_status"])

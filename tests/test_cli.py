@@ -15,6 +15,15 @@ from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
 
 
 class CliTests(TestCase):
+    def test_version_flag_reports_package_version_without_subcommand(self):
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            with self.assertRaises(SystemExit) as raised:
+                main(["--version"])
+
+        self.assertEqual(raised.exception.code, 0)
+        self.assertEqual(stdout.getvalue(), "skill2workflow 0.1.0\n")
+
     def test_cancel_run_command_cancels_waiting_published_run(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

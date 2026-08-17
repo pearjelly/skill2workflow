@@ -43,7 +43,12 @@ python3 -m venv /tmp/skill2workflow-venv
 /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=77.0.1"
 /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .
 /tmp/skill2workflow-venv/bin/skill2workflow --help
+/tmp/skill2workflow-venv/bin/skill2workflow --version
 ```
+
+The version check should report the package version from the active
+environment. It is useful for catching an unintended PATH or virtualenv
+mismatch before reproducing a bug.
 
 You can also run the package smoke helper, which builds a wheel, installs it
 into a separate temporary virtual environment, and validates the installed

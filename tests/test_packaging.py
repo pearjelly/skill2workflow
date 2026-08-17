@@ -94,6 +94,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("REQUIRED_CONSOLE_COMMANDS", text)
         self.assertIn("skill2workflow", text)
         self.assertIn('command, "--help"', text)
+        self.assertIn('"--version"', text)
+        self.assertIn('version_matches_metadata', text)
         self.assertIn("validate", text)
         self.assertIn("systemd-unit", text)
         self.assertIn('"live_snapshot_status": live_snapshot_status', text)
@@ -146,6 +148,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("release-artifact-sbom.md", guide)
         self.assertIn("member SHA-256 hashes", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
+        self.assertIn("--version", guide)
+        self.assertIn("wheel metadata", guide)
         self.assertIn("- Completed delivery loops: 1-189", roadmap)
         self.assertIn(
             "- Active loop: None; Loop 189 is complete with safe Workflow Bundle run summaries",
