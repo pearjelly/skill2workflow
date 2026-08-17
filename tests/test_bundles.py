@@ -1,9 +1,11 @@
+import hashlib
 import io
 import json
 import zipfile
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.bundles import (
     BUNDLE_DIFF_SCHEMA_VERSION,
@@ -11,6 +13,7 @@ from skill2workflow.bundles import (
     create_workflow_bundle,
     diff_workflow_bundles,
     load_verified_workflow_bundle,
+    load_verified_workflow_bundle_with_report,
     verify_workflow_bundle,
 )
 
@@ -94,8 +97,21 @@ class WorkflowBundleTests(TestCase):
             bundle = Path(temporary) / "workflow.s2w"
             create_workflow_bundle(workflow, bundle)
             loaded = load_verified_workflow_bundle(bundle)
+            raw_bundle = bundle.read_bytes()
+            with patch(
+                "skill2workflow.bundles._read_bundle_bytes",
+                return_value=raw_bundle,
+            ) as reader:
+                loaded_with_report, report = load_verified_workflow_bundle_with_report(bundle)
 
         self.assertEqual(loaded, workflow)
+        self.assertEqual(loaded_with_report, workflow)
+        reader.assert_called_once_with(bundle)
+        self.assertTrue(report["valid"])
+        self.assertEqual(
+            report["bundle_sha256"],
+            hashlib.sha256(raw_bundle).hexdigest(),
+        )
 
     def test_load_verified_bundle_rejects_tampering_with_fixed_error(self):
         with TemporaryDirectory() as temporary:

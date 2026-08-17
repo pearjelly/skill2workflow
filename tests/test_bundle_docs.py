@@ -31,6 +31,7 @@ class WorkflowBundleDocumentationTests(TestCase):
             "context.bundle_run",
             "bundle_verified",
             "side_effects_authorized",
+            "bundle_sha256",
             "deterministic ZIP",
             "never contains",
             "8 MiB",

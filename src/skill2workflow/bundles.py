@@ -120,6 +120,36 @@ def create_workflow_bundle(
     }
 
 
+def _new_verification_report() -> Dict[str, object]:
+    return {
+        "schema_version": BUNDLE_VERIFICATION_SCHEMA_VERSION,
+        "valid": False,
+        "bundle_bytes": 0,
+        "bundle_sha256": "",
+        "members": 0,
+        "workflow": None,
+        "errors": [],
+    }
+
+
+def _finalize_verification_report(
+    report: Dict[str, object], workflow: Dict[str, object]
+) -> Dict[str, object]:
+    metadata = workflow.get("workflow", {})
+    workflow_digest = report.pop("_workflow_sha256")
+    report["workflow"] = {
+        "id": str(metadata.get("id") or ""),
+        "version": str(metadata.get("version") or ""),
+        "schema_version": str(workflow.get("schema_version") or ""),
+        "status": str(metadata.get("status") or ""),
+        "bytes": report.pop("_workflow_bytes"),
+        "sha256": workflow_digest,
+    }
+    report["valid"] = True
+    report["errors"] = []
+    return report
+
+
 def verify_workflow_bundle(bundle: Path) -> Dict[str, object]:
     """Verify one bundle without extracting or executing it.
 
@@ -128,20 +158,14 @@ def verify_workflow_bundle(bundle: Path) -> Dict[str, object]:
     use in CI and on untrusted shared artifacts.
     """
 
-    report = {
-        "schema_version": BUNDLE_VERIFICATION_SCHEMA_VERSION,
-        "valid": False,
-        "bundle_bytes": 0,
-        "members": 0,
-        "workflow": None,
-        "errors": [],
-    }
+    report = _new_verification_report()
     try:
         raw = _read_bundle_bytes(Path(bundle))
     except (OSError, ValueError, zipfile.BadZipFile):
         report["errors"] = [{"code": "bundle_unreadable", "path": "$"}]
         return report
     report["bundle_bytes"] = len(raw)
+    report["bundle_sha256"] = _sha256(raw)
     try:
         with zipfile.ZipFile(io.BytesIO(raw), "r"):
             pass
@@ -171,19 +195,7 @@ def verify_workflow_bundle(bundle: Path) -> Dict[str, object]:
     if workflow is None:
         return report
 
-    metadata = workflow.get("workflow", {})
-    workflow_digest = report.pop("_workflow_sha256")
-    report["workflow"] = {
-        "id": str(metadata.get("id") or ""),
-        "version": str(metadata.get("version") or ""),
-        "schema_version": str(workflow.get("schema_version") or ""),
-        "status": str(metadata.get("status") or ""),
-        "bytes": report.pop("_workflow_bytes"),
-        "sha256": workflow_digest,
-    }
-    report["valid"] = True
-    report["errors"] = []
-    return report
+    return _finalize_verification_report(report, workflow)
 
 
 def load_verified_workflow_bundle(bundle: Path) -> Dict[str, object]:
@@ -195,17 +207,25 @@ def load_verified_workflow_bundle(bundle: Path) -> Dict[str, object]:
     turn archive contents into an error response.
     """
 
-    report = {
-        "schema_version": BUNDLE_VERIFICATION_SCHEMA_VERSION,
-        "valid": False,
-        "bundle_bytes": 0,
-        "members": 0,
-        "workflow": None,
-        "errors": [],
-    }
+    workflow, _ = load_verified_workflow_bundle_with_report(bundle)
+    return workflow
+
+
+def load_verified_workflow_bundle_with_report(
+    bundle: Path,
+) -> Tuple[Dict[str, object], Dict[str, object]]:
+    """Load a verified workflow and its value-free report from one read.
+
+    The workflow and report are produced from the same bounded archive bytes,
+    so callers can retain the archive SHA-256 without introducing a second
+    path read or a time-of-check/time-of-use gap.
+    """
+
+    report = _new_verification_report()
     try:
         raw = _read_bundle_bytes(Path(bundle))
         report["bundle_bytes"] = len(raw)
+        report["bundle_sha256"] = _sha256(raw)
         workflow = _inspect_bundle(raw, report)
     except (
         OSError,
@@ -224,7 +244,7 @@ def load_verified_workflow_bundle(bundle: Path) -> Dict[str, object]:
         raise ValueError("workflow bundle verification failed") from error
     if workflow is None:
         raise ValueError("workflow bundle verification failed")
-    return workflow
+    return workflow, _finalize_verification_report(report, workflow)
 
 
 def diff_workflow_bundles(from_bundle: Path, to_bundle: Path) -> Dict[str, object]:

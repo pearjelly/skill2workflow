@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-186
+- Completed delivery loops: 1-187
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 186 is complete with compact Workflow Bundle run evidence
+- Active loop: None; Loop 187 is complete with exact Workflow Bundle provenance evidence
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-186 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-187 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 186; the detailed
+The follow-on production hardening continues through Loop 187; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4564,9 +4564,45 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
   --storage sqlite
 ```
 
+### Loop 187: Exact Workflow Bundle Provenance Evidence
+
+**Status:** Complete.
+
+**Prior basis:** Loop 186 recorded verification and side-effect consent, but
+the run state did not identify which exact Bundle archive supplied the
+verified Workflow DSL.
+
+**Outcome:** Successful `bundle-run` executions now also persist the lowercase
+SHA-256 digest of the exact verified archive in
+`context.bundle_run.bundle_sha256`. The digest is computed during the same
+bounded, descriptor-checked read that supplies the executable workflow, so the
+provenance field cannot drift through a second path read. No Bundle values,
+paths, credentials, or provider payloads are retained.
+
+**Evidence:** Bundle loader tests prove the workflow and value-free report are
+derived from one read, CLI tests cover approval-only and explicitly authorized
+connector runs, and the installed command, package smoke, full-suite, secret
+hygiene, and release-preflight checks remain green.
+
+**Safety boundary:** The digest is an artifact fingerprint, not a signature,
+attestation, approval record, or provider reconciliation mechanism. The
+separate `--allow-side-effects` guard remains mandatory for connector-bearing
+Bundles.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
+  /tmp/connector-flow.s2w \
+  --input /tmp/connector-flow-input.json \
+  --allow-side-effects \
+  --state-dir /tmp/skill2workflow-bundle-run \
+  --storage sqlite
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 186 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 187 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4718,6 +4754,7 @@ This rolling queue is ordered. Loop 186 is complete and there is no active deliv
 | Loop 184: Verified Workflow Bundle Input Preflight | Complete | Check optional bundle trigger input and connector mappings without state or side effects, then reuse the admission result before bundle execution | `bundle-preflight`, value-free readiness report, blocked-input pre-state guard, `bundle-run --input`, installed CLI, docs, and package evidence |
 | Loop 185: Explicit Workflow Bundle Side-Effect Consent | Complete | Require per-invocation operator consent before a connector-bearing Bundle can create state, resolve credentials, or call a connector | `--allow-side-effects` guard, pre-state rejection, authorized HTTP connector evidence, installed CLI, docs, and package evidence |
 | Loop 186: Compact Workflow Bundle Run Evidence | Complete | Preserve only Bundle verification and side-effect-consent booleans in successful local run context for diagnosis without secrets or provider payloads | `context.bundle_run` metadata, state tests, installed CLI, docs, and package evidence |
+| Loop 187: Exact Workflow Bundle Provenance Evidence | Complete | Preserve the exact verified Bundle archive fingerprint in successful local run context without retaining paths, values, credentials, or provider payloads | same-read verified loader, `context.bundle_run.bundle_sha256`, provenance tests, installed CLI, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

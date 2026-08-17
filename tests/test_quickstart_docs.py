@@ -27,7 +27,7 @@ class InstalledQuickstartDocumentationTests(TestCase):
         self.assertLess(quickstart, source_demo)
         self.assertIn("Installed wheel quickstart", readme)
         self.assertIn("Source-checkout contributor demo", readme)
-        self.assertIn("Delivery Loops 1-186 are complete", readme)
+        self.assertIn("Delivery Loops 1-187 are complete", readme)
         self.assertIn("installed controlled quickstart", readme)
 
     def test_roadmap_and_harness_record_completed_loop_52(self):
@@ -35,9 +35,9 @@ class InstalledQuickstartDocumentationTests(TestCase):
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-        self.assertIn("- Completed delivery loops: 1-186", roadmap)
+        self.assertIn("- Completed delivery loops: 1-187", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 186 is complete with compact Workflow Bundle run evidence",
+            "- Active loop: None; Loop 187 is complete with exact Workflow Bundle provenance evidence",
             roadmap,
         )
         self.assertIn("| Loop 52: Installed Controlled Quickstart | Complete |", roadmap)

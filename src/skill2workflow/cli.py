@@ -19,6 +19,7 @@ from .bundles import (
     diff_workflow_bundles,
     create_workflow_bundle,
     load_verified_workflow_bundle,
+    load_verified_workflow_bundle_with_report,
     verify_workflow_bundle,
 )
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
@@ -980,7 +981,7 @@ def _main(argv=None) -> int:
         return 0 if report["ready"] else 1
 
     if args.command == "bundle-run":
-        workflow = load_verified_workflow_bundle(args.bundle)
+        workflow, bundle_report = load_verified_workflow_bundle_with_report(args.bundle)
         input_value = _load_bundle_input(args.input)
         preflight = build_workflow_preflight(
             workflow,
@@ -1003,6 +1004,7 @@ def _main(argv=None) -> int:
             "bundle_run": {
                 "bundle_verified": True,
                 "side_effects_authorized": bool(args.allow_side_effects),
+                "bundle_sha256": str(bundle_report["bundle_sha256"]),
             }
         }
         if args.input is not None:

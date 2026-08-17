@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added exact verified Bundle provenance to successful runs through the
+  value-free `context.bundle_run.bundle_sha256` digest, computed from the same
+  bounded archive read used for execution.
+
 - Added compact `context.bundle_run` evidence to successful Bundle runs,
   recording verification and side-effect-consent booleans without retaining
   credentials, provider payloads, or extra Bundle values.

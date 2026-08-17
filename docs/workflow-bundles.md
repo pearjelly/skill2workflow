@@ -107,14 +107,18 @@ create a published version, promote an alias, or introduce a second execution
 authority. Invalid bundles fail before the state directory is initialized.
 
 Every successful `bundle-run` also stores a compact `context.bundle_run`
-metadata object with `bundle_verified` and `side_effects_authorized` booleans.
+metadata object with `bundle_verified`, `side_effects_authorized`, and the
+lowercase SHA-256 digest of the exact verified archive in `bundle_sha256`.
 This helps an operator distinguish an explicitly authorized local execution
-from a side-effect guard rejection without recording bundle values, credentials,
-or provider payloads. It is run-state evidence, not a signed approval record
-or a replacement for the control-plane audit boundary.
+from a side-effect guard rejection and identify the exact input artifact
+without recording bundle values, paths, credentials, or provider payloads. The
+digest is computed during the same bounded read that supplies the executable
+Workflow DSL, avoiding a second path read. It is run-state evidence, not a
+signed approval record or a replacement for the control-plane audit boundary.
 
 The successful bundle verification report contains only workflow identity,
-status, byte counts, digests, member count, and fixed error fields. The
+status, byte counts, archive/workflow SHA-256 digests, member count, and fixed
+error fields. The
 preflight report likewise exposes only bounded structural metadata and input
 keys/counts. Neither report echoes workflow descriptions, trigger input values,
 connector URLs, request bodies, credential values, or provider responses.
