@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-180
+- Completed delivery loops: 1-181
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 180 is complete with portable deterministic Workflow DSL bundles
+- Active loop: None; Loop 181 is complete with verified local Workflow DSL bundle publication
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-180 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-181 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 180; the detailed
+The follow-on production hardening continues through Loop 181; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -4344,9 +4344,45 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-verify \
 Loop 180 closes the reproducible local sharing gap while preserving the
 Workflow DSL, published artifact, credential, and service contracts.
 
+### Loop 181: Verified Local Workflow Bundle Publication
+
+**Status:** Complete.
+
+**Prior basis:** Loop 180 made one Workflow DSL artifact deterministic and
+safe to verify, but operators still had to manually extract or copy the
+workflow before publishing it into a local control plane. That duplicated the
+trust decision and made the share-to-run path unnecessarily fragile.
+
+**Outcome:** `bundle-publish` reads a bundle through the same regular-file and
+size boundary, verifies the exact two-member archive, manifest digest, DSL, and
+secret hygiene in memory, then hands the validated document to the existing
+immutable `LocalControlPlane.publish_workflow` path. It never extracts files,
+executes a workflow, resolves credentials, calls a connector, or overwrites a
+different artifact for the same workflow/version.
+
+**Evidence:** [`docs/workflow-bundles.md`](docs/workflow-bundles.md) defines the
+explicit publish handoff and idempotent/conflict behavior. Bundle loader,
+CLI/control-plane, documentation, package-smoke, and full-suite tests cover
+valid publication, malformed/tampered rejection, SQLite storage, redaction,
+and installed-wheel availability.
+
+**Safety boundary:** This is an explicit local publication command. It does
+not add remote bundle upload, marketplace discovery, hosted signing,
+credential packaging, workflow execution, or migration of published service
+state. Workflow DSL and the normal publication path remain authoritative.
+
+The repeatable evidence command is:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-publish \
+  /tmp/approval-flow.s2w \
+  --state-dir /tmp/skill2workflow-control \
+  --storage sqlite
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 180 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 181 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4492,6 +4528,7 @@ This rolling queue is ordered. Loop 180 is complete and there is no active deliv
 | Loop 178: Bounded Workflow Execution Explanations | Complete | Give local and remote operators a safe pre-execution review of topology, gates, connector side effects, input shape, retries, and timeouts without exposing values or executing work | Fixed side-effect-free explanation schema, local/remote CLI, authenticated read-only route, 64 KiB/1,000-node/2,000-edge bounds, redaction tests, and operator documentation |
 | Loop 179: Side-Effect-Free Trigger Preflight | Complete | Let operators validate trigger input and HTTP body mappings before starting a real run without exposing values or invoking providers | Fixed value-free preflight schema, local/remote CLI, authenticated POST route, 1 MiB/64 KiB bounds, stable issue codes, redaction/read-only tests, package-smoke evidence, and operator documentation |
 | Loop 180: Portable Workflow DSL Bundles | Complete | Share one validated Workflow DSL artifact as a deterministic, secret-checked local bundle without packaging state or credentials | Fixed two-member ZIP manifest, digest verification, 8 MiB/2 MiB/4 MiB bounds, path/read safety, local CLI, tests, docs, and package evidence |
+| Loop 181: Verified Local Workflow Bundle Publication | Complete | Move a fully verified local bundle into the normal immutable publication path without extraction, execution, or credential access | In-memory verified loader, explicit local `bundle-publish`, JSON/SQLite publication coverage, conflict/idempotency evidence, installed CLI, tests, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -8,6 +8,7 @@ from unittest import TestCase
 from skill2workflow.bundles import (
     BUNDLE_SCHEMA_VERSION,
     create_workflow_bundle,
+    load_verified_workflow_bundle,
     verify_workflow_bundle,
 )
 
@@ -84,6 +85,22 @@ class WorkflowBundleTests(TestCase):
 
         self.assertFalse(report["valid"])
         self.assertEqual(report["errors"], [{"code": "too_many_members", "path": "$.members"}])
+
+    def test_load_verified_bundle_returns_workflow_without_extraction(self):
+        workflow = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        with TemporaryDirectory() as temporary:
+            bundle = Path(temporary) / "workflow.s2w"
+            create_workflow_bundle(workflow, bundle)
+            loaded = load_verified_workflow_bundle(bundle)
+
+        self.assertEqual(loaded, workflow)
+
+    def test_load_verified_bundle_rejects_tampering_with_fixed_error(self):
+        with TemporaryDirectory() as temporary:
+            bundle = Path(temporary) / "invalid.s2w"
+            bundle.write_bytes(b"not a zip")
+            with self.assertRaisesRegex(ValueError, "verification failed"):
+                load_verified_workflow_bundle(bundle)
 
     def test_verify_rejects_malformed_workflow_shape_without_traceback(self):
         manifest = {

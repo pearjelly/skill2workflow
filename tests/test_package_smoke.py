@@ -165,6 +165,14 @@ class PackageSmokeTests(TestCase):
                             "errors": [],
                         }
                     )
+                if "bundle-publish" in command:
+                    return json.dumps(
+                        {
+                            "workflow_id": "workflow_demo",
+                            "version": "0.1.0",
+                            "status": "published",
+                        }
+                    )
                 return "ok\n"
 
             with patch("scripts.package_smoke.venv.EnvBuilder", FakeEnvBuilder), patch(
@@ -205,6 +213,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["license_included"])
         self.assertTrue(result["private_artifacts_excluded"])
         self.assertTrue(result["bundle_status"])
+        self.assertTrue(result["bundle_publish_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])
         self.assertTrue(result["python_classifiers_valid"])

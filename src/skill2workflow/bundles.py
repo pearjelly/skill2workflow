@@ -136,11 +136,97 @@ def verify_workflow_bundle(bundle: Path) -> Dict[str, object]:
     }
     try:
         raw = _read_bundle_bytes(Path(bundle))
-        report["bundle_bytes"] = len(raw)
-        archive = zipfile.ZipFile(io.BytesIO(raw), "r")
-    except (OSError, ValueError, zipfile.BadZipFile) as error:
+    except (OSError, ValueError, zipfile.BadZipFile):
         report["errors"] = [{"code": "bundle_unreadable", "path": "$"}]
         return report
+    report["bundle_bytes"] = len(raw)
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw), "r"):
+            pass
+    except zipfile.BadZipFile:
+        report["errors"] = [{"code": "bundle_unreadable", "path": "$"}]
+        return report
+
+    try:
+        workflow = _inspect_bundle(raw, report)
+    except (
+        OSError,
+        ValueError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        zipfile.BadZipFile,
+        NotImplementedError,
+        RuntimeError,
+        EOFError,
+        TypeError,
+        KeyError,
+        AttributeError,
+        RecursionError,
+    ):
+        _invalid(report, "invalid_archive", "$")
+        return report
+
+    if workflow is None:
+        return report
+
+    metadata = workflow.get("workflow", {})
+    workflow_digest = report.pop("_workflow_sha256")
+    report["workflow"] = {
+        "id": str(metadata.get("id") or ""),
+        "version": str(metadata.get("version") or ""),
+        "schema_version": str(workflow.get("schema_version") or ""),
+        "status": str(metadata.get("status") or ""),
+        "bytes": report.pop("_workflow_bytes"),
+        "sha256": workflow_digest,
+    }
+    report["valid"] = True
+    report["errors"] = []
+    return report
+
+
+def load_verified_workflow_bundle(bundle: Path) -> Dict[str, object]:
+    """Load a bundle's Workflow DSL only after the full verification boundary.
+
+    This is the explicit local-import primitive used by ``bundle-publish``.
+    It reads the archive in memory, never extracts files, and raises one fixed
+    error for any invalid or unreadable bundle so callers cannot accidentally
+    turn archive contents into an error response.
+    """
+
+    report = {
+        "schema_version": BUNDLE_VERIFICATION_SCHEMA_VERSION,
+        "valid": False,
+        "bundle_bytes": 0,
+        "members": 0,
+        "workflow": None,
+        "errors": [],
+    }
+    try:
+        raw = _read_bundle_bytes(Path(bundle))
+        report["bundle_bytes"] = len(raw)
+        workflow = _inspect_bundle(raw, report)
+    except (
+        OSError,
+        ValueError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        zipfile.BadZipFile,
+        NotImplementedError,
+        RuntimeError,
+        EOFError,
+        TypeError,
+        KeyError,
+        AttributeError,
+        RecursionError,
+    ) as error:
+        raise ValueError("workflow bundle verification failed") from error
+    if workflow is None:
+        raise ValueError("workflow bundle verification failed")
+    return workflow
+
+
+def _inspect_bundle(raw: bytes, report: Dict[str, object]):
+    archive = zipfile.ZipFile(io.BytesIO(raw), "r")
 
     try:
         infos = archive.infolist()
@@ -185,34 +271,9 @@ def verify_workflow_bundle(bundle: Path) -> Dict[str, object]:
         if findings:
             return _invalid(report, "secret_like_value", "$.workflow")
 
-        metadata = workflow.get("workflow", {})
-        workflow_digest = _sha256(member_data["workflow.json"])
-        report["workflow"] = {
-            "id": str(metadata.get("id") or ""),
-            "version": str(metadata.get("version") or ""),
-            "schema_version": str(workflow.get("schema_version") or ""),
-            "status": str(metadata.get("status") or ""),
-            "bytes": len(member_data["workflow.json"]),
-            "sha256": workflow_digest,
-        }
-        report["valid"] = True
-        report["errors"] = []
-        return report
-    except (
-        OSError,
-        ValueError,
-        UnicodeDecodeError,
-        json.JSONDecodeError,
-        zipfile.BadZipFile,
-        NotImplementedError,
-        RuntimeError,
-        EOFError,
-        TypeError,
-        KeyError,
-        AttributeError,
-        RecursionError,
-    ):
-        return _invalid(report, "invalid_archive", "$")
+        report["_workflow_bytes"] = len(member_data["workflow.json"])
+        report["_workflow_sha256"] = _sha256(member_data["workflow.json"])
+        return workflow
     finally:
         archive.close()
 
@@ -399,9 +460,9 @@ def _validate_manifest(
     return None
 
 
-def _invalid(report: Dict[str, object], code: str, path: str) -> Dict[str, object]:
+def _invalid(report: Dict[str, object], code: str, path: str):
     report["errors"] = [{"code": code, "path": path}]
-    return report
+    return None
 
 
 def _is_symlink(info: zipfile.ZipInfo) -> bool:

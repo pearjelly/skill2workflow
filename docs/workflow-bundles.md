@@ -12,7 +12,7 @@ The bundle is a distribution format, not a second execution authority. The
 runtime still validates and executes Workflow DSL, and a bundle never contains
 credentials, resolved connector values, run state, or audit history.
 
-## Create and verify
+## Create, verify, and publish
 
 Create a bundle from a local Workflow DSL file:
 
@@ -39,6 +39,22 @@ total uncompressed limit, exact member names, ZIP symlink/path safety, manifest
 digests, Workflow DSL validation, and secret-like values. Invalid bundles
 return a stable redacted report and a non-zero exit code.
 
+Publish a verified bundle into one explicit local control plane:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-publish \
+  /tmp/approval-flow.s2w \
+  --state-dir /tmp/skill2workflow-control \
+  --storage sqlite
+```
+
+`bundle-publish` performs the same complete in-memory verification first, then
+passes the validated Workflow DSL to the normal immutable publication path.
+It never runs the workflow, resolves credentials, calls a connector, or
+overwrites a different published artifact. A repeated identical publication
+is idempotent under the existing control-plane contract; a different document
+for the same workflow/version is rejected as an immutable-artifact conflict.
+
 The successful report contains only workflow identity, status, byte counts,
 digests, member count, and fixed error fields. It does not echo workflow
 descriptions, trigger inputs, connector URLs, request bodies, credential
@@ -61,5 +77,4 @@ artifact.
 The manifest contract is versioned at
 [`schemas/workflow-bundle-0.1.0.schema.json`](../schemas/workflow-bundle-0.1.0.schema.json).
 The capability is local-only in this loop; it does not add remote upload,
-automatic installation, marketplace discovery, hosted signing, or migration
-of published service state.
+marketplace discovery, hosted signing, or migration of published service state.

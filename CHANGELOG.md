@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added explicit local `bundle-publish` handoff: a bundle is fully verified
+  in memory before entering the normal immutable Workflow publication path.
+  Publishing does not execute workflows, resolve credentials, or call
+  connectors.
+
 - Added deterministic local Workflow DSL bundles through `bundle-create` and
   `bundle-verify`. The fixed `skill2workflow-workflow-bundle-0.1.0` ZIP
   contains only a digest-bound manifest and validated `workflow.json`; creation

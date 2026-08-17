@@ -36,6 +36,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "validate",
     "bundle-create",
     "bundle-verify",
+    "bundle-publish",
     "publish",
     "promote",
     "workflow-diff",
@@ -318,10 +319,25 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    bundle_publish_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "bundle-publish",
+                str(bundle_path),
+                "--state-dir",
+                str(isolated_dir / "bundle-control"),
+                "--storage",
+                "sqlite",
+            ],
+            cwd=isolated_dir,
+        )
+    )
     if (
         bundle_create_result.get("valid") is not True
         or bundle_create_result.get("status") != "created"
         or bundle_verify_result.get("valid") is not True
+        or bundle_publish_result.get("status") != "published"
         or not bundle_path.is_file()
     ):
         raise RuntimeError("installed bundle commands did not preserve their contract")
@@ -379,6 +395,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "required_command_help_contains_usage": True,
         "validate_status": True,
         "bundle_status": True,
+        "bundle_publish_status": True,
     }
 
 

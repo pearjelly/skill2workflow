@@ -18,6 +18,7 @@ class WorkflowBundleDocumentationTests(TestCase):
         for phrase in (
             "bundle-create",
             "bundle-verify",
+            "bundle-publish",
             "deterministic ZIP",
             "never contains",
             "8 MiB",

@@ -3447,6 +3447,109 @@ class CliTests(TestCase):
         self.assertTrue(json.loads(created.getvalue())["valid"])
         self.assertTrue(json.loads(verified.getvalue())["valid"])
 
+    def test_bundle_publish_verifies_and_publishes_to_local_control_plane(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            state_dir = root / "state"
+            workflow_path.write_text(json.dumps(_approval_workflow()), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "bundle-create",
+                            str(workflow_path),
+                            "--output",
+                            str(bundle_path),
+                        ]
+                    ),
+                    0,
+                )
+            published = StringIO()
+            with redirect_stdout(published):
+                publish_exit = main(
+                    [
+                        "bundle-publish",
+                        str(bundle_path),
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        result = json.loads(published.getvalue())
+        self.assertEqual(publish_exit, 0)
+        self.assertEqual(result["workflow_id"], "workflow_demo")
+        self.assertEqual(result["version"], "0.1.0")
+        self.assertEqual(result["status"], "published")
+        self.assertNotIn("Review", published.getvalue())
+
+    def test_bundle_publish_rejects_different_document_for_immutable_version(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            first_workflow = root / "first.json"
+            first_bundle = root / "first.s2w"
+            second_workflow = root / "second.json"
+            second_bundle = root / "second.s2w"
+            first_workflow.write_text(json.dumps(_approval_workflow()), encoding="utf-8")
+            changed = _approval_workflow()
+            changed["nodes"][0]["title"] = "Changed"
+            second_workflow.write_text(json.dumps(changed), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(
+                        [
+                            "bundle-create",
+                            str(first_workflow),
+                            "--output",
+                            str(first_bundle),
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "bundle-publish",
+                            str(first_bundle),
+                            "--state-dir",
+                            str(state_dir),
+                            "--storage",
+                            "sqlite",
+                        ]
+                    ),
+                    0,
+                )
+                self.assertEqual(
+                    main(
+                        [
+                            "bundle-create",
+                            str(second_workflow),
+                            "--output",
+                            str(second_bundle),
+                        ]
+                    ),
+                    0,
+                )
+            stderr = StringIO()
+            with redirect_stdout(StringIO()), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "bundle-publish",
+                        str(second_bundle),
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("immutable", stderr.getvalue())
+
     def test_bundle_verify_maps_invalid_artifact_to_nonzero_without_traceback(self):
         with TemporaryDirectory() as tmp:
             bundle_path = Path(tmp) / "invalid.s2w"

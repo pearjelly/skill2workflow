@@ -15,7 +15,11 @@ from .backup import (
     restore_state_backup,
     verify_state_backup,
 )
-from .bundles import create_workflow_bundle, verify_workflow_bundle
+from .bundles import (
+    create_workflow_bundle,
+    load_verified_workflow_bundle,
+    verify_workflow_bundle,
+)
 from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
@@ -135,6 +139,14 @@ def _main(argv=None) -> int:
         help="Verify a Workflow DSL bundle without extracting or executing it",
     )
     bundle_verify_cmd.add_argument("bundle", type=Path)
+
+    bundle_publish_cmd = subparsers.add_parser(
+        "bundle-publish",
+        help="Verify a Workflow DSL bundle, then publish it to a local control plane",
+    )
+    bundle_publish_cmd.add_argument("bundle", type=Path)
+    bundle_publish_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    bundle_publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
     visualize_cmd.add_argument("workflow", type=Path)
@@ -907,6 +919,15 @@ def _main(argv=None) -> int:
         report = verify_workflow_bundle(args.bundle)
         _print_json(report)
         return 0 if report["valid"] else 1
+
+    if args.command == "bundle-publish":
+        workflow = load_verified_workflow_bundle(args.bundle)
+        return _control_action(
+            lambda: LocalControlPlane(
+                args.state_dir,
+                storage=args.storage,
+            ).publish_workflow(workflow)
+        )
 
     if args.command == "visualize":
         workflow = _load_json(args.workflow)

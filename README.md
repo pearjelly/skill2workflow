@@ -174,7 +174,7 @@ explicit connector boundaries. It currently supports:
 - Inspect compact, bounded published-workflow inventory without workflow content
 - Explain a workflow before execution with a bounded, side-effect-free, value-free plan using the fixed `skill2workflow-workflow-explanation-0.1.0` contract
 - Preflight trigger input and HTTP body mappings with a bounded, side-effect-free, value-free admission report using the fixed `skill2workflow-workflow-preflight-0.1.0` contract
-- Create and verify deterministic, secret-checked Workflow DSL bundles for safe local sharing with the fixed `skill2workflow-workflow-bundle-0.1.0` manifest
+- Create, verify, and explicitly publish deterministic, secret-checked Workflow DSL bundles into a local control plane with the fixed `skill2workflow-workflow-bundle-0.1.0` manifest
 - Drain due schedule work in explicitly bounded side-effect batches
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
@@ -557,11 +557,17 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-create \
   --output /tmp/approval-flow.s2w
 PYTHONPATH=src python3 -m skill2workflow.cli bundle-verify \
   /tmp/approval-flow.s2w
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-publish \
+  /tmp/approval-flow.s2w \
+  --state-dir /tmp/skill2workflow-control \
+  --storage sqlite
 ```
 
 Bundles are deterministic ZIP files containing only the Workflow DSL and a
 digest-bound manifest. Creation and verification are secret-hygiene checked,
-bounded, read-only at verification time, and never execute connectors. See
+bounded, read-only at verification time, and never execute connectors. The
+explicit publish command verifies again before entering the normal immutable
+publication path; it does not run the workflow or resolve credentials. See
 [`docs/workflow-bundles.md`](docs/workflow-bundles.md).
 
 Use `--version production` with `trigger`, webhook paths, or schedule
@@ -812,7 +818,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-180 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-181 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1471,8 +1477,10 @@ remain outside the report.
 Loop 180 adds [portable Workflow DSL bundles](docs/workflow-bundles.md):
 `bundle-create` produces a deterministic, secret-checked two-file ZIP and
 `bundle-verify` checks its digest, bounds, path safety, DSL validity, and
-secret hygiene without extraction or execution. The format is a sharing and
-review surface, not a second runtime authority or credential container.
+secret hygiene without extraction or execution. Loop 181 adds the explicit
+`bundle-publish` handoff into the normal local immutable publication path;
+the bundle remains a sharing surface, not a second runtime authority or
+credential container.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

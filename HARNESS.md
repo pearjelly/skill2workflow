@@ -105,10 +105,16 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-create \
   --output /tmp/skill2workflow-approval.s2w
 PYTHONPATH=src python3 -m skill2workflow.cli bundle-verify \
   /tmp/skill2workflow-approval.s2w
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-publish \
+  /tmp/skill2workflow-approval.s2w \
+  --state-dir /tmp/skill2workflow-control \
+  --storage sqlite
 ```
 
 The bundle path is deterministic and secret-checked; verification is bounded,
-read-only, and does not extract or execute either member. See
+read-only, and does not extract or execute either member. Publication performs
+the same verification before entering the normal immutable local control-plane
+path. See
 [`docs/workflow-bundles.md`](docs/workflow-bundles.md).
 
 Run the state upgrade/migration evidence:
