@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-202
+- Completed delivery loops: 1-203
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 202 is complete with a durable external connector failure boundary
+- Active loop: None; Loop 203 is complete with a durable external connector metadata boundary
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -153,6 +153,11 @@ These are verified as bounded local controls, not maturity-gate advances;
 Production Baseline remains directional.
 
 ## Active Loop
+
+No delivery loop is currently active. The detailed entries below are retained
+as historical evidence for completed Production Baseline loops; the current
+completion point and next-selection rule are authoritative in “Status At A
+Glance” and “Rolling Loop Queue”.
 
 ### Loop 56: Linux systemd Supervision
 
@@ -5153,9 +5158,44 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_executor.ExecutorTests.test_explicit_external_connector_error_text_is_sanitized_before_persistence -v
 ```
 
+### Loop 203: Durable External Connector Metadata Boundary
+
+**Status:** Complete.
+
+**Prior basis:** Loop 202 fixed durable failure text, but an external fixture
+could still return arbitrary provider or business strings in `output`, `audit`,
+input-mapping summaries, or credential summaries. The 1 MiB envelope bounded
+size and JSON shape, but not the value vocabulary persisted in local JSON or
+SQLite state.
+
+**Outcome:** The executor now projects non-built-in connector metadata before
+writing node results or connector events. It retains only the fixed status and
+presence vocabulary plus bounded identifier lists used by the approved
+fixtures; unknown fields, invalid enum values, nested objects, and invalid
+strings are dropped. Direct `ConnectorRuntime` results remain unchanged, and
+built-in HTTP output compatibility is preserved.
+
+**Evidence:** Direct runtime tests prove immediate metadata remains available.
+SQLite executor tests prove malicious output/audit/input-mapping/credential
+fields are absent from in-memory and reloaded state while approved metadata
+and connector-event projections remain intact. The focused plan is
+[`docs/superpowers/plans/2026-08-18-external-connector-durable-metadata.md`](docs/superpowers/plans/2026-08-18-external-connector-durable-metadata.md).
+
+**Safety boundary:** This is a durable metadata projection, not imported-Python
+sandboxing, provider cancellation, trigger-context rewriting, or exactly-once
+external execution.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_external_connector_direct_metadata_keeps_immediate_contract \
+  tests.test_executor.ExecutorTests.test_external_connector_metadata_is_projected_before_durable_persistence -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 202 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 203 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5324,6 +5364,7 @@ This rolling queue is ordered. Loop 202 is complete and there is no active deliv
 | Loop 200: Service-Level HTTP Origin Upper Bound | Complete | Govern built-in HTTP destinations at the self-hosted service boundary, including recurring execution, without changing Workflow DSL compatibility | Versioned exact-origin service policy, direct/scheduled propagation, pre-credential/network suppression, schema/docs, and regression evidence |
 | Loop 201: Discoverable Service HTTP Origin Bootstrap | Complete | Make the service-level HTTP origin policy safe and discoverable during first-run initialization | Repeatable CLI options, canonical config output, pre-creation validation, operator docs, and bootstrap regression evidence |
 | Loop 202: Durable External Connector Failure Boundary | Complete | Keep provider-authored external connector failure text out of durable run and audit projections without breaking immediate callers | Fixed durable failure message, returned/raised/retry coverage, SQLite reload evidence, docs, and production gates |
+| Loop 203: Durable External Connector Metadata Boundary | Complete | Keep arbitrary external connector output, audit, input-mapping, and credential strings out of durable state without breaking immediate callers | Fixed value-free durable projection, direct-result compatibility, SQLite reload evidence, docs, and production gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

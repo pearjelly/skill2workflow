@@ -99,6 +99,13 @@ contract, while failed non-built-in connector results use the fixed
 events. This is additive runtime protection and does not change Workflow DSL
 `0.1.0` fields.
 
+The same durable boundary projects non-built-in connector `output`, `audit`,
+input-mapping, and credential summaries to fixed status/presence fields and
+bounded identifier lists. Unknown fields and invalid strings are dropped
+before persistence; the immediate connector result remains unchanged. This is
+also additive runtime protection and does not change Workflow DSL `0.1.0`
+fields.
+
 Built-in HTTP transport failures use fixed, value-free connector messages:
 `http connector request failed` for non-timeout network failures and
 `http connector timed out` for timeouts. Request-body serialization failures

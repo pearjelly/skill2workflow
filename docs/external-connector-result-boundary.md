@@ -1,7 +1,8 @@
 # External Connector Result Boundary
 
-Loop 173 closes the handoff between an explicitly loaded external connector and
-the durable executor.
+Loop 173 introduced the bounded JSON handoff between an explicitly loaded
+external connector and the durable executor. Loop 203 closes the remaining
+metadata projection gap at that same boundary.
 
 ## Contract
 
@@ -26,9 +27,14 @@ the existing explicit `ConnectorExecutionError` and returned-error contract
 for callers that need immediate diagnostics, but the executor applies a
 second durable boundary: any failed result from a non-built-in connector is
 stored and emitted in retry/audit events only as the fixed
-`external connector failed` message. Connector code remains responsible for
-using compact, value-free messages for its direct API and for keeping provider
-details out of output values.
+`external connector failed` message. Loop 203 adds a second projection for
+successful and failed external results before they are persisted: `output` and
+`audit` retain only the fixed status/presence vocabulary and bounded identifier
+lists used by the approved fixtures; `input_mapping` retains only its status
+and input-key names; and `credentials` retains only its status and bounded
+handle names. Unknown fields, invalid enum values, nested objects, and strings
+outside the fixed vocabulary are dropped. The direct runtime result remains
+unchanged for callers that need immediate diagnostics.
 
 The limit is enforced for explicitly loaded external connectors only. The
 built-in HTTP connector keeps its existing 1 MiB request/response payload
@@ -38,14 +44,14 @@ but they cannot bypass this final runtime persistence boundary.
 
 ## Safety boundary
 
-This contract bounds the result and exception handoff to the local executor
-and makes external failure text value-free at the durable boundary. It does
-not sandbox imported Python code, interrupt an outbound provider call, redact
-business values returned by a connector, add remote package installation, or
-claim exactly-once external effects. Connector authors must continue to return
-compact, value-safe audit and credential summaries, use value-free
-`ConnectorExecutionError` messages, and keep resolved secrets out of
-`output`.
+This contract bounds the result and exception handoff to the local executor,
+makes external failure text value-free, and projects persisted metadata to a
+fixed value-free vocabulary. It does not sandbox imported Python code,
+interrupt an outbound provider call, rewrite user-supplied trigger context,
+add remote package installation, or claim exactly-once external effects.
+Connector authors should still keep direct results compact and avoid placing
+resolved secrets in `output`; the durable executor boundary is the final
+protection for persisted run state and audit events.
 
 The focused evidence command is:
 

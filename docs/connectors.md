@@ -331,6 +331,15 @@ The Python helper `validate_connector_manifest(manifest)` checks the minimum man
 
 External connector executors must return the same compact result shape as built-ins. The complete normalized result envelope is bounded to 1 MiB and must round-trip through standard JSON before it enters durable state. They may include `credentials` and `input_mapping` summaries, but those summaries must contain handles, statuses, and input key names only. Resolved credential values and raw mapped business values must not be returned.
 
+At the executor's durable boundary, non-built-in connector `output` and
+`audit` objects are projected to a fixed value-free vocabulary: approved
+status strings, boolean presence/attempt flags, and bounded identifier lists.
+`input_mapping` keeps only its status and input-key names, while `credentials`
+keeps only its status and bounded handle names. Unknown fields or invalid
+strings are dropped before JSON/SQLite run state and connector events are
+written. This does not change the immediate `ConnectorRuntime` result returned
+to a local caller; it protects the persisted projection.
+
 Published-run audit events promote compact connector metadata for inspection. For external fixtures this includes fields such as `credential_status`, `credential_handles`, `input_mapping_status`, and `input_mapping_keys`, not payload values.
 
 ## Connector Package Layout

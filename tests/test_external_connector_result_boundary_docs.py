@@ -19,6 +19,8 @@ class ExternalConnectorResultBoundaryDocsTests(TestCase):
             "external connector execution failed",
             "external connector failed",
             "direct runtime result",
+            "fixed value-free vocabulary",
+            "Unknown fields",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("external-connector-result-boundary.md", connectors)

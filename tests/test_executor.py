@@ -605,6 +605,108 @@ class ExecutorTests(TestCase):
         )
         self.assertNotIn(private_marker, json.dumps(state, ensure_ascii=False))
 
+    def test_external_connector_metadata_is_projected_before_durable_persistence(self):
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "connectors"
+            / "local_echo_connector.py"
+        )
+        fixture = load_external_connector(fixture_path)
+        private_marker = "provider-value=private-secret"
+
+        def execute(_binding, credential_provider=None, context=None):
+            return {
+                "status": "completed",
+                "connector": {"id": "local_echo", "kind": private_marker},
+                "output": {
+                    "operation": "create_task",
+                    "provider_status": "completed",
+                    "task_title_present": True,
+                    "body_keys": ["customer_id", private_marker],
+                    "provider_message": private_marker,
+                },
+                "audit": {
+                    "operation": "create_task",
+                    "provider_status": "completed",
+                    "task_title_present": True,
+                    "raw_provider_message": private_marker,
+                },
+                "input_mapping": {
+                    "status": "applied",
+                    "input_keys": ["customer_id", private_marker],
+                    "mapped_value": private_marker,
+                },
+                "credentials": {
+                    "status": "resolved",
+                    "handles": ["safe_token_handle", private_marker],
+                    "resolved_value": private_marker,
+                },
+            }
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.manifest, execute)])
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["nodes"][1]["connector"] = {
+            "id": "local_echo",
+            "kind": "local_echo",
+            "request": {},
+        }
+
+        for storage in ("json", "sqlite"):
+            with self.subTest(storage=storage), TemporaryDirectory() as tmp:
+                state = LocalExecutor(
+                    Path(tmp), storage=storage, connector_runtime=runtime
+                ).run(workflow)
+                persisted = LocalExecutor(Path(tmp), storage=storage).get_run(
+                    state["run_id"]
+                )
+
+            for snapshot in (state, persisted):
+                encoded = json.dumps(snapshot, ensure_ascii=False)
+                self.assertNotIn(private_marker, encoded)
+                result = snapshot["node_results"]["call_api"]
+                self.assertEqual(
+                    result["connector"],
+                    {"id": "local_echo", "kind": "local_echo"},
+                )
+                self.assertEqual(
+                    result["output"],
+                    {
+                        "operation": "create_task",
+                        "provider_status": "completed",
+                        "task_title_present": True,
+                        "body_keys": ["customer_id"],
+                    },
+                )
+                self.assertEqual(
+                    result["audit"],
+                    {
+                        "operation": "create_task",
+                        "provider_status": "completed",
+                        "task_title_present": True,
+                    },
+                )
+                self.assertEqual(
+                    result["input_mapping"],
+                    {"status": "applied", "input_keys": ["customer_id"]},
+                )
+                self.assertEqual(
+                    result["credentials"],
+                    {"status": "resolved", "handles": ["safe_token_handle"]},
+                )
+                completed = [
+                    event
+                    for event in snapshot["events"]
+                    if event["type"] in {"connector_completed", "node_completed"}
+                ]
+                self.assertTrue(completed)
+                self.assertTrue(
+                    any(
+                        event.get("connector_metadata") == result["audit"]
+                        for event in completed
+                    )
+                )
+
     def test_retry_policy_retries_failed_connector_and_records_recovery(self):
         server = _FlakyConnectorTestServer()
         workflow = _http_connector_workflow(server.url)

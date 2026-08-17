@@ -26,6 +26,132 @@ MAX_WORKFLOW_TIMEOUT_MS = 2_592_000_000
 MAX_RETRY_BACKOFF_MS = 60_000
 MAX_WORKFLOW_DEADLINE_SWEEP_RUNS = 256
 
+# External connector results keep their immediate runtime contract, but the
+# executor must not persist arbitrary provider/business strings.  This is a
+# deliberately small vocabulary shared by the checked-in connector fixtures.
+# Unknown fields are dropped at the durable boundary; connector authors can
+# still expose value-free presence flags and bounded key-name lists.
+_EXTERNAL_METADATA_STRING_VALUES = {
+    "operation": frozenset({"create_task"}),
+    "mode": frozenset({"dry_run", "live"}),
+    "provider_status": frozenset(
+        {
+            "live_disabled",
+            "validation_failed",
+            "credential_failed",
+            "authorization_failed",
+            "permission_denied",
+            "rate_limited",
+            "resource_not_found",
+            "idempotency_conflict",
+            "provider_unavailable",
+            "timeout",
+            "malformed_response",
+            "completed",
+        }
+    ),
+    "credential_status": frozenset({"skipped", "resolved", "failed"}),
+    "input_mapping_status": frozenset({"applied", "skipped", "not_applied"}),
+}
+_EXTERNAL_METADATA_BOOLEAN_KEYS = frozenset(
+    {
+        "task_title_present",
+        "task_description_present",
+        "assignee_present",
+        "due_at_present",
+        "idempotency_key_present",
+        "lark_task_id_present",
+        "provider_payload_constructed",
+        "credential_resolution_attempted",
+        "network_called",
+    }
+)
+_EXTERNAL_METADATA_LIST_KEYS = frozenset(
+    {"body_keys", "received_input_keys", "credential_handles", "input_mapping_keys"}
+)
+_EXTERNAL_METADATA_MAX_LIST_ITEMS = 32
+_EXTERNAL_METADATA_MAX_NAME_BYTES = 128
+_EXTERNAL_CREDENTIAL_STATUSES = frozenset({"skipped", "resolved", "failed"})
+
+
+def _safe_external_metadata_name(value: object) -> str:
+    """Return one bounded identifier suitable for durable metadata, or empty."""
+
+    if not isinstance(value, str):
+        return ""
+    candidate = value
+    if not candidate or len(candidate.encode("utf-8")) > _EXTERNAL_METADATA_MAX_NAME_BYTES:
+        return ""
+    if not all(
+        character.isalnum() or character in {"_", ".", ":", "-"}
+        for character in candidate
+    ):
+        return ""
+    return candidate
+
+
+def _safe_external_metadata_names(value: object) -> List[str]:
+    if not isinstance(value, list):
+        return []
+    names = {
+        name
+        for name in (_safe_external_metadata_name(item) for item in value)
+        if name
+    }
+    return sorted(names)[:_EXTERNAL_METADATA_MAX_LIST_ITEMS]
+
+
+def _durable_external_metadata(summary: object) -> Dict[str, object]:
+    """Project external metadata to a fixed value-free durable vocabulary."""
+
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    normalized: Dict[str, object] = {}
+    for raw_key, value in summary.items():
+        key = str(raw_key)
+        allowed_values = _EXTERNAL_METADATA_STRING_VALUES.get(key)
+        if allowed_values is not None:
+            if isinstance(value, str) and value in allowed_values:
+                normalized[key] = value
+            continue
+        if key in _EXTERNAL_METADATA_BOOLEAN_KEYS:
+            if isinstance(value, bool):
+                normalized[key] = value
+            continue
+        if key in _EXTERNAL_METADATA_LIST_KEYS:
+            normalized[key] = _safe_external_metadata_names(value)
+    return normalized
+
+
+def _durable_external_input_mapping(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    normalized: Dict[str, object] = {}
+    status = summary.get("status")
+    if isinstance(status, str) and status in {"applied", "skipped", "not_applied"}:
+        normalized["status"] = status
+    if "input_keys" in summary:
+        normalized["input_keys"] = _safe_external_metadata_names(summary.get("input_keys"))
+    return normalized
+
+
+def _durable_external_credentials(summary: object) -> Dict[str, object]:
+    if not isinstance(summary, dict) or not summary:
+        return {}
+    normalized: Dict[str, object] = {}
+    status = summary.get("status")
+    if isinstance(status, str) and status in _EXTERNAL_CREDENTIAL_STATUSES:
+        normalized["status"] = status
+    if "handles" in summary:
+        normalized["handles"] = _safe_external_metadata_names(summary.get("handles"))
+    return normalized
+
+
+def _durable_connector_output(ref: Dict[str, str], output: object) -> Dict[str, object]:
+    if ref.get("id") not in BUILTIN_CONNECTOR_IDS:
+        return _durable_external_metadata(output)
+    return copy.deepcopy(output) if isinstance(output, dict) else {}
+
 
 class LocalExecutor:
     """Execute Workflow DSL with pluggable local run-state storage."""
@@ -536,23 +662,35 @@ class LocalExecutor:
                     return timed_out
 
         result_status = str(connector_result.get("status", "failed"))
+        durable_output = _durable_connector_output(
+            ref,
+            connector_result.get("output", {}),
+        )
+        mapping_summary = connector_result.get("input_mapping")
+        credential_summary = connector_result.get("credentials")
+        audit_summary = connector_result.get("audit")
+        if ref.get("id") not in BUILTIN_CONNECTOR_IDS:
+            mapping_summary = _durable_external_input_mapping(mapping_summary)
+            credential_summary = _durable_external_credentials(credential_summary)
+            audit_summary = _durable_external_metadata(audit_summary)
         node_result = {
             "status": result_status,
             "title": node.get("title", current_id),
-            "connector": connector_result.get("connector", ref),
-            "output": connector_result.get("output", {}),
+            "connector": (
+                copy.deepcopy(ref)
+                if ref.get("id") not in BUILTIN_CONNECTOR_IDS
+                else copy.deepcopy(connector_result.get("connector", ref))
+            ),
+            "output": durable_output,
             "attempts": attempts,
             "max_attempts": max_attempts,
             "backoff_ms": backoff_ms,
             "timestamp": self._now(),
         }
-        mapping_summary = connector_result.get("input_mapping")
         if isinstance(mapping_summary, dict) and mapping_summary:
             node_result["input_mapping"] = mapping_summary
-        credential_summary = connector_result.get("credentials")
         if isinstance(credential_summary, dict) and credential_summary:
             node_result["credentials"] = credential_summary
-        audit_summary = connector_result.get("audit")
         if isinstance(audit_summary, dict) and audit_summary:
             node_result["audit"] = audit_summary
         if last_error:

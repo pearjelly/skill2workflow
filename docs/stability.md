@@ -47,6 +47,11 @@ These surfaces should remain compatible during the `0.1.x` line:
   fixed `external connector failed` message in durable run state and
   retry/audit projections, so connector-authored provider text does not cross
   the executor persistence boundary
+- Durable projections from non-built-in connector results retain only the
+  fixed status/presence vocabulary and bounded identifier lists for `output`,
+  `audit`, input-mapping, and credential summaries; unknown fields and invalid
+  strings are dropped while direct runtime results remain unchanged, as
+  documented in [`external-connector-result-boundary.md`](external-connector-result-boundary.md)
 - Built-in HTTP transport failures use fixed value-free messages (`http
   connector request failed`, `http connector timed out`, and the fixed JSON
   body serialization message); underlying URL, provider-transport, proxy,

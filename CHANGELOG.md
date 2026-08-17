@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a durable value-free projection for non-built-in connector metadata:
+  `output`, `audit`, input-mapping, and credential summaries now retain only
+  the fixed status/presence vocabulary and bounded identifier lists before
+  entering JSON/SQLite run state or connector events. Immediate connector
+  results remain unchanged.
+
 - Added a durable executor boundary for external connector failure text:
   immediate connector callers retain their existing diagnostics, while failed
   external results use the fixed `external connector failed` message in run

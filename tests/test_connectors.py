@@ -178,6 +178,34 @@ class ConnectorTests(TestCase):
         self.assertEqual(result["error"], private_marker)
         self.assertNotEqual(EXTERNAL_CONNECTOR_DURABLE_FAILURE, result["error"])
 
+    def test_external_connector_direct_metadata_keeps_immediate_contract(self):
+        fixture = _load_local_echo_fixture()
+        private_marker = "provider-payload-visible-to-direct-caller"
+
+        def execute(_binding, credential_provider=None, context=None):
+            return {
+                "status": "completed",
+                "connector": {"id": "local_echo", "kind": "local_echo"},
+                "output": {"provider_message": private_marker},
+                "audit": {"raw_provider_message": private_marker},
+                "input_mapping": {
+                    "status": "applied",
+                    "input_keys": [private_marker],
+                },
+                "credentials": {
+                    "status": "resolved",
+                    "handles": [private_marker],
+                },
+            }
+
+        runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, execute)])
+        result = runtime.execute_connector(_local_echo_node())
+
+        self.assertEqual(result["output"]["provider_message"], private_marker)
+        self.assertEqual(result["audit"]["raw_provider_message"], private_marker)
+        self.assertEqual(result["input_mapping"]["input_keys"], [private_marker])
+        self.assertEqual(result["credentials"]["handles"], [private_marker])
+
     def test_http_connector_sends_method_headers_json_body_and_normalizes_response(self):
         server = _ConnectorTestServer()
 
