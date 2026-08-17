@@ -829,7 +829,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-187 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-188 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1512,6 +1512,8 @@ Loop 186 adds compact Bundle run evidence: successful runs retain only
 Loop 187 adds the exact verified archive fingerprint to that evidence through
 `context.bundle_run.bundle_sha256`, computed during the same bounded read used
 for execution.
+Loop 188 adds optional `bundle-run --format json` admission failures with a
+stable reason code and safety flags, while preserving the default text error.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 

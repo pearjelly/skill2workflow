@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added optional `bundle-run --format json` output for a stable, value-free
+  side-effect-consent refusal report that automation can classify without
+  parsing human-readable stderr.
+
 - Added exact verified Bundle provenance to successful runs through the
   value-free `context.bundle_run.bundle_sha256` digest, computed from the same
   bounded archive read used for execution.

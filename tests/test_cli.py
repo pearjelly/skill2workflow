@@ -3731,6 +3731,67 @@ class CliTests(TestCase):
         self.assertIn("--allow-side-effects", stderr.getvalue())
         self.assertFalse(state_dir.exists())
 
+    def test_bundle_run_json_consent_report_is_value_free_and_stable(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            input_path = root / "input.json"
+            state_dir = root / "state"
+            workflow_path.write_text(
+                json.dumps(_mapped_connector_workflow("http://127.0.0.1:9/task")),
+                encoding="utf-8",
+            )
+            input_path.write_text(
+                json.dumps({"customer_id": "private-customer"}), encoding="utf-8"
+            )
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
+                    0,
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                exit_code = main(
+                    [
+                        "bundle-run",
+                        str(bundle_path),
+                        "--input",
+                        str(input_path),
+                        "--format",
+                        "json",
+                        "--state-dir",
+                        str(state_dir),
+                    ]
+                )
+
+        report = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(
+            set(report),
+            {"schema_version", "status", "workflow", "bundle_sha256", "reason", "summary", "safety"},
+        )
+        self.assertEqual(
+            report["schema_version"],
+            "skill2workflow-workflow-bundle-run-0.1.0",
+        )
+        self.assertEqual(report["status"], "blocked")
+        self.assertEqual(report["reason"]["code"], "side_effect_consent_required")
+        self.assertEqual(report["reason"]["required_flag"], "--allow-side-effects")
+        self.assertEqual(report["summary"]["side_effecting_node_count"], 1)
+        self.assertEqual(
+            report["safety"],
+            {
+                "state_created": False,
+                "credentials_resolved": False,
+                "connector_calls": False,
+                "raw_values_included": False,
+            },
+        )
+        self.assertRegex(report["bundle_sha256"], r"^[0-9a-f]{64}$")
+        self.assertNotIn("private-customer", stdout.getvalue())
+        self.assertFalse(state_dir.exists())
+
     def test_bundle_run_executes_connector_only_with_explicit_consent(self):
         server = _CliConnectorTestServer()
         try:

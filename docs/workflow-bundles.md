@@ -106,6 +106,24 @@ run may execute explicitly requested connector side effects, but it does not
 create a published version, promote an alias, or introduce a second execution
 authority. Invalid bundles fail before the state directory is initialized.
 
+Automation that needs a stable refusal contract can add `--format json`:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
+  /tmp/connector-flow.s2w \
+  --format json \
+  --state-dir /tmp/skill2workflow-bundle-run
+```
+
+When connector side effects are present and consent is missing, the command
+returns exit code 1 and emits the value-free
+`skill2workflow-workflow-bundle-run-0.1.0` report. It includes the workflow
+identity, Bundle SHA-256, stable reason code, side-effecting node count, and
+the `side_effect_consent_required` reason, plus false safety flags for state
+creation, credential resolution, connector calls,
+and raw values. The default invocation keeps the existing human-readable
+stderr message.
+
 Every successful `bundle-run` also stores a compact `context.bundle_run`
 metadata object with `bundle_verified`, `side_effects_authorized`, and the
 lowercase SHA-256 digest of the exact verified archive in `bundle_sha256`.
@@ -141,5 +159,7 @@ The manifest contract is versioned at
 [`schemas/workflow-bundle-0.1.0.schema.json`](../schemas/workflow-bundle-0.1.0.schema.json).
 The value-free diff contract is versioned at
 [`schemas/workflow-bundle-diff-0.1.0.schema.json`](../schemas/workflow-bundle-diff-0.1.0.schema.json).
+The structured side-effect refusal contract is versioned at
+[`schemas/workflow-bundle-run-0.1.0.schema.json`](../schemas/workflow-bundle-run-0.1.0.schema.json).
 The capability is local-only in this loop; it does not add remote upload,
 marketplace discovery, hosted signing, or migration of published service state.

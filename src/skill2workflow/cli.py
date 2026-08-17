@@ -83,6 +83,7 @@ from .webhooks import serve_webhook_requests
 
 
 MAX_CLI_JSON_DOCUMENT_BYTES = 8 * 1024 * 1024
+BUNDLE_RUN_ADMISSION_SCHEMA_VERSION = "skill2workflow-workflow-bundle-run-0.1.0"
 
 
 def main(argv=None) -> int:
@@ -178,6 +179,12 @@ def _main(argv=None) -> int:
         "--allow-side-effects",
         action="store_true",
         help="Explicitly authorize connector side effects for this local run",
+    )
+    bundle_run_cmd.add_argument(
+        "--format",
+        choices=["json", "text"],
+        default=None,
+        help="Format admission failures (JSON is stable for automation)",
     )
     bundle_run_cmd.add_argument("--credential-file", type=Path)
 
@@ -989,16 +996,22 @@ def _main(argv=None) -> int:
             input_present=args.input is not None,
         )
         if not preflight["ready"]:
-            _print_json(preflight)
+            if args.format == "text":
+                print(render_workflow_preflight_text(preflight), end="")
+            else:
+                _print_json(preflight)
             return 1
         if (
             preflight["summary"]["side_effecting_node_count"] > 0
             and not args.allow_side_effects
         ):
-            print(
-                "bundle-run requires --allow-side-effects for workflows with connector side effects",
-                file=sys.stderr,
-            )
+            if args.format == "json":
+                _print_json(_bundle_run_consent_report(preflight, bundle_report))
+            else:
+                print(
+                    "bundle-run requires --allow-side-effects for workflows with connector side effects",
+                    file=sys.stderr,
+                )
             return 1
         context = {
             "bundle_run": {
@@ -1984,6 +1997,40 @@ def _load_bundle_input(path: Path):
     if path is None:
         return None
     return normalize_trigger_input(_load_json(path), label="bundle input")
+
+
+def _bundle_run_consent_report(
+    preflight: dict, bundle_report: dict
+) -> dict:
+    """Return a value-free machine-readable side-effect admission refusal."""
+
+    workflow = preflight.get("workflow", {})
+    summary = preflight.get("summary", {})
+    return {
+        "schema_version": BUNDLE_RUN_ADMISSION_SCHEMA_VERSION,
+        "status": "blocked",
+        "workflow": {
+            "id": str(workflow.get("id", "")),
+            "version": str(workflow.get("version", "")),
+            "status": str(workflow.get("status", "")),
+        },
+        "bundle_sha256": str(bundle_report.get("bundle_sha256", "")),
+        "reason": {
+            "code": "side_effect_consent_required",
+            "required_flag": "--allow-side-effects",
+        },
+        "summary": {
+            "side_effecting_node_count": int(
+                summary.get("side_effecting_node_count", 0)
+            )
+        },
+        "safety": {
+            "state_created": False,
+            "credentials_resolved": False,
+            "connector_calls": False,
+            "raw_values_included": False,
+        },
+    }
 
 
 def _write_back_workflow(workflow, graph):
