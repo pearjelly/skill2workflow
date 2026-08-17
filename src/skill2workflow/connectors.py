@@ -27,6 +27,8 @@ MAX_HTTP_URL_BYTES = 16_384
 MAX_HTTP_HEADER_COUNT = 64
 MAX_HTTP_HEADER_BYTES = 65_536
 MAX_HTTP_METHOD_BYTES = 32
+MAX_HTTP_ALLOWED_ORIGINS = 32
+MAX_HTTP_ORIGIN_BYTES = 512
 HTTP_RESPONSE_MODES = ("full", "metadata")
 # External connector code is explicitly loaded, but its normalized result still
 # crosses the durable executor boundary. Keep that handoff bounded independently
@@ -80,6 +82,11 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
                         "headers": {"type": "object"},
                         "body": {},
                         "input_mapping": {"type": "array"},
+                        "allowed_origins": {
+                            "type": "array",
+                            "maxItems": MAX_HTTP_ALLOWED_ORIGINS,
+                            "items": {"type": "string"},
+                        },
                         "timeout_ms": {"type": "integer"},
                         "response_mode": {"type": "string", "enum": list(HTTP_RESPONSE_MODES)},
                     },
@@ -405,6 +412,7 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
     _validate_http_request_metadata(url, method, headers)
     url, body, mapping_summary = _mapped_http_request(request_spec, context)
     _validate_http_request_metadata(url, method, headers)
+    _validate_http_destination(url, request_spec.get("allowed_origins"))
     _apply_http_credentials(binding.get("credentials", []), headers, credential_provider)
     _validate_http_request_metadata(url, method, headers)
     data = None
@@ -531,6 +539,60 @@ def _validate_http_request_metadata(url: str, method: str, headers: Dict[str, st
 def _is_http_token(value: str) -> bool:
     separators = '()<>@,;:\\"/[]?={} \t'
     return all(33 <= ord(character) <= 126 and character not in separators for character in value)
+
+
+def _validate_http_destination(url: str, allowed_origins: object) -> None:
+    """Enforce an optional exact-origin egress allowlist before credentials/network."""
+
+    if allowed_origins is None:
+        return
+    if not isinstance(allowed_origins, list) or not allowed_origins:
+        raise ConnectorExecutionError(
+            "http connector request.allowed_origins must be a non-empty list"
+        )
+    if len(allowed_origins) > MAX_HTTP_ALLOWED_ORIGINS:
+        raise ConnectorExecutionError(
+            f"http connector request.allowed_origins exceeds {MAX_HTTP_ALLOWED_ORIGINS} entries"
+        )
+    request_origin = _normalize_http_origin(url, "http connector request.url")
+    normalized = []
+    for index, origin in enumerate(allowed_origins):
+        if not isinstance(origin, str):
+            raise ConnectorExecutionError(
+                f"http connector request.allowed_origins[{index}] must be an origin string"
+            )
+        normalized.append(
+            _normalize_http_origin(
+                origin,
+                f"http connector request.allowed_origins[{index}]",
+                require_origin=True,
+            )
+        )
+    if request_origin not in normalized:
+        raise ConnectorExecutionError("http connector request URL is not in allowed_origins")
+
+
+def _normalize_http_origin(value: str, label: str, require_origin: bool = False) -> str:
+    try:
+        if len(value.encode("utf-8")) > MAX_HTTP_ORIGIN_BYTES:
+            raise ConnectorExecutionError(f"{label} exceeds {MAX_HTTP_ORIGIN_BYTES} bytes")
+        parsed = urlsplit(value)
+        hostname = parsed.hostname
+        port = parsed.port
+    except (UnicodeError, ValueError) as error:
+        raise ConnectorExecutionError(f"{label} is invalid") from error
+    if parsed.scheme not in ("http", "https") or not parsed.netloc or not hostname:
+        raise ConnectorExecutionError(f"{label} is invalid")
+    if parsed.username is not None or parsed.password is not None:
+        raise ConnectorExecutionError(f"{label} must not contain userinfo")
+    if require_origin and (parsed.path not in ("", "/") or parsed.query or parsed.fragment):
+        raise ConnectorExecutionError(f"{label} must not contain a path, query, or fragment")
+    default_port = 80 if parsed.scheme == "http" else 443
+    port_suffix = "" if port in (None, default_port) else f":{port}"
+    host = hostname.lower()
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"{parsed.scheme}://{host}{port_suffix}"
 
 
 def _http_response_output(response: object, status_code: int, payload: str, mode: str) -> Dict[str, object]:

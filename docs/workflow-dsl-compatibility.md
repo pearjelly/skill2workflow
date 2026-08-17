@@ -79,6 +79,11 @@ entries/65,536 UTF-8 bytes. Invalid URL, method, or header metadata fails
 before network access with the existing connector failure boundary; existing
 valid request behavior remains compatible.
 
+`connector.request.allowed_origins` is an additive exact-origin egress
+allowlist. Workflows that omit it retain legacy destination behavior; when
+present, the runtime requires the normalized request origin to match one of
+the declared entries before credential resolution or network access.
+
 SQLite publication and deprecation likewise mutate one registry record and its
 audit row atomically. Concurrent publication of distinct immutable versions is
 additive; a same-version checksum mismatch remains an immutable-version error.
@@ -123,7 +128,7 @@ Visual write-back is allowlisted. The editor may update:
 - Node active timeout (`timeout_ms`, bounded to `0..86400000` milliseconds)
 - Retry max attempts
 - Fixed connector retry backoff in the bounded `0..60000` millisecond range
-- Built-in HTTP connector request method, URL, headers, body, bounded body/query input mapping, response retention mode, and timeout
+- Built-in HTTP connector request method, URL, exact-origin allowlist, headers, body, bounded body/query input mapping, response retention mode, and timeout
 
 The editor must not change:
 

@@ -14,6 +14,7 @@ from skill2workflow.connectors import (
     CONNECTOR_MANIFEST_VERSION,
     MAX_HTTP_HEADER_BYTES,
     MAX_HTTP_HEADER_COUNT,
+    MAX_HTTP_ALLOWED_ORIGINS,
     MAX_HTTP_PAYLOAD_BYTES,
     MAX_HTTP_URL_BYTES,
     MAX_EXTERNAL_CONNECTOR_RESULT_BYTES,
@@ -631,6 +632,58 @@ class ConnectorTests(TestCase):
         self.assertEqual(target.requests[0]["headers"]["Authorization"], "Bearer secret-token")
         self.assertEqual(proxy.requests, [])
 
+    def test_http_connector_enforces_exact_origin_allowlist_before_credentials(self):
+        server = _ConnectorTestServer()
+
+        try:
+            result = execute_connector(
+                _credential_http_node(server.url("/success")) | {
+                    "connector": {
+                        "id": "http",
+                        "kind": "http",
+                        "request": {
+                            "url": server.url("/success"),
+                            "allowed_origins": [server.origin()],
+                        },
+                        "credentials": [
+                            {
+                                "target": "header",
+                                "name": "Authorization",
+                                "handle": "demo_api_token",
+                                "prefix": "Bearer ",
+                            }
+                        ],
+                    }
+                },
+                credential_provider=StaticCredentialProvider({"demo_api_token": "secret-token"}),
+            )
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(server.requests[0]["headers"]["Authorization"], "Bearer secret-token")
+
+            server.requests.clear()
+            disallowed = _credential_http_node(server.url("/success"), handle="missing_token")
+            disallowed["connector"]["request"]["allowed_origins"] = ["https://api.example.com"]
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                "http connector request URL is not in allowed_origins",
+            ):
+                execute_connector(disallowed)
+            self.assertEqual(server.requests, [])
+
+            malformed = _http_node(server.url("/success"))
+            malformed["connector"]["request"]["allowed_origins"] = ["https://api.example.com/path"]
+            with self.assertRaisesRegex(ConnectorExecutionError, "must not contain a path"):
+                execute_connector(malformed)
+
+            oversized = _http_node(server.url("/success"))
+            oversized["connector"]["request"]["allowed_origins"] = [
+                server.origin()
+            ] * (MAX_HTTP_ALLOWED_ORIGINS + 1)
+            with self.assertRaisesRegex(ConnectorExecutionError, "allowed_origins exceeds"):
+                execute_connector(oversized)
+        finally:
+            server.close()
+
     def test_http_connector_missing_credential_fails_before_network_call(self):
         with self.assertRaisesRegex(ConnectorExecutionError, "credential handle not found: missing_token"):
             execute_connector(_credential_http_node("http://127.0.0.1:1/not-called", handle="missing_token"))
@@ -785,6 +838,10 @@ class _ConnectorTestServer:
     def url(self, path):
         host, port = self._server.server_address
         return f"http://{host}:{port}{path}"
+
+    def origin(self):
+        host, port = self._server.server_address
+        return f"http://{host}:{port}"
 
     @property
     def requests(self):

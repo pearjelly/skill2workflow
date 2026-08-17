@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-196
+- Completed delivery loops: 1-197
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 196 is complete with bounded HTTP request metadata
+- Active loop: None; Loop 197 is complete with declarative HTTP origin governance
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-196 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-197 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -116,6 +116,9 @@ of a credentialed HTTP request through a local proxy server.
 
 Loop 196 adds bounded and normalized HTTP URL, method, and header metadata
 after reproducing raw `urllib` exceptions and unbounded request envelopes.
+
+Loop 197 adds optional exact-origin egress governance for built-in HTTP
+requests, enforced before credential resolution and network access.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4920,9 +4923,43 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_connectors.ConnectorTests.test_http_connector_rejects_oversized_request_metadata_before_network_call -v
 ```
 
+### Loop 197: Declarative HTTP Origin Governance
+
+**Status:** Complete.
+
+**Prior basis:** Direct egress and bounded request metadata made the transport
+safer, but a published workflow still had no declarative way to review or
+restrict which HTTP origin it could call. The runtime could not distinguish an
+intended provider endpoint from an accidental destination.
+
+**Outcome:** `connector.request.allowed_origins` now accepts up to 32 exact
+`http`/`https` origins. The runtime canonicalizes scheme/host/port and rejects
+non-matching destinations before resolving credential handles or opening a
+socket. Omission preserves the legacy unrestricted destination behavior, while
+the compiler, versioned schema, LiteGraph write-back, and docs expose the
+allowlist for reviewed workflows.
+
+**Evidence:** Runtime tests prove matching local origins succeed, mismatches
+make no request and do not resolve a missing credential, malformed entries and
+oversized lists fail closed, compiler/schema tests cover the additive contract,
+and visual write-back preserves the allowlist. Full-suite, package,
+secret-hygiene, and Production Baseline checks remain green.
+
+**Safety boundary:** This is exact-origin governance, not a wildcard matcher,
+SSRF defense, DNS-rebinding defense, IP-range policy, or network firewall.
+Workflows that omit the field retain compatibility; production operators
+should declare explicit origins for externally connected workflows.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_http_connector_enforces_exact_origin_allowlist_before_credentials -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 196 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 197 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5085,6 +5122,7 @@ This rolling queue is ordered. Loop 196 is complete and there is no active deliv
 | Loop 194: Fixed HTTP No-Redirect Credential Boundary | Complete | Reject HTTP redirects before credential headers can be replayed to a second target | Dedicated no-redirect opener, real dual-server credential regression, unchanged non-redirect contract tests, docs, and package evidence |
 | Loop 195: Fixed HTTP Direct-Egress Boundary | Complete | Prevent ambient process proxy settings from rerouting credentialed HTTP requests | Empty proxy handler, real target-plus-proxy regression, unchanged direct HTTP contract tests, docs, and package evidence |
 | Loop 196: Bounded HTTP Request Metadata | Complete | Keep URL, method, and headers bounded and normalize malformed request failures before network access | Fixed URL/method/header bounds, injection and invalid-port rejection, raw-exception regression tests, docs, and package evidence |
+| Loop 197: Declarative HTTP Origin Governance | Complete | Let reviewed workflows restrict built-in HTTP egress to exact origins before credential resolution | Additive `allowed_origins` schema/compiler/runtime contract, no-network mismatch tests, LiteGraph write-back, docs, and package evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

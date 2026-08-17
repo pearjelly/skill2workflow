@@ -33,6 +33,9 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Built-in HTTP request metadata uses fixed 16,384-byte URL, 32-byte method,
   and 64-entry/65,536-byte header bounds; malformed metadata fails closed
   before network access, as documented in [`connectors.md`](connectors.md)
+- `connector.request.allowed_origins` is an additive exact-origin egress
+  allowlist; omission preserves legacy behavior, while configured entries are
+  enforced before credential resolution and network access
 - SQLite run-state documents use the same fixed 8 MiB UTF-8 persistence bound
   as the JSON backend across save, load, recovery, cancellation, deadline
   expiry, and startup summary repair, documented in

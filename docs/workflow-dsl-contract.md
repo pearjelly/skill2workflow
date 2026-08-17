@@ -123,6 +123,13 @@ Built-in bindings:
 
 HTTP connector credentials may reference local handles under `connector.credentials`. Only handles belong in Workflow DSL; resolved secret values are supplied at runtime through the local credential provider and are not written to run state or audit events by the built-in runtime.
 
+The built-in HTTP connector may declare `connector.request.allowed_origins` as
+an exact list such as [`https://api.example.com/`]. When present, the
+request's normalized scheme/host/port origin must match one entry before
+credentials are resolved or network access begins. Entries do not support
+wildcards, paths beyond an optional `/`, query strings, fragments, or userinfo;
+omitting the field preserves the legacy unrestricted destination behavior.
+
 HTTP connector request metadata may declare bounded `input_mapping` and a
 `response_mode` of `full` (default) or `metadata`. The built-in runtime reads
 `/input/...` paths from durable run context and writes either `/body/...` fields

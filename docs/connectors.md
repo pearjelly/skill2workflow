@@ -45,6 +45,7 @@ Supported request metadata:
 | --- | --- |
 | `method` | Optional HTTP method. Defaults to `GET` and is uppercased before execution. |
 | `url` | Required `http://` or `https://` URL. Other schemes fail before a network call. |
+| `allowed_origins` | Optional exact-origin egress allowlist. Entries are `http://` or `https://` origins without userinfo, query, or fragment; omission preserves legacy unrestricted destination behavior. |
 | `headers` | Optional object. Keys and values are stringified. |
 | `body` | Optional JSON-serializable value. When present, it is encoded as UTF-8 JSON and must be at most 1 MiB. |
 | `response_mode` | Optional response retention mode: `full` (default) keeps the legacy headers/body projection; `metadata` discards raw response headers and body after bounded reading. |

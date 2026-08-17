@@ -222,6 +222,28 @@ class CompilerTests(TestCase):
 
         self.assertEqual(validate_workflow_structured(workflow), [])
 
+    def test_validate_accepts_http_origin_allowlist(self):
+        workflow = _http_mapping_workflow([])
+        workflow["nodes"][1]["connector"]["request"]["allowed_origins"] = [
+            "http://127.0.0.1:8080",
+            "https://api.example.com/",
+        ]
+
+        self.assertEqual(validate_workflow_structured(workflow), [])
+
+    def test_validate_rejects_invalid_http_origin_allowlist(self):
+        cases = [
+            ([], "allowed_origins_invalid"),
+            (["https://api.example.com/path?q=1"], "allowed_origin_entry_invalid"),
+            (["https://user:pass@api.example.com"], "allowed_origin_entry_invalid"),
+            (["http://api.example.com:bad"], "allowed_origin_entry_invalid"),
+        ]
+        for origins, code in cases:
+            with self.subTest(origins=origins):
+                workflow = _http_mapping_workflow([])
+                workflow["nodes"][1]["connector"]["request"]["allowed_origins"] = origins
+                self.assertIn(code, {error["code"] for error in validate_workflow_structured(workflow)})
+
     def test_validate_rejects_invalid_http_input_mapping_contract(self):
         cases = [
             ("not-list", "input_mapping_invalid"),

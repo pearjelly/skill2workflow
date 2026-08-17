@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import re
 from typing import Dict, List, Set
+from urllib.parse import urlsplit
 
-from .connectors import default_connector_binding
+from .connectors import MAX_HTTP_ALLOWED_ORIGINS, MAX_HTTP_ORIGIN_BYTES, default_connector_binding
 from .input_schema import validate_input_schema_contract
 
 Workflow = Dict[str, object]
@@ -524,6 +525,8 @@ def _validate_http_connector_request(
     request = connector.get("request")
     if not isinstance(request, dict):
         return
+    if "allowed_origins" in request:
+        _validate_http_allowed_origins(node, index, request.get("allowed_origins"), errors)
     if "response_mode" in request:
         response_mode = request.get("response_mode")
         if not isinstance(response_mode, str) or response_mode not in {"full", "metadata"}:
@@ -582,6 +585,70 @@ def _validate_http_connector_request(
                     "input_mapping_required_invalid",
                     f"{node.get('id')} connector.request.input_mapping[{mapping_index}].required must be a boolean",
                     mapping_path + ["required"],
+                )
+            )
+
+
+def _validate_http_allowed_origins(
+    node: Dict[str, object],
+    index: int,
+    origins: object,
+    errors: List[ValidationError],
+) -> None:
+    path = ["nodes", index, "connector", "request", "allowed_origins"]
+    if not isinstance(origins, list) or not origins:
+        errors.append(
+            _validation_error(
+                "allowed_origins_invalid",
+                f"{node.get('id')} connector.request.allowed_origins must be a non-empty list",
+                path,
+            )
+        )
+        return
+    if len(origins) > MAX_HTTP_ALLOWED_ORIGINS:
+        errors.append(
+            _validation_error(
+                "allowed_origins_too_many",
+                f"{node.get('id')} connector.request.allowed_origins must contain at most {MAX_HTTP_ALLOWED_ORIGINS} entries",
+                path,
+            )
+        )
+    for origin_index, origin in enumerate(origins[:MAX_HTTP_ALLOWED_ORIGINS]):
+        origin_path = path + [origin_index]
+        if not isinstance(origin, str):
+            errors.append(
+                _validation_error(
+                    "allowed_origin_entry_invalid",
+                    f"{node.get('id')} connector.request.allowed_origins[{origin_index}] must be an origin string",
+                    origin_path,
+                )
+            )
+            continue
+        try:
+            if len(origin.encode("utf-8")) > MAX_HTTP_ORIGIN_BYTES:
+                raise ValueError("origin too long")
+            parsed = urlsplit(origin)
+            hostname = parsed.hostname
+            parsed.port
+        except (UnicodeError, ValueError):
+            hostname = None
+            parsed = None
+        if (
+            parsed is None
+            or parsed.scheme not in ("http", "https")
+            or not parsed.netloc
+            or not hostname
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in ("", "/")
+            or parsed.query
+            or parsed.fragment
+        ):
+            errors.append(
+                _validation_error(
+                    "allowed_origin_entry_invalid",
+                    f"{node.get('id')} connector.request.allowed_origins[{origin_index}] must be an http/https origin without userinfo, query, or fragment",
+                    origin_path,
                 )
             )
 

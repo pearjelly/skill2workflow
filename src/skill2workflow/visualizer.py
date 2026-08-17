@@ -342,6 +342,11 @@ def _apply_connector_edits(node: Dict[str, object], graph_connector: object) -> 
                 f"{node['id']} connector.request.response_mode must be full or metadata"
             )
         request["response_mode"] = response_mode
+    if "allowed_origins" in graph_request:
+        allowed_origins = graph_request.get("allowed_origins")
+        if not isinstance(allowed_origins, list):
+            raise ValueError(f"{node['id']} connector.request.allowed_origins must be a list")
+        request["allowed_origins"] = copy.deepcopy(allowed_origins)
 
 
 def _non_negative_int(value: object, label: str) -> int:

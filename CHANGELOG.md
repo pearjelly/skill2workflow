@@ -21,6 +21,10 @@ release; Roadmap loop completion alone does not publish a new version.
   methods, and 64-entry/65,536-byte headers. Invalid metadata now fails with
   the connector's normalized error contract before network access.
 
+- Added optional exact-origin HTTP egress governance through
+  `connector.request.allowed_origins`, enforced before credential resolution
+  and network access; omission remains backward compatible.
+
 - Added opt-in HTTP `response_mode: "metadata"` to discard raw response headers
   and bodies after bounded reading while preserving status and size metadata;
   `full` remains the backward-compatible default.

@@ -202,6 +202,18 @@
           "default": "full",
           "description": "Response retention mode. full preserves the legacy body/headers projection; metadata discards raw response values after bounded reading."
         },
+        "allowed_origins": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512,
+            "description": "Exact http/https origin allowlist entry; paths, queries, fragments, and userinfo are not allowed."
+          },
+          "description": "Optional exact-origin egress allowlist for the built-in HTTP connector. Omission preserves the legacy unrestricted destination behavior."
+        },
         "input_mapping": {
           "type": "array",
           "description": "Optional bounded mapping from run context input into HTTP request body fields or query parameters.",

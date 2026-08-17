@@ -233,6 +233,9 @@ class VisualizerTests(TestCase):
         api["properties"]["connector"]["request"]["body"] = {"approved": True}
         api["properties"]["connector"]["request"]["timeout_ms"] = 1000
         api["properties"]["connector"]["request"]["response_mode"] = "metadata"
+        api["properties"]["connector"]["request"]["allowed_origins"] = [
+            "https://example.test/"
+        ]
         api["properties"]["timeout_ms"] = 1500
 
         updated = apply_litegraph_edits_to_workflow(workflow, graph)
@@ -256,6 +259,7 @@ class VisualizerTests(TestCase):
                     "body": {"approved": True},
                     "timeout_ms": 1000,
                     "response_mode": "metadata",
+                    "allowed_origins": ["https://example.test/"],
                 },
             },
         )
