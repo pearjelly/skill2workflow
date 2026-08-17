@@ -30,6 +30,7 @@ from skill2workflow.service_client import (
     fetch_run_detail,
     fetch_run_list,
     fetch_run_page,
+    fetch_audit_events,
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
     fetch_workflow_artifact_report,
@@ -56,6 +57,54 @@ RUN_ID = "run_service_client_001"
 
 
 class ServiceClientTests(TestCase):
+    def test_audit_event_page_uses_authenticated_get_and_validates_contract(self):
+        observed = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed.append({"path": self.path, "authorization": self.headers.get("Authorization")})
+                _send_json(
+                    self,
+                    200,
+                    _audit_event_page_fixture(),
+                )
+
+            def log_message(self, *_args):
+                return
+
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            page = fetch_audit_events(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                max_items=10,
+                cursor="cursor-token",
+                workflow_id="workflow",
+                workflow_version="0.1.0",
+                run_id=RUN_ID,
+                event_type="connector_failed",
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(page["schema_version"], "skill2workflow-audit-event-list-0.1.0")
+        self.assertEqual(observed[0]["authorization"], f"Bearer {AUTH_TOKEN}")
+        for value in ("max_items=10", "cursor=cursor-token", "workflow_id=workflow", "event_type=connector_failed"):
+            self.assertIn(value, observed[0]["path"])
+        self.assertFalse(thread.is_alive())
+
+    def test_audit_event_page_rejects_unsafe_filter_before_network_access(self):
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            with self.assertRaises(ValueError):
+                fetch_audit_events("https://service.example", token_file, event_type="bad\nvalue")
     def test_run_page_uses_authenticated_get_with_filters_and_cursor(self):
         observed = []
 
@@ -2214,6 +2263,45 @@ def _audit_integrity_payload():
         "head_digest": "a" * 64,
         "first_invalid_sequence": 0,
         "reason": "",
+    }
+
+
+def _audit_event_page_fixture():
+    return {
+        "schema_version": "skill2workflow-audit-event-list-0.1.0",
+        "filters": {
+            "workflow_id": "workflow",
+            "workflow_version": "0.1.0",
+            "run_id": RUN_ID,
+            "event_type": "connector_failed",
+        },
+        "events": [
+            {
+                "sequence": 1,
+                "type": "connector_failed",
+                "run_id": RUN_ID,
+                "workflow_id": "workflow",
+                "workflow_version": "0.1.0",
+                "timestamp": "2026-08-17T00:00:00Z",
+                "node_id": "call_api",
+                "connector_id": "http",
+                "connector_kind": "http",
+                "connector_status": "failed",
+                "attempt": 1,
+                "max_attempts": 2,
+                "next_attempt": 0,
+                "backoff_ms": 0,
+                "approved": False,
+                "has_error": True,
+            }
+        ],
+        "window": {
+            "max_items": 10,
+            "total": 1,
+            "returned": 1,
+            "truncated": False,
+            "next_cursor": "",
+        },
     }
 
 

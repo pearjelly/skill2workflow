@@ -299,6 +299,36 @@ class StorageTests(TestCase):
         self.assertEqual([item["run_id"] for item in second["items"]], ["run_cursor_0"])
         self.assertFalse(second["has_more"])
 
+    def test_sqlite_audit_page_filters_and_continues_with_sequence_cursor(self):
+        with TemporaryDirectory() as tmp:
+            store = SqliteControlStore(Path(tmp))
+            for index, event_type in enumerate(("run_started", "connector_failed", "run_completed"), 1):
+                store.append_audit(
+                    {
+                        "type": event_type,
+                        "workflow_id": "workflow_audit_page",
+                        "workflow_version": "0.1.0",
+                        "run_id": "run_audit_page",
+                        "timestamp": f"2026-08-17T00:00:0{index}Z",
+                        "error": "private provider detail" if event_type == "connector_failed" else "",
+                    }
+                )
+            first = store.audit_page(2, workflow_id="workflow_audit_page")
+            second = store.audit_page(
+                2,
+                before_sequence=first["next_cursor"],
+                workflow_id="workflow_audit_page",
+            )
+            failed = store.audit_page(2, event_type="connector_failed")
+
+        self.assertEqual(first["total"], 3)
+        self.assertTrue(first["has_more"])
+        self.assertEqual([item["sequence"] for item in first["items"]], [2, 3])
+        self.assertEqual([item["sequence"] for item in second["items"]], [1])
+        self.assertFalse(second["has_more"])
+        self.assertEqual(failed["total"], 1)
+        self.assertEqual(failed["items"][0]["event"]["type"], "connector_failed")
+
     def test_sqlite_idempotent_audit_repair_is_atomic_across_concurrent_retries(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

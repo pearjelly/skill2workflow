@@ -976,6 +976,39 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file, "run_remote_1")
 
+    def test_service_audit_events_command_prints_filtered_page(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = _audit_event_page_fixture()
+        with patch("skill2workflow.cli.fetch_audit_events", return_value=expected) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-audit-events",
+                        "--service-url", "https://service.example",
+                        "--auth-token-file", str(token_file),
+                        "--max-items", "10",
+                        "--cursor", "cursor-token",
+                        "--workflow-id", "workflow",
+                        "--workflow-version", "0.1.0",
+                        "--run-id", "run_remote_1",
+                        "--event-type", "connector_failed",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with(
+            "https://service.example",
+            token_file,
+            max_items=10,
+            cursor="cursor-token",
+            workflow_id="workflow",
+            workflow_version="0.1.0",
+            run_id="run_remote_1",
+            event_type="connector_failed",
+        )
+
     def test_service_support_bundle_writes_private_output(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")
@@ -3036,6 +3069,26 @@ def _mapped_connector_workflow(url: str):
         "timeout_ms": 2000,
     }
     return workflow
+
+
+def _audit_event_page_fixture():
+    return {
+        "schema_version": "skill2workflow-audit-event-list-0.1.0",
+        "filters": {
+            "workflow_id": "workflow",
+            "workflow_version": "0.1.0",
+            "run_id": "run_remote_1",
+            "event_type": "connector_failed",
+        },
+        "events": [],
+        "window": {
+            "max_items": 10,
+            "total": 0,
+            "returned": 0,
+            "truncated": False,
+            "next_cursor": "",
+        },
+    }
 
 
 class _CliConnectorRequestHandler(BaseHTTPRequestHandler):

@@ -84,6 +84,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-schedule-disable",
     "service-support-bundle",
     "service-audit-consistency",
+    "service-audit-events",
     "control-snapshot",
 )
 

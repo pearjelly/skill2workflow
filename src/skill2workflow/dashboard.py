@@ -20,6 +20,7 @@ SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
 RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
 RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
 RUN_PAGE_SCHEMA_VERSION = "skill2workflow-run-list-0.2.0"
+AUDIT_EVENT_LIST_SCHEMA_VERSION = "skill2workflow-audit-event-list-0.1.0"
 SUPPORT_BUNDLE_SCHEMA_VERSION = "skill2workflow-support-bundle-0.1.0"
 WORKFLOW_INVENTORY_SCHEMA_VERSION = "skill2workflow-workflow-inventory-0.1.0"
 RECURRING_SCHEDULE_LIST_SCHEMA_VERSION = "skill2workflow-recurring-schedule-list-0.1.0"
@@ -31,6 +32,7 @@ MAX_OFFLINE_SNAPSHOT_ITEMS = 1000
 MAX_RUN_DETAIL_EVENTS = 50
 MAX_RUN_LIST_ITEMS = 100
 MAX_RUN_PAGE_ITEMS = 100
+MAX_AUDIT_EVENT_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_LIST_ITEMS = 100
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_ITEMS = 100
 MAX_SUPPORT_BUNDLE_BYTES = 128 * 1024
@@ -615,6 +617,7 @@ def build_support_bundle_from_control(
     http_requests.pop("workflow_inventory", None)
     http_requests.pop("workflow_diff", None)
     http_requests.pop("run_page", None)
+    http_requests.pop("audit_event_list", None)
     observability = dict(observability)
     observability["http_requests"] = http_requests
     return {
@@ -721,6 +724,45 @@ def _validate_run_page_cursor_parts(updated_at: str, run_id: str) -> None:
         raise ValueError("run page cursor is invalid")
     if any(character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-" for character in run_id):
         raise ValueError("run page cursor is invalid")
+
+
+def _encode_audit_page_cursor(sequence: object) -> str:
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence <= 0:
+        raise ValueError("audit event cursor is invalid")
+    raw = json.dumps({"sequence": sequence}, separators=(",", ":"), sort_keys=True).encode("ascii")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_audit_page_cursor(cursor: str) -> int:
+    normalized = str(cursor or "")
+    if not normalized:
+        return 0
+    if len(normalized) > 128 or any(
+        character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for character in normalized
+    ):
+        raise ValueError("audit event cursor is invalid")
+    try:
+        raw = base64.urlsafe_b64decode(normalized + "=" * (-len(normalized) % 4))
+        value = json.loads(raw.decode("ascii"))
+    except (binascii.Error, UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError("audit event cursor is invalid") from error
+    if not isinstance(value, dict) or set(value) != {"sequence"}:
+        raise ValueError("audit event cursor is invalid")
+    sequence = value.get("sequence")
+    if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence <= 0:
+        raise ValueError("audit event cursor is invalid")
+    return sequence
+
+
+def _validate_audit_filter(value: object, field: str, limit: int) -> str:
+    if value is None:
+        return ""
+    if not isinstance(value, str) or len(value.encode("utf-8")) > limit:
+        raise ValueError(f"audit event {field} filter is invalid")
+    if any(ord(character) < 0x20 or ord(character) == 0x7F for character in value):
+        raise ValueError(f"audit event {field} filter is invalid")
+    return value
 
 
 def build_run_detail_from_control(
@@ -835,6 +877,70 @@ def build_run_detail_from_control(
     }
 
 
+def build_audit_event_page_from_control(
+    control: LocalControlPlane,
+    *,
+    max_items: int = MAX_AUDIT_EVENT_LIST_ITEMS,
+    cursor: str = "",
+    workflow_id: str = "",
+    workflow_version: str = "",
+    run_id: str = "",
+    event_type: str = "",
+) -> Dict[str, object]:
+    """Project one bounded, redacted SQLite audit page for remote operators."""
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or max_items <= 0
+        or max_items > MAX_AUDIT_EVENT_LIST_ITEMS
+    ):
+        raise ValueError("max_items must be a positive bounded integer")
+    filters = {
+        "workflow_id": _validate_audit_filter(workflow_id, "workflow_id", 128),
+        "workflow_version": _validate_audit_filter(workflow_version, "workflow_version", 128),
+        "run_id": _validate_audit_filter(run_id, "run_id", 128),
+        "event_type": _validate_audit_filter(event_type, "event_type", 64),
+    }
+    before_sequence = _decode_audit_page_cursor(cursor)
+    reader = getattr(control, "audit_page", None)
+    if not callable(reader):
+        raise ValueError("audit event pages require sqlite storage")
+    page = reader(
+        max_items,
+        before_sequence=before_sequence,
+        workflow_id=filters["workflow_id"],
+        version=filters["workflow_version"],
+        run_id=filters["run_id"],
+        event_type=filters["event_type"],
+    )
+    raw_items = page.get("items", []) if isinstance(page, dict) else []
+    if not isinstance(raw_items, list):
+        raise ValueError("audit event page is invalid")
+    events = []
+    for item in raw_items:
+        if not isinstance(item, dict) or set(item) != {"sequence", "event"}:
+            raise ValueError("audit event page is invalid")
+        events.append(_safe_audit_event(item.get("event"), item.get("sequence")))
+    total = _safe_non_negative_int(page.get("total", 0))
+    has_more = bool(page.get("has_more"))
+    next_cursor = ""
+    if has_more:
+        next_cursor = _encode_audit_page_cursor(page.get("next_cursor"))
+    return {
+        "schema_version": AUDIT_EVENT_LIST_SCHEMA_VERSION,
+        "filters": filters,
+        "events": events,
+        "window": {
+            "max_items": max_items,
+            "total": total,
+            "returned": len(events),
+            "truncated": bool(has_more),
+            "next_cursor": next_cursor,
+        },
+    }
+
+
 _RUN_OVERLAY_FIELDS = (
     "node_id",
     "status",
@@ -926,6 +1032,40 @@ def _safe_run_event(event: Dict[str, object], sequence: int) -> Dict[str, object
             else:
                 safe[field] = _safe_string(value)
     return safe
+
+
+def _safe_audit_event(event: object, sequence: object) -> Dict[str, object]:
+    """Project one persisted audit row without copying payload or error text."""
+
+    if (
+        not isinstance(event, dict)
+        or isinstance(sequence, bool)
+        or not isinstance(sequence, int)
+        or sequence <= 0
+    ):
+        raise ValueError("audit event row is invalid")
+    event_type = _safe_string(event.get("type"), 64) or "event"
+    failure_types = {
+        "connector_failed", "node_failed", "run_failed", "run_interrupted",
+    }
+    return {
+        "sequence": sequence,
+        "type": event_type,
+        "run_id": _safe_string(event.get("run_id"), 128),
+        "workflow_id": _safe_string(event.get("workflow_id"), 128),
+        "workflow_version": _safe_string(event.get("workflow_version"), 128),
+        "timestamp": _safe_string(event.get("timestamp"), 256),
+        "node_id": _safe_string(event.get("node_id"), 128),
+        "connector_id": _safe_string(event.get("connector_id"), 128),
+        "connector_kind": _safe_string(event.get("connector_kind"), 128),
+        "connector_status": _safe_string(event.get("connector_status"), 128),
+        "attempt": _safe_non_negative_int(event.get("attempt", 0)),
+        "max_attempts": _safe_non_negative_int(event.get("max_attempts", 0)),
+        "next_attempt": _safe_non_negative_int(event.get("next_attempt", 0)),
+        "backoff_ms": _safe_non_negative_int(event.get("backoff_ms", 0)),
+        "approved": event.get("approved") if isinstance(event.get("approved"), bool) else False,
+        "has_error": bool(event.get("error") or event.get("last_error")) or event_type in failure_types,
+    }
 
 
 def _safe_string(value: object, limit: int = 256) -> str:

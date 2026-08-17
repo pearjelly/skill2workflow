@@ -1704,6 +1704,69 @@ class SqliteControlStore:
             events.reverse()
         return events
 
+    def audit_page(
+        self,
+        max_items: int,
+        *,
+        before_sequence: int = 0,
+        workflow_id: str = "",
+        version: str = "",
+        run_id: str = "",
+        event_type: str = "",
+    ) -> Dict[str, object]:
+        """Read one cursor-bounded audit page without retaining the history."""
+
+        _validate_audit_event_limit(max_items)
+        if (
+            isinstance(before_sequence, bool)
+            or not isinstance(before_sequence, int)
+            or before_sequence < 0
+        ):
+            raise ValueError("audit page cursor must be a non-negative integer")
+        clauses = []
+        parameters = []
+        for column, value in (
+            ("workflow_id", workflow_id),
+            ("workflow_version", version),
+            ("run_id", run_id),
+            ("event_type", event_type),
+        ):
+            if value:
+                clauses.append(f"{column} = ?")
+                parameters.append(value)
+        where = " where " + " and ".join(clauses) if clauses else ""
+        cursor_clause = ""
+        if before_sequence:
+            cursor_clause = (" and " if where else " where ") + "sequence < ?"
+            parameters.append(before_sequence)
+        with self._connection() as connection:
+            total_parameters = list(parameters[:-1]) if before_sequence else list(parameters)
+            total = int(
+                connection.execute(
+                    "select count(*) from audit_events" + where,
+                    total_parameters,
+                ).fetchone()[0]
+            )
+            rows = connection.execute(
+                "select sequence, payload_json from audit_events"
+                + where
+                + cursor_clause
+                + " order by sequence desc limit ?",
+                parameters + [max_items + 1],
+            ).fetchall()
+        has_more = len(rows) > max_items
+        selected = rows[:max_items]
+        events = []
+        for sequence, payload_json in reversed(selected):
+            events.append({"sequence": int(sequence), "event": json.loads(str(payload_json))})
+        next_cursor = int(selected[-1][0]) if has_more and selected else 0
+        return {
+            "total": total,
+            "items": events,
+            "has_more": has_more,
+            "next_cursor": next_cursor,
+        }
+
     def audit_event_exists(self, event: AuditEvent) -> bool:
         """Return whether one canonical audit payload is already persisted."""
 
@@ -1833,6 +1896,14 @@ class SqliteControlStore:
                 """
             )
             _ensure_audit_integrity_schema(connection)
+            connection.execute(
+                "create index if not exists audit_events_run_sequence_idx "
+                "on audit_events(run_id, sequence)"
+            )
+            connection.execute(
+                "create index if not exists audit_events_type_sequence_idx "
+                "on audit_events(event_type, sequence)"
+            )
 
     def _import_json_state(self) -> None:
         if self.index_path.exists() and not self.load_index():

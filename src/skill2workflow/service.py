@@ -42,6 +42,8 @@ from .dashboard import (
     build_run_detail_from_control,
     build_run_list_from_control,
     build_run_page_from_control,
+    build_audit_event_page_from_control,
+    MAX_AUDIT_EVENT_LIST_ITEMS,
     build_support_bundle_from_control,
 )
 from .schedules import RecurringScheduleDispatcher, SchedulerLeaseError
@@ -84,6 +86,7 @@ MAX_LIVE_CONTROL_SNAPSHOT_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 MAX_RUN_DETAIL_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_PAGE_RESPONSE_BYTES = 64 * 1024
+MAX_AUDIT_EVENT_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_DISPATCH_LIST_RESPONSE_BYTES = 64 * 1024
@@ -789,6 +792,8 @@ def _handler_for(service: RuntimeService):
                         self._handle_run_list()
                     elif self.command == "GET" and path == "/api/v1/runs":
                         self._handle_run_page()
+                    elif self.command == "GET" and path == "/api/v1/audit-events":
+                        self._handle_audit_event_page()
                     elif self.command == "GET" and _run_detail_id(path):
                         self._handle_run_detail(_run_detail_id(path))
                     elif self.command == "POST" and _resume_run_id(path):
@@ -1055,6 +1060,63 @@ def _handler_for(service: RuntimeService):
                 return
             except (OSError, sqlite3.Error):
                 self._send_json(503, {"error": "run page unavailable"})
+                return
+            self._send_json(200, payload)
+
+        def _handle_audit_event_page(self):
+            """Serve a bounded, redacted, cursor-paged audit event projection."""
+
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                content_length = _content_length(self)
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+                return
+            if content_length != 0:
+                self._send_json(
+                    400,
+                    {"error": "audit event page request must not include a body"},
+                )
+                return
+            try:
+                query = _audit_event_page_query(self.path)
+            except ValueError as error:
+                self._send_json(400, {"error": str(error)})
+                return
+            try:
+                payload = build_audit_event_page_from_control(
+                    service.control_plane,
+                    max_items=query["max_items"],
+                    cursor=query["cursor"],
+                    workflow_id=query["workflow_id"],
+                    workflow_version=query["workflow_version"],
+                    run_id=query["run_id"],
+                    event_type=query["event_type"],
+                )
+                encoded = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_AUDIT_EVENT_LIST_RESPONSE_BYTES:
+                    raise ValueError("audit event page exceeds response limit")
+            except ValueError:
+                self._send_json(503, {"error": "audit event page unavailable"})
+                return
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "audit event page unavailable"})
                 return
             self._send_json(200, payload)
 
@@ -2205,6 +2267,8 @@ def _request_route(method: str, path: str) -> str:
         return "run_list"
     if method == "GET" and path == "/api/v1/runs":
         return "run_page"
+    if method == "GET" and path == "/api/v1/audit-events":
+        return "audit_event_list"
     if method == "GET" and _run_detail_id(path):
         return "run_detail"
     if path.startswith("/webhooks/"):
@@ -2320,6 +2384,44 @@ def _run_page_query(request_path: str) -> Dict[str, object]:
         "max_items": max_items,
         "status": one("status"),
         "workflow_id": one("workflow_id"),
+    }
+
+
+def _audit_event_page_query(request_path: str) -> Dict[str, object]:
+    """Parse the bounded query contract for remote audit event pages."""
+
+    try:
+        query = parse_qs(
+            urlsplit(str(request_path)).query,
+            keep_blank_values=True,
+            max_num_fields=12,
+        )
+    except ValueError as error:
+        raise ValueError("audit event query is invalid") from error
+    allowed = {
+        "cursor", "max_items", "workflow_id", "workflow_version", "run_id", "event_type"
+    }
+    if any(key not in allowed for key in query):
+        raise ValueError("audit event query contains an unsupported field")
+
+    def one(key: str) -> str:
+        values = query.get(key, [""])
+        if len(values) != 1:
+            raise ValueError(f"audit event query field {key} must appear once")
+        return str(values[0])
+
+    raw_limit = one("max_items") or str(MAX_AUDIT_EVENT_LIST_ITEMS)
+    try:
+        max_items = int(raw_limit)
+    except (TypeError, ValueError) as error:
+        raise ValueError("audit event max_items must be an integer") from error
+    return {
+        "cursor": one("cursor"),
+        "max_items": max_items,
+        "workflow_id": one("workflow_id"),
+        "workflow_version": one("workflow_version"),
+        "run_id": one("run_id"),
+        "event_type": one("event_type"),
     }
 
 

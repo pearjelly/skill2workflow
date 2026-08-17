@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added the authenticated, read-only `GET /api/v1/audit-events` route and
+  `service-audit-events` CLI. The fixed redacted SQLite projection supports
+  exact filters and opaque sequence cursors under a 100-item/64 KiB bound,
+  and never returns workflow DSL, trigger context, connector metadata,
+  credentials, or raw provider errors.
 - Added a bounded Production Baseline evidence bundle that runs the approved
   release, state-safety, service, and observability checks with isolated child
   workspaces and a secret-free summary contract. Release preflight can opt in

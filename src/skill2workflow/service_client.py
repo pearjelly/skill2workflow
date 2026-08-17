@@ -26,6 +26,8 @@ from .dashboard import (
     RUN_LIST_SCHEMA_VERSION,
     RUN_PAGE_SCHEMA_VERSION,
     MAX_RUN_PAGE_ITEMS,
+    AUDIT_EVENT_LIST_SCHEMA_VERSION,
+    MAX_AUDIT_EVENT_LIST_ITEMS,
     RECURRING_SCHEDULE_ACTION_SCHEMA_VERSION,
     RECURRING_SCHEDULE_LIST_SCHEMA_VERSION,
     SUPPORT_BUNDLE_SCHEMA_VERSION,
@@ -53,6 +55,7 @@ from .webhooks import MAX_REQUEST_BODY_BYTES
 
 MAX_SERVICE_ACTION_RESPONSE_BYTES = 64 * 1024
 MAX_RUN_PAGE_RESPONSE_BYTES = 64 * 1024
+MAX_AUDIT_EVENT_LIST_RESPONSE_BYTES = 64 * 1024
 MAX_SUPPORT_BUNDLE_RESPONSE_BYTES = 128 * 1024
 MAX_AUDIT_CONSISTENCY_RESPONSE_BYTES = 64 * 1024
 MAX_RECURRING_SCHEDULE_LIST_RESPONSE_BYTES = 64 * 1024
@@ -366,6 +369,55 @@ def fetch_run_page(
         max_response_bytes=MAX_RUN_PAGE_RESPONSE_BYTES,
     )
     _validate_run_page(payload)
+    return payload
+
+
+def fetch_audit_events(
+    service_url: str,
+    token_file: Path,
+    *,
+    max_items: int = MAX_AUDIT_EVENT_LIST_ITEMS,
+    cursor: str = "",
+    workflow_id: str = "",
+    workflow_version: str = "",
+    run_id: str = "",
+    event_type: str = "",
+) -> Dict[str, object]:
+    """Fetch a bounded, redacted, cursor-paged audit event projection."""
+
+    if isinstance(max_items, bool) or not isinstance(max_items, int) or not 1 <= max_items <= MAX_AUDIT_EVENT_LIST_ITEMS:
+        raise ValueError("max_items must be an integer from 1 through 100")
+    normalized_workflow_id = _validate_workflow_ref(workflow_id, "workflow_id") if workflow_id else ""
+    normalized_workflow_version = _validate_workflow_ref(workflow_version, "workflow_version") if workflow_version else ""
+    normalized_run_id = _validate_run_id(run_id) if run_id else ""
+    if not isinstance(event_type, str) or len(event_type) > 64 or any(
+        ord(char) < 0x20 or ord(char) == 0x7F for char in event_type
+    ):
+        raise ValueError("event_type must be at most 64 characters")
+    if not isinstance(cursor, str) or len(cursor) > 128 or any(
+        char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+        for char in cursor
+    ):
+        raise ValueError("cursor must be a safe audit event cursor")
+    params = {"max_items": str(max_items)}
+    if cursor:
+        params["cursor"] = cursor
+    if normalized_workflow_id:
+        params["workflow_id"] = normalized_workflow_id
+    if normalized_workflow_version:
+        params["workflow_version"] = normalized_workflow_version
+    if normalized_run_id:
+        params["run_id"] = normalized_run_id
+    if event_type:
+        params["event_type"] = event_type
+    payload = _get_json(
+        service_url,
+        token_file,
+        "/api/v1/audit-events?" + urlencode(params),
+        conflict_message="audit event list unavailable",
+        max_response_bytes=MAX_AUDIT_EVENT_LIST_RESPONSE_BYTES,
+    )
+    _validate_audit_event_page(payload)
     return payload
 
 
@@ -1104,6 +1156,87 @@ def _validate_run_page(payload: Dict[str, object]) -> None:
         or window.get("total") != summary.get("total")
     ):
         raise ServiceActionError()
+
+
+def _validate_audit_event_page(payload: Dict[str, object]) -> None:
+    """Reject responses outside the fixed redacted audit-event contract."""
+
+    if set(payload) != {"schema_version", "filters", "events", "window"}:
+        raise ServiceActionError()
+    if payload.get("schema_version") != AUDIT_EVENT_LIST_SCHEMA_VERSION:
+        raise ServiceActionError()
+    filters = payload.get("filters")
+    filter_fields = {"workflow_id", "workflow_version", "run_id", "event_type"}
+    if (
+        not isinstance(filters, dict)
+        or set(filters) != filter_fields
+        or any(not isinstance(filters.get(field), str) for field in filter_fields)
+        or len(filters.get("workflow_id", "")) > 128
+        or len(filters.get("workflow_version", "")) > 128
+        or len(filters.get("run_id", "")) > 128
+        or len(filters.get("event_type", "")) > 64
+    ):
+        raise ServiceActionError()
+    events = payload.get("events")
+    event_fields = {
+        "sequence", "type", "run_id", "workflow_id", "workflow_version", "timestamp",
+        "node_id", "connector_id", "connector_kind", "connector_status", "attempt",
+        "max_attempts", "next_attempt", "backoff_ms", "approved", "has_error",
+    }
+    if not isinstance(events, list) or len(events) > MAX_AUDIT_EVENT_LIST_ITEMS:
+        raise ServiceActionError()
+    for event in events:
+        if (
+            not isinstance(event, dict)
+            or set(event) != event_fields
+            or not _is_non_negative_integer(event.get("sequence"))
+            or event.get("sequence") < 1
+            or not isinstance(event.get("type"), str)
+            or not event.get("type")
+            or len(event.get("type")) > 64
+            or any(
+                not isinstance(event.get(field), str)
+                for field in (
+                    "run_id", "workflow_id", "workflow_version", "timestamp",
+                    "node_id", "connector_id", "connector_kind", "connector_status",
+                )
+            )
+            or not _is_non_negative_integer(event.get("attempt"))
+            or not _is_non_negative_integer(event.get("max_attempts"))
+            or not _is_non_negative_integer(event.get("next_attempt"))
+            or not _is_non_negative_integer(event.get("backoff_ms"))
+            or not isinstance(event.get("approved"), bool)
+            or not isinstance(event.get("has_error"), bool)
+            or len(event.get("run_id", "")) > 128
+            or len(event.get("workflow_id", "")) > 128
+            or len(event.get("workflow_version", "")) > 128
+            or len(event.get("timestamp", "")) > 256
+            or any(len(event.get(field, "")) > 128 for field in ("node_id", "connector_id", "connector_kind", "connector_status"))
+        ):
+            raise ServiceActionError()
+    window = payload.get("window")
+    if (
+        not isinstance(window, dict)
+        or set(window) != {"max_items", "total", "returned", "truncated", "next_cursor"}
+        or not _is_non_negative_integer(window.get("max_items"))
+        or window.get("max_items") < 1
+        or window.get("max_items") > MAX_AUDIT_EVENT_LIST_ITEMS
+        or not _is_non_negative_integer(window.get("total"))
+        or not _is_non_negative_integer(window.get("returned"))
+        or window.get("returned") != len(events)
+        or window.get("returned") > window.get("total")
+        or window.get("returned") > window.get("max_items")
+        or not isinstance(window.get("truncated"), bool)
+        or not isinstance(window.get("next_cursor"), str)
+        or len(window.get("next_cursor", "")) > 128
+        or any(
+            char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+            for char in window.get("next_cursor", "")
+        )
+        or window.get("truncated") != bool(window.get("next_cursor"))
+    ):
+        raise ServiceActionError()
+
 
 def _validate_recurring_schedule_list(payload: Dict[str, object]) -> None:
     """Reject responses outside the fixed redacted recurring-schedule contract."""

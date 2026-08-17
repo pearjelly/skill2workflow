@@ -1721,6 +1721,70 @@ class RuntimeServiceTests(TestCase):
         self.assertTrue(page["window"]["has_more"])
         self.assertFalse(thread.is_alive())
 
+    def test_audit_event_page_is_authenticated_filtered_cursor_paged_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            for event_type in ("run_started", "connector_failed", "run_completed"):
+                control.store.append_audit(
+                    {
+                        "type": event_type,
+                        "workflow_id": "workflow_private_remote",
+                        "workflow_version": "0.1.0",
+                        "run_id": "run_private_remote",
+                        "timestamp": "2026-08-17T00:00:00Z",
+                        "error": "private raw provider error",
+                        "connector_metadata": {"secret": "private connector value"},
+                    }
+                )
+            audit_count_before = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}/api/v1/audit-events"
+            denied_status, denied = _get_json(base_url)
+            first_status, first = _get_json(
+                base_url + "?workflow_id=workflow_private_remote&max_items=2",
+                token=AUTH_TOKEN,
+            )
+            second_status, second = _get_json(
+                base_url + "?workflow_id=workflow_private_remote&max_items=2&cursor=" + first["window"]["next_cursor"],
+                token=AUTH_TOKEN,
+            )
+            body_status, body = _get_raw_get(base_url, token=AUTH_TOKEN, body=b"{}")
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+            audit_count_after = len(LocalControlPlane(state_dir, storage="sqlite").list_audit_events())
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual((first_status, second_status), (200, 200))
+        self.assertEqual(first["schema_version"], "skill2workflow-audit-event-list-0.1.0")
+        self.assertEqual([event["sequence"] for event in first["events"]], [2, 3])
+        self.assertEqual([event["sequence"] for event in second["events"]], [1])
+        serialized = json.dumps(first, ensure_ascii=False)
+        self.assertNotIn("private raw provider error", serialized)
+        self.assertNotIn("private connector value", serialized)
+        self.assertEqual(body_status, 400)
+        self.assertEqual(body, {"error": "audit event page request must not include a body"})
+        self.assertEqual(audit_count_after, audit_count_before)
+        self.assertFalse(thread.is_alive())
+
     def test_support_bundle_is_authenticated_redacted_bounded_and_read_only(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

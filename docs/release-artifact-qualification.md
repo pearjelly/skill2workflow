@@ -26,6 +26,7 @@ state upgrade, retention, cancellation, and operator snapshot export.
 The installed command set also includes the protected `service-resume`,
 `service-cancel`, redacted `service-show`, bounded `service-runs`, bounded
 `service-run-page`, bounded
+`service-audit-events`, bounded
 `service-recurring-schedules`, bounded `service-recurring-dispatches`, bounded
 `service-workflow-artifacts`, bounded `service-backup-readiness`, bounded
 `service-retention-readiness`, bounded

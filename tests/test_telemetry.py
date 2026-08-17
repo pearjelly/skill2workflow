@@ -228,6 +228,7 @@ class RuntimeTelemetryTests(TestCase):
                 "runtime_info",
                 "audit_consistency",
                 "support_bundle", "run_list", "run_page", "run_detail", "workflow_trigger", "run_cancel",
+                "audit_event_list",
                 "workflow_release", "workflow_promotion", "workflow_deprecation", "workflow_inventory", "workflow_diff", "run_resume", "unknown",
             },
         )

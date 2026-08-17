@@ -244,6 +244,11 @@ skill2workflow service-audit-consistency \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow service-audit-events \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token \
+  --max-items 100
+
 skill2workflow service-support-bundle \
   --service-url https://service.example \
   --auth-token-file /run/secrets/skill2workflow-ingress-token \
@@ -480,6 +485,7 @@ Implemented:
   - reports registry/file consistency through bounded `workflow-artifacts` diagnostics
   - reports run-state/control-audit divergence through bounded `audit-consistency` diagnostics
   - exposes the same diagnostic through authenticated `service-audit-consistency` for remote operators
+  - exposes a bounded, redacted chronological audit tail through authenticated `service-audit-events`
   - exposes durable recurring schedule timing and state through authenticated `service-recurring-schedules` and controlled enable/disable actions through `service-schedule-enable`/`service-schedule-disable`
   - supports an optional expected-current-version compare-and-swap promotion guard
   - tracks draft, published, and deprecated lifecycle state through JSON or SQLite registry storage

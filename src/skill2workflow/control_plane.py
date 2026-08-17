@@ -954,6 +954,30 @@ class LocalControlPlane:
             limit=limit,
         )
 
+    def audit_page(
+        self,
+        max_items: int,
+        *,
+        before_sequence: int = 0,
+        workflow_id: str = "",
+        version: str = "",
+        run_id: str = "",
+        event_type: str = "",
+    ) -> Dict[str, object]:
+        """Read a bounded SQLite audit page without exposing raw state."""
+
+        reader = getattr(self.store, "audit_page", None)
+        if not callable(reader):
+            raise ValueError("audit event pages require sqlite storage")
+        return reader(
+            max_items,
+            before_sequence=before_sequence,
+            workflow_id=workflow_id,
+            version=version,
+            run_id=run_id,
+            event_type=event_type,
+        )
+
     def verify_audit_integrity(self) -> Dict[str, object]:
         """Verify the storage-backed audit evidence without exposing payloads."""
 

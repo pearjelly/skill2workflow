@@ -31,6 +31,7 @@ from .service_bootstrap import initialize_service_workspace, rotate_service_toke
 from .service_doctor import diagnose_service
 from .service_client import (
     fetch_audit_consistency,
+    fetch_audit_events,
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatches,
     fetch_workflow_artifact_report,
@@ -594,6 +595,19 @@ def main(argv=None) -> int:
         default="",
         help="Inspect one run when the global bounded report is truncated",
     )
+
+    service_audit_events_cmd = subparsers.add_parser(
+        "service-audit-events",
+        help="List bounded redacted audit events through the authenticated service",
+    )
+    service_audit_events_cmd.add_argument("--service-url", required=True)
+    service_audit_events_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_audit_events_cmd.add_argument("--max-items", type=int, default=100)
+    service_audit_events_cmd.add_argument("--cursor", default="")
+    service_audit_events_cmd.add_argument("--workflow-id", default="")
+    service_audit_events_cmd.add_argument("--workflow-version", default="")
+    service_audit_events_cmd.add_argument("--run-id", default="")
+    service_audit_events_cmd.add_argument("--event-type", default="")
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
@@ -1209,6 +1223,20 @@ def main(argv=None) -> int:
             lambda: fetch_audit_consistency(
                 args.service_url,
                 args.auth_token_file,
+            )
+        )
+
+    if args.command == "service-audit-events":
+        return _service_action(
+            lambda: fetch_audit_events(
+                args.service_url,
+                args.auth_token_file,
+                max_items=args.max_items,
+                cursor=args.cursor,
+                workflow_id=args.workflow_id,
+                workflow_version=args.workflow_version,
+                run_id=args.run_id,
+                event_type=args.event_type,
             )
         )
 

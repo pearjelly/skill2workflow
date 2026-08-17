@@ -35,6 +35,7 @@ _ROUTES = (
     "support_bundle",
     "run_list",
     "run_page",
+    "audit_event_list",
     "run_detail",
     "workflow_trigger",
     "workflow_release",

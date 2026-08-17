@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-152
+- Completed delivery loops: 1-153
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 152 is complete with a Production Baseline evidence bundle
+- Active loop: None; Loop 153 is complete with a bounded remote audit event tail
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-152 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-153 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -3527,9 +3527,47 @@ production maturity. It does not claim independent-builder reproducibility,
 hosted availability, disaster recovery, exactly-once provider effects, or
 automatic promotion of the Production Baseline gate.
 
+### Loop 153: Authenticated Redacted Audit Event Tail
+
+**Status:** Complete.
+
+**Prior basis:** Remote operators could inspect one run, a bounded run/audit
+consistency report, or an aggregate support bundle, but a long-running service
+still required shell access to inspect the chronological audit tail. Copying
+raw audit history would risk exposing trigger context, connector metadata,
+credentials, and provider error text.
+
+**Outcome:** The authenticated `GET /api/v1/audit-events` route and installed
+`service-audit-events` client expose the fixed
+`skill2workflow-audit-event-list-0.1.0` projection. SQLite performs exact
+filtering and sequence-cursor pagination with a 100-item/64 KiB bound. The
+allowlist includes only compact lifecycle, node/connector status, retry, and
+approval evidence plus an error-presence flag; raw payloads and error strings
+are never returned. The route is read-only, zero-body, readiness-independent,
+and telemetry uses the fixed `audit_event_list` label.
+
+**Evidence:** Storage, dashboard, service, client, CLI, telemetry, schema, and
+documentation tests cover filtering, cursor continuation, authentication,
+response validation, redaction, read-only behavior, and package help. The
+focused command is:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_storage.StorageTests.test_sqlite_audit_page_filters_and_continues_with_sequence_cursor \
+  tests.test_dashboard.DashboardTests.test_audit_event_page_is_cursor_paged_and_redacted \
+  tests.test_service.RuntimeServiceTests.test_audit_event_page_is_authenticated_filtered_cursor_paged_and_redacted \
+  tests.test_service_client.ServiceClientTests.test_audit_event_page_uses_authenticated_get_and_validates_contract \
+  tests.test_cli.CliTests.test_service_audit_events_command_prints_filtered_page -v
+```
+
+**Safety boundary:** This is a bounded incident-diagnostics projection for a
+single-tenant SQLite service. It does not provide audit export, tamper repair,
+full-text search, provider reconciliation, multi-tenant authorization, or a
+claim of complete historical observability beyond the paged rows.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 152 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 153 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -3647,6 +3685,7 @@ This rolling queue is ordered. Loop 152 is complete and there is no active deliv
 | Loop 150: Reproducible Release Artifact Builds | Complete | Prove that fixed inputs produce identical qualified release wheels before publication | Two isolated fixed-epoch wheel builds, byte and manifest equality, public evidence, release-preflight and CI gates, tests, and documentation |
 | Loop 151: Bounded Service Soak And Cutover Evidence | Complete | Prove repeated real-process cutovers preserve idempotent trigger behavior and SQLite/audit continuity | Three-cycle service soak, replay/conflict checks, graceful shutdown, authenticated audit diagnostics, operational CI gate, tests, and documentation |
 | Loop 152: Production Baseline Evidence Bundle | Complete | Make the approved production-boundary evidence repeatable as one safe release-review artifact | Fixed 19-check bundle, isolated child workspaces, redacted summary schema, optional release-preflight flag, CI coverage, tests, and documentation |
+| Loop 153: Authenticated Redacted Audit Event Tail | Complete | Give remote operators bounded chronological audit diagnostics without exporting sensitive payloads | Fixed redacted schema, exact filters, opaque sequence cursors, SQLite source bounds, authenticated CLI/route, leakage/read-only evidence, and documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

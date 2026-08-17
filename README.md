@@ -754,7 +754,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-152 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-153 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1252,6 +1252,11 @@ that runs the approved local checks as one release-review input. It keeps each
 check isolated, removes child artifacts, and writes only fixed names, statuses,
 exit codes, and timeout flags; it does not promote maturity automatically.
 
+Loop 153 adds a bounded [remote audit event tail](docs/remote-audit-events.md):
+authenticated operators can page through a redacted SQLite audit projection
+with exact filters and opaque sequence cursors, without exporting workflow DSL,
+trigger context, connector metadata, credentials, or raw errors.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1270,6 +1275,7 @@ See:
 - `docs/run-list.md`
 - `docs/support-bundle.md`
 - `docs/remote-audit-consistency.md`
+- `docs/remote-audit-events.md`
 - `docs/remote-schedule-inventory.md`
 - `docs/remote-schedule-actions.md`
 - `docs/remote-schedule-dispatches.md`

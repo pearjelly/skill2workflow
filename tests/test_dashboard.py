@@ -18,6 +18,7 @@ from skill2workflow.dashboard import (
     build_run_detail_from_control,
     build_run_list,
     build_run_page_from_control,
+    build_audit_event_page_from_control,
     build_support_bundle_from_control,
 )
 from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringScheduleStore
@@ -66,6 +67,44 @@ class DashboardTests(TestCase):
         self.assertTrue(page["window"]["has_more"])
         self.assertTrue(page["window"]["next_cursor"])
         self.assertNotIn("context", json.dumps(page, ensure_ascii=False))
+
+    def test_audit_event_page_is_cursor_paged_and_redacted(self):
+        with TemporaryDirectory() as tmp:
+            control = LocalControlPlane(Path(tmp), storage="sqlite")
+            for event_type in ("run_started", "connector_failed", "run_completed"):
+                control.store.append_audit(
+                    {
+                        "type": event_type,
+                        "workflow_id": "workflow_private_audit",
+                        "workflow_version": "0.1.0",
+                        "run_id": "run_private_audit",
+                        "timestamp": "2026-08-17T00:00:00Z",
+                        "error": "private raw provider error",
+                        "connector_metadata": {"secret": "private connector value"},
+                    }
+                )
+            first = build_audit_event_page_from_control(
+                control,
+                max_items=2,
+                workflow_id="workflow_private_audit",
+            )
+            second = build_audit_event_page_from_control(
+                control,
+                max_items=2,
+                cursor=first["window"]["next_cursor"],
+                workflow_id="workflow_private_audit",
+            )
+
+        serialized = json.dumps(first, ensure_ascii=False)
+        self.assertEqual(first["schema_version"], "skill2workflow-audit-event-list-0.1.0")
+        self.assertEqual(first["filters"]["workflow_id"], "workflow_private_audit")
+        self.assertEqual([event["sequence"] for event in first["events"]], [2, 3])
+        self.assertEqual([event["sequence"] for event in second["events"]], [1])
+        self.assertTrue(first["window"]["truncated"])
+        self.assertFalse(second["window"]["truncated"])
+        self.assertNotIn("private raw provider error", serialized)
+        self.assertNotIn("private connector value", serialized)
+        self.assertTrue(first["events"][0]["has_error"])
 
     def test_sqlite_bounded_snapshot_does_not_call_unbounded_list_paths(self):
         with TemporaryDirectory() as tmp:
