@@ -97,12 +97,14 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
 
 `bundle-run` verifies the bundle before creating run state, then uses the same
 executor, storage, retry, timeout, and credential-file boundaries as `run`.
-With `--input`, it first requires the same `bundle-preflight` admission report
-to be ready and stores the bounded input under `context.input`; a blocked input
-cannot create state or resolve credentials. It may execute explicitly
-requested connector side effects, but it does not create a published version,
-promote an alias, or introduce a second execution authority. Invalid bundles
-fail before the state directory is initialized.
+It always requires the same `bundle-preflight` admission report to be ready.
+When the report contains connector nodes, the operator must also pass the
+explicit `--allow-side-effects` switch; without it the command exits before
+creating state, resolving credentials, or making a network call. With
+`--input`, the bounded input is stored under `context.input`. An authorized
+run may execute explicitly requested connector side effects, but it does not
+create a published version, promote an alias, or introduce a second execution
+authority. Invalid bundles fail before the state directory is initialized.
 
 The successful bundle verification report contains only workflow identity,
 status, byte counts, digests, member count, and fixed error fields. The

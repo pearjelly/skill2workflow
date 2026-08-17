@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added an explicit `bundle-run --allow-side-effects` consent guard: a
+  connector-bearing Bundle cannot create state, resolve credentials, or call a
+  network connector until the operator opts in.
+
 - Added `bundle-preflight` for value-free, side-effect-free admission checks on
   verified bundles and optional trigger input; `bundle-run --input` reuses the
   same check before creating state or resolving credentials.

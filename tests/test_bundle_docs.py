@@ -27,6 +27,7 @@ class WorkflowBundleDocumentationTests(TestCase):
             "bundle-diff",
             "bundle-preflight",
             "bundle-run",
+            "allow-side-effects",
             "deterministic ZIP",
             "never contains",
             "8 MiB",

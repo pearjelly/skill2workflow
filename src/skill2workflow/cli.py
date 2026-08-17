@@ -173,6 +173,11 @@ def _main(argv=None) -> int:
     bundle_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     bundle_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
     bundle_run_cmd.add_argument("--input", type=Path)
+    bundle_run_cmd.add_argument(
+        "--allow-side-effects",
+        action="store_true",
+        help="Explicitly authorize connector side effects for this local run",
+    )
     bundle_run_cmd.add_argument("--credential-file", type=Path)
 
     visualize_cmd = subparsers.add_parser("visualize", help="Convert Workflow DSL JSON into LiteGraph JSON")
@@ -977,16 +982,25 @@ def _main(argv=None) -> int:
     if args.command == "bundle-run":
         workflow = load_verified_workflow_bundle(args.bundle)
         input_value = _load_bundle_input(args.input)
+        preflight = build_workflow_preflight(
+            workflow,
+            input_value=input_value,
+            input_present=args.input is not None,
+        )
+        if not preflight["ready"]:
+            _print_json(preflight)
+            return 1
+        if (
+            preflight["summary"]["side_effecting_node_count"] > 0
+            and not args.allow_side_effects
+        ):
+            print(
+                "bundle-run requires --allow-side-effects for workflows with connector side effects",
+                file=sys.stderr,
+            )
+            return 1
         context = None
         if args.input is not None:
-            preflight = build_workflow_preflight(
-                workflow,
-                input_value=input_value,
-                input_present=True,
-            )
-            if not preflight["ready"]:
-                _print_json(preflight)
-                return 1
             context = {"input": input_value}
         _print_json(
             LocalExecutor(

@@ -3686,6 +3686,80 @@ class CliTests(TestCase):
         self.assertFalse(state_dir.exists())
         self.assertNotIn("private-value", stdout.getvalue())
 
+    def test_bundle_run_requires_explicit_side_effect_consent_before_state(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            input_path = root / "input.json"
+            state_dir = root / "state"
+            workflow_path.write_text(
+                json.dumps(_mapped_connector_workflow("http://127.0.0.1:9/task")),
+                encoding="utf-8",
+            )
+            input_path.write_text(json.dumps({"customer_id": "customer_123"}), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
+                    0,
+                )
+            stderr = StringIO()
+            with redirect_stdout(StringIO()), redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "bundle-run",
+                        str(bundle_path),
+                        "--input",
+                        str(input_path),
+                        "--state-dir",
+                        str(state_dir),
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertIn("--allow-side-effects", stderr.getvalue())
+        self.assertFalse(state_dir.exists())
+
+    def test_bundle_run_executes_connector_only_with_explicit_consent(self):
+        server = _CliConnectorTestServer()
+        try:
+            with TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                workflow_path = root / "workflow.json"
+                bundle_path = root / "workflow.s2w"
+                input_path = root / "input.json"
+                state_dir = root / "state"
+                workflow_path.write_text(
+                    json.dumps(_mapped_connector_workflow(server.url)),
+                    encoding="utf-8",
+                )
+                input_path.write_text(json.dumps({"customer_id": "customer_123"}), encoding="utf-8")
+                with redirect_stdout(StringIO()):
+                    self.assertEqual(
+                        main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
+                        0,
+                    )
+                stdout = StringIO()
+                with redirect_stdout(stdout):
+                    exit_code = main(
+                        [
+                            "bundle-run",
+                            str(bundle_path),
+                            "--input",
+                            str(input_path),
+                            "--allow-side-effects",
+                            "--state-dir",
+                            str(state_dir),
+                        ]
+                    )
+                result = json.loads(stdout.getvalue())
+        finally:
+            server.close()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(server.requests[0]["body"]["customer_id"], "customer_123")
+
     def test_bundle_run_rejects_invalid_bundle_before_creating_state(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
