@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added optional service-wide `runtime.http_allowed_origins` governance for
+  the built-in HTTP connector. Exact origins are validated at service startup
+  and enforced before credential resolution or network access for direct and
+  recurring execution; omission remains backward compatible.
+
 - Normalized unexpected exceptions from explicitly loaded external connector
   fixtures to the fixed `external connector execution failed` message before
   they can enter durable run state.

@@ -197,8 +197,98 @@ class ServiceConfigTests(TestCase):
                     with self.assertRaises(ValueError):
                         load_service_config(config_path)
 
+    def test_load_service_config_accepts_exact_http_origin_upper_bound(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = root / "service.json"
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "schema_version": SERVICE_SCHEMA_VERSION,
+                        "service": {"host": "127.0.0.1", "port": 8080},
+                        "runtime": {
+                            "state_dir": str(root / "state"),
+                            "storage": "sqlite",
+                            "http_allowed_origins": [
+                                "HTTPS://Example.com:443",
+                                "http://api.example.com:80",
+                            ],
+                        },
+                        "auth": {
+                            "provider": "bearer_token_file",
+                            "token_file": str(root / "ingress.token"),
+                        },
+                        "credentials": {
+                            "provider": "directory",
+                            "directory": str(root / "credentials"),
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config = load_service_config(config_path)
+
+        self.assertEqual(
+            config.http_allowed_origins,
+            ("https://example.com", "http://api.example.com"),
+        )
+
+    def test_load_service_config_rejects_invalid_http_origin_policy(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config_path = root / "service.json"
+            base = {
+                "schema_version": SERVICE_SCHEMA_VERSION,
+                "service": {"host": "127.0.0.1", "port": 8080},
+                "runtime": {
+                    "state_dir": str(root / "state"),
+                    "storage": "sqlite",
+                },
+                "auth": {
+                    "provider": "bearer_token_file",
+                    "token_file": str(root / "ingress.token"),
+                },
+                "credentials": {
+                    "provider": "directory",
+                    "directory": str(root / "credentials"),
+                },
+            }
+            for origins in (
+                [],
+                ["https://example.com/path"],
+                ["https://example.com", "https://EXAMPLE.com/"],
+            ):
+                with self.subTest(origins=origins):
+                    payload = json.loads(json.dumps(base))
+                    payload["runtime"]["http_allowed_origins"] = origins
+                    config_path.write_text(json.dumps(payload), encoding="utf-8")
+                    with self.assertRaises(ValueError):
+                        load_service_config(config_path)
+
 
 class RuntimeServiceTests(TestCase):
+    def test_service_http_origin_policy_is_shared_by_http_and_scheduler_execution(self):
+        with TemporaryDirectory() as tmp:
+            service = RuntimeService(
+                _service_config(
+                    Path(tmp),
+                    http_allowed_origins=["HTTPS://Example.com:443"],
+                )
+            )
+            self.assertEqual(
+                service.connector_runtime.http_allowed_origins,
+                ("https://example.com",),
+            )
+            self.assertIs(
+                service.control_plane.executor.connector_runtime,
+                service.connector_runtime,
+            )
+            self.assertIs(
+                service.scheduler.dispatcher.control_plane.executor.connector_runtime,
+                service.connector_runtime,
+            )
+            service._server.server_close()
+
     def test_readiness_checks_sqlite_registry_without_materializing_records(self):
         with TemporaryDirectory() as tmp:
             service = RuntimeService(_service_config(Path(tmp)))
@@ -4430,7 +4520,12 @@ def _get_raw(url: str, token=None):
             error.close()
 
 
-def _service_config(root: Path, state_dir=None, backup_parent_dir=None):
+def _service_config(
+    root: Path,
+    state_dir=None,
+    backup_parent_dir=None,
+    http_allowed_origins=None,
+):
     token_file = root / "ingress.token"
     token_file.write_text(AUTH_TOKEN, encoding="utf-8")
     token_file.chmod(0o600)
@@ -4452,6 +4547,7 @@ def _service_config(root: Path, state_dir=None, backup_parent_dir=None):
         token_file,
         credential_dir,
         backup_parent_dir,
+        http_allowed_origins,
     )
 
 

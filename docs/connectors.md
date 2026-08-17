@@ -66,6 +66,19 @@ there is no implicit proxy route that can receive resolved credentials. A
 workflow that requires a proxy must use a separately reviewed connector with an
 explicit, documented proxy boundary.
 
+The self-hosted service can add a second, service-wide upper bound through
+`runtime.http_allowed_origins` in `service.json`. It accepts up to 32 exact
+origins and is shared by direct service triggers and recurring-schedule
+dispatches. When configured, a request must match both the service list and
+the workflow list; the service check runs before credential resolution or
+network access. This setting is omitted by default for compatibility and is
+not applied to explicitly loaded external connectors, whose provider-specific
+egress must be reviewed separately.
+
+This is exact-origin governance, not a wildcard matcher, DNS-rebinding
+defense, IP-range policy, network firewall, or multi-tenant isolation. Operators
+should combine it with the documented external TLS and host-network boundary.
+
 ### HTTP Request Metadata Boundary
 
 Request metadata is bounded independently of the 1 MiB body boundary:

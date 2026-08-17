@@ -24,6 +24,7 @@ from skill2workflow.connectors import (
     _timeout_seconds,
     default_connectors,
     execute_connector,
+    normalize_http_allowed_origins,
     validate_connector_manifest,
 )
 from skill2workflow.credentials import StaticCredentialProvider
@@ -717,6 +718,54 @@ class ConnectorTests(TestCase):
                 execute_connector(oversized)
         finally:
             server.close()
+
+    def test_connector_runtime_enforces_service_origin_upper_bound_before_credentials(self):
+        server = _ConnectorTestServer()
+        runtime = ConnectorRuntime(http_allowed_origins=[server.origin()])
+
+        try:
+            result = runtime.execute_connector(
+                _http_node(server.url("/success")),
+            )
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(len(server.requests), 1)
+
+            server.requests.clear()
+            disallowed = _credential_http_node(
+                "https://api.example.com/secret",
+                handle="missing_token",
+            )
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                "http connector request URL is not in service http_allowed_origins",
+            ):
+                runtime.execute_connector(disallowed)
+            self.assertEqual(server.requests, [])
+
+            workflow_mismatch = _http_node(server.url("/success"))
+            workflow_mismatch["connector"]["request"]["allowed_origins"] = [
+                "https://api.example.com"
+            ]
+            with self.assertRaisesRegex(
+                ConnectorExecutionError,
+                "http connector request URL is not in allowed_origins",
+            ):
+                runtime.execute_connector(workflow_mismatch)
+            self.assertEqual(server.requests, [])
+        finally:
+            server.close()
+
+    def test_service_origin_policy_normalizes_and_rejects_ambiguous_values(self):
+        self.assertEqual(
+            normalize_http_allowed_origins(
+                ["HTTPS://Example.com:443", "http://[::1]:80"]
+            ),
+            ("https://example.com", "http://[::1]"),
+        )
+        with self.assertRaisesRegex(ValueError, "must not contain duplicate origins"):
+            normalize_http_allowed_origins(["https://example.com", "https://EXAMPLE.com/"])
+        with self.assertRaisesRegex(ValueError, "must not contain a path"):
+            normalize_http_allowed_origins(["https://example.com/api"])
 
     def test_http_connector_missing_credential_fails_before_network_call(self):
         with self.assertRaisesRegex(ConnectorExecutionError, "credential handle not found: missing_token"):

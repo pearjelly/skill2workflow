@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-199
+- Completed delivery loops: 1-200
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 199 is complete with an external connector exception boundary
+- Active loop: None; Loop 200 is complete with a service-level HTTP origin upper bound
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-199 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-200 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5038,9 +5038,51 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_executor.ExecutorTests.test_unexpected_external_connector_failure_persists_fixed_value_free_error -v
 ```
 
+### Loop 200: Service-Level HTTP Origin Upper Bound
+
+**Status:** Complete.
+
+**Prior basis:** Loop 197 let each reviewed workflow declare an exact HTTP
+origin allowlist, but a service-wide deployment policy was still absent. A
+single workflow that omitted its optional list could therefore reach any
+destination permitted by the process network boundary, including when it was
+started by a recurring schedule.
+
+**Outcome:** The versioned self-hosted service configuration now accepts the
+optional `runtime.http_allowed_origins` list. It is canonicalized and bounded
+at startup to 32 unique exact `http`/`https` origins. The same immutable policy
+is injected into the direct service control plane and the lease-owned
+recurring scheduler; built-in HTTP requests must satisfy it before credential
+resolution or network access, and still must satisfy any workflow-level list.
+Omission preserves the existing service behavior and Workflow DSL `0.1.0`
+compatibility. The policy is intentionally limited to the built-in HTTP
+connector; explicitly loaded external fixtures retain their own reviewed
+egress responsibility.
+
+**Evidence:** Connector tests prove canonicalization, malformed/duplicate
+rejection, matching execution, service-policy mismatch suppression before a
+missing credential or network call, and intersection with the workflow list.
+Service configuration tests prove startup validation and propagation to both
+the HTTP control plane and recurring dispatcher. The versioned service schema,
+bootstrap/service/operator guides, compatibility notes, and stability
+contract document the additive field and its exact-origin safety boundary.
+
+**Safety boundary:** This is service-level exact-origin governance, not a
+wildcard matcher, SSRF or DNS-rebinding defense, IP-range firewall, proxy
+policy, external-connector sandbox, or multi-tenant isolation.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_connector_runtime_enforces_service_origin_upper_bound_before_credentials \
+  tests.test_service.ServiceConfigTests.test_load_service_config_accepts_exact_http_origin_upper_bound \
+  tests.test_service.RuntimeServiceTests.test_service_http_origin_policy_is_shared_by_http_and_scheduler_execution -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 199 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 200 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5206,6 +5248,7 @@ This rolling queue is ordered. Loop 199 is complete and there is no active deliv
 | Loop 197: Declarative HTTP Origin Governance | Complete | Let reviewed workflows restrict built-in HTTP egress to exact origins before credential resolution | Additive `allowed_origins` schema/compiler/runtime contract, no-network mismatch tests, LiteGraph write-back, docs, and package evidence |
 | Loop 198: Fixed HTTP Transport Error Redaction | Complete | Keep built-in HTTP transport and request-body failures value-free before durable connector persistence | Fixed timeout/network/serialization messages, injected leakage regressions, compatibility/docs updates, and package evidence |
 | Loop 199: External Connector Exception Boundary | Complete | Keep unexpected explicitly loaded connector exceptions inside the normalized durable failure path | Fixed unexpected-exception message, direct and SQLite leakage regressions, result-boundary docs, and package evidence |
+| Loop 200: Service-Level HTTP Origin Upper Bound | Complete | Govern built-in HTTP destinations at the self-hosted service boundary, including recurring execution, without changing Workflow DSL compatibility | Versioned exact-origin service policy, direct/scheduled propagation, pre-credential/network suppression, schema/docs, and regression evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

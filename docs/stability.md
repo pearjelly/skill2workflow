@@ -38,6 +38,11 @@ These surfaces should remain compatible during the `0.1.x` line:
 - `connector.request.allowed_origins` is an additive exact-origin egress
   allowlist; omission preserves legacy behavior, while configured entries are
   enforced before credential resolution and network access
+- The optional self-hosted `runtime.http_allowed_origins` configuration is a
+  service-wide exact-origin upper bound for built-in HTTP execution and
+  recurring schedules; requests must satisfy both service and workflow lists,
+  and omission preserves legacy behavior, as documented in
+  [`service-config-boundary.md`](service-config-boundary.md)
 - Built-in HTTP transport failures use fixed value-free messages (`http
   connector request failed`, `http connector timed out`, and the fixed JSON
   body serialization message); underlying URL, provider-transport, proxy,

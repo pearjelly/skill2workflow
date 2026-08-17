@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Tuple
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from . import __version__
@@ -30,6 +30,7 @@ from .backup import (
     normalize_backup_retention_policy,
 )
 from .control_plane import LocalControlPlane
+from .connectors import ConnectorRuntime, normalize_http_allowed_origins
 from .credentials import DirectoryCredentialProvider
 from .explain import (
     MAX_WORKFLOW_EXPLANATION_BYTES,
@@ -166,6 +167,7 @@ class ServiceConfig:
     auth_token_file: Path
     credential_dir: Path
     backup_parent_dir: Optional[Path] = None
+    http_allowed_origins: Optional[Tuple[str, ...]] = None
 
 
 def load_service_config(path: Path) -> ServiceConfig:
@@ -252,10 +254,10 @@ def parse_service_config(payload: object) -> ServiceConfig:
     if not isinstance(service, dict) or set(service) != {"host", "port"}:
         raise ValueError("service config service must contain only host and port")
     if not isinstance(runtime, dict) or not set(runtime).issubset(
-        {"state_dir", "storage", "backup_parent_dir"}
+        {"state_dir", "storage", "backup_parent_dir", "http_allowed_origins"}
     ) or set(runtime) < {"state_dir", "storage"}:
         raise ValueError(
-            "service config runtime must contain state_dir and storage, with optional backup_parent_dir"
+            "service config runtime must contain state_dir and storage, with optional backup_parent_dir and http_allowed_origins"
         )
     if not isinstance(auth, dict) or set(auth) != {"provider", "token_file"}:
         raise ValueError("service config auth must contain only provider and token_file")
@@ -277,6 +279,13 @@ def parse_service_config(payload: object) -> ServiceConfig:
         if "backup_parent_dir" in runtime
         else None
     )
+    try:
+        http_allowed_origins = normalize_http_allowed_origins(
+            runtime.get("http_allowed_origins"),
+            label="service runtime.http_allowed_origins",
+        )
+    except ValueError:
+        raise
     if not isinstance(host, str) or host not in _LOOPBACK_HOSTS:
         raise ValueError(
             "service host must be an explicit loopback address behind the external TLS boundary"
@@ -298,6 +307,7 @@ def parse_service_config(payload: object) -> ServiceConfig:
         auth_token_file=auth_token_file,
         credential_dir=credential_dir,
         backup_parent_dir=backup_parent_dir,
+        http_allowed_origins=http_allowed_origins,
     )
 
 
@@ -407,15 +417,20 @@ class RuntimeService:
         self.telemetry = RuntimeTelemetry(config.state_dir)
         self.authenticator = FileBearerTokenAuthenticator(config.auth_token_file)
         self.credential_provider = DirectoryCredentialProvider(config.credential_dir)
+        self.connector_runtime = ConnectorRuntime(
+            http_allowed_origins=config.http_allowed_origins,
+        )
         self.scheduler = ServiceScheduleLoop(
             config.state_dir,
             credential_provider=self.credential_provider,
+            connector_runtime=self.connector_runtime,
             telemetry=self.telemetry,
         )
         self.control_plane = LocalControlPlane(
             config.state_dir,
             storage=config.storage,
             credential_provider=self.credential_provider,
+            connector_runtime=self.connector_runtime,
             execution_owner=self.scheduler.dispatcher.owner_id,
         )
         inspect_state_backup_readiness(
@@ -582,10 +597,17 @@ def _require_private_directory(path: Path, label: str) -> None:
 class ServiceScheduleLoop:
     """Keep one dispatcher lease alive and poll recurring schedules off the HTTP thread."""
 
-    def __init__(self, state_dir: Path, credential_provider=None, telemetry=None):
+    def __init__(
+        self,
+        state_dir: Path,
+        credential_provider=None,
+        telemetry=None,
+        connector_runtime=None,
+    ):
         self.dispatcher = RecurringScheduleDispatcher(
             state_dir,
             credential_provider=credential_provider,
+            connector_runtime=connector_runtime,
             lease_seconds=10,
         )
         self.telemetry = telemetry

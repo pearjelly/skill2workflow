@@ -84,6 +84,14 @@ allowlist. Workflows that omit it retain legacy destination behavior; when
 present, the runtime requires the normalized request origin to match one of
 the declared entries before credential resolution or network access.
 
+The self-hosted service configuration may additionally define
+`runtime.http_allowed_origins` as a service-wide exact-origin upper bound.
+This is outside Workflow DSL `0.1.0`, is optional for compatibility, and is
+enforced for built-in HTTP execution (including recurring schedules) before
+credential resolution or network access. A request must satisfy both lists
+when both are present; external connector fixtures remain responsible for
+their own provider-specific egress policy.
+
 Built-in HTTP transport failures use fixed, value-free connector messages:
 `http connector request failed` for non-timeout network failures and
 `http connector timed out` for timeouts. Request-body serialization failures

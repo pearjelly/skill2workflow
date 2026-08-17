@@ -1252,6 +1252,7 @@ class RecurringScheduleDispatcher:
         credential_provider=None,
         owner_id: str = "",
         lease_seconds: int = 10,
+        connector_runtime=None,
     ):
         self.state_dir = Path(state_dir)
         self.store = RecurringScheduleStore(self.state_dir)
@@ -1263,6 +1264,7 @@ class RecurringScheduleDispatcher:
             self.state_dir,
             storage="sqlite",
             credential_provider=credential_provider,
+            connector_runtime=connector_runtime,
             execution_owner=self.owner_id,
         )
 

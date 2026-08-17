@@ -40,6 +40,26 @@ The owner-only `backups/` directory is recorded as the optional
 remote backup inventory; the service never creates or deletes backup sets
 through HTTP.
 
+For a deployment that uses the built-in HTTP connector, add an owner-reviewed
+service-wide upper bound to `config/service.json` before running the Doctor:
+
+```json
+{
+  "runtime": {
+    "http_allowed_origins": [
+      "https://api.example.com"
+    ]
+  }
+}
+```
+
+Merge that field into the generated `runtime` object; do not replace the
+required `state_dir` or `storage` fields. Each entry must be one exact
+`http`/`https` origin without a path, query, fragment, userinfo, or wildcard.
+The service checks this list before credentials or network access for direct
+triggers and recurring schedules. Omit it only when the deployment's network
+boundary intentionally permits the legacy unrestricted behavior.
+
 Initialization is fail-closed. A relative root, non-loopback host, invalid port,
 missing parent, symlink target, weak generated secret, or existing target is
 rejected. The target must not already exist, and there is no force or overwrite

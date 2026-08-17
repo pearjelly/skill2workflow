@@ -104,7 +104,8 @@ the original fixed recent-tail dispatch contract remains unchanged.
 Loop 160 adds the authenticated, read-only backup inventory route and the
 installed `service-backup-inventory` client documented in
 [`remote-backup-inventory.md`](remote-backup-inventory.md). Bootstrap records
-an optional owner-only `runtime.backup_parent_dir`; the route returns only
+optional owner-only `runtime.backup_parent_dir`; deployments may also set the
+exact-origin `runtime.http_allowed_origins` service boundary; the route returns only
 bounded integrity, age, layout, and size metadata and remains available for
 diagnostics while the service is draining or on standby.
 Loop 161 adds the cursor-paged backup inventory route and installed
@@ -215,7 +216,11 @@ The machine-readable shape is published at [`schemas/service-config-0.2.0.schema
   "runtime": {
     "state_dir": "/var/lib/skill2workflow",
     "storage": "sqlite",
-    "backup_parent_dir": "/var/backups/skill2workflow"
+    "backup_parent_dir": "/var/backups/skill2workflow",
+    "http_allowed_origins": [
+      "https://api.example.com",
+      "https://lark.example.com"
+    ]
   },
   "auth": {
     "provider": "bearer_token_file",
@@ -228,7 +233,7 @@ The machine-readable shape is published at [`schemas/service-config-0.2.0.schema
 }
 ```
 
-Validation is fail-closed: unknown fields, a wrong schema version, missing security providers, relative paths, JSON storage, an invalid port, or a non-loopback bind address prevent startup. The token file and credential directory must be usable before readiness. Port `0` is accepted for test harnesses that need an operating-system-assigned port.
+Validation is fail-closed: unknown fields, a wrong schema version, missing security providers, relative paths, JSON storage, an invalid port, a non-loopback bind address, or malformed service-level HTTP origins prevent startup. The token file and credential directory must be usable before readiness. Port `0` is accepted for test harnesses that need an operating-system-assigned port. Service-level HTTP origins are exact origins, not wildcard patterns; requests must also satisfy any workflow-level allowlist.
 
 After installing the package, start the service with:
 

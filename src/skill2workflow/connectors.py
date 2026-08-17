@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 from contextlib import closing
 from dataclasses import dataclass
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .credentials import CredentialResolutionError
@@ -149,7 +149,15 @@ class ExternalConnector:
 class ConnectorRuntime:
     """Execute built-in connectors plus explicitly registered external fixtures."""
 
-    def __init__(self, external_connectors: List[ExternalConnector] = None):
+    def __init__(
+        self,
+        external_connectors: List[ExternalConnector] = None,
+        http_allowed_origins: object = None,
+    ):
+        self.http_allowed_origins = normalize_http_allowed_origins(
+            http_allowed_origins,
+            label="connector runtime http_allowed_origins",
+        )
         self._external_connectors: Dict[str, ExternalConnector] = {}
         for connector in external_connectors or []:
             self.register_external_connector(connector)
@@ -194,7 +202,12 @@ class ConnectorRuntime:
                 credential_provider=credential_provider,
                 context=context,
             )
-        return execute_connector(node, credential_provider=credential_provider, context=context)
+        return execute_connector(
+            node,
+            credential_provider=credential_provider,
+            context=context,
+            http_allowed_origins=self.http_allowed_origins,
+        )
 
 
 def default_connectors() -> List[Dict[str, object]]:
@@ -283,14 +296,24 @@ def connector_ref(binding: object) -> Dict[str, str]:
     return {"id": connector_id, "kind": connector_kind}
 
 
-def execute_connector(node: Dict[str, object], credential_provider=None, context=None) -> ConnectorResult:
+def execute_connector(
+    node: Dict[str, object],
+    credential_provider=None,
+    context=None,
+    http_allowed_origins: object = None,
+) -> ConnectorResult:
     """Execute a node's connector binding and return a normalized result."""
     binding = node.get("connector")
     ref = connector_ref(binding)
     if not ref["id"]:
         raise ConnectorExecutionError(f"{node.get('id', '<node>')} has no connector binding")
     if ref["id"] == "http":
-        return _execute_http_connector(binding, credential_provider=credential_provider, context=context)
+        return _execute_http_connector(
+            binding,
+            credential_provider=credential_provider,
+            context=context,
+            service_allowed_origins=http_allowed_origins,
+        )
     if ref["id"] == "manual":
         raise ConnectorExecutionError("manual connector is resumed through human gate state")
     raise ConnectorExecutionError(f"unsupported connector: {ref['id']}")
@@ -406,7 +429,12 @@ def _normalize_compact_metadata(summary: object) -> Dict[str, object]:
     return normalized
 
 
-def _execute_http_connector(binding: object, credential_provider=None, context=None) -> ConnectorResult:
+def _execute_http_connector(
+    binding: object,
+    credential_provider=None,
+    context=None,
+    service_allowed_origins: object = None,
+) -> ConnectorResult:
     if not isinstance(binding, dict):
         raise ConnectorExecutionError("http connector binding must be an object")
     request_spec = binding.get("request")
@@ -424,6 +452,12 @@ def _execute_http_connector(binding: object, credential_provider=None, context=N
     _validate_http_request_metadata(url, method, headers)
     url, body, mapping_summary = _mapped_http_request(request_spec, context)
     _validate_http_request_metadata(url, method, headers)
+    _validate_http_destination(
+        url,
+        service_allowed_origins,
+        label="service runtime.http_allowed_origins",
+        mismatch_error="http connector request URL is not in service http_allowed_origins",
+    )
     _validate_http_destination(url, request_spec.get("allowed_origins"))
     _apply_http_credentials(binding.get("credentials", []), headers, credential_provider)
     _validate_http_request_metadata(url, method, headers)
@@ -568,35 +602,79 @@ def _is_http_token(value: str) -> bool:
     return all(33 <= ord(character) <= 126 and character not in separators for character in value)
 
 
-def _validate_http_destination(url: str, allowed_origins: object) -> None:
+def normalize_http_allowed_origins(
+    value: object,
+    *,
+    label: str = "http allowed_origins",
+) -> Optional[Tuple[str, ...]]:
+    """Validate and normalize a service-level exact-origin HTTP allowlist.
+
+    Service configuration is parsed before a connector executes, so malformed
+    policy values use ``ValueError`` at that boundary.  The returned tuple is
+    immutable and canonicalizes default ports, host casing, and IPv6 spelling.
+    """
+
+    if value is None:
+        return None
+    if not isinstance(value, (list, tuple)) or not value:
+        raise ValueError(f"{label} must be a non-empty list")
+    if len(value) > MAX_HTTP_ALLOWED_ORIGINS:
+        raise ValueError(
+            f"{label} exceeds {MAX_HTTP_ALLOWED_ORIGINS} entries"
+        )
+    normalized = []
+    for index, origin in enumerate(value):
+        if not isinstance(origin, str):
+            raise ValueError(f"{label}[{index}] must be an origin string")
+        try:
+            canonical = _normalize_http_origin(
+                origin,
+                f"{label}[{index}]",
+                require_origin=True,
+            )
+        except ConnectorExecutionError as error:
+            raise ValueError(str(error)) from error
+        if canonical in normalized:
+            raise ValueError(f"{label} must not contain duplicate origins")
+        normalized.append(canonical)
+    return tuple(normalized)
+
+
+def _validate_http_destination(
+    url: str,
+    allowed_origins: object,
+    *,
+    label: str = "http connector request.allowed_origins",
+    mismatch_error: str = "http connector request URL is not in allowed_origins",
+) -> None:
     """Enforce an optional exact-origin egress allowlist before credentials/network."""
 
     if allowed_origins is None:
         return
-    if not isinstance(allowed_origins, list) or not allowed_origins:
+    if not isinstance(allowed_origins, (list, tuple)) or not allowed_origins:
         raise ConnectorExecutionError(
-            "http connector request.allowed_origins must be a non-empty list"
+            f"{label} must be a non-empty list"
         )
     if len(allowed_origins) > MAX_HTTP_ALLOWED_ORIGINS:
         raise ConnectorExecutionError(
-            f"http connector request.allowed_origins exceeds {MAX_HTTP_ALLOWED_ORIGINS} entries"
+            f"{label} exceeds {MAX_HTTP_ALLOWED_ORIGINS} entries"
         )
     request_origin = _normalize_http_origin(url, "http connector request.url")
     normalized = []
     for index, origin in enumerate(allowed_origins):
         if not isinstance(origin, str):
             raise ConnectorExecutionError(
-                f"http connector request.allowed_origins[{index}] must be an origin string"
+                f"{label}[{index}] must be an origin string"
             )
         normalized.append(
             _normalize_http_origin(
                 origin,
-                f"http connector request.allowed_origins[{index}]",
+                f"{label}[{index}]",
                 require_origin=True,
             )
         )
     if request_origin not in normalized:
-        raise ConnectorExecutionError("http connector request URL is not in allowed_origins")
+        raise ConnectorExecutionError(mismatch_error)
 
 
 def _normalize_http_origin(value: str, label: str, require_origin: bool = False) -> str:

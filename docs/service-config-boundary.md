@@ -19,10 +19,21 @@ loopback binding. The generated service workspace still publishes
 does not claim to establish filesystem ownership or permissions on hand-made
 configurations.
 
+The optional `runtime.http_allowed_origins` field is a service-wide upper
+bound for the built-in HTTP connector. It accepts at most 32 exact `http` or
+`https` origins, canonicalizes the scheme/host/default port, and rejects
+userinfo, paths, queries, fragments, malformed ports, and duplicates before
+the service starts. A request must satisfy both this service policy (when
+configured) and any workflow-level `connector.request.allowed_origins` list.
+The policy is shared by direct service triggers and recurring-schedule
+dispatches, and is checked before credential resolution or network access.
+Omitting the field preserves the existing unrestricted service behavior.
+
 ## Scope and exclusions
 
 This is a local startup-file boundary for the versioned
 `skill2workflow-service-0.2.0` document. It does not change the service HTTP
 body limits, credential-file reads, Workflow DSL compatibility, or the
 single-tenant deployment model. It does not provide encrypted configuration,
-secret management, remote configuration, or multi-tenant isolation.
+secret management, remote configuration, DNS-rebinding protection, IP-range
+firewalling, or multi-tenant isolation.

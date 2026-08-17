@@ -56,6 +56,7 @@ def write_systemd_service_unit(
             if loaded.backup_parent_dir is not None
             else None
         ),
+        http_allowed_origins=loaded.http_allowed_origins,
     )
     unit_file = _new_unit_file(output_path)
     user = _identity(service_user, "service user")
