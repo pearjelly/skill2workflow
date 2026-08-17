@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded local JSON run-state serialization and reads to 8 MiB with
+  regular-file, no-follow, descriptor identity, and growth/replacement-race
+  checks across save, load, listing, and interrupted-run recovery. SQLite
+  service storage and the JSON state shape remain unchanged.
+
 - Bounded local `SKILL.md` parse/compile inputs to 2 MiB with regular-file,
   no-follow, descriptor identity, and growth/replacement-race checks while
   preserving the existing parser and source-line mapping contract.

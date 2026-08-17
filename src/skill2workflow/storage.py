@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import heapq
 import json
+import os
 import sqlite3
 import stat
 from collections import Counter, deque
@@ -26,6 +27,8 @@ AUDIT_INTEGRITY_ALGORITHM = "sha256-chain-v1"
 MAX_AUDIT_LIST_ITEMS = 1000
 MAX_RUN_LIST_ITEMS = 1000
 MAX_INTERRUPTED_RECOVERY_BATCH = 100
+MAX_JSON_RUN_STATE_BYTES = 8 * 1024 * 1024
+_JSON_RUN_STATE_READ_CHUNK_BYTES = 64 * 1024
 _AUDIT_GENESIS_DIGEST = ""
 _LEGACY_AUDIT_COLUMNS = {
     "sequence",
@@ -86,13 +89,14 @@ class JsonRunStore:
 
     def save(self, state: RunState) -> None:
         path = self.runs_dir / f"{state['run_id']}.json"
-        path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+        path.write_bytes(_encode_json_run_state(state))
 
     def load(self, run_id: str) -> RunState:
         path = self.runs_dir / f"{run_id}.json"
-        if not path.exists():
-            raise FileNotFoundError(f"run not found: {run_id}")
-        return json.loads(path.read_text(encoding="utf-8"))
+        try:
+            return _read_json_run_state(path)
+        except FileNotFoundError as error:
+            raise FileNotFoundError(f"run not found: {run_id}") from error
 
     def get_run_summary(self, run_id: str) -> RunState:
         return _summarize_run_document(self.load(run_id))
@@ -103,7 +107,7 @@ class JsonRunStore:
         return sum(1 for path in self.runs_dir.glob("*.json") if path.is_file())
 
     def list(self) -> List[RunState]:
-        return [json.loads(path.read_text(encoding="utf-8")) for path in sorted(self.runs_dir.glob("*.json"))]
+        return [_read_json_run_state(path) for path in sorted(self.runs_dir.glob("*.json"))]
 
     def run_event_type_counts(self, run_ids: List[str]) -> Dict[str, Dict[str, int]]:
         selected = {str(run_id) for run_id in run_ids if str(run_id)}
@@ -145,7 +149,7 @@ class JsonRunStore:
         selected = []
         total = 0
         for path in self.runs_dir.glob("*.json"):
-            state = json.loads(path.read_text(encoding="utf-8"))
+            state = _read_json_run_state(path)
             total += 1
             if status_counts is not None:
                 status_counts[str(state.get("status", "other"))] += 1
@@ -187,7 +191,7 @@ class JsonRunStore:
         for path in sorted(self.runs_dir.glob("*.json")):
             if not path.is_file():
                 continue
-            state = json.loads(path.read_text(encoding="utf-8"))
+            state = _read_json_run_state(path)
             run_id = str(state.get("run_id", ""))
             if (
                 str(state.get("status", "")) == "interrupted"
@@ -2352,6 +2356,76 @@ def _required_execution_value(value: str, field: str) -> str:
 def _validate_sweep_limit(limit: int) -> None:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 256:
         raise ValueError("workflow deadline sweep limit must be an integer from 1 through 256")
+
+
+def _encode_json_run_state(state: RunState) -> bytes:
+    """Serialize one JSON run state without exceeding the local file bound."""
+
+    raw = json.dumps(state, ensure_ascii=False, indent=2).encode("utf-8")
+    if len(raw) > MAX_JSON_RUN_STATE_BYTES:
+        raise ValueError(
+            f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
+        )
+    return raw
+
+
+def _read_json_run_state(path: Path) -> RunState:
+    """Read one JSON run state through a bounded, identity-bound descriptor."""
+
+    try:
+        before = path.lstat()
+    except OSError:
+        raise
+    if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+        raise ValueError("JSON run state must be a regular non-symlink file")
+    if before.st_size > MAX_JSON_RUN_STATE_BYTES:
+        raise ValueError(
+            f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
+        )
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_dev != before.st_dev
+            or opened.st_ino != before.st_ino
+        ):
+            raise ValueError("JSON run state changed while being read")
+        if opened.st_size > MAX_JSON_RUN_STATE_BYTES:
+            raise ValueError(
+                f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
+            )
+
+        chunks = []
+        remaining = MAX_JSON_RUN_STATE_BYTES + 1
+        while remaining:
+            chunk = os.read(
+                descriptor,
+                min(_JSON_RUN_STATE_READ_CHUNK_BYTES, remaining),
+            )
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        if len(raw) > MAX_JSON_RUN_STATE_BYTES:
+            raise ValueError(
+                f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
+            )
+        after = path.lstat()
+        if after.st_dev != before.st_dev or after.st_ino != before.st_ino:
+            raise ValueError("JSON run state changed while being read")
+        if after.st_size > MAX_JSON_RUN_STATE_BYTES:
+            raise ValueError(
+                f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes"
+            )
+    finally:
+        os.close(descriptor)
+    return json.loads(raw.decode("utf-8"))
 
 
 def _validate_interrupted_recovery_limit(limit: int) -> None:

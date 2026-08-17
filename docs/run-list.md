@@ -24,7 +24,9 @@ array as the unbounded command. SQLite orders the window by durable update time
 and run ID and reads a compact summary/event projection without parsing complete
 run state documents containing workflow, input, or node-result data; JSON uses
 the newest durable event timestamp (with a filesystem fallback for legacy states
-without timestamps). The read is storage-bounded and does not mutate runs,
+without timestamps) and applies the fixed 8 MiB local JSON run-state boundary
+documented in [`json-run-state-boundary.md`](json-run-state-boundary.md). The
+read is storage-bounded and does not mutate runs,
 append audit events, or change retention. The complete path remains available
 when the flag is omitted.
 

@@ -5,10 +5,12 @@ from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.storage import (
     JsonControlStore,
     JsonRunStore,
+    MAX_JSON_RUN_STATE_BYTES,
     SqliteControlStore,
     SqliteRunStore,
     _iter_foreign_active_execution_rows,
@@ -18,6 +20,90 @@ from skill2workflow.storage import (
 
 
 class StorageTests(TestCase):
+    def test_json_run_state_save_rejects_oversized_payload(self):
+        with TemporaryDirectory() as tmp:
+            store = JsonRunStore(Path(tmp) / "json")
+            with self.assertRaisesRegex(
+                ValueError,
+                f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes",
+            ):
+                store.save(
+                    {
+                        "run_id": "run_oversized_state",
+                        "payload": "x" * MAX_JSON_RUN_STATE_BYTES,
+                    }
+                )
+            self.assertFalse(
+                (Path(tmp) / "json" / "runs" / "run_oversized_state.json").exists()
+            )
+
+    def test_json_run_state_load_rejects_oversized_before_opening(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "json" / "runs" / "run_oversized_load.json"
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b"x" * (MAX_JSON_RUN_STATE_BYTES + 1))
+            store = JsonRunStore(Path(tmp) / "json")
+
+            with patch("skill2workflow.storage.os.open") as open_file:
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes",
+                ):
+                    store.load("run_oversized_load")
+            open_file.assert_not_called()
+
+    def test_json_run_state_load_rejects_symlink_and_path_replacement(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp) / "json" / "runs"
+            root.mkdir(parents=True)
+            path = root / "run_link.json"
+            outside = root / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            path.symlink_to(outside)
+            store = JsonRunStore(Path(tmp) / "json")
+
+            with self.assertRaisesRegex(ValueError, "regular non-symlink"):
+                store.load("run_link")
+
+            path.unlink()
+            path.write_text("{}", encoding="utf-8")
+            replacement = root / "replacement.json"
+            replacement.write_text("{}", encoding="utf-8")
+            real_open = os.open
+            replaced = False
+
+            def replace_before_open(open_path, flags, *args, **kwargs):
+                nonlocal replaced
+                if Path(open_path) == path and not replaced:
+                    replaced = True
+                    replacement.replace(path)
+                return real_open(open_path, flags, *args, **kwargs)
+
+            with patch(
+                "skill2workflow.storage.os.open",
+                side_effect=replace_before_open,
+            ):
+                with self.assertRaisesRegex(
+                    ValueError, "JSON run state changed while being read"
+                ):
+                    store.load("run_link")
+
+    def test_json_run_state_load_rejects_read_growth_past_bound(self):
+        with TemporaryDirectory() as tmp:
+            store = JsonRunStore(Path(tmp) / "json")
+            path = Path(tmp) / "json" / "runs" / "run_growth.json"
+            path.write_text("{}", encoding="utf-8")
+
+            with patch(
+                "skill2workflow.storage.os.read",
+                return_value=b"x" * (MAX_JSON_RUN_STATE_BYTES + 1),
+            ):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"JSON run state exceeds {MAX_JSON_RUN_STATE_BYTES} bytes",
+                ):
+                    store.load("run_growth")
+
     def test_interrupted_execution_rows_stream_without_fetchall(self):
         with TemporaryDirectory() as tmp:
             store = SqliteRunStore(Path(tmp) / "sqlite")

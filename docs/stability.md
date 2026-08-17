@@ -62,6 +62,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   without replaying workflow execution or a human decision; this is a retry
   recovery contract, not a distributed transaction or provider compensation
 - JSON storage as the dependency-light default
+- Local JSON run-state documents use the fixed 8 MiB regular-file/no-follow,
+  device/inode-bound read and write contract documented in
+  [`json-run-state-boundary.md`](json-run-state-boundary.md); the JSON state
+  shape and SQLite service requirement remain unchanged
 - SQLite storage as an opt-in local persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
 - Built-in HTTP connector request/response payloads are bounded to 1 MiB with fixed overflow and invalid-UTF-8 failures, as documented in `docs/connectors.md`
