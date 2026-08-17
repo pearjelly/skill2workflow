@@ -27,6 +27,11 @@ LOCAL_SCHEDULE_DISPATCH_LIST_SCHEMA_VERSION = "skill2workflow-local-schedule-dis
 MAX_LOCAL_SCHEDULE_LIST_ITEMS = 1000
 MAX_LOCAL_SCHEDULE_DISPATCH_LIST_ITEMS = 1000
 MAX_SCHEDULE_RUN_DUE_ITEMS = 100
+# One-shot files are local state, but every operator/read path still needs a
+# finite parser boundary.  The trigger input itself is capped at 1 MiB; this
+# larger envelope leaves room for the schedule metadata and canonical JSON
+# while keeping malformed files from becoming an unbounded allocation.
+MAX_SCHEDULE_FILE_BYTES = 2 * 1024 * 1024
 
 Schedule = Dict[str, object]
 ScheduleRunResult = Dict[str, object]
@@ -48,19 +53,26 @@ class LocalScheduleStore:
         schedule = normalize_schedule_definition(definition)
         schedule_id = str(schedule["schedule"]["id"])
         path = self._schedule_path(schedule_id)
-        path.write_text(json.dumps(schedule, ensure_ascii=False, indent=2), encoding="utf-8")
+        serialized = json.dumps(schedule, ensure_ascii=False, indent=2)
+        if len(serialized.encode("utf-8")) > MAX_SCHEDULE_FILE_BYTES:
+            raise ValueError(
+                f"schedule file exceeds {MAX_SCHEDULE_FILE_BYTES} bytes"
+            )
+        path.write_text(serialized, encoding="utf-8")
         return schedule
 
     def get_schedule(self, schedule_id: str) -> Schedule:
         path = self._schedule_path(schedule_id)
         if not path.exists():
             raise ValueError(f"schedule not found: {schedule_id}")
-        return normalize_schedule_definition(json.loads(path.read_text(encoding="utf-8")))
+        return normalize_schedule_definition(
+            _read_schedule_document(path)
+        )
 
     def list_schedules(self) -> List[Schedule]:
         schedules = []
         for path in sorted(self.schedules_dir.glob("*.json")):
-            schedules.append(normalize_schedule_definition(json.loads(path.read_text(encoding="utf-8"))))
+            schedules.append(normalize_schedule_definition(_read_schedule_document(path)))
         return schedules
 
     def list_compact_bounded(self, max_items: int) -> Dict[str, object]:
@@ -75,7 +87,7 @@ class LocalScheduleStore:
         # avoidable memory pressure on large local schedule directories.
         for path in self.schedules_dir.glob("*.json"):
             schedule = normalize_schedule_definition(
-                json.loads(path.read_text(encoding="utf-8"))
+                _read_schedule_document(path)
             )
             total += 1
             compact, sort_key = _compact_schedule(schedule, "one_shot")
@@ -226,7 +238,7 @@ class LocalScheduleRunner:
             selected = []
             for path in self.store.schedules_dir.glob("*.json"):
                 schedule = normalize_schedule_definition(
-                    json.loads(path.read_text(encoding="utf-8"))
+                    _read_schedule_document(path)
                 )
                 if not _is_due(schedule, now_at):
                     continue
@@ -249,7 +261,7 @@ class LocalScheduleRunner:
         due = []
         for path in sorted(self.store.schedules_dir.glob("*.json")):
             schedule = normalize_schedule_definition(
-                json.loads(path.read_text(encoding="utf-8"))
+                _read_schedule_document(path)
             )
             if not _is_due(schedule, now_at):
                 continue
@@ -328,6 +340,21 @@ class LocalScheduleRunner:
                 "budget_exhausted": processed >= max_items,
             }
         return result
+
+
+def _read_schedule_document(path: Path) -> object:
+    """Read one local schedule JSON document through a bounded byte window."""
+
+    size = path.stat().st_size
+    if size > MAX_SCHEDULE_FILE_BYTES:
+        raise ValueError(f"schedule file exceeds {MAX_SCHEDULE_FILE_BYTES} bytes")
+    # The stat is only an early rejection.  Re-check the actual read so a
+    # file that grows between stat/open cannot bypass the parser boundary.
+    with path.open("rb") as stream:
+        raw = stream.read(MAX_SCHEDULE_FILE_BYTES + 1)
+    if len(raw) > MAX_SCHEDULE_FILE_BYTES:
+        raise ValueError(f"schedule file exceeds {MAX_SCHEDULE_FILE_BYTES} bytes")
+    return json.loads(raw.decode("utf-8"))
 
 
 def normalize_schedule_definition(definition: object) -> Schedule:

@@ -31,6 +31,8 @@ class TriggerDocumentationTests(TestCase):
             "HTTP `408`",
             "request timed out",
             "request body incomplete",
+            "fixed 2 MiB UTF-8 envelope",
+            "growth-raced files fail closed",
         ):
             self.assertIn(phrase, guide)
         self.assertIn("Loop 62: Durable SQLite Trigger Idempotency", roadmap)

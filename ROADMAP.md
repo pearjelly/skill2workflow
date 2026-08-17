@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-164
+- Completed delivery loops: 1-165
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 164 is complete with lazy bounded one-shot schedule discovery
+- Active loop: None; Loop 165 is complete with bounded one-shot schedule document reads
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-163 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-165 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -3889,9 +3889,37 @@ after the first over-budget directory. The existing `inventory_truncated`
  leases, dispatch claims, distributed scheduling, or complete-list
  compatibility paths.
 
+### Loop 165: Bounded One-Shot Schedule Document Reads
+
+**Status:** Complete.
+
+**Prior basis:** Loop 164 made one-shot schedule directory discovery lazy and
+bounded the number of retained definitions, but every discovered JSON file was
+still read with an unbounded `read_text` call. A corrupted or hostile local
+schedule could therefore force excessive parser memory before the existing
+1 MiB trigger-input validation ran.
+
+**Outcome:** One-shot schedule save, lookup, complete listing, compact bounded
+inventory, and due-run discovery now share a fixed 2 MiB UTF-8 document bound.
+The reader rejects a file that is already oversized and re-checks the bounded
+read window so a file growing between `stat` and `open` cannot bypass the
+parser boundary. Existing schedule normalization, trigger-input limits,
+complete-list behavior, and recurring SQLite scheduling remain unchanged.
+
+**Evidence:** Schedule regression coverage writes an oversized otherwise-valid
+document and proves every one-shot read surface fails closed before
+normalization. The focused schedule suite, full suite, package, production
+baseline, and secret-hygiene gates retain the public CLI and documentation
+contracts.
+
+**Safety boundary:** This bounds local one-shot JSON parsing only. It does not
+change trigger input semantics, recurring schedule storage, workflow
+execution, provider effects, directory enumeration, or distributed
+scheduling.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 164 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 165 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4021,6 +4049,7 @@ This rolling queue is ordered. Loop 164 is complete and there is no active deliv
 | Loop 162: Protected Remote Backup Retention Planning | Complete | Let remote operators review a complete expiration policy and aggregate eligible bytes without exposing backup names | Authenticated 64 KiB policy request/16 KiB redacted aggregate plan, truncation blocking, client/CLI/schema/docs, and authentication/redaction/read-only tests |
 | Loop 163: Bounded Remote Backup Retention Scanning | Complete | Keep over-budget retention preflights from traversing an unbounded backup parent before failing closed | Fixed `limit + 1` scan guard, lower-bound truncation semantics, regression coverage, and aligned backup/remote-retention documentation |
 | Loop 164: Lazy Bounded One-Shot Schedule Discovery | Complete | Keep bounded local due batches and compact schedule inventories from materializing every schedule-directory path | Lazy file enumeration, deterministic `(run_at, schedule.id)` selection, bounded full-definition retention, compatibility tests, and aligned trigger documentation |
+| Loop 165: Bounded One-Shot Schedule Document Reads | Complete | Keep local one-shot schedule parsing from allocating an unbounded JSON document | Fixed 2 MiB UTF-8 read window across save/read/list/compact/due paths, growth-race recheck, fail-closed regression coverage, and aligned scheduling documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

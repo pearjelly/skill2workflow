@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded local one-shot schedule document reads to a fixed 2 MiB UTF-8
+  envelope across save, lookup, listing, compact inventory, and due discovery.
+  Oversized or growth-raced documents fail closed before normalization; the
+  existing trigger-input and recurring SQLite contracts are unchanged.
+
 - Bounded one-shot schedule discovery now lazily enumerates local schedule
   files. `schedule-run-due --max-items` retains only the requested number of
   earliest `(run_at, schedule.id)` definitions, and `schedules --limit` no

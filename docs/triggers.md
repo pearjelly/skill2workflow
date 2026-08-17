@@ -307,6 +307,11 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/skill2workflow-sc
   --state-dir /tmp/skill2workflow-control
 ```
 
+The local one-shot JSON document is capped at a fixed 2 MiB UTF-8 envelope on
+save and every read path. Oversized or growth-raced files fail closed before
+normalization; this envelope is separate from the shared 1 MiB canonical
+`trigger.input` limit.
+
 List schedules:
 
 ```bash

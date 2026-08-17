@@ -199,7 +199,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due \
   --now 2026-08-11T00:00:00Z
 ```
 
-The legacy `skill2workflow-schedule-0.1.0` format remains a local one-shot JSON schedule for evaluation and compatibility. The long-running service dispatches only the durable `0.2.0` SQLite contract.
+The legacy `skill2workflow-schedule-0.1.0` format remains a local one-shot JSON schedule for evaluation and compatibility. Each one-shot document is capped at a fixed 2 MiB UTF-8 envelope on save and every read path; an oversized or growing file fails closed before JSON normalization. The long-running service dispatches only the durable `0.2.0` SQLite contract.
 
 The remote create path is documented in
 [`remote-schedule-create.md`](remote-schedule-create.md). It is retry-safe for

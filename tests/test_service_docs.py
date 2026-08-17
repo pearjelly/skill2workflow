@@ -49,6 +49,7 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("Loop 162 adds the authenticated, read-only backup retention plan", guide)
         self.assertIn("Loop 163 stops that preflight after the first over-budget directory", guide)
         self.assertIn("Loop 164 applies the same source-boundary discipline", guide)
+        self.assertIn("Loop 165 adds a fixed 2 MiB UTF-8 envelope", guide)
         self.assertIn("POST /api/v1/backup-retention-plan", guide)
         self.assertIn("remote-backup-retention-plan.md", guide)
         self.assertIn("service-backup-retention-plan", guide)
@@ -126,6 +127,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-164 are complete", readme)
+        self.assertIn("Delivery Loops 1-165 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

@@ -1,5 +1,6 @@
 import json
 import threading
+from io import BytesIO
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -10,6 +11,7 @@ from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.schedules import (
     LocalScheduleRunner,
     LocalScheduleStore,
+    MAX_SCHEDULE_FILE_BYTES,
     normalize_schedule_definition,
 )
 from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
@@ -123,6 +125,36 @@ class ScheduleTests(TestCase):
         self.assertEqual(saved["schedule"]["id"], "schedule_daily_report")
         self.assertEqual([item["schedule"]["id"] for item in loaded], ["schedule_daily_report"])
         self.assertEqual(loaded[0]["trigger"]["input"], {"customer_id": "customer_123"})
+
+    def test_one_shot_schedule_file_reads_reject_oversized_documents(self):
+        with TemporaryDirectory() as tmp:
+            state_dir = Path(tmp)
+            store = LocalScheduleStore(state_dir)
+            store.save(_schedule_definition(schedule_id="oversized"))
+            path = state_dir / "schedules" / "oversized.json"
+            document = json.loads(path.read_text(encoding="utf-8"))
+            document["unused_metadata"] = "x" * MAX_SCHEDULE_FILE_BYTES
+            path.write_text(json.dumps(document), encoding="utf-8")
+            runner = LocalScheduleRunner(state_dir)
+
+            operations = (
+                lambda: store.get_schedule("oversized"),
+                store.list_schedules,
+                lambda: runner.list_schedules_bounded(1),
+                lambda: runner.list_due_schedules("2026-07-06T00:00:00Z", max_items=1),
+            )
+            for operation in operations:
+                with self.assertRaisesRegex(ValueError, "schedule file exceeds"):
+                    operation()
+
+            path.write_text(json.dumps(_schedule_definition(schedule_id="oversized")), encoding="utf-8")
+            with patch.object(
+                Path,
+                "open",
+                return_value=BytesIO(b"x" * (MAX_SCHEDULE_FILE_BYTES + 1)),
+            ):
+                with self.assertRaisesRegex(ValueError, "schedule file exceeds"):
+                    store.get_schedule("oversized")
 
     def test_bounded_local_schedule_inventory_is_newest_compact_and_value_free(self):
         with TemporaryDirectory() as tmp:

@@ -54,6 +54,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("does not parse complete definitions", guide)
         self.assertIn("PUT /api/v1/recurring-schedules/{schedule_id}", guide)
         self.assertIn("compare-and-swap token", guide)
+        self.assertIn("fixed 2 MiB UTF-8 envelope", guide)
 
     def test_bounded_local_schedule_schemas_fix_the_redacted_window_contract(self):
         schedule_schema = json.loads(
@@ -97,7 +98,8 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-164 are complete", readme)
+        self.assertIn("Delivery Loops 1-165 are complete", readme)
+        self.assertIn("Loop 165 adds a fixed 2 MiB UTF-8 document bound", readme)
         self.assertIn("Loop 146 adds a compact SQLite recurring-schedule projection", readme)
         self.assertIn("docs/recurring-scheduling.md", readme)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)

@@ -756,7 +756,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-164 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-165 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1321,6 +1321,12 @@ Loop 164 adds lazy bounded discovery for local one-shot schedules: bounded due
  batches retain only the earliest normalized `(run_at, schedule.id)` records,
  and compact schedule inventory no longer materializes every directory path.
  Complete-list and complete due-run compatibility paths remain unchanged.
+
+Loop 165 adds a fixed 2 MiB UTF-8 document bound for local one-shot schedules.
+Save, lookup, complete listing, compact inventory, and due-run discovery reject
+oversized documents before JSON normalization, including a growth-race
+recheck. The existing 1 MiB trigger-input boundary and recurring SQLite
+contract remain unchanged.
 
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
