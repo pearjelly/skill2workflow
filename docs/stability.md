@@ -51,7 +51,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   fixed status/presence vocabulary and bounded identifier lists for `output`,
   `audit`, input-mapping, and credential summaries; unknown fields and invalid
   strings are dropped while direct runtime results remain unchanged, as
-  documented in [`external-connector-result-boundary.md`](external-connector-result-boundary.md)
+  documented in [`external-connector-result-boundary.md`](external-connector-result-boundary.md).
+  An explicit connector manifest may add finite string enums, booleans, and
+  bounded identifier lists through `audit_contract.durable_metadata`; the
+  manifest policy is strictly bounded and validated before registration.
 - Built-in HTTP transport failures use fixed value-free messages (`http
   connector request failed`, `http connector timed out`, and the fixed JSON
   body serialization message); underlying URL, provider-transport, proxy,

@@ -850,7 +850,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-203 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-204 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -873,6 +873,11 @@ metadata: durable `output`, `audit`, input-mapping, and credential projections
 retain only fixed status/presence fields and bounded identifier lists. Unknown
 fields are dropped before JSON/SQLite persistence, while direct runtime results
 remain available to local callers.
+
+Loop 204 lets an explicitly loaded external connector declare an additional
+bounded durable metadata vocabulary in its manifest: finite string enums,
+booleans, and identifier lists. The runtime validates the declaration before
+registration and still drops undeclared or invalid values before persistence.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

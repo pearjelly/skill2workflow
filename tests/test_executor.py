@@ -707,6 +707,75 @@ class ExecutorTests(TestCase):
                     )
                 )
 
+    def test_manifest_declared_external_metadata_is_projected_without_raw_values(self):
+        fixture_path = (
+            Path(__file__).resolve().parents[1]
+            / "examples"
+            / "connectors"
+            / "local_echo_connector.py"
+        )
+        fixture = load_external_connector(fixture_path)
+        manifest = json.loads(json.dumps(fixture.manifest))
+        manifest["id"] = "metadata_extension"
+        manifest["kind"] = "metadata_extension"
+        manifest["audit_contract"]["durable_metadata"] = {
+            "string_enums": {"region": ["cn", "us"]},
+            "booleans": ["request_id_present"],
+            "lists": ["safe_keys"],
+        }
+        private_marker = "provider-value=private-extension"
+
+        def execute(_binding, credential_provider=None, context=None):
+            return {
+                "status": "completed",
+                "connector": {"id": "metadata_extension", "kind": "metadata_extension"},
+                "output": {
+                    "region": "cn",
+                    "request_id_present": True,
+                    "safe_keys": ["alpha"],
+                    "private_message": private_marker,
+                },
+                "audit": {
+                    "region": "cn",
+                    "request_id_present": True,
+                    "private_message": private_marker,
+                },
+            }
+
+        runtime = ConnectorRuntime([ExternalConnector(manifest, execute)])
+        workflow = _http_connector_workflow("https://unused.invalid")
+        workflow["nodes"][1]["connector"] = {
+            "id": "metadata_extension",
+            "kind": "metadata_extension",
+            "request": {},
+        }
+
+        for storage in ("json", "sqlite"):
+            with self.subTest(storage=storage), TemporaryDirectory() as tmp:
+                state = LocalExecutor(
+                    Path(tmp), storage=storage, connector_runtime=runtime
+                ).run(workflow)
+                persisted = LocalExecutor(Path(tmp), storage=storage).get_run(
+                    state["run_id"]
+                )
+
+            for snapshot in (state, persisted):
+                encoded = json.dumps(snapshot, ensure_ascii=False)
+                self.assertNotIn(private_marker, encoded)
+                result = snapshot["node_results"]["call_api"]
+                self.assertEqual(
+                    result["output"],
+                    {
+                        "region": "cn",
+                        "request_id_present": True,
+                        "safe_keys": ["alpha"],
+                    },
+                )
+                self.assertEqual(
+                    result["audit"],
+                    {"region": "cn", "request_id_present": True},
+                )
+
     def test_retry_policy_retries_failed_connector_and_records_recovery(self):
         server = _FlakyConnectorTestServer()
         workflow = _http_connector_workflow(server.url)

@@ -226,7 +226,12 @@ Connector manifests use this minimum shape:
   },
   "audit_contract": {
     "value_policy": "compact_no_payload_values",
-    "events": ["connector_started", "connector_completed", "connector_failed"]
+    "events": ["connector_started", "connector_completed", "connector_failed"],
+    "durable_metadata": {
+      "string_enums": {"provider_status": ["completed", "unavailable"]},
+      "booleans": ["request_id_present"],
+      "lists": ["safe_keys"]
+    }
   }
 }
 ```
@@ -243,7 +248,7 @@ Manifest fields:
 | `config_schema` | Required object describing connector configuration metadata. It is descriptive in this local runtime; Workflow DSL validation remains authoritative. |
 | `execution_contract` | Required object describing how the runtime calls the connector and what normalized result shape it returns. |
 | `credential_contract` | Required object describing handle support and resolved-value policy. |
-| `audit_contract` | Required object describing compact audit event behavior. |
+| `audit_contract` | Required object describing compact audit event behavior. Optional `durable_metadata` declares a bounded value-free extension vocabulary. |
 
 Execution handoff:
 
@@ -252,6 +257,24 @@ Execution handoff:
 - Connector code must return a normalized result with `status`, `connector`, `output`, and optional `error` fields.
 - Connector code must not mutate the published Workflow DSL artifact.
 - Connector code must not write resolved credentials, raw authorization headers, raw webhook bodies, or mapped business payload values into audit events.
+
+### Manifest-declared durable metadata
+
+`audit_contract.durable_metadata` is optional and additive. It is a declaration,
+not a request to persist arbitrary values:
+
+| Section | Retained value | Bound |
+| --- | --- | --- |
+| `string_enums` | one of the declared finite strings | at most 32 fields and 32 values per field; each name/value is a 128-byte identifier |
+| `booleans` | `true` or `false` | at most 32 field names |
+| `lists` | sorted, deduplicated bounded identifier names | at most 32 field names; at most 32 retained names per result |
+
+Field names must be unique across all three sections and use only letters,
+numbers, `_`, `.`, `:`, or `-`. Unknown fields, invalid enum values, nested
+objects, and arbitrary business strings are still dropped. `input_mapping` and
+`credentials` retain their existing fixed summaries. Manifest validation occurs
+before external fixture registration, while direct connector results keep their
+existing immediate diagnostics.
 
 Future external connectors should use `execution_contract.mode: "external"` and provide their own package entrypoint. The current runtime supports one narrow prototype path: tests or smoke helpers may explicitly load a local connector fixture file and register it with `ConnectorRuntime`. This is not a dynamic package loader, connector installer, marketplace, OAuth flow, hosted callback system, queue, or production scheduler.
 
@@ -337,8 +360,13 @@ status strings, boolean presence/attempt flags, and bounded identifier lists.
 `input_mapping` keeps only its status and input-key names, while `credentials`
 keeps only its status and bounded handle names. Unknown fields or invalid
 strings are dropped before JSON/SQLite run state and connector events are
-written. This does not change the immediate `ConnectorRuntime` result returned
-to a local caller; it protects the persisted projection.
+written. A connector manifest may add a reviewed finite vocabulary under
+`audit_contract.durable_metadata` using only `string_enums`, `booleans`, and
+`lists`; the same bounds and identifier rules apply, and malformed declarations
+are rejected before the fixture is registered. This lets an extension preserve
+safe connector-specific facts without allowing arbitrary provider values into
+durable state. This does not change the immediate `ConnectorRuntime` result
+returned to a local caller; it protects the persisted projection.
 
 Published-run audit events promote compact connector metadata for inspection. For external fixtures this includes fields such as `credential_status`, `credential_handles`, `input_mapping_status`, and `input_mapping_keys`, not payload values.
 

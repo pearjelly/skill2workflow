@@ -25,6 +25,9 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("connectors` inspection command", connectors)
         self.assertIn("2 MiB", connectors)
         self.assertIn("no-follow descriptor", connectors)
+        self.assertIn("audit_contract.durable_metadata", connectors)
+        self.assertIn("string_enums", connectors)
+        self.assertIn("malformed declarations", connectors)
 
         self.assertIn("### Local Connector Package Shape", examples)
         self.assertIn("examples/connectors/local_echo_connector.py", examples)

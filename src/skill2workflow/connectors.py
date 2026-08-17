@@ -36,6 +36,138 @@ HTTP_RESPONSE_MODES = ("full", "metadata")
 MAX_EXTERNAL_CONNECTOR_RESULT_BYTES = 1_048_576
 EXTERNAL_CONNECTOR_EXECUTION_FAILURE = "external connector execution failed"
 EXTERNAL_CONNECTOR_DURABLE_FAILURE = "external connector failed"
+MAX_EXTERNAL_METADATA_FIELDS = 32
+MAX_EXTERNAL_METADATA_ENUM_VALUES = 32
+MAX_EXTERNAL_METADATA_NAME_BYTES = 128
+
+
+def _metadata_identifier(value: object) -> str:
+    """Return one bounded identifier suitable for a manifest metadata policy."""
+
+    if not isinstance(value, str) or not value:
+        return ""
+    try:
+        encoded_length = len(value.encode("utf-8"))
+    except UnicodeError:
+        return ""
+    if encoded_length > MAX_EXTERNAL_METADATA_NAME_BYTES:
+        return ""
+    if not all(
+        character.isalnum() or character in {"_", ".", ":", "-"}
+        for character in value
+    ):
+        return ""
+    return value
+
+
+def _validate_durable_metadata_policy(value: object, label: str) -> List[str]:
+    """Validate an optional value-free metadata vocabulary in a manifest."""
+
+    if value is None:
+        return []
+    if not isinstance(value, dict):
+        return [f"{label} must be an object"]
+    allowed_sections = {"string_enums", "booleans", "lists"}
+    errors = []
+    unknown_sections = [key for key in value if key not in allowed_sections]
+    if unknown_sections:
+        errors.append(f"{label} contains unsupported sections")
+
+    string_enums = value.get("string_enums", {})
+    if not isinstance(string_enums, dict):
+        errors.append(f"{label}.string_enums must be an object")
+        string_enums = {}
+    if len(string_enums) > MAX_EXTERNAL_METADATA_FIELDS:
+        errors.append(
+            f"{label}.string_enums exceeds {MAX_EXTERNAL_METADATA_FIELDS} fields"
+        )
+    declared_names = set()
+    for name, choices in string_enums.items():
+        normalized_name = _metadata_identifier(name)
+        if not normalized_name:
+            errors.append(f"{label}.string_enums contains an invalid field name")
+            continue
+        if normalized_name in declared_names:
+            errors.append(f"{label} contains duplicate field names")
+        declared_names.add(normalized_name)
+        if (
+            not isinstance(choices, list)
+            or not choices
+            or len(choices) > MAX_EXTERNAL_METADATA_ENUM_VALUES
+        ):
+            errors.append(
+                f"{label}.string_enums.{normalized_name} must contain 1-"
+                f"{MAX_EXTERNAL_METADATA_ENUM_VALUES} values"
+            )
+            continue
+        normalized_choices = []
+        for choice in choices:
+            normalized_choice = _metadata_identifier(choice)
+            if not normalized_choice:
+                errors.append(
+                    f"{label}.string_enums.{normalized_name} contains an invalid value"
+                )
+                continue
+            if normalized_choice in normalized_choices:
+                errors.append(
+                    f"{label}.string_enums.{normalized_name} contains duplicate values"
+                )
+            normalized_choices.append(normalized_choice)
+
+    for section in ("booleans", "lists"):
+        names = value.get(section, [])
+        if not isinstance(names, list):
+            errors.append(f"{label}.{section} must be a list")
+            continue
+        if len(names) > MAX_EXTERNAL_METADATA_FIELDS:
+            errors.append(
+                f"{label}.{section} exceeds {MAX_EXTERNAL_METADATA_FIELDS} fields"
+            )
+        for name in names:
+            normalized_name = _metadata_identifier(name)
+            if not normalized_name:
+                errors.append(f"{label}.{section} contains an invalid field name")
+                continue
+            if normalized_name in declared_names:
+                errors.append(f"{label} contains duplicate field names")
+            declared_names.add(normalized_name)
+    return errors
+
+
+def durable_metadata_policy(manifest: object) -> Dict[str, object]:
+    """Return a normalized manifest-declared durable metadata policy.
+
+    Validation happens when a manifest is registered. This helper remains
+    defensive because manifests can also be inspected as plain dictionaries.
+    """
+
+    if not isinstance(manifest, dict):
+        return {}
+    audit_contract = manifest.get("audit_contract")
+    if not isinstance(audit_contract, dict):
+        return {}
+    value = audit_contract.get("durable_metadata")
+    if not isinstance(value, dict):
+        return {}
+    result: Dict[str, object] = {
+        "string_enums": {},
+        "booleans": set(),
+        "lists": set(),
+    }
+    string_enums = value.get("string_enums", {})
+    if isinstance(string_enums, dict):
+        result["string_enums"] = {
+            str(name): frozenset(str(choice) for choice in choices)
+            for name, choices in string_enums.items()
+            if _metadata_identifier(name) and isinstance(choices, list)
+        }
+    for section in ("booleans", "lists"):
+        names = value.get(section, [])
+        if isinstance(names, list):
+            result[section] = {
+                str(name) for name in names if _metadata_identifier(name)
+            }
+    return result
 
 
 DEFAULT_CONNECTORS: List[Dict[str, object]] = [
@@ -193,6 +325,14 @@ class ConnectorRuntime:
         manifests.extend(copy.deepcopy(item.manifest) for item in self._external_connectors.values())
         return manifests
 
+    def external_durable_metadata_policy(self, connector_id: object) -> Dict[str, object]:
+        """Return one registered external connector's safe metadata vocabulary."""
+
+        connector = self._external_connectors.get(str(connector_id or ""))
+        if connector is None:
+            return {}
+        return durable_metadata_policy(connector.manifest)
+
     def execute_connector(self, node: Dict[str, object], credential_provider=None, context=None) -> ConnectorResult:
         """Execute a connector through the built-in path or an explicit external fixture."""
         binding = node.get("connector")
@@ -277,6 +417,12 @@ def validate_connector_manifest(manifest: object) -> List[str]:
         events = audit_contract.get("events")
         if not isinstance(events, list) or not events:
             errors.append("audit_contract.events must be a non-empty list")
+        errors.extend(
+            _validate_durable_metadata_policy(
+                audit_contract.get("durable_metadata"),
+                "audit_contract.durable_metadata",
+            )
+        )
 
     return errors
 

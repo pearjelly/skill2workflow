@@ -101,24 +101,50 @@ def _safe_external_metadata_names(value: object) -> List[str]:
     return sorted(names)[:_EXTERNAL_METADATA_MAX_LIST_ITEMS]
 
 
-def _durable_external_metadata(summary: object) -> Dict[str, object]:
+def _durable_external_metadata(
+    summary: object, policy: Dict[str, object] = None
+) -> Dict[str, object]:
     """Project external metadata to a fixed value-free durable vocabulary."""
 
     if not isinstance(summary, dict) or not summary:
         return {}
+    allowed_string_values = dict(_EXTERNAL_METADATA_STRING_VALUES)
+    allowed_boolean_keys = set(_EXTERNAL_METADATA_BOOLEAN_KEYS)
+    allowed_list_keys = set(_EXTERNAL_METADATA_LIST_KEYS)
+    if isinstance(policy, dict):
+        string_enums = policy.get("string_enums")
+        if isinstance(string_enums, dict):
+            for key, values in string_enums.items():
+                if isinstance(key, str) and isinstance(values, (set, frozenset)):
+                    allowed_string_values.setdefault(
+                        key,
+                        frozenset(
+                            item for item in values if isinstance(item, str)
+                        ),
+                    )
+        boolean_keys = policy.get("booleans")
+        if isinstance(boolean_keys, (set, frozenset)):
+            allowed_boolean_keys.update(
+                key for key in boolean_keys if isinstance(key, str)
+            )
+        list_keys = policy.get("lists")
+        if isinstance(list_keys, (set, frozenset)):
+            allowed_list_keys.update(
+                key for key in list_keys if isinstance(key, str)
+            )
     normalized: Dict[str, object] = {}
     for raw_key, value in summary.items():
         key = str(raw_key)
-        allowed_values = _EXTERNAL_METADATA_STRING_VALUES.get(key)
+        allowed_values = allowed_string_values.get(key)
         if allowed_values is not None:
             if isinstance(value, str) and value in allowed_values:
                 normalized[key] = value
             continue
-        if key in _EXTERNAL_METADATA_BOOLEAN_KEYS:
+        if key in allowed_boolean_keys:
             if isinstance(value, bool):
                 normalized[key] = value
             continue
-        if key in _EXTERNAL_METADATA_LIST_KEYS:
+        if key in allowed_list_keys:
             normalized[key] = _safe_external_metadata_names(value)
     return normalized
 
@@ -147,10 +173,25 @@ def _durable_external_credentials(summary: object) -> Dict[str, object]:
     return normalized
 
 
-def _durable_connector_output(ref: Dict[str, str], output: object) -> Dict[str, object]:
+def _durable_connector_output(
+    ref: Dict[str, str], output: object, policy: Dict[str, object] = None
+) -> Dict[str, object]:
     if ref.get("id") not in BUILTIN_CONNECTOR_IDS:
-        return _durable_external_metadata(output)
+        return _durable_external_metadata(output, policy)
     return copy.deepcopy(output) if isinstance(output, dict) else {}
+
+
+def _external_metadata_policy(runtime: object, ref: Dict[str, str]) -> Dict[str, object]:
+    if ref.get("id") in BUILTIN_CONNECTOR_IDS:
+        return {}
+    provider = getattr(runtime, "external_durable_metadata_policy", None)
+    if not callable(provider):
+        return {}
+    try:
+        policy = provider(ref.get("id", ""))
+    except Exception:
+        return {}
+    return policy if isinstance(policy, dict) else {}
 
 
 class LocalExecutor:
@@ -662,9 +703,13 @@ class LocalExecutor:
                     return timed_out
 
         result_status = str(connector_result.get("status", "failed"))
+        external_metadata_policy = _external_metadata_policy(
+            self.connector_runtime, ref
+        )
         durable_output = _durable_connector_output(
             ref,
             connector_result.get("output", {}),
+            external_metadata_policy,
         )
         mapping_summary = connector_result.get("input_mapping")
         credential_summary = connector_result.get("credentials")
@@ -672,7 +717,9 @@ class LocalExecutor:
         if ref.get("id") not in BUILTIN_CONNECTOR_IDS:
             mapping_summary = _durable_external_input_mapping(mapping_summary)
             credential_summary = _durable_external_credentials(credential_summary)
-            audit_summary = _durable_external_metadata(audit_summary)
+            audit_summary = _durable_external_metadata(
+                audit_summary, external_metadata_policy
+            )
         node_result = {
             "status": result_status,
             "title": node.get("title", current_id),

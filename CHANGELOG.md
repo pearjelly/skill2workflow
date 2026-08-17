@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added an optional manifest-declared durable metadata vocabulary for explicit
+  external connectors. Reviewed finite string enums, booleans, and bounded
+  identifier lists can now survive the executor projection; malformed or
+  duplicate declarations fail before registration, and direct connector
+  results remain unchanged.
+
 - Added a durable value-free projection for non-built-in connector metadata:
   `output`, `audit`, input-mapping, and credential summaries now retain only
   the fixed status/presence vocabulary and bounded identifier lists before

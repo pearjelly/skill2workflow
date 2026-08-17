@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-203
+- Completed delivery loops: 1-204
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 203 is complete with a durable external connector metadata boundary
+- Active loop: None; Loop 204 is complete with a manifest-declared external connector metadata policy
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -5193,9 +5193,45 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_executor.ExecutorTests.test_external_connector_metadata_is_projected_before_durable_persistence -v
 ```
 
+### Loop 204: Manifest-Declared External Connector Metadata Policy
+
+**Status:** Complete.
+
+**Prior basis:** Loop 203 protected durable state with a fixed executor
+vocabulary, but an open-source connector author had no safe way to retain a
+connector-specific finite status, presence flag, or key-name list. The only
+alternatives were to silently lose useful diagnostics or widen the executor
+with provider-specific code.
+
+**Outcome:** External manifests may optionally declare
+`audit_contract.durable_metadata` with bounded `string_enums`, `booleans`, and
+`lists` sections. Registration rejects unknown sections, invalid identifiers,
+duplicate names, and oversized declarations. The executor merges only the
+validated policy with the existing fixed vocabulary; input-mapping and
+credential summaries remain fixed, unknown values are dropped, and direct
+runtime results remain unchanged.
+
+**Evidence:** Connector tests cover policy normalization and fail-closed
+validation. Executor tests cover custom enum/boolean/list retention and
+private-value exclusion across JSON and SQLite reloads. The focused plan is
+[`docs/superpowers/plans/2026-08-18-external-connector-durable-metadata-policy.md`](docs/superpowers/plans/2026-08-18-external-connector-durable-metadata-policy.md).
+
+**Safety boundary:** This is a reviewed metadata vocabulary, not arbitrary
+durable-field injection, imported-Python sandboxing, provider cancellation,
+credential storage, trigger-context rewriting, or exactly-once execution.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_connectors.ConnectorTests.test_manifest_declared_metadata_policy_is_bounded_and_exposed \
+  tests.test_connectors.ConnectorTests.test_manifest_declared_metadata_policy_rejects_unsafe_shape \
+  tests.test_executor.ExecutorTests.test_manifest_declared_external_metadata_is_projected_without_raw_values -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 203 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 204 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5365,6 +5401,7 @@ This rolling queue is ordered. Loop 203 is complete and there is no active deliv
 | Loop 201: Discoverable Service HTTP Origin Bootstrap | Complete | Make the service-level HTTP origin policy safe and discoverable during first-run initialization | Repeatable CLI options, canonical config output, pre-creation validation, operator docs, and bootstrap regression evidence |
 | Loop 202: Durable External Connector Failure Boundary | Complete | Keep provider-authored external connector failure text out of durable run and audit projections without breaking immediate callers | Fixed durable failure message, returned/raised/retry coverage, SQLite reload evidence, docs, and production gates |
 | Loop 203: Durable External Connector Metadata Boundary | Complete | Keep arbitrary external connector output, audit, input-mapping, and credential strings out of durable state without breaking immediate callers | Fixed value-free durable projection, direct-result compatibility, SQLite reload evidence, docs, and production gates |
+| Loop 204: Manifest-Declared External Connector Metadata Policy | Complete | Let reviewed external connectors retain safe connector-specific finite metadata without widening durable state to arbitrary provider values | Strict manifest policy validation, JSON/SQLite custom-vocabulary projection evidence, docs, and production gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

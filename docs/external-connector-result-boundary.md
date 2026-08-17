@@ -32,9 +32,13 @@ successful and failed external results before they are persisted: `output` and
 `audit` retain only the fixed status/presence vocabulary and bounded identifier
 lists used by the approved fixtures; `input_mapping` retains only its status
 and input-key names; and `credentials` retains only its status and bounded
-handle names. Unknown fields, invalid enum values, nested objects, and strings
-outside the fixed vocabulary are dropped. The direct runtime result remains
-unchanged for callers that need immediate diagnostics.
+handle names. Loop 204 makes the output/audit vocabulary extensible through an
+optional manifest declaration under `audit_contract.durable_metadata`. That
+declaration may add only finite string enums, booleans, and bounded identifier
+lists, with strict field/value/count limits and duplicate-name rejection.
+Unknown fields, invalid enum values, nested objects, and strings outside the
+fixed or manifest-declared vocabulary are dropped. The direct runtime result
+remains unchanged for callers that need immediate diagnostics.
 
 The limit is enforced for explicitly loaded external connectors only. The
 built-in HTTP connector keeps its existing 1 MiB request/response payload

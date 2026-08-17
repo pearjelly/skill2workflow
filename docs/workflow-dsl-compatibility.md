@@ -104,7 +104,10 @@ input-mapping, and credential summaries to fixed status/presence fields and
 bounded identifier lists. Unknown fields and invalid strings are dropped
 before persistence; the immediate connector result remains unchanged. This is
 also additive runtime protection and does not change Workflow DSL `0.1.0`
-fields.
+fields. Connector manifests may add a bounded, value-free
+`audit_contract.durable_metadata` vocabulary for finite string enums, booleans,
+and identifier lists; malformed declarations fail before explicit fixture
+registration and do not alter the Workflow DSL contract.
 
 Built-in HTTP transport failures use fixed, value-free connector messages:
 `http connector request failed` for non-timeout network failures and

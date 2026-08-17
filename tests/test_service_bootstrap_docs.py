@@ -29,14 +29,14 @@ class ServiceBootstrapDocumentationTests(TestCase):
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-        self.assertIn("- Completed delivery loops: 1-203", roadmap)
+        self.assertIn("- Completed delivery loops: 1-204", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 203 is complete with a durable external connector metadata boundary",
+            "- Active loop: None; Loop 204 is complete with a manifest-declared external connector metadata policy",
             roadmap,
         )
         self.assertIn("| Loop 51: Secure Service Bootstrap | Complete |", roadmap)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-203 are complete", readme)
+        self.assertIn("Delivery Loops 1-204 are complete", readme)
         self.assertIn("secure service bootstrap", readme)
         self.assertIn("scripts/service_bootstrap_smoke.py", harness)
         self.assertIn("Secure service bootstrap", agents)

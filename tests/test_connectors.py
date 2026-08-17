@@ -79,6 +79,38 @@ class ConnectorTests(TestCase):
         )
         self.assertEqual([manifest["id"] for manifest in default_connectors()], ["manual", "http"])
 
+    def test_manifest_declared_metadata_policy_is_bounded_and_exposed(self):
+        fixture = _load_local_echo_fixture()
+        manifest = json.loads(json.dumps(fixture.MANIFEST))
+        manifest["audit_contract"]["durable_metadata"] = {
+            "string_enums": {"region": ["cn", "us"]},
+            "booleans": ["request_id_present"],
+            "lists": ["safe_keys"],
+        }
+
+        self.assertEqual(validate_connector_manifest(manifest), [])
+        runtime = ConnectorRuntime([ExternalConnector(manifest, fixture.execute)])
+        policy = runtime.external_durable_metadata_policy("local_echo")
+        self.assertEqual(policy["string_enums"]["region"], frozenset({"cn", "us"}))
+        self.assertEqual(policy["booleans"], {"request_id_present"})
+        self.assertEqual(policy["lists"], {"safe_keys"})
+
+    def test_manifest_declared_metadata_policy_rejects_unsafe_shape(self):
+        fixture = _load_local_echo_fixture()
+        manifest = json.loads(json.dumps(fixture.MANIFEST))
+        manifest["audit_contract"]["durable_metadata"] = {
+            "string_enums": {"bad field": ["ok"]},
+            "booleans": ["region"],
+            "lists": ["region"],
+            "unknown": [],
+        }
+
+        errors = validate_connector_manifest(manifest)
+
+        self.assertTrue(any("unsupported sections" in error for error in errors))
+        self.assertTrue(any("invalid field name" in error for error in errors))
+        self.assertTrue(any("duplicate field names" in error for error in errors))
+
     def test_explicit_external_connector_executes_normalized_result_without_secret(self):
         fixture = _load_local_echo_fixture()
         runtime = ConnectorRuntime([ExternalConnector(fixture.MANIFEST, fixture.execute)])
