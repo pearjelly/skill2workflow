@@ -61,6 +61,7 @@ def initialize_service_workspace(
         _owner_only_directory(workspace)
         config_dir = _private_directory(workspace / "config")
         state_dir = _private_directory(workspace / "state")
+        backup_parent_dir = _private_directory(workspace / "backups")
         secrets_dir = _private_directory(workspace / "secrets")
         credential_dir = _private_directory(secrets_dir / "connectors")
         token_file = secrets_dir / "ingress-token"
@@ -70,7 +71,11 @@ def initialize_service_workspace(
         config = {
             "schema_version": SERVICE_SCHEMA_VERSION,
             "service": {"host": host, "port": port},
-            "runtime": {"state_dir": str(state_dir), "storage": "sqlite"},
+            "runtime": {
+                "state_dir": str(state_dir),
+                "storage": "sqlite",
+                "backup_parent_dir": str(backup_parent_dir),
+            },
             "auth": {
                 "provider": "bearer_token_file",
                 "token_file": str(token_file),
@@ -98,6 +103,7 @@ def initialize_service_workspace(
         "root": str(workspace),
         "config_file": str(config_file),
         "state_dir": str(state_dir),
+        "backup_directory": str(backup_parent_dir),
         "token_file": str(token_file),
         "credential_directory": str(credential_dir),
     }

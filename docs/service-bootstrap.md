@@ -24,6 +24,7 @@ team-a/                              0700
   config/                            0700
     service.json                     0600
   state/                             0700
+  backups/                           0700
   secrets/                           0700
     ingress-token                    0600
     connectors/                      0700
@@ -33,6 +34,11 @@ The generated ingress secret contains at least 32 random bytes. The command
 never prints its value; its compact JSON output contains paths only. The service
 configuration contains only provider names and absolute file locations, never
 inline secrets.
+
+The owner-only `backups/` directory is recorded as the optional
+`runtime.backup_parent_dir` setting. It is a read-only source for the protected
+remote backup inventory; the service never creates or deletes backup sets
+through HTTP.
 
 Initialization is fail-closed. A relative root, non-loopback host, invalid port,
 missing parent, symlink target, weak generated secret, or existing target is

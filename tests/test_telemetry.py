@@ -231,6 +231,7 @@ class RuntimeTelemetryTests(TestCase):
                 "recurring_schedule_create", "recurring_schedule_action", "recurring_schedule_update", "recurring_schedule_patch", "recurring_schedule_delete", "recurring_schedule_dispatch_list", "recurring_schedule_dispatch_page",
                 "workflow_artifact_report",
                 "backup_readiness",
+                "backup_inventory",
                 "retention_readiness",
                 "operational_readiness",
                 "audit_integrity",

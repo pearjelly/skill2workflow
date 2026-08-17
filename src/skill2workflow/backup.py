@@ -30,7 +30,11 @@ BACKUP_READINESS_SCHEMA_VERSION = "skill2workflow-backup-readiness-0.1.0"
 BACKUP_LIST_SCHEMA_VERSION = "skill2workflow-state-backup-list-0.1.0"
 BACKUP_RETENTION_POLICY_SCHEMA_VERSION = "skill2workflow-backup-retention-policy-0.1.0"
 BACKUP_RETENTION_PLAN_SCHEMA_VERSION = "skill2workflow-backup-retention-plan-0.1.0"
+REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION = (
+    "skill2workflow-remote-backup-inventory-0.1.0"
+)
 MAX_BACKUP_LIST_ITEMS = 1000
+MAX_REMOTE_BACKUP_INVENTORY_ITEMS = 100
 STATE_LAYOUT_VERSION = CURRENT_STATE_LAYOUT_VERSION
 _DATABASES = ("control.sqlite3", "runs.sqlite3", "scheduler.sqlite3")
 _REQUIRED_TABLES = {
@@ -363,6 +367,53 @@ def list_state_backups(parent_dir: Path, limit: int = 100) -> Dict[str, object]:
             "max_items": limit,
             "returned": len(backups),
             "truncated": total > len(backups),
+        },
+    }
+
+
+def build_remote_backup_inventory(
+    parent_dir: Path,
+    max_items: int = MAX_REMOTE_BACKUP_INVENTORY_ITEMS,
+) -> Dict[str, object]:
+    """Return a bounded, redacted backup inventory for authenticated operators.
+
+    The local inventory intentionally includes the operator-chosen directory
+    name so a shell user can verify or restore a specific set.  A service
+    response must not export that name (it can contain business identifiers),
+    so this projection retains only integrity, age, layout, and size metadata.
+    """
+
+    if (
+        isinstance(max_items, bool)
+        or not isinstance(max_items, int)
+        or not 1 <= max_items <= MAX_REMOTE_BACKUP_INVENTORY_ITEMS
+    ):
+        raise ValueError(
+            "remote backup inventory max_items must be an integer from 1 through "
+            f"{MAX_REMOTE_BACKUP_INVENTORY_ITEMS}"
+        )
+    inventory = list_state_backups(parent_dir, limit=max_items)
+    backups = []
+    for item in reversed(inventory["backups"]):
+        backups.append(
+            {
+                "status": str(item["status"]),
+                "created_at": str(item["created_at"]),
+                "state_layout_version": str(item["state_layout_version"]),
+                "workflow_artifact_count": int(item["workflow_artifact_count"]),
+                "file_count": int(item["file_count"]),
+                "total_bytes": int(item["total_bytes"]),
+            }
+        )
+    return {
+        "schema_version": REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION,
+        "status": "ok",
+        "total": int(inventory["total"]),
+        "backups": backups,
+        "window": {
+            "max_items": max_items,
+            "returned": len(backups),
+            "truncated": bool(inventory["window"]["truncated"]),
         },
     }
 

@@ -51,6 +51,11 @@ def write_systemd_service_unit(
             loaded.credential_dir,
             "service credential directory",
         ),
+        backup_parent_dir=(
+            _private_directory(loaded.backup_parent_dir, "service backup parent directory")
+            if loaded.backup_parent_dir is not None
+            else None
+        ),
     )
     unit_file = _new_unit_file(output_path)
     user = _identity(service_user, "service user")
@@ -227,6 +232,8 @@ def _validate_unit_paths(config_file: Path, config: ServiceConfig, executable: P
         "service credential directory": config.credential_dir,
         "service executable": executable,
     }
+    if config.backup_parent_dir is not None:
+        values["service backup parent directory"] = config.backup_parent_dir
     for label, path in values.items():
         _unit_argument(label, path)
 
@@ -242,6 +249,12 @@ def _validate_unit_paths(config_file: Path, config: ServiceConfig, executable: P
     ):
         if _paths_overlap(writable, protected):
             raise ValueError(f"{label} must not overlap the writable service state directory")
+    if config.backup_parent_dir is not None and _paths_overlap(
+        writable, config.backup_parent_dir
+    ):
+        raise ValueError(
+            "service backup parent directory must not overlap the writable service state directory"
+        )
 
 
 def _unit_argument(label: str, path: Path) -> str:
@@ -282,6 +295,11 @@ def _render_unit(
     token_value = _unit_argument("service auth token", config.auth_token_file)
     credential_value = _unit_argument(
         "service credential directory", config.credential_dir
+    )
+    backup_value = (
+        _unit_argument("service backup parent directory", config.backup_parent_dir)
+        if config.backup_parent_dir is not None
+        else ""
     )
     executable_value = _unit_argument("service executable", executable)
     return "\n".join(
@@ -329,7 +347,8 @@ def _render_unit(
             "CapabilityBoundingSet=",
             "AmbientCapabilities=",
             f"ReadWritePaths={state_value}",
-            f"ReadOnlyPaths={config_value} {token_value} {credential_value}",
+            f"ReadOnlyPaths={config_value} {token_value} {credential_value}"
+            + (f" {backup_value}" if backup_value else ""),
             "",
             "[Install]",
             "WantedBy=multi-user.target",

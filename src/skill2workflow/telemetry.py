@@ -24,6 +24,7 @@ _ROUTES = (
     "control_snapshot",
     "workflow_artifact_report",
     "backup_readiness",
+    "backup_inventory",
     "retention_readiness",
     "operational_readiness",
     "audit_integrity",

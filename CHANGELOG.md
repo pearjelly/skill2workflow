@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added protected remote backup inventory through
+  `GET /api/v1/backup-inventory` and the installed
+  `service-backup-inventory` CLI. The optional owner-only backup parent is
+  created by service bootstrap; the 100-item/64 KiB response reports only
+  redacted integrity, age, layout, and size metadata and never exposes backup
+  names, paths, workflow values, or credentials.
 - Added a separate cursor-paged recurring-schedule dispatch diagnostics
   surface at `GET /api/v1/recurring-schedule-dispatch-pages` (and its targeted
   schedule route), plus the installed `service-recurring-dispatch-page` CLI.

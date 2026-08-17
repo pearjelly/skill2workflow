@@ -29,6 +29,7 @@ The installed command set also includes the protected `service-resume`,
 `service-audit-events`, bounded
 `service-recurring-schedules`, bounded `service-recurring-dispatches`, bounded
 `service-workflow-artifacts`, bounded `service-backup-readiness`, bounded
+`service-backup-inventory`, bounded
 `service-retention-readiness`, bounded
 `service-operational-readiness`, bounded
 `service-probe`, bounded `service-wait`, bounded `service-audit-integrity`, bounded

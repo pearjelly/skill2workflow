@@ -159,6 +159,7 @@ explicit connector boundaries. It currently supports:
 - Inspect remote workflow artifact consistency without exposing workflow content or credentials
 - Create, verify, and atomically restore owner-only offline SQLite state backups
 - Inspect a bounded, read-only inventory of local backups with integrity status and size metadata
+- Inspect a protected, redacted remote inventory of configured backups with integrity status and size metadata
 - Produce a bounded, read-only backup expiration plan with a minimum-valid-backup floor
 - Inspect compact, bounded local schedules and dispatch history without trigger inputs or lease identities
 - Inspect compact, bounded published-workflow inventory without workflow content
@@ -755,7 +756,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-159 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-160 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1293,6 +1294,12 @@ the separate `service-recurring-dispatch-page` client walks older redacted
 dispatch evidence with an opaque SQLite ordering cursor, while preserving the
 fixed recent-tail route and its exact 0.1.0 response contract.
 
+Loop 160 adds a protected [remote backup inventory](docs/remote-backup-inventory.md):
+the bootstrap creates an owner-only backup parent, the authenticated service
+reports a bounded redacted window of backup integrity/age/size metadata, and
+the installed `service-backup-inventory` client never exports backup names,
+paths, workflow values, or credentials.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1321,6 +1328,7 @@ See:
 - `docs/remote-schedule-dispatch-pages.md`
 - `docs/remote-workflow-artifacts.md`
 - `docs/remote-backup-readiness.md`
+- `docs/remote-backup-inventory.md`
 - `docs/remote-audit-integrity.md`
 - `docs/remote-runtime-info.md`
 - `docs/remote-trigger.md`

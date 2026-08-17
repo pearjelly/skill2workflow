@@ -39,6 +39,10 @@
           "type": "string",
           "minLength": 1
         },
+        "backup_parent_dir": {
+          "type": "string",
+          "minLength": 1
+        },
         "storage": {
           "const": "sqlite"
         }

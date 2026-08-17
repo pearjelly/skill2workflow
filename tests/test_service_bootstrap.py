@@ -37,6 +37,7 @@ class ServiceBootstrapTests(TestCase):
             token_path = root / "secrets" / "ingress-token"
             credentials = root / "secrets" / "connectors"
             state_dir = root / "state"
+            backup_directory = root / "backups"
             config = load_service_config(config_path)
 
             self.assertEqual(result["status"], "initialized")
@@ -48,6 +49,7 @@ class ServiceBootstrapTests(TestCase):
                     "root",
                     "config_file",
                     "state_dir",
+                    "backup_directory",
                     "token_file",
                     "credential_directory",
                 },
@@ -58,16 +60,19 @@ class ServiceBootstrapTests(TestCase):
             self.assertEqual(config.host, "127.0.0.1")
             self.assertEqual(config.port, 0)
             self.assertEqual(config.state_dir, state_dir.resolve())
+            self.assertEqual(config.backup_parent_dir, backup_directory.resolve())
             self.assertEqual(config.auth_token_file, token_path.resolve())
             self.assertEqual(config.credential_dir, credentials.resolve())
             self.assertTrue(credentials.is_dir())
             self.assertTrue(state_dir.is_dir())
+            self.assertTrue(backup_directory.is_dir())
             if os.name != "nt":
                 self.assertEqual(_mode(root), 0o700)
                 self.assertEqual(_mode(root / "config"), 0o700)
                 self.assertEqual(_mode(root / "secrets"), 0o700)
                 self.assertEqual(_mode(credentials), 0o700)
                 self.assertEqual(_mode(state_dir), 0o700)
+                self.assertEqual(_mode(backup_directory), 0o700)
                 self.assertEqual(_mode(config_path), 0o600)
                 self.assertEqual(_mode(token_path), 0o600)
 

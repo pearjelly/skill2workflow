@@ -17,8 +17,10 @@ from skill2workflow.backup import (
     BACKUP_RETENTION_POLICY_SCHEMA_VERSION,
     BACKUP_LIST_SCHEMA_VERSION,
     BACKUP_SCHEMA_VERSION,
+    REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION,
     STATE_LAYOUT_VERSION,
     build_backup_retention_plan,
+    build_remote_backup_inventory,
     create_state_backup,
     inspect_state_backup_readiness,
     _iter_workflow_artifact_records,
@@ -449,6 +451,42 @@ class StateBackupTests(TestCase):
         self.assertEqual(result["total"], 1)
         self.assertEqual(result["backups"][0]["status"], "invalid")
         self.assertEqual(result["backups"][0]["name"], "broken")
+
+    def test_remote_backup_inventory_redacts_names_and_orders_newest_first(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            parent = root / "backups"
+            parent.mkdir()
+            parent.chmod(0o700)
+            _populate_state(state_dir)
+            for name, timestamp in (
+                ("customer-private-old", "2026-08-14T00:00:01+00:00"),
+                ("customer-private-new", "2026-08-14T00:00:03+00:00"),
+            ):
+                backup_dir = parent / name
+                create_state_backup(state_dir, backup_dir)
+                manifest_path = backup_dir / "manifest.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["created_at"] = timestamp
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+
+            result = build_remote_backup_inventory(parent, max_items=2)
+
+        self.assertEqual(result["schema_version"], REMOTE_BACKUP_INVENTORY_SCHEMA_VERSION)
+        self.assertEqual(result["total"], 2)
+        self.assertEqual(result["window"], {"max_items": 2, "returned": 2, "truncated": False})
+        self.assertEqual(
+            [entry["created_at"] for entry in result["backups"]],
+            ["2026-08-14T00:00:03+00:00", "2026-08-14T00:00:01+00:00"],
+        )
+        serialized = json.dumps(result, ensure_ascii=False)
+        self.assertNotIn("customer-private-old", serialized)
+        self.assertNotIn("customer-private-new", serialized)
+        for limit in (0, 101, True, "2"):
+            with self.assertRaises(ValueError):
+                build_remote_backup_inventory(parent, max_items=limit)
 
     def test_backup_retention_plan_preserves_minimum_and_invalid_sets(self):
         with TemporaryDirectory() as tmp:

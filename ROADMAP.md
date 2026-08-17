@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-159
+- Completed delivery loops: 1-160
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 159 is complete with cursor-paged remote recurring-schedule dispatch diagnostics
+- Active loop: None; Loop 160 is complete with protected redacted remote backup inventory
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-159 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-160 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -3745,9 +3745,41 @@ It does not claim scheduler ownership, export trigger input, replay or retry a
 dispatch, reconcile uncertain provider effects, add bulk mutation, RBAC,
 distributed locking, or exactly-once execution.
 
+### Loop 160: Protected Redacted Remote Backup Inventory
+
+**Status:** Complete.
+
+**Prior basis:** The offline backup command, local inventory, retention plan,
+and remote backup-readiness preflight were all available, but a running service
+could not show a remote operator whether configured backup sets remained
+valid, how old they were, or how much storage they consumed. Requiring shell
+access for that read-only check slowed incident review and encouraged copying
+private backup names into remote tooling.
+
+**Outcome:** Service bootstrap now creates an owner-only `backups/` directory
+and records the optional `runtime.backup_parent_dir` setting. The authenticated
+`GET /api/v1/backup-inventory` route and installed
+`service-backup-inventory` client return at most 100 entries and 64 KiB of
+redacted integrity, creation-time, layout, artifact-count, file-count, and
+size metadata. Existing hand-written service configurations remain valid
+without the optional setting; the route fails closed until a private parent is
+configured. The generated systemd unit grants that parent read-only access.
+
+**Evidence:** [`docs/remote-backup-inventory.md`](docs/remote-backup-inventory.md)
+defines the route, query, configuration, redaction, and failure contracts.
+Backup, service, client, CLI, telemetry, schema, bootstrap, systemd, package,
+documentation, and full-suite tests cover authentication, bounds, malformed
+queries, integrity projection, name/path exclusion, optional compatibility,
+and read-only behavior.
+
+**Safety boundary:** This is a diagnostic projection only. It does not create,
+delete, upload, restore, encrypt, sign, schedule, or expire backups; expose
+backup names or paths; or claim disaster-recovery, multi-tenant, or
+exactly-once provider guarantees.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 159 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 160 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -3872,6 +3904,7 @@ This rolling queue is ordered. Loop 159 is complete and there is no active deliv
 | Loop 157: CAS-Protected Remote Recurring-Schedule State Actions | Complete | Let remote enable/disable operations reject stale inventory intent without breaking legacy callers | Optional `next_run_at` CAS body, serialized state mutation, fixed `409`, installed CLI flag, compatibility tests, and documentation |
 | Loop 158: Safe Remote Recurring-Schedule Patches | Complete | Let remote operators update non-sensitive schedule fields without re-supplying or exposing trigger input | Safe-field-only PATCH, `next_run_at` CAS, trigger/progress preservation, redacted response schema, installed CLI, audit/telemetry, tests, and documentation |
 | Loop 159: Cursor-Paged Remote Recurring-Schedule Dispatch Diagnostics | Complete | Let remote operators inspect older dispatch evidence after the fixed recent tail is exhausted | Separate redacted page schema, opaque SQLite ordering cursor, global/targeted authenticated routes, installed CLI, source-bounded reads, compatibility preservation, tests, and documentation |
+| Loop 160: Protected Redacted Remote Backup Inventory | Complete | Let remote operators inspect configured backup integrity, age, and size without shell access or private names | Optional owner-only backup parent, redacted 100-item/64 KiB route and CLI, bootstrap/systemd wiring, schema, authentication/bounds/redaction tests, and documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -4124,7 +4157,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, bounded active timeout policy, human gates, retry/recovery policy, run context, connector events, and verifiable SQLite audit evidence |
-| Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish/promote/deprecate/inventory bounded versions through the authenticated service, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, write a redacted support bundle, rotate the local ingress token atomically, preflight a normalized retention policy through the authenticated service, inspect bounded local backup inventory and retention plans, inspect bounded redacted local workflow inventory, and consume aggregate operational readiness through the authenticated service |
+| Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish/promote/deprecate/inventory bounded versions through the authenticated service, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, write a redacted support bundle, rotate the local ingress token atomically, preflight a normalized retention policy through the authenticated service, inspect bounded local and protected remote backup inventories and retention plans, inspect bounded redacted local workflow inventory, and consume aggregate operational readiness through the authenticated service |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:

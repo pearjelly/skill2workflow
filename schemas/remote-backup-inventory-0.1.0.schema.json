@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/remote-backup-inventory-0.1.0.schema.json",
+  "title": "skill2workflow authenticated redacted remote backup inventory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "total", "backups", "window"],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-remote-backup-inventory-0.1.0"
+    },
+    "status": { "const": "ok" },
+    "total": { "type": "integer", "minimum": 0 },
+    "backups": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/backup" }
+    },
+    "window": { "$ref": "#/$defs/window" }
+  },
+  "$defs": {
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "created_at",
+        "state_layout_version",
+        "workflow_artifact_count",
+        "file_count",
+        "total_bytes"
+      ],
+      "properties": {
+        "status": { "enum": ["valid", "invalid"] },
+        "created_at": { "type": "string" },
+        "state_layout_version": {
+          "enum": [
+            "",
+            "skill2workflow-sqlite-layout-legacy-unversioned",
+            "skill2workflow-sqlite-layout-0.1.0"
+          ]
+        },
+        "workflow_artifact_count": { "type": "integer", "minimum": 0 },
+        "file_count": { "type": "integer", "minimum": 0 },
+        "total_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_items", "returned", "truncated"],
+      "properties": {
+        "max_items": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "returned": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "truncated": { "type": "boolean" }
+      }
+    }
+  }
+}

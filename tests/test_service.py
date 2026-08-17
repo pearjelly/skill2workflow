@@ -17,6 +17,7 @@ from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 
 from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.backup import create_state_backup
 from skill2workflow.service import (
     SERVICE_SCHEMA_VERSION,
     FileBearerTokenAuthenticator,
@@ -1518,6 +1519,65 @@ class RuntimeServiceTests(TestCase):
         self.assertTrue(accepted["active_scheduler_lease"])
         self.assertFalse(accepted["backup_allowed"])
         self.assertEqual(accepted["blocking_reasons"], ["active_scheduler_lease"])
+        self.assertFalse(thread.is_alive())
+
+    def test_backup_inventory_is_authenticated_redacted_and_bounded(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            backup_parent = root / "backups"
+            config = _service_config(
+                root,
+                state_dir=state_dir,
+                backup_parent_dir=backup_parent,
+            )
+            initializer = RuntimeService(config)
+            initializer._server.server_close()
+            create_state_backup(state_dir, backup_parent / "customer-private-2026-08-17")
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda running: (
+                        holder.update({"service": running}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            denied_status, denied = _get_json(
+                f"{base_url}/api/v1/backup-inventory?max_items=1"
+            )
+            accepted_status, accepted = _get_json(
+                f"{base_url}/api/v1/backup-inventory?max_items=1",
+                token=AUTH_TOKEN,
+            )
+            malformed_status, malformed = _get_json(
+                f"{base_url}/api/v1/backup-inventory?max_items=101",
+                token=AUTH_TOKEN,
+            )
+            holder["service"].begin_shutdown()
+            thread.join(timeout=3)
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(accepted_status, 200)
+        self.assertEqual(
+            accepted["schema_version"],
+            "skill2workflow-remote-backup-inventory-0.1.0",
+        )
+        self.assertEqual(accepted["total"], 1)
+        self.assertEqual(accepted["window"], {"max_items": 1, "returned": 1, "truncated": False})
+        self.assertEqual(accepted["backups"][0]["status"], "valid")
+        self.assertNotIn("customer-private-2026-08-17", json.dumps(accepted))
+        self.assertNotIn(str(backup_parent), json.dumps(accepted))
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "backup inventory max_items must be an integer from 1 through 100"})
         self.assertFalse(thread.is_alive())
 
     def test_retention_readiness_is_authenticated_bounded_and_blocks_live_service(self):
@@ -4000,7 +4060,7 @@ def _get_raw(url: str, token=None):
             error.close()
 
 
-def _service_config(root: Path, state_dir=None):
+def _service_config(root: Path, state_dir=None, backup_parent_dir=None):
     token_file = root / "ingress.token"
     token_file.write_text(AUTH_TOKEN, encoding="utf-8")
     token_file.chmod(0o600)
@@ -4010,6 +4070,10 @@ def _service_config(root: Path, state_dir=None):
     selected_state_dir = state_dir or root / "state"
     selected_state_dir.mkdir(parents=True, exist_ok=True)
     selected_state_dir.chmod(0o700)
+    if backup_parent_dir is not None:
+        backup_parent_dir = Path(backup_parent_dir)
+        backup_parent_dir.mkdir(parents=True, exist_ok=True)
+        backup_parent_dir.chmod(0o700)
     return ServiceConfig(
         "127.0.0.1",
         0,
@@ -4017,6 +4081,7 @@ def _service_config(root: Path, state_dir=None):
         "sqlite",
         token_file,
         credential_dir,
+        backup_parent_dir,
     )
 
 

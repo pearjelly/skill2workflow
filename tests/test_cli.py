@@ -458,6 +458,39 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         fetch.assert_called_once_with("https://service.example", token_file)
 
+    def test_service_backup_inventory_command_prints_inventory(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-remote-backup-inventory-0.1.0",
+            "status": "ok",
+            "total": 1,
+            "backups": [],
+            "window": {"max_items": 7, "returned": 0, "truncated": True},
+        }
+        with patch(
+            "skill2workflow.cli.fetch_backup_inventory",
+            return_value=expected,
+        ) as fetch:
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "service-backup-inventory",
+                        "--service-url",
+                        "https://service.example",
+                        "--auth-token-file",
+                        str(token_file),
+                        "--max-items",
+                        "7",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        fetch.assert_called_once_with(
+            "https://service.example", token_file, max_items=7
+        )
+
     def test_service_retention_readiness_command_loads_policy_and_prints_report(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")
