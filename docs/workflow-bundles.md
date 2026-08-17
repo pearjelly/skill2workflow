@@ -124,6 +124,22 @@ creation, credential resolution, connector calls,
 and raw values. The default invocation keeps the existing human-readable
 stderr message.
 
+For a successful run, add `--summary` when a script or handoff needs only
+bounded status and provenance rather than the complete local run state:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
+  /tmp/approval-flow.s2w \
+  --summary \
+  --state-dir /tmp/skill2workflow-bundle-run
+```
+
+The value-free `skill2workflow-workflow-bundle-summary-0.1.0` output contains
+the run identity, status counters, and the three `context.bundle_run` evidence
+fields. It omits Workflow DSL, trigger input, node-result payloads, connector
+responses, and credentials. Without `--summary`, the existing complete local
+run-state output remains available for debugging.
+
 Every successful `bundle-run` also stores a compact `context.bundle_run`
 metadata object with `bundle_verified`, `side_effects_authorized`, and the
 lowercase SHA-256 digest of the exact verified archive in `bundle_sha256`.
@@ -161,5 +177,7 @@ The value-free diff contract is versioned at
 [`schemas/workflow-bundle-diff-0.1.0.schema.json`](../schemas/workflow-bundle-diff-0.1.0.schema.json).
 The structured side-effect refusal contract is versioned at
 [`schemas/workflow-bundle-run-0.1.0.schema.json`](../schemas/workflow-bundle-run-0.1.0.schema.json).
+The value-free successful-run summary contract is versioned at
+[`schemas/workflow-bundle-summary-0.1.0.schema.json`](../schemas/workflow-bundle-summary-0.1.0.schema.json).
 The capability is local-only in this loop; it does not add remote upload,
 marketplace discovery, hosted signing, or migration of published service state.

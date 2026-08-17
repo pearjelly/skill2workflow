@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/workflow-bundle-summary-0.1.0.schema.json",
+  "title": "skill2workflow value-free Workflow Bundle run summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "workflow_id",
+    "workflow_version",
+    "status",
+    "current_node",
+    "event_count",
+    "node_result_count",
+    "bundle_run"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "skill2workflow-workflow-bundle-summary-0.1.0"
+    },
+    "run_id": {"type": "string", "pattern": "^run_[A-Za-z0-9_-]{1,123}$"},
+    "workflow_id": {"type": "string"},
+    "workflow_version": {"type": "string"},
+    "status": {"type": "string"},
+    "current_node": {"type": "string"},
+    "event_count": {"type": "integer", "minimum": 0},
+    "node_result_count": {"type": "integer", "minimum": 0},
+    "bundle_run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bundle_verified", "side_effects_authorized", "bundle_sha256"],
+      "properties": {
+        "bundle_verified": {"const": true},
+        "side_effects_authorized": {"type": "boolean"},
+        "bundle_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

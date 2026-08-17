@@ -84,6 +84,7 @@ from .webhooks import serve_webhook_requests
 
 MAX_CLI_JSON_DOCUMENT_BYTES = 8 * 1024 * 1024
 BUNDLE_RUN_ADMISSION_SCHEMA_VERSION = "skill2workflow-workflow-bundle-run-0.1.0"
+BUNDLE_RUN_SUMMARY_SCHEMA_VERSION = "skill2workflow-workflow-bundle-summary-0.1.0"
 
 
 def main(argv=None) -> int:
@@ -185,6 +186,11 @@ def _main(argv=None) -> int:
         choices=["json", "text"],
         default=None,
         help="Format admission failures (JSON is stable for automation)",
+    )
+    bundle_run_cmd.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print a value-free run summary instead of the complete run state",
     )
     bundle_run_cmd.add_argument("--credential-file", type=Path)
 
@@ -1022,13 +1028,12 @@ def _main(argv=None) -> int:
         }
         if args.input is not None:
             context["input"] = input_value
-        _print_json(
-            LocalExecutor(
-                args.state_dir,
-                storage=args.storage,
-                credential_provider=_credential_provider(args),
-            ).run(workflow, context=context)
-        )
+        result = LocalExecutor(
+            args.state_dir,
+            storage=args.storage,
+            credential_provider=_credential_provider(args),
+        ).run(workflow, context=context)
+        _print_json(_bundle_run_summary(result) if args.summary else result)
         return 0
 
     if args.command == "visualize":
@@ -2029,6 +2034,34 @@ def _bundle_run_consent_report(
             "credentials_resolved": False,
             "connector_calls": False,
             "raw_values_included": False,
+        },
+    }
+
+
+def _bundle_run_summary(state: dict) -> dict:
+    """Project a value-free result for automation and operator handoff."""
+
+    context = state.get("context")
+    bundle_run = context.get("bundle_run") if isinstance(context, dict) else None
+    if not isinstance(bundle_run, dict):
+        raise ValueError("bundle run summary metadata is unavailable")
+    events = state.get("events")
+    node_results = state.get("node_results")
+    return {
+        "schema_version": BUNDLE_RUN_SUMMARY_SCHEMA_VERSION,
+        "run_id": str(state.get("run_id", "")),
+        "workflow_id": str(state.get("workflow_id", "")),
+        "workflow_version": str(state.get("workflow_version", "")),
+        "status": str(state.get("status", "")),
+        "current_node": str(state.get("current_node", "")),
+        "event_count": len(events) if isinstance(events, list) else 0,
+        "node_result_count": len(node_results) if isinstance(node_results, dict) else 0,
+        "bundle_run": {
+            "bundle_verified": bool(bundle_run.get("bundle_verified")),
+            "side_effects_authorized": bool(
+                bundle_run.get("side_effects_authorized")
+            ),
+            "bundle_sha256": str(bundle_run.get("bundle_sha256", "")),
         },
     }
 

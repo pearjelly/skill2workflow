@@ -3628,6 +3628,59 @@ class CliTests(TestCase):
             r"^[0-9a-f]{64}$",
         )
 
+    def test_bundle_run_summary_is_value_free_and_preserves_run_evidence(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workflow_path = root / "workflow.json"
+            bundle_path = root / "workflow.s2w"
+            state_dir = root / "state"
+            workflow_path.write_text(json.dumps(_workflow()), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["bundle-create", str(workflow_path), "--output", str(bundle_path)]),
+                    0,
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "bundle-run",
+                        str(bundle_path),
+                        "--summary",
+                        "--state-dir",
+                        str(state_dir),
+                    ]
+                )
+
+        summary = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(
+            set(summary),
+            {
+                "schema_version",
+                "run_id",
+                "workflow_id",
+                "workflow_version",
+                "status",
+                "current_node",
+                "event_count",
+                "node_result_count",
+                "bundle_run",
+            },
+        )
+        self.assertEqual(
+            summary["schema_version"],
+            "skill2workflow-workflow-bundle-summary-0.1.0",
+        )
+        self.assertEqual(summary["status"], "completed")
+        self.assertGreater(summary["event_count"], 0)
+        self.assertEqual(summary["bundle_run"]["bundle_verified"], True)
+        self.assertEqual(summary["bundle_run"]["side_effects_authorized"], False)
+        self.assertRegex(summary["bundle_run"]["bundle_sha256"], r"^[0-9a-f]{64}$")
+        self.assertNotIn("context", summary)
+        self.assertNotIn("node_results", summary)
+        self.assertNotIn("workflow", summary)
+
     def test_bundle_preflight_is_value_free_and_does_not_create_state(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)
