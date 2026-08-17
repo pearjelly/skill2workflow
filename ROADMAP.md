@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-168
+- Completed delivery loops: 1-169
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 168 is complete with bounded local credential-file reads
+- Active loop: None; Loop 169 is complete with bounded SKILL.md authoring inputs
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-168 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-169 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 168; the detailed
+The follow-on production hardening continues through Loop 169; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -3998,9 +3998,33 @@ change the self-hosted service directory provider, permission-bit policy,
 encryption, secret-manager integration, remote configuration, or multi-tenant
 behavior.
 
+### Loop 169: Bounded SKILL.md Authoring Inputs
+
+**Status:** Complete.
+
+**Prior basis:** The local JSON and credential-file inputs had bounded reads,
+but the first `parse`/`compile` step still used unbounded `Path.read_text()` for
+user-provided `SKILL.md` files. A large, linked, or replaced authoring source
+could therefore bypass the input boundary before Skill IR construction.
+
+**Outcome:** `parse_skill_file` accepts at most 2 MiB, rejects symlinks and
+non-regular files, checks size before opening, binds the descriptor to one
+device/inode, reads at most one byte beyond the bound, and rechecks the path
+after reading. Existing frontmatter, checklist extraction, and source-line
+mapping remain compatible for valid inputs.
+
+**Evidence:** Parser regression coverage proves pre-open size rejection,
+symlink rejection, path-replacement fencing, read-growth rejection, and the
+existing parser contract. The boundary is documented in
+[`docs/skill-input-boundary.md`](docs/skill-input-boundary.md).
+
+**Safety boundary:** This bounds the local authoring source only. It does not
+change Workflow DSL semantics, trigger-input limits, remote upload, arbitrary
+Markdown conversion, encryption, or multi-tenant behavior.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 168 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 169 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4134,6 +4158,7 @@ This rolling queue is ordered. Loop 168 is complete and there is no active deliv
 | Loop 166: Bounded CLI JSON Document Inputs | Complete | Keep generic local CLI JSON parsing from allocating an unbounded operator file | Fixed 8 MiB UTF-8 window, growth-race recheck, stable no-traceback input failures, compatibility regression coverage, and CLI boundary documentation |
 | Loop 167: Descriptor-Bound Service Configuration Reads | Complete | Keep service startup from parsing an unbounded or path-raced configuration document | Fixed 64 KiB read window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and service configuration documentation |
 | Loop 168: Bounded Local Credential-File Reads | Complete | Keep local CLI credential maps from bypassing the secret-input boundary through unbounded or path-raced reads | Fixed 2 MiB read window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and credential-file boundary documentation |
+| Loop 169: Bounded SKILL.md Authoring Inputs | Complete | Keep parse/compile authoring sources from bypassing the input boundary through unbounded or path-raced reads | Fixed 2 MiB read window, regular-file/no-symlink check, device/inode binding, growth/replacement regression coverage, and SKILL.md input boundary documentation |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

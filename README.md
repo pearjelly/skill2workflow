@@ -98,6 +98,7 @@ installed CLI, SQLite production persistence, static visual inspection, and
 explicit connector boundaries. It currently supports:
 
 - Parse standard `SKILL.md` into Skill IR
+- Bound local `SKILL.md` parse/compile inputs to 2 MiB with descriptor identity and growth-race checks while preserving source-line mapping
 - Preserve checklist source mapping with step title, detail, section, and line number
 - Normalize numbered lists, bullet lists, and markdown task checkboxes
 - Ignore fenced code blocks when extracting rule hints
@@ -757,7 +758,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-168 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-169 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1345,6 +1346,12 @@ bounded to 2 MiB, read through a regular-file/no-follow descriptor bound to one
 device/inode, and rejected on symlink, replacement, or growth races. See
 [`docs/credential-file-boundary.md`](docs/credential-file-boundary.md).
 
+Loop 169 hardens the `parse`/`compile` authoring path: `SKILL.md` inputs are
+bounded to 2 MiB, read through a regular-file/no-follow descriptor bound to one
+device/inode, and rejected on symlink, replacement, or growth races. Existing
+frontmatter, checklist, and source-line mapping behavior remains unchanged.
+See [`docs/skill-input-boundary.md`](docs/skill-input-boundary.md).
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1358,6 +1365,7 @@ See:
 - `docs/cli-input-boundary.md`
 - `docs/service-config-boundary.md`
 - `docs/credential-file-boundary.md`
+- `docs/skill-input-boundary.md`
 - `docs/authoring.md`
 - `docs/backup-restore.md`
 - `docs/cancellation.md`

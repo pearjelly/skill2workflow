@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import os
 import re
+import stat
 from pathlib import Path
 from typing import Dict, List, Tuple
 
 
 SkillIR = Dict[str, object]
+MAX_SKILL_FILE_BYTES = 2 * 1024 * 1024
 
 
 def parse_skill_file(path: Path) -> SkillIR:
     """Parse a SKILL.md file into the project Skill IR."""
     source_path = Path(path)
-    text = source_path.read_text(encoding="utf-8")
+    text = _read_skill_file(source_path)
     metadata, body, body_start_line = _parse_frontmatter(text)
     checklist_details = _extract_checklist_details(body, body_start_line)
     checklist = [_format_step_detail(step) for step in checklist_details]
@@ -43,6 +46,53 @@ def parse_skill_file(path: Path) -> SkillIR:
         "sections": sections,
         "source_path": str(source_path),
     }
+
+
+def _read_skill_file(path: Path) -> str:
+    """Read one bounded SKILL.md without following path replacement races."""
+
+    try:
+        before = path.lstat()
+    except OSError:
+        raise
+    if stat.S_ISLNK(before.st_mode) or not stat.S_ISREG(before.st_mode):
+        raise ValueError("SKILL.md must be a regular non-symlink file")
+    if before.st_size > MAX_SKILL_FILE_BYTES:
+        raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    descriptor = os.open(path, flags)
+    try:
+        opened = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_dev != before.st_dev
+            or opened.st_ino != before.st_ino
+        ):
+            raise ValueError("SKILL.md changed while being read")
+        if opened.st_size > MAX_SKILL_FILE_BYTES:
+            raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
+        chunks = []
+        remaining = MAX_SKILL_FILE_BYTES + 1
+        while remaining:
+            chunk = os.read(descriptor, min(64 * 1024, remaining))
+            if not chunk:
+                break
+            chunks.append(chunk)
+            remaining -= len(chunk)
+        raw = b"".join(chunks)
+        if len(raw) > MAX_SKILL_FILE_BYTES:
+            raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
+        after = path.lstat()
+        if after.st_dev != before.st_dev or after.st_ino != before.st_ino:
+            raise ValueError("SKILL.md changed while being read")
+        if after.st_size > MAX_SKILL_FILE_BYTES:
+            raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
+    finally:
+        os.close(descriptor)
+    return raw.decode("utf-8")
 
 
 def _parse_frontmatter(text: str) -> Tuple[Dict[str, str], str, int]:

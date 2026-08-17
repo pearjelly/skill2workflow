@@ -148,6 +148,9 @@ These surfaces should remain compatible during the `0.1.x` line:
 These surfaces may change while the project learns from real workflows:
 
 - Parser heuristics for arbitrary `SKILL.md` formats
+- Local `SKILL.md` parse/compile inputs use the fixed 2 MiB regular-file,
+  no-follow, device/inode-bound read contract documented in
+  `docs/skill-input-boundary.md`
 - Skill IR shape
 - Compiler defaults for new node types
 - LiteGraph node layout and web editor UI

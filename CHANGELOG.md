@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bounded local `SKILL.md` parse/compile inputs to 2 MiB with regular-file,
+  no-follow, descriptor identity, and growth/replacement-race checks while
+  preserving the existing parser and source-line mapping contract.
+
 - Bounded local JSON credential-file reads to 2 MiB with regular-file,
   no-follow, descriptor identity, and growth/replacement-race checks. The
   existing local credential shape and service directory-provider contract are

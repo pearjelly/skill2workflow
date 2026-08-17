@@ -1,12 +1,72 @@
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from textwrap import dedent
 from unittest import TestCase
+from unittest.mock import patch
 
-from skill2workflow.parser import parse_skill_file
+from skill2workflow.parser import MAX_SKILL_FILE_BYTES, parse_skill_file
 
 
 class ParserTests(TestCase):
+    def test_parse_rejects_oversized_skill_before_opening(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "SKILL.md"
+            path.write_bytes(b"# skill\n" + b"x" * MAX_SKILL_FILE_BYTES)
+
+            with patch("skill2workflow.parser.os.open") as open_file:
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes",
+                ):
+                    parse_skill_file(path)
+
+            open_file.assert_not_called()
+
+    def test_parse_rejects_symlink_and_path_replacement(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "SKILL.md"
+            outside = root / "outside.md"
+            outside.write_text("# outside", encoding="utf-8")
+            path.symlink_to(outside)
+
+            with self.assertRaisesRegex(ValueError, "regular non-symlink"):
+                parse_skill_file(path)
+
+            path.unlink()
+            path.write_text("# first", encoding="utf-8")
+            replacement = root / "replacement.md"
+            replacement.write_text("# replacement", encoding="utf-8")
+            real_open = os.open
+            replaced = False
+
+            def replace_before_open(open_path, flags, *args, **kwargs):
+                nonlocal replaced
+                if Path(open_path) == path and not replaced:
+                    replaced = True
+                    replacement.replace(path)
+                return real_open(open_path, flags, *args, **kwargs)
+
+            with patch("skill2workflow.parser.os.open", side_effect=replace_before_open):
+                with self.assertRaisesRegex(ValueError, "changed while being read"):
+                    parse_skill_file(path)
+
+    def test_parse_rejects_read_growth_past_bound(self):
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp) / "SKILL.md"
+            path.write_text("# skill", encoding="utf-8")
+
+            with patch(
+                "skill2workflow.parser.os.read",
+                return_value=b"x" * (MAX_SKILL_FILE_BYTES + 1),
+            ):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes",
+                ):
+                    parse_skill_file(path)
+
     def test_parse_standard_skill_into_ir(self):
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "SKILL.md"
