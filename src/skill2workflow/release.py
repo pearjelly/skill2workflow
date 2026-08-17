@@ -69,6 +69,7 @@ def run_release_preflight(
     dry_run: bool = True,
     skip_git: bool = False,
     skip_commands: bool = False,
+    production_baseline: bool = False,
     command_runner: Optional[CommandRunner] = None,
     verification_commands: Optional[Sequence[CommandSpec]] = None,
 ) -> PreflightResult:
@@ -95,7 +96,9 @@ def run_release_preflight(
     if skip_commands:
         checks.append(_skipped("commands", "verification commands skipped"))
     else:
-        commands = verification_commands or default_verification_commands(repo_root)
+        commands = list(verification_commands or default_verification_commands(repo_root))
+        if production_baseline:
+            commands.append(production_baseline_command(repo_root))
         checks.extend(_check_verification_commands(repo_root, commands, runner))
 
     return PreflightResult(version=version, tag=tag, dry_run=dry_run, checks=checks)
@@ -129,6 +132,20 @@ def default_verification_commands(repo_root: Path) -> Sequence[CommandSpec]:
     ]
 
 
+def production_baseline_command(repo_root: Path) -> CommandSpec:
+    """Return the optional bounded production evidence command for a release."""
+
+    return CommandSpec(
+        "production_baseline",
+        [
+            sys.executable,
+            "scripts/production_baseline_smoke.py",
+            "--work-dir",
+            "/tmp/skill2workflow-production-baseline",
+        ],
+    )
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Run read-only release preflight checks.")
     parser.add_argument("--version", required=True, help="Package version, for example 0.1.1")
@@ -142,6 +159,11 @@ def main(argv=None) -> int:
     parser.add_argument("--dry-run", action="store_true", help="Label this run as a dry-run. The command is read-only.")
     parser.add_argument("--skip-git", action="store_true", help="Skip clean-tree and tag availability checks.")
     parser.add_argument("--skip-commands", action="store_true", help="Skip verification command execution.")
+    parser.add_argument(
+        "--production-baseline",
+        action="store_true",
+        help="Run the bounded production-baseline evidence bundle.",
+    )
     parser.add_argument("--format", choices=["text", "json"], default="text")
     args = parser.parse_args(argv)
 
@@ -152,6 +174,7 @@ def main(argv=None) -> int:
         dry_run=args.dry_run,
         skip_git=args.skip_git,
         skip_commands=args.skip_commands,
+        production_baseline=args.production_baseline,
     )
     if args.format == "json":
         print(json.dumps(result.to_dict(), ensure_ascii=False, indent=2))

@@ -182,6 +182,7 @@ explicit connector boundaries. It currently supports:
 - Generate a value-free wheel provenance manifest with archive/member SHA-256 hashes and package metadata
 - Provide contributor, release, compatibility, and stability documentation for open-source evaluation
 - Run a bounded real-process service soak with repeated cutovers, idempotency replay/conflict checks, and SQLite/audit continuity evidence
+- Run one bounded production-baseline evidence bundle that replays the approved release, state-safety, service, and observability checks with secret-free summary output
 
 ## Quickstart
 
@@ -753,7 +754,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-151 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-152 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1246,6 +1247,11 @@ SQLite state directory, checks authenticated trigger replay and conflict
 handling, and verifies audit continuity without external providers or a claim
 of indefinite capacity.
 
+Loop 152 adds a bounded [Production Baseline evidence bundle](docs/production-baseline-evidence.md)
+that runs the approved local checks as one release-review input. It keeps each
+check isolated, removes child artifacts, and writes only fixed names, statuses,
+exit codes, and timeout flags; it does not promote maturity automatically.
+
 The production direction is a self-hosted, single-tenant runtime for one team. See `ROADMAP.md` for the production-readiness gates, rolling Loop queue, acceptance evidence, and deferred boundaries.
 
 See:
@@ -1295,6 +1301,7 @@ See:
 - `docs/pilot-playbook.md`
 - `docs/quickstart.md`
 - `docs/release-process.md`
+- [`docs/production-baseline-evidence.md`](docs/production-baseline-evidence.md)
 - `docs/release-artifact-qualification.md`
 - `docs/recurring-scheduling.md`
 - `docs/releases/v0.1.0.md`

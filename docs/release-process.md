@@ -21,7 +21,7 @@ and migration narrative, while the changelog remains the concise history.
 Then run the full local preflight from a clean branch:
 
 ```bash
-PYTHONPATH=src python3 scripts/release_preflight.py --version 0.1.1 --notes docs/releases/v0.1.1.md --dry-run
+PYTHONPATH=src python3 scripts/release_preflight.py --version 0.1.1 --notes docs/releases/v0.1.1.md --dry-run --production-baseline
 ```
 
 The command checks:
@@ -35,6 +35,10 @@ The command checks:
 - full unit suite
 - Python module compilation
 - an isolated wheel build, install, console-script, service-help, and validation smoke
+
+When `--production-baseline` is supplied, it also runs the fixed 19-check
+Production Baseline evidence bundle. Without that flag, the preflight keeps its
+historical artifact-only command set for faster routine checks.
 
 The isolated wheel smoke also executes the installed `systemd-unit` command
 against a fixed-port secure workspace and checks its redacted least-privilege
@@ -55,6 +59,7 @@ python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-release-package-smoke
 python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-release-reproducible-build
 python3 scripts/service_soak_smoke.py --work-dir /tmp/skill2workflow-release-service-soak --cycles 3 --triggers-per-cycle 6
+python3 scripts/production_baseline_smoke.py --work-dir /tmp/skill2workflow-release-production-baseline
 git diff --check
 ```
 
@@ -94,6 +99,7 @@ python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-rel
 python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-release-schedule-ci
 python3 scripts/recurring_scheduler_smoke.py --work-dir /tmp/skill2workflow-release-recurring-ci
 python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-release-doctor-ci
+python3 scripts/production_baseline_smoke.py --work-dir /tmp/skill2workflow-release-production-baseline-ci
 ```
 
 These are local deterministic drills, not a claim of hosted disaster recovery,
@@ -162,7 +168,7 @@ preflight and live `/readyz` ownership.
 `.github/workflows/release-preflight.yml` runs a pull-request dry-run for release-related files. It reads the package version from `pyproject.toml`, derives `docs/releases/v<version>.md`, and runs:
 
 ```bash
-PYTHONPATH=src python scripts/release_preflight.py --version <version> --notes docs/releases/v<version>.md --dry-run --skip-git
+PYTHONPATH=src python scripts/release_preflight.py --version <version> --notes docs/releases/v<version>.md --dry-run --skip-git --production-baseline
 ```
 
 CI skips git cleanliness and tag availability because pull-request checkouts are not the release source of truth and the current released tag may already exist. Local maintainer preflight must not skip git checks before a real release.
@@ -179,6 +185,7 @@ python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-release-package-smoke
 python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-release-reproducible-build
 python3 scripts/service_soak_smoke.py --work-dir /tmp/skill2workflow-release-service-soak --cycles 3 --triggers-per-cycle 6
+python3 scripts/production_baseline_smoke.py --work-dir /tmp/skill2workflow-release-production-baseline
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/approval-flow.workflow.json --format json
 PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json
 git tag -a v<version> -m "skill2workflow v<version>"

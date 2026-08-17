@@ -6,6 +6,7 @@ from skill2workflow.release import (
     CommandResult,
     CommandSpec,
     default_verification_commands,
+    production_baseline_command,
     run_release_preflight,
 )
 
@@ -221,6 +222,30 @@ class ReleasePreflightTests(TestCase):
                 "skill2workflow-release-reproducible-build"
             )
         )
+
+    def test_production_baseline_is_an_explicit_optional_release_check(self):
+        repo_root = Path("/tmp/release-source")
+        command = production_baseline_command(repo_root)
+        self.assertEqual(command.name, "production_baseline")
+        self.assertEqual(command.command[1:3], ["scripts/production_baseline_smoke.py", "--work-dir"])
+        self.assertTrue(command.command[3].endswith("skill2workflow-production-baseline"))
+
+        with TemporaryDirectory() as tmp:
+            release_root = _write_release_repo(Path(tmp), version="0.1.1")
+            runner = FakeRunner({("python", "-m", "unittest"): CommandResult(0, "", "")})
+            result = run_release_preflight(
+                release_root,
+                version="0.1.1",
+                notes=Path("docs/releases/v0.1.1.md"),
+                command_runner=runner,
+                verification_commands=[CommandSpec("unit_tests", ["python", "-m", "unittest"])],
+                skip_git=True,
+                production_baseline=True,
+            )
+            self.assertTrue(result.ok)
+            self.assertTrue(
+                any("scripts/production_baseline_smoke.py" in command for command in runner.commands)
+            )
 
 
 class FakeRunner:

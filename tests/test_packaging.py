@@ -119,6 +119,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("reproducible-builds.md", release_process)
         self.assertIn("service_soak_smoke.py", release_process)
         self.assertIn("service-soak.md", release_process)
+        self.assertIn("production_baseline_smoke.py", release_process)
+        self.assertIn("--production-baseline", release_process)
         self.assertIn("wheel", harness)
         self.assertNotIn("verifies editable install", harness)
 
@@ -144,13 +146,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("release-artifact-sbom.md", guide)
         self.assertIn("member SHA-256 hashes", guide)
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
-        self.assertIn("- Completed delivery loops: 1-151", roadmap)
+        self.assertIn("- Completed delivery loops: 1-152", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 151 is complete with bounded service soak and cutover evidence",
+            "- Active loop: None; Loop 152 is complete with a Production Baseline evidence bundle",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-151 are complete", readme)
+        self.assertIn("Delivery Loops 1-152 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

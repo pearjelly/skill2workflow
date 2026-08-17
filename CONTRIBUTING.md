@@ -76,6 +76,8 @@ python3 scripts/observability_rules_smoke.py
 python3 scripts/observability_dashboard_smoke.py
 python3 scripts/service_boundary_smoke.py --work-dir /tmp/skill2workflow-service-boundary-ci
 python3 scripts/service_soak_smoke.py --work-dir /tmp/skill2workflow-service-soak-ci --cycles 3 --triggers-per-cycle 6
+# Full production-baseline evidence is release-scoped and repeats the suite.
+python3 scripts/production_baseline_smoke.py --work-dir /tmp/skill2workflow-production-baseline-ci
 ```
 
 The CI recovery and state-safety gate can be reproduced locally as one isolated

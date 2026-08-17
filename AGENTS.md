@@ -87,6 +87,7 @@ This repository is the `skill2workflow` open-source harness.
 - Editable install: `python3 -m venv /tmp/skill2workflow-venv && /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68" && /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .`
 - Installed CLI smoke: `/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json`
 - Release preflight dry-run: `PYTHONPATH=src python3 scripts/release_preflight.py --version 0.1.0 --notes docs/releases/v0.1.0.md --dry-run --skip-git`
+- Production baseline evidence: `python3 scripts/production_baseline_smoke.py --work-dir /tmp/skill2workflow-production-baseline`
 - Release notes: `docs/releases/v0.1.0.md`
 
 ## Working Rules

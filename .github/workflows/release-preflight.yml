@@ -13,16 +13,19 @@ on:
       - "tests/test_release_preflight.py"
       - "scripts/package_smoke.py"
       - "scripts/reproducible_build.py"
+      - "scripts/production_baseline_smoke.py"
       - "scripts/service_soak_smoke.py"
       - "scripts/release_manifest.py"
       - "docs/release-artifact-manifest.md"
       - "tests/test_package_smoke.py"
       - "tests/test_reproducible_build.py"
+      - "tests/test_production_baseline_smoke.py"
       - "tests/test_service_soak_smoke.py"
       - "tests/test_release_manifest.py"
       - "tests/test_packaging.py"
       - "tests/test_changelog.py"
       - "docs/reproducible-builds.md"
+      - "docs/production-baseline-evidence.md"
       - "docs/release-artifact-qualification.md"
       - "docs/release-process.md"
       - "docs/stability.md"
@@ -67,4 +70,5 @@ jobs:
             --version "${{ steps.package.outputs.version }}" \
             --notes "docs/releases/v${{ steps.package.outputs.version }}.md" \
             --dry-run \
-            --skip-git
+            --skip-git \
+            --production-baseline

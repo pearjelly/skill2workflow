@@ -82,6 +82,17 @@ class ContinuousIntegrationContractTests(TestCase):
         )
         self.assertIn("secret_hygiene.py --repository-root .", workflow)
 
+    def test_release_preflight_enables_the_production_baseline_bundle(self):
+        workflow = (
+            Path(__file__).resolve().parents[1]
+            / ".github"
+            / "workflows"
+            / "release-preflight.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn("production_baseline_smoke.py", workflow)
+        self.assertIn("tests/test_production_baseline_smoke.py", workflow)
+        self.assertIn("--production-baseline", workflow)
+
     def test_contributor_and_release_docs_reproduce_production_boundary_drills(self):
         root = Path(__file__).resolve().parents[1]
         contributing = (root / "CONTRIBUTING.md").read_text(encoding="utf-8")
@@ -91,6 +102,7 @@ class ContinuousIntegrationContractTests(TestCase):
             "security_boundary_smoke.py",
             "observability_smoke.py",
             "service_boundary_smoke.py",
+            "service_soak_smoke.py",
         ):
             self.assertIn(script, contributing)
             self.assertIn(script, release)
@@ -109,6 +121,7 @@ class ContinuousIntegrationContractTests(TestCase):
             "schedule_smoke.py",
             "recurring_scheduler_smoke.py",
             "service_doctor_smoke.py",
+            "production_baseline_smoke.py",
         ):
             self.assertIn(script, contributing)
             self.assertIn(script, release)

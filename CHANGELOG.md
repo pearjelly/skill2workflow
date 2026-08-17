@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded Production Baseline evidence bundle that runs the approved
+  release, state-safety, service, and observability checks with isolated child
+  workspaces and a secret-free summary contract. Release preflight can opt in
+  with `--production-baseline`.
 - Added a bounded real-process service soak and cutover drill. It repeats
   authenticated triggers across SQLite restarts, verifies idempotency replay
   and conflict handling, checks audit integrity/consistency, and runs in the

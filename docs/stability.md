@@ -20,6 +20,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Release SBOM schema `skill2workflow-release-sbom-0.1.0`, using SPDX JSON 2.3 with one checksum entry per qualified wheel member and a package-to-file relationship set, documented in [`release-artifact-sbom.md`](release-artifact-sbom.md)
 - Reproducible release evidence schema `skill2workflow-reproducible-build-0.1.0`, recording two byte-identical fixed-epoch wheel builds for one checkout and toolchain, documented in [`reproducible-builds.md`](reproducible-builds.md)
 - Service soak evidence schema `skill2workflow-service-soak-evidence-0.1.0`, recording bounded repeated cutovers, idempotency replay/conflict checks, and SQLite/audit continuity without changing runtime contracts, documented in [`service-soak.md`](service-soak.md)
+- Production Baseline evidence schema `skill2workflow-production-baseline-evidence-0.1.0`, recording the fixed local release/state-safety/service/observability check set without command output or sensitive values, documented in [`production-baseline-evidence.md`](production-baseline-evidence.md)
 - Control-plane workflow version aliases and the `promote`/trigger resolution contract documented in `docs/triggers.md`
 - Reviewable published workflow diffs and the optional compare-and-swap promotion precondition documented in [`workflow-releases.md`](workflow-releases.md)
 - SQLite promotion transactionally couples the compare-and-swap check, alias mutation, and promotion audit append; JSON remains local-evaluation storage without cross-process coordination
