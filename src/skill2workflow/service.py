@@ -2138,6 +2138,7 @@ def _handler_for(service: RuntimeService):
                 self.send_header(str(name), str(value))
             self.end_headers()
             self.wfile.write(data)
+            self.wfile.flush()
 
         def _send_text(self, status_code: int, payload: str) -> None:
             data = payload.encode("utf-8")
@@ -2149,6 +2150,7 @@ def _handler_for(service: RuntimeService):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+            self.wfile.flush()
 
         def log_message(self, format, *args):
             return

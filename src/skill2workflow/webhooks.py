@@ -117,6 +117,7 @@ def _handler_for(control_plane):
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
+            self.wfile.flush()
 
         def log_message(self, format, *args):
             return
