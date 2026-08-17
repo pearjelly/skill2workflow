@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Hardened explicit external connector fixture loading with a 2 MiB UTF-8
+  source bound, regular-file/no-follow checks, device/inode identity checks,
+  replacement detection, and in-memory compilation.
+
 - Added an explicit local `--connector-fixture` flag for `run`, `resume`, and
   `bundle-run`, allowing reviewed external connector fixtures to participate in
   one CLI process without changing the default registry or service boundary.

@@ -199,9 +199,15 @@ skill2workflow bundle-run /tmp/workflow.s2w \
 
 This is intentionally a local, operator-supplied code-loading path. It is not
 available through the long-running service, remote trigger API, automatic
-discovery, or package installation. Only load connector files that have been
-reviewed as executable code; the existing credential, input, result-size, and
-audit-redaction boundaries still apply.
+discovery, or package installation. The loader accepts only a regular,
+non-symbolic-link file, reads at most 2 MiB of UTF-8 source through a
+no-follow descriptor bound to the file's device and inode, and detects a file
+replacement or growth before compiling it in memory. This bounds the loader's
+file handoff; it is not a Python sandbox. Only load connector files that have
+been reviewed as executable code. The existing credential, input, result-size,
+and audit-redaction boundaries still apply. See
+[`external-connector-loading-boundary.md`](external-connector-loading-boundary.md)
+for the exact contract.
 
 Explicit local fixture loading:
 

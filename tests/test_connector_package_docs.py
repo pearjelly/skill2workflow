@@ -11,6 +11,8 @@ class ConnectorPackageDocsTests(TestCase):
         examples = _read("docs/examples.md")
         compatibility = _read("docs/workflow-dsl-compatibility.md")
         stability = _read("docs/stability.md")
+        loading_boundary = _read("docs/external-connector-loading-boundary.md")
+        docs_index = _read("docs/README.md")
 
         self.assertIn("## Connector Package Layout", connectors)
         self.assertIn("MANIFEST", connectors)
@@ -20,6 +22,8 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("automatic connector discovery", connectors)
         self.assertIn("--connector-fixture", connectors)
         self.assertIn("long-running service", connectors)
+        self.assertIn("2 MiB", connectors)
+        self.assertIn("no-follow descriptor", connectors)
 
         self.assertIn("### Local Connector Package Shape", examples)
         self.assertIn("examples/connectors/local_echo_connector.py", examples)
@@ -29,9 +33,17 @@ class ConnectorPackageDocsTests(TestCase):
         self.assertIn("Workflow DSL `0.1.0` compatibility is separate from connector package conventions", compatibility)
         self.assertIn("connector manifest version", compatibility)
         self.assertIn("run`, `resume`, and `bundle-run`", compatibility)
+        self.assertIn("external-connector-loading-boundary.md", compatibility)
 
         self.assertIn("explicit local connector fixture loading", stability)
         self.assertIn("automatic connector discovery and product-specific connector packages", stability)
+        self.assertIn("device/inode-bound no-follow descriptor", stability)
+
+        self.assertIn("# External Connector Fixture Loading Boundary", loading_boundary)
+        self.assertIn("regular, non-symbolic-link", loading_boundary)
+        self.assertIn("2 MiB", loading_boundary)
+        self.assertIn("not a Python sandbox", loading_boundary)
+        self.assertIn("external-connector-loading-boundary.md", docs_index)
 
     def test_builtin_http_payload_boundary_is_documented(self):
         connectors = _read("docs/connectors.md")

@@ -177,6 +177,13 @@ Current connector package conventions use:
 - Connector execution contract version: `skill2workflow-connector-execution-0.1.0`
 - Explicit local loader: `load_external_connector(path)`
 
+The explicit loader's source-file safety boundary is documented in
+[`external-connector-loading-boundary.md`](external-connector-loading-boundary.md):
+regular non-symlink input, a 2 MiB UTF-8 source limit, no-follow descriptor
+loading, device/inode identity checks, and replacement/growth detection. This
+does not sandbox executable Python or make fixture loading available to the
+service or remote trigger paths.
+
 Changing the connector manifest version or execution contract version is not automatically a Workflow DSL breaking change. It becomes a Workflow DSL compatibility issue only if existing `schema_version: "0.1.0"` workflow artifacts can no longer bind to connector ids/kinds, preserve request metadata, validate, publish, or execute through an explicit runtime configuration.
 
 Connector package conventions remain local-first: explicit file loading and registration are supported for examples and smoke tests, while automatic discovery, package installation, connector marketplaces, OAuth, hosted callbacks, queues, and product-specific connector packages remain outside the current compatibility boundary.

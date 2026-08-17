@@ -40,6 +40,7 @@ working on.
 ## Extend and contribute
 
 - [Connectors](connectors.md) — manifest and execution boundary
+- [External connector loading](external-connector-loading-boundary.md) — bounded local fixture source handoff
 - [Credential boundary](credential-boundary.md) — handles, rotation, and redaction
 - [Runtime policy](runtime-policy.md) — retry, timeout, and fallback semantics
 - [Compatibility](workflow-dsl-compatibility.md) and [stability](stability.md)

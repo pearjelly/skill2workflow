@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-189
+- Completed delivery loops: 1-190
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 189 is complete with safe Workflow Bundle run summaries
+- Active loop: None; Loop 190 is complete with a bounded external connector fixture loading boundary
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-189 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-190 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -65,7 +65,7 @@ boundary after the exact-length body-read evidence. Loop 98 isolates lifecycle
 event logging after review of the exception-boundary drill. Loop 99 hardens
 service teardown after review of the lifecycle-observer drill. Loop 100 makes
 the security, observability, and restart-continuity drills mandatory in CI.
-The follow-on production hardening continues through Loop 189; the detailed
+The follow-on production hardening continues through Loop 190; the detailed
 entries below record the operator-action recovery, audit-projection, metrics,
 startup-shutdown, atomic lifecycle-state, shutdown-admission, and scheduler
 dispatch boundaries, live HTTP request-pressure telemetry, and scheduler
@@ -98,6 +98,10 @@ Doctor now run as isolated Python 3.14 gates on every push and pull request.
 Candidate evidence includes backup and restore, upgrade and migration policy, cancellation and retention behavior, logs or metrics export, fault drills, contract stability, and sustained real-team operating evidence. Backup/restore became Loop 44, state upgrade/migration became Loop 45, observability export became Loop 46, data retention/disposal became Loop 47, durable cooperative cancellation became Loop 48, interrupted-run crash recovery became Loop 49, release-artifact qualification became Loop 50, secure service bootstrap became Loop 51, the installed controlled quickstart became Loop 52, the operational readiness Doctor became Loop 53, descriptor-bound connector credentials became Loop 54, the authenticated live Operator snapshot became Loop 55, a manually reviewed Linux systemd unit became Loop 56, an authenticated human-gate decision endpoint became Loop 57, protected remote operator action clients became Loop 58, authenticated redacted run detail became Loop 59, authenticated redacted run discovery became Loop 60, authenticated redacted support bundle became Loop 61, durable trigger idempotency became Loop 62, bounded active execution timeout became Loop 63, declarative fallback transitions became Loop 64, SQLite audit integrity became Loop 65, bounded trigger inputs became Loop 66, declarative trigger input contracts became Loop 67, bounded service request admission became Loop 68, stable workflow version promotion aliases became Loop 69, published artifact integrity verification became Loop 70, and reviewable workflow releases became Loop 71 after review of the preceding evidence; atomic workflow alias promotion became Loop 72 after review of the release-review drill; atomic workflow registry mutations became Loop 73 after review of the promotion transaction drill; workflow artifact consistency diagnostics became Loop 74 after review of the registry mutation drill; atomic run-audit emission and consistency diagnostics became Loop 75 after review of the artifact consistency drill; authenticated remote run-audit consistency became Loop 76 after review of the remote diagnostic drill; targeted remote run-audit inspection became Loop 77 after review of the global-window operator gap; remote recurring-schedule inventory became Loop 78 after review of the remote operator scheduling gap; protected remote recurring-schedule actions became Loop 79 after review of the inventory drill; remote recurring-schedule dispatch diagnostics became Loop 80 after review of the schedule action drill; remote workflow artifact consistency diagnostics became Loop 81 after review of the remote dispatch evidence; remote backup readiness diagnostics became Loop 82 after review of the remote artifact consistency evidence; remote audit-chain verification became Loop 83 after review of the backup-readiness evidence; remote runtime identity diagnostics became Loop 84 after review of the remote audit-integrity evidence; protected remote workflow triggering became Loop 85 after review of the remote runtime-info evidence; protected remote Workflow publication became Loop 86 after review of the remote-trigger evidence; protected remote Workflow promotion became Loop 87 after review of the remote-publication evidence; protected remote Workflow diff became Loop 88 after review of the remote-promotion evidence; protected local ingress-token rotation became Loop 89 after review of the remote-diff evidence; protected remote Workflow deprecation became Loop 90 after review of the token-rotation evidence; bounded remote Workflow inventory became Loop 91 after review of the remote-deprecation evidence; policy-bound remote retention readiness became Loop 92 after review of the remote-inventory evidence; aggregate remote operational readiness became Loop 93 after review of the retention evidence; bounded request-body reads became Loop 94 after review of the operational-readiness evidence; and the deployment service probe became Loop 95 after review of the transport-boundary evidence; exact-length request-body reads became Loop 96 after review of the service-probe evidence; the fail-closed service exception boundary became Loop 97 after review of the body-read evidence. The bounded global workflow deadline became Loop 115 after review of the retry-backoff evidence. Remaining capabilities become numbered loops only after preceding evidence is reviewed.
 
 Verified offline backup/restore, copy-on-write state migration, bounded telemetry export, copy-on-write retention/disposal, durable cooperative cancellation, fail-closed interrupted-run recovery, isolated wheel qualification, secure first-use initialization, an installed first-value workflow journey, read-only startup diagnostics, descriptor-bound connector credentials, a bounded live Operator read surface, a manually reviewed least-privilege Linux systemd unit, an authenticated human-gate decision endpoint, protected remote operator action clients, bounded redacted run detail, bounded redacted run discovery, a bounded redacted support bundle, durable SQLite trigger idempotency, bounded active execution timeout, declarative connector fallback transitions, tamper-evident SQLite audit verification, bounded trigger input validation, declarative trigger input contracts, bounded service request admission, stable workflow version promotion aliases, published artifact integrity verification, and reviewable workflow releases, plus atomic workflow alias promotion, atomic workflow registry mutations, workflow artifact consistency diagnostics, atomic run-audit emission and consistency diagnostics, targeted remote run-audit inspection, remote recurring-schedule inventory, protected remote recurring-schedule actions, bounded remote recurring-schedule dispatch diagnostics, remote workflow artifact consistency diagnostics, remote backup readiness diagnostics, remote audit-chain verification, remote runtime identity diagnostics, protected remote workflow triggering, protected remote Workflow publication, protected remote Workflow promotion, protected remote Workflow diff, protected local ingress-token rotation, protected remote Workflow deprecation, bounded remote Workflow inventory, policy-bound remote retention readiness, aggregate remote operational readiness, bounded request-body reads, the fixed deployment service probe, exact-length request-body reads, lifecycle event-logger isolation, deterministic service teardown, production-boundary CI gates for security, observability, and restart continuity, the uniform zero-body metrics boundary, startup-shutdown race protection, atomic lifecycle state transitions, atomic shutdown admission, and atomic scheduler dispatch admission, live in-flight request pressure metrics, a fixed Prometheus alert starter pack, a read-only Grafana dashboard starter pack, and a value-free release artifact provenance manifest, bounded connector retry backoff, a bounded global workflow deadline, filtered cursor-paged run discovery, per-node active execution deadlines, a bounded built-in HTTP connector payload boundary, atomic first-use SQLite state initialization, bounded local audit inspection, bounded offline control snapshots, bounded local run discovery, bounded local backup inventory, bounded backup retention planning, bounded local schedule inspection, bounded local workflow inventory, bounded interrupted-run audit reconciliation, bounded run-detail audit reads, and compact SQLite run-summary projections, compact SQLite recurring-schedule projections, compact SQLite run-detail projections, and recovery and state-safety CI gates, an SPDX release artifact SBOM, reproducible fixed-epoch wheel builds, bounded service soak/cutover evidence, and a bounded Production Baseline evidence bundle, are achieved by Loops 44-152. Production Baseline remains directional until the remaining candidate evidence is selected, delivered, and reviewed; these controls do not advance project maturity by themselves.
+
+Loop 190 adds a bounded, descriptor-bound explicit external connector fixture
+loader without making dynamic code loading available to the service or remote
+trigger paths.
 
 The lease-owned workflow deadline sweep became Loop 116 after review of the
 global-deadline evidence. Filtered cursor-paged run discovery became Loop 117
@@ -4673,9 +4677,43 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-run \
   --state-dir /tmp/skill2workflow-bundle-run
 ```
 
+### Loop 190: Bounded External Connector Fixture Loading
+
+**Status:** Complete.
+
+**Prior basis:** The explicit local `--connector-fixture` path made reviewed
+external connector code usable from `run`, `resume`, and `bundle-run`, but the
+loader still delegated to a second path-based import with no source-size or
+replacement boundary.
+
+**Outcome:** `load_external_connector(path)` now accepts only one regular,
+non-symbolic-link file, reads at most 2 MiB of UTF-8 source through an
+`O_NOFOLLOW` descriptor where available, binds the read to the original
+device/inode, detects replacement or growth, and compiles the bounded source
+in memory. The default registry and long-running service remain closed to
+dynamic connector loading.
+
+**Evidence:** Focused loader tests cover regular execution, symbolic-link and
+non-regular rejection, source-size and UTF-8 bounds, and syntax-error
+normalization. Existing CLI fixture tests, external-connector smoke, package
+smoke, full-suite, secret-hygiene, and Production Baseline evidence remain
+green. The contract is documented in
+[`docs/external-connector-loading-boundary.md`](docs/external-connector-loading-boundary.md).
+
+**Safety boundary:** This bounds the local file handoff; it is not a Python
+sandbox. The fixture executes with the invoking process privileges and must be
+reviewed by the operator. It is unavailable to the service, remote trigger
+API, automatic discovery, and package installation paths.
+
+Repeatable command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_external_connectors -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 189 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 190 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -4830,6 +4868,7 @@ This rolling queue is ordered. Loop 189 is complete and there is no active deliv
 | Loop 187: Exact Workflow Bundle Provenance Evidence | Complete | Preserve the exact verified Bundle archive fingerprint in successful local run context without retaining paths, values, credentials, or provider payloads | same-read verified loader, `context.bundle_run.bundle_sha256`, provenance tests, installed CLI, docs, and package evidence |
 | Loop 188: Structured Workflow Bundle Admission Refusals | Complete | Expose machine-readable side-effect-consent refusals without changing the default text error or creating state | `bundle-run --format json`, fixed refusal schema, safety tests, installed CLI, docs, and package evidence |
 | Loop 189: Safe Workflow Bundle Run Summaries | Complete | Expose successful Bundle runs as a value-free handoff without changing complete local output | `bundle-run --summary`, fixed summary schema, redaction tests, installed CLI, docs, and package evidence |
+| Loop 190: Bounded External Connector Fixture Loading | Complete | Bound explicit local connector source loading without widening service or remote dynamic-code paths | 2 MiB UTF-8 source bound, regular-file/no-follow checks, device/inode identity and replacement detection, focused loader tests, docs, and baseline evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -5083,7 +5122,7 @@ The project is a runnable local-first harness across all five approved architect
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, bounded active timeout policy, human gates, retry/recovery policy, run context, connector events, and verifiable SQLite audit evidence |
 | Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish/promote/deprecate/inventory bounded versions through the authenticated service, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, write a redacted support bundle, rotate the local ingress token atomically, preflight retention policy and trigger inputs/mappings through authenticated service diagnostics, inspect bounded local and protected remote backup inventories (including cursor-paged older evidence) and retention plans, inspect bounded redacted local workflow inventory, and consume aggregate operational readiness through the authenticated service |
-| Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
+| Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, bounded descriptor-bound fixture loading, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:
 

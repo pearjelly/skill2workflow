@@ -185,7 +185,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - State layout marker `skill2workflow-state-layout-marker-0.1.0`, fail-closed compatibility preflight, and legacy-to-current copy-on-write migration documented in `docs/upgrade-migration.md`
 - Body-only HTTP connector input mapping documented in `docs/connectors.md`
 - Minimum connector manifest contract documented in `docs/connectors.md`
-- explicit local connector fixture loading for examples, using `load_external_connector(path)` plus `ConnectorRuntime([external_connector])`
+- explicit local connector fixture loading for examples, using `load_external_connector(path)` plus `ConnectorRuntime([external_connector])`; the loader accepts only a regular non-symlink file, reads at most 2 MiB of UTF-8 source through a device/inode-bound no-follow descriptor, and detects replacement or growth before compiling
 - Connector package layout expectations documented in `docs/connectors.md`
 
 ## Experimental

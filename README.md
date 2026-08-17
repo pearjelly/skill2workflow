@@ -182,7 +182,7 @@ explicit connector boundaries. It currently supports:
 - Store workflow registry and audit metadata in JSON/JSONL or opt-in SQLite
 - List built-in connector manifests
 - Validate and inspect the minimum connector manifest contract for future extensions
-- Explicitly load one local external connector fixture through a narrow runtime registration path while keeping the default built-in registry stable
+- Explicitly load one local external connector fixture through a narrow, bounded regular-file/no-follow runtime registration path while keeping the default built-in registry stable
 - Run a reviewed external connector fixture from local `run`, `resume`, or `bundle-run` processes with an explicit `--connector-fixture` flag; service and remote trigger paths remain closed to dynamic code loading
 - Bound the complete normalized result returned by an explicit external connector to a strict 1 MiB JSON envelope before durable persistence
 - Audit connector execution events through the control plane
@@ -843,7 +843,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-189 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-190 are complete.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1532,6 +1532,13 @@ Loop 189 adds optional `bundle-run --summary` output for safe automation and
 handoffs without exposing the complete run state. The isolated wheel smoke
 also executes this mode through the installed CLI against SQLite and checks
 the fixed schema and Bundle fingerprint.
+
+Loop 190 hardens the explicit local connector path with a 2 MiB UTF-8 source
+bound, regular-file/no-follow checks, device/inode identity checks, replacement
+detection, and in-memory compilation. This is a file-handoff boundary rather
+than a Python sandbox; the service and remote trigger paths still do not load
+connector code dynamically. See
+[`docs/external-connector-loading-boundary.md`](docs/external-connector-loading-boundary.md).
 
 The installed console script also supports `--version`, reporting the package
 version without requiring a workflow subcommand; the wheel smoke checks that
