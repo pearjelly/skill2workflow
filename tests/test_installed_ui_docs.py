@@ -36,3 +36,4 @@ class InstalledUiDocumentationTests(TestCase):
         self.assertIn("Loop 211: Confirmation-Protected Live Human-Gate Action", roadmap)
         self.assertIn("Loop 212: Bounded Live Run-Detail Evidence", roadmap)
         self.assertIn("Loop 213: Bounded Live Run Discovery", roadmap)
+        self.assertIn("Loop 214: Confirmation-Protected Live Cooperative Cancellation", roadmap)

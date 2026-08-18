@@ -44,6 +44,13 @@ class ControlUiContractTests(TestCase):
         self.assertIn("/api/v1/runs/", javascript)
         self.assertIn('method: "POST"', javascript)
         self.assertIn("window.confirm", javascript)
+        self.assertIn('id="run-cancel-actions"', html)
+        self.assertIn('id="cancel-run"', html)
+        self.assertIn("cancelSelectedRun", javascript)
+        self.assertIn("selectedCancellableRun", javascript)
+        self.assertIn("/cancel", javascript)
+        self.assertIn('body: "{}"', javascript)
+        self.assertIn("Cancellation is cooperative", javascript)
         self.assertIn("loadLiveRunDetail", javascript)
         self.assertIn("validateLiveRunDetail", javascript)
         self.assertIn("skill2workflow-run-detail-0.1.0", javascript)
@@ -63,6 +70,7 @@ class ControlUiContractTests(TestCase):
         self.assertIn(".human-gate-actions", css)
         self.assertIn(".run-detail-status", css)
         self.assertIn(".run-page-status", css)
+        self.assertIn(".run-cancel-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):
         guide = (ROOT / "docs" / "live-control-snapshot.md").read_text(

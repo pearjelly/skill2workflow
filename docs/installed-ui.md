@@ -72,6 +72,13 @@ and status before replacing the summary JSON with the evidence view. A detail
 failure leaves the bounded run summary visible and never blocks the decision
 controls or exposes raw state.
 
+For a live run in `created`, `running`, or `waiting` status, the detail panel
+also exposes **Cancel run**. It requires an explicit confirmation and sends
+only `{}` to the fixed same-origin `/api/v1/runs/{run_id}/cancel` route. The
+existing cooperative semantics remain visible in the UI: an in-flight
+connector attempt may finish, and the action never claims rollback or forceful
+termination. Terminal runs and all non-live snapshots keep the control hidden.
+
 The live Runs view starts with the control snapshot's newest bounded window.
 When its `runs` window is truncated, **Load Older Runs** becomes available. Each
 explicit click fetches one fixed 100-item cursor page through
@@ -80,9 +87,10 @@ contract, retains at most 500 rows in browser memory, and never accepts a
 user-authored service path or filter. Static, example, and file snapshots keep
 the control disabled.
 
-This live mode adds one explicit human-gate mutation only. It does not add TLS,
-public ingress, RBAC, workflow publication, cancellation, automatic retries,
-or provider reconciliation. Keep the UI on loopback or place it behind an
+This live mode adds only the existing human-gate resume and cooperative
+cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
+publication, automatic retries, forceful termination, or provider
+reconciliation. Keep the UI on loopback or place it behind an
 operator-managed HTTPS boundary when serving a wider network.
 
 Use `--once` for a bounded packaging or smoke-test request. The command does

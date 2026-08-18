@@ -22,6 +22,7 @@
     liveRefreshTimer: null,
     liveLoading: false,
     humanGateLoading: false,
+    runCancelLoading: false,
     liveRunDetail: null,
     liveRunDetailId: "",
     liveRunDetailLoading: false,
@@ -82,6 +83,9 @@
     els.humanGateStatus = document.getElementById("human-gate-status");
     els.approveRun = document.getElementById("approve-run");
     els.rejectRun = document.getElementById("reject-run");
+    els.runCancelActions = document.getElementById("run-cancel-actions");
+    els.runCancelStatus = document.getElementById("run-cancel-status");
+    els.cancelRun = document.getElementById("cancel-run");
     els.runDetailStatus = document.getElementById("run-detail-status");
     els.detailJson = document.getElementById("detail-json");
   }
@@ -98,6 +102,7 @@
     els.rejectRun.addEventListener("click", function () {
       decideSelectedRun(false);
     });
+    els.cancelRun.addEventListener("click", cancelSelectedRun);
     els.snapshotFile.addEventListener("change", loadSelectedFile);
     els.filterInput.addEventListener("input", function () {
       state.filter = els.filterInput.value.trim().toLowerCase();
@@ -391,6 +396,61 @@
     }
   }
 
+  async function cancelSelectedRun() {
+    const run = selectedCancellableRun();
+    if (!run || state.runCancelLoading) {
+      return;
+    }
+    if (
+      typeof window.confirm === "function" &&
+      !window.confirm(
+        "Cancel run " +
+          run.run_id +
+          "? Cancellation is cooperative; an in-flight connector attempt may finish.",
+      )
+    ) {
+      return;
+    }
+    state.runCancelLoading = true;
+    renderRunCancelActions();
+    renderHumanGateActions();
+    setStatus("Cancelling", "");
+    try {
+      const response = await fetch(
+        LIVE_RESUME_PREFIX + encodeURIComponent(run.run_id) + "/cancel",
+        {
+          method: "POST",
+          cache: "no-store",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        },
+      );
+      if (!response.ok) {
+        throw new Error("cancellation unavailable");
+      }
+      const payload = await response.json();
+      if (
+        !payload ||
+        payload.run_id !== run.run_id ||
+        typeof payload.status !== "string" ||
+        !payload.status
+      ) {
+        throw new Error("cancellation unavailable");
+      }
+      setStatus(
+        payload.status === "cancelled" ? "Cancelled" : "Cancellation requested",
+        "is-valid",
+      );
+      await loadLiveSnapshot({ background: true });
+    } catch (error) {
+      setStatus("Unavailable", "is-invalid");
+    } finally {
+      state.runCancelLoading = false;
+      renderRunCancelActions();
+      renderHumanGateActions();
+    }
+  }
+
   async function loadLiveRunDetail(runId) {
     if (!isLiveSnapshot() || !isSafeRunId(runId)) {
       return;
@@ -499,6 +559,21 @@
     return run;
   }
 
+  function selectedCancellableRun() {
+    if (!isLiveSnapshot() || !state.selected || state.selected.kind !== "run") {
+      return null;
+    }
+    const run = state.selected.value;
+    if (
+      !run ||
+      !isSafeRunId(run.run_id) ||
+      ["created", "running", "waiting"].indexOf(run.status) === -1
+    ) {
+      return null;
+    }
+    return run;
+  }
+
   async function loadServiceProbe() {
     setServiceStatus("Live service: checking", "");
     try {
@@ -585,6 +660,7 @@
     state.liveRunDetailId = "";
     state.liveRunDetailLoading = false;
     state.liveRunDetailError = false;
+    state.runCancelLoading = false;
     state.liveRunRows = null;
     state.liveRunPageCursor = "";
     state.liveRunPageHasMore = Boolean(
@@ -636,6 +712,7 @@
     state.liveRunDetailId = "";
     state.liveRunDetailLoading = false;
     state.liveRunDetailError = false;
+    state.runCancelLoading = false;
     state.liveRunRows = null;
     state.liveRunPageCursor = "";
     state.liveRunPageHasMore = false;
@@ -974,6 +1051,7 @@
         state.liveRunDetailId = "";
         state.liveRunDetailLoading = false;
         state.liveRunDetailError = false;
+        state.runCancelLoading = false;
         renderTables();
         renderDetail();
         if (kind === "run" && isLiveSnapshot()) {
@@ -1016,6 +1094,7 @@
     const value = selected.value || {};
     showDetail(titleForSelection(selected), value);
     renderHumanGateActions();
+    renderRunCancelActions();
     renderRunDetailStatus(selected);
   }
 
@@ -1057,12 +1136,25 @@
     const run = selectedWaitingRun();
     const visible = Boolean(run);
     els.humanGateActions.hidden = !visible;
-    els.approveRun.disabled = !visible || state.humanGateLoading;
-    els.rejectRun.disabled = !visible || state.humanGateLoading;
+    els.approveRun.disabled = !visible || state.humanGateLoading || state.runCancelLoading;
+    els.rejectRun.disabled = !visible || state.humanGateLoading || state.runCancelLoading;
     if (visible) {
       els.humanGateStatus.textContent = state.humanGateLoading
         ? "Submitting the decision…"
         : "This run is waiting for an explicit human decision.";
+    }
+  }
+
+  function renderRunCancelActions() {
+    const run = selectedCancellableRun();
+    const visible = Boolean(run);
+    els.runCancelActions.hidden = !visible;
+    els.cancelRun.disabled =
+      !visible || state.runCancelLoading || state.humanGateLoading;
+    if (visible) {
+      els.runCancelStatus.textContent = state.runCancelLoading
+        ? "Recording cooperative cancellation…"
+        : "Cancellation is cooperative; an in-flight connector attempt may finish.";
     }
   }
 

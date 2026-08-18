@@ -23,6 +23,7 @@ from .service_client import (
     fetch_support_bundle,
     fetch_service_probe,
     post_run_resume,
+    post_run_cancel,
     service_endpoint,
 )
 
@@ -38,6 +39,8 @@ _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
 _LIVE_RESUME_PREFIX = "/api/v1/runs/"
 _LIVE_RESUME_SUFFIX = "/resume"
 _LIVE_RESUME_MAX_REQUEST_BYTES = 128
+_LIVE_CANCEL_SUFFIX = "/cancel"
+_LIVE_CANCEL_MAX_REQUEST_BYTES = 16
 _LIVE_RUN_DETAIL_PREFIX = "/api/v1/runs/"
 _LIVE_RUN_DETAIL_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 _LIVE_RUN_PAGE_PATH = "/api/v1/run-page"
@@ -155,22 +158,36 @@ def serve_ui(
         def do_POST(self):
             parsed = urlsplit(self.path)
             if parsed.path.startswith(_LIVE_RESUME_PREFIX):
-                if parsed.query or not parsed.path.endswith(_LIVE_RESUME_SUFFIX):
+                if parsed.query:
                     self._write_json(
                         404,
-                        {"error": "human gate decision path is not available"},
+                        {"error": "run action path is not available"},
                     )
                     return
-                run_id = parsed.path[
-                    len(_LIVE_RESUME_PREFIX) : -len(_LIVE_RESUME_SUFFIX)
-                ]
+                suffix = (
+                    _LIVE_RESUME_SUFFIX
+                    if parsed.path.endswith(_LIVE_RESUME_SUFFIX)
+                    else _LIVE_CANCEL_SUFFIX
+                    if parsed.path.endswith(_LIVE_CANCEL_SUFFIX)
+                    else ""
+                )
+                if not suffix:
+                    self._write_json(
+                        404,
+                        {"error": "run action path is not available"},
+                    )
+                    return
+                run_id = parsed.path[len(_LIVE_RESUME_PREFIX) : -len(suffix)]
                 if not _is_safe_live_run_id(run_id):
                     self._write_json(
                         404,
-                        {"error": "human gate decision path is not available"},
+                        {"error": "run action path is not available"},
                     )
                     return
-                self._serve_live_resume(run_id)
+                if suffix == _LIVE_RESUME_SUFFIX:
+                    self._serve_live_resume(run_id)
+                else:
+                    self._serve_live_cancel(run_id)
                 return
             self.send_error(404)
 
@@ -362,6 +379,70 @@ def serve_ui(
                 return
             except Exception:
                 self._write_json(503, {"error": "human gate decision unavailable"})
+                return
+            self._write_json(200, result)
+
+        def _serve_live_cancel(self, run_id):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "run cancellation is not configured"})
+                return
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(
+                    400,
+                    {"error": "run cancellation body must be an empty JSON object"},
+                )
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(
+                    400,
+                    {"error": "run cancellation body must be an empty JSON object"},
+                )
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(
+                    400,
+                    {"error": "run cancellation body must be an empty JSON object"},
+                )
+                return
+            if content_length > _LIVE_CANCEL_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "run cancellation body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(
+                    400,
+                    {"error": "run cancellation body must be an empty JSON object"},
+                )
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if payload != {}:
+                self._write_json(
+                    400,
+                    {"error": "run cancellation body must be an empty JSON object"},
+                )
+                return
+            try:
+                result = post_run_cancel(configured_service_url, token_file, run_id)
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "run not found"})
+                elif error.status_code == 409:
+                    self._write_json(409, {"error": "run cannot be cancelled"})
+                else:
+                    self._write_json(503, {"error": "run cancellation unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "run cancellation unavailable"})
                 return
             self._write_json(200, result)
 

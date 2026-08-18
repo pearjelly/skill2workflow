@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a confirmation-protected **Cancel run** action to the live control-plane
+  UI for `created`, `running`, and `waiting` runs. It reuses durable
+  cooperative cancellation and never claims forceful termination, rollback, or
+  provider reconciliation.
+
 - Added a bounded **Load Older Runs** control to the live control-plane UI.
   It reuses the redacted cursor-paged run-list contract, deduplicates rows,
   caps browser retention at 500 runs, and forwards no arbitrary service query.

@@ -68,7 +68,8 @@ guide](docs/installed-ui.md). With an explicit service origin and protected
 token file, the same console can inspect bounded live state, download a
 redacted support bundle, inspect a bounded run-detail evidence tail, discover
 older runs through fixed cursor pages, and confirm one selected waiting human
-gate through a fixed, confirmation-protected action.
+gate or request cooperative cancellation for one non-terminal run through fixed,
+confirmation-protected actions.
 
 ## Visual Overview
 
@@ -865,7 +866,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-213 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-214 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -923,6 +924,11 @@ poll-free.
 Loop 210 adds one-click download of the existing bounded, redacted support
 bundle from the live console. The fixed route remains read-only and server-side
 authenticated; no automatic upload or arbitrary proxy is introduced.
+
+Loop 214 adds a confirmation-protected **Cancel run** action to the live console
+for `created`, `running`, and `waiting` runs. It reuses the durable cooperative
+cancellation contract through a fixed same-origin route, sends only `{}`, and
+does not claim forceful provider termination, rollback, or reconciliation.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

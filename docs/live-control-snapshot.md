@@ -154,6 +154,14 @@ opaque cursor and always requests the service's 100-item
 its retained live list at 500 items. No arbitrary status, workflow, path, or
 service query is forwarded from the browser.
 
+The same live detail panel can request **Cancel run** for a `created`,
+`running`, or `waiting` run. After explicit confirmation it sends exactly `{}`
+to the fixed same-origin `POST /api/v1/runs/{run_id}/cancel` route. The UI
+validates the compact `{run_id,status}` response and refreshes the snapshot.
+This is the existing cooperative cancellation contract: an in-flight provider
+call may finish, no external effect is rolled back, and terminal runs are not
+rewritten. Static, example, and file snapshots never expose the control.
+
 ## Verification
 
 Run the real-process drill:
@@ -170,10 +178,11 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-212 add
-only the existing human-gate resume decision and redacted run-detail read; the
-UI excludes browser credential storage, CORS, workflow publication,
-cancellation, RBAC, pagination cursors, remote audit storage, multi-tenant
-filtering, automatic retries, provider reconciliation, and hosted TLS. Network
-exposure still requires the external TLS and private operator boundary documented in
+The live console remains a single-team operator boundary. Loops 211-214 add
+only the existing human-gate resume decision, cooperative cancellation, and
+redacted run-detail/discovery reads; the UI excludes browser credential
+storage, CORS, workflow publication, forceful termination, RBAC, pagination
+cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
+automatic retries, provider reconciliation, and hosted TLS. Network exposure
+still requires the external TLS and private operator boundary documented in
 [security-boundary.md](security-boundary.md).

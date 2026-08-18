@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-213
+- Completed delivery loops: 1-214
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 213 is complete with bounded live run discovery
+- Active loop: None; Loop 214 is complete with confirmation-protected live cooperative cancellation
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-213 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-214 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5548,9 +5548,45 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 214: Confirmation-Protected Live Cooperative Cancellation
+
+**Status:** Complete.
+
+**Prior basis:** Loop 213 completed the live list → inspect → decide read path,
+but the installed console still required the operator to switch to the CLI to
+request cancellation. The service already had durable cooperative cancellation;
+this loop closes the live operator-control gap without adding a new execution
+authority.
+
+**Outcome:** A selected live run in `created`, `running`, or `waiting` status
+now exposes **Cancel run** behind an explicit browser confirmation. The UI sends
+exactly `{}` to the fixed same-origin `POST /api/v1/runs/{run_id}/cancel` route,
+which forwards the existing authenticated service action with the token kept
+server-side. Human-gate and cancellation actions disable each other while a
+request is in flight, and a successful response refreshes the live snapshot.
+
+**Evidence:** UI integration tests prove the fixed cancel route, exact empty
+JSON body, server-side Authorization forwarding, and token non-disclosure.
+Control UI contract tests cover the non-terminal guard, confirmation text,
+mutual action disabling, response validation, and static/file boundary.
+Documentation, package, reproducible-build, secret-hygiene, external-connector,
+full-suite, and Production Baseline gates remain the release checks.
+
+**Safety boundary:** This is a request for the existing cooperative cancellation
+semantics. It does not forcefully abort an in-flight provider call, roll back an
+external effect, accept arbitrary reason text or paths, rewrite terminal runs,
+or reconcile provider state. Static, example, and file snapshots never expose
+the mutation.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 213 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 214 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5730,6 +5766,7 @@ This rolling queue is ordered. Loop 213 is complete and there is no active deliv
 | Loop 211: Confirmation-Protected Live Human-Gate Action | Complete | Let operators approve or reject one selected waiting run from the live console without exposing credentials or adding arbitrary mutation proxying | Fixed waiting-run guard, confirmation-protected POST, server-side token forwarding, response refresh, UI/route tests, docs, and full gates |
 | Loop 212: Bounded Live Run-Detail Evidence | Complete | Let operators inspect the existing redacted event tail before a live human-gate decision without exposing credentials or raw state | Fixed run-detail proxy, 50-event/64 KiB bounds, schema/window validation, UI/route tests, docs, and full gates |
 | Loop 213: Bounded Live Run Discovery | Complete | Let operators find older runs from the live console without arbitrary queries or unbounded browser state | Fixed cursor-page proxy, 100-item pages, 500-row client cap, schema/window validation, UI/route tests, docs, and full gates |
+| Loop 214: Confirmation-Protected Live Cooperative Cancellation | Complete | Let operators request cooperative cancellation for one selected non-terminal live run without exposing credentials or adding arbitrary mutation proxying | Fixed cancel proxy, exact empty object, non-terminal guard, confirmation, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
