@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded **Load Live Readiness** view to the live control-plane UI.
+  It reuses the authenticated operational-readiness contract through a fixed
+  server-side proxy and renders service, artifact, audit, backup, and blocking
+  reason checks without exposing paths, workflow content, credentials, lease
+  identities, or provider data.
+
 - Added a bounded **Load Live Schedules** view to the live control-plane UI.
   It reuses the existing redacted recurring-schedule inventory through a fixed
   server-side proxy, keeps the token server-side, and exposes no schedule

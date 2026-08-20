@@ -71,7 +71,8 @@ older runs and audit events through fixed cursor pages, and confirm one selected
 waiting human gate or request cooperative cancellation for one non-terminal run
 through fixed, confirmation-protected actions. It can also inspect the existing
 bounded recurring-schedule inventory without exposing trigger inputs or
-credentials.
+credentials, and load the existing value-free production-readiness report to
+inspect artifact, audit, backup, and blocking-reason checks.
 
 ## Visual Overview
 
@@ -868,7 +869,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-216 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-217 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring

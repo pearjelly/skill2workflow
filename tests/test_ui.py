@@ -915,3 +915,96 @@ class UiTests(TestCase):
             upstream.shutdown()
             upstream.server_close()
             upstream_thread.join(timeout=2)
+
+    def test_live_proxy_exposes_operational_readiness_without_browser_token(self):
+        observed = {}
+        report = {
+            "schema_version": "skill2workflow-operational-readiness-0.1.0",
+            "status": "ready",
+            "service": {
+                "status": "ready",
+                "ready": True,
+                "storage": "sqlite",
+                "state_layout_version": "skill2workflow-sqlite-layout-0.1.0",
+                "scheduler_lease_owned": True,
+            },
+            "checks": {
+                "workflow_artifacts": {"status": "clean", "issue_count": 0},
+                "audit_integrity": {"status": "valid"},
+                "offline_backup": {
+                    "status": "blocked",
+                    "active_scheduler_lease": True,
+                },
+            },
+            "blocking_reasons": [],
+            "operator_notes": ["offline_backup_requires_stop"],
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                body = json.dumps(report, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text(
+                    "ui-test-token-012345678901234567890123456789\n",
+                    encoding="utf-8",
+                )
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+
+                def ready(server):
+                    ui_port["value"] = server.server_port
+
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1",
+                        "port": 0,
+                        "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file,
+                        "ready_callback": ready,
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{ui_port['value']}/api/v1/operational-readiness",
+                    timeout=2,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(payload["status"], "ready")
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(observed["path"], "/api/v1/operational-readiness")
+                self.assertEqual(
+                    observed["authorization"],
+                    "Bearer ui-test-token-012345678901234567890123456789",
+                )
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)

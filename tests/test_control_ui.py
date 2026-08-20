@@ -80,6 +80,15 @@ class ControlUiContractTests(TestCase):
         self.assertIn('data-view="schedules"', html)
         self.assertIn('id="schedule-rows"', html)
         self.assertIn('id="schedule-page-status"', html)
+        self.assertIn('id="load-live-readiness"', html)
+        self.assertIn("Load Live Readiness", html)
+        self.assertIn("/api/v1/operational-readiness", javascript)
+        self.assertIn("loadLiveReadiness", javascript)
+        self.assertIn("validateOperationalReadiness", javascript)
+        self.assertIn("OPERATIONAL_READINESS_SCHEMA", javascript)
+        self.assertIn('data-view="readiness"', html)
+        self.assertIn('id="readiness-rows"', html)
+        self.assertIn('id="readiness-page-status"', html)
         self.assertIn(".snapshot-scope.is-bounded", css)
         self.assertIn(".snapshot-scope.is-truncated", css)
         self.assertIn(".service-status.is-valid", css)
@@ -88,6 +97,7 @@ class ControlUiContractTests(TestCase):
         self.assertIn(".run-page-status", css)
         self.assertIn(".audit-page-status", css)
         self.assertIn(".schedule-page-status", css)
+        self.assertIn(".readiness-page-status", css)
         self.assertIn(".run-cancel-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):

@@ -104,6 +104,14 @@ compact last-run metadata. Trigger inputs, scheduler lease details,
 credentials, and provider payloads never enter the browser; static, example,
 and file snapshots keep the control disabled.
 
+The live console also exposes **Load Live Readiness**. It calls only the fixed
+same-origin `/api/v1/operational-readiness` route and validates the
+`skill2workflow-operational-readiness-0.1.0` contract before rendering the
+service, workflow-artifact, audit-integrity, offline-backup, and blocking-reason
+rows. The report is read-only and value-free: it contains no paths, workflow
+content, run identifiers, lease identities, credentials, or provider data.
+Static, example, and file snapshots keep the control disabled.
+
 This live mode adds only the existing human-gate resume and cooperative
 cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider

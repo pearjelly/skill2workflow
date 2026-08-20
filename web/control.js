@@ -8,10 +8,12 @@
   const LIVE_RUN_PAGE_URL = "/api/v1/run-page";
   const LIVE_AUDIT_PAGE_URL = "/api/v1/audit-page";
   const LIVE_SCHEDULE_LIST_URL = "/api/v1/recurring-schedules";
+  const LIVE_OPERATIONAL_READINESS_URL = "/api/v1/operational-readiness";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
   const AUDIT_PAGE_SCHEMA = "skill2workflow-audit-event-list-0.1.0";
   const SCHEDULE_LIST_SCHEMA = "skill2workflow-recurring-schedule-list-0.1.0";
+  const OPERATIONAL_READINESS_SCHEMA = "skill2workflow-operational-readiness-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
   const LIVE_AUDIT_ROWS_MAX = 500;
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
@@ -42,6 +44,8 @@
     liveAuditPageLoading: false,
     liveSchedules: null,
     liveSchedulesLoading: false,
+    liveReadiness: null,
+    liveReadinessLoading: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -65,6 +69,7 @@
     els.loadOlderRuns = document.getElementById("load-older-runs");
     els.loadOlderAudit = document.getElementById("load-older-audit");
     els.loadLiveSchedules = document.getElementById("load-live-schedules");
+    els.loadLiveReadiness = document.getElementById("load-live-readiness");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
@@ -75,6 +80,7 @@
     els.runPageStatus = document.getElementById("run-page-status");
     els.auditPageStatus = document.getElementById("audit-page-status");
     els.schedulePageStatus = document.getElementById("schedule-page-status");
+    els.readinessPageStatus = document.getElementById("readiness-page-status");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -92,6 +98,7 @@
     els.auditRows = document.getElementById("audit-rows");
     els.connectorRows = document.getElementById("connector-rows");
     els.scheduleRows = document.getElementById("schedule-rows");
+    els.readinessRows = document.getElementById("readiness-rows");
     els.versionRows = document.getElementById("version-rows");
     els.detailTitle = document.getElementById("detail-title");
     els.statusGrid = document.getElementById("status-grid");
@@ -114,6 +121,7 @@
     els.loadOlderRuns.addEventListener("click", loadOlderRuns);
     els.loadOlderAudit.addEventListener("click", loadOlderAudit);
     els.loadLiveSchedules.addEventListener("click", loadLiveSchedules);
+    els.loadLiveReadiness.addEventListener("click", loadLiveReadiness);
     els.approveRun.addEventListener("click", function () {
       decideSelectedRun(true);
     });
@@ -360,6 +368,43 @@
     }
   }
 
+  async function loadLiveReadiness() {
+    if (!isLiveSnapshot() || !state.liveModeConfigured || state.liveReadinessLoading) {
+      return;
+    }
+    state.liveReadinessLoading = true;
+    updateLiveReadinessControls();
+    setReadinessPageStatus("Loading live readiness…", "");
+    try {
+      const response = await fetch(LIVE_OPERATIONAL_READINESS_URL, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("operational readiness unavailable");
+      }
+      const report = await response.json();
+      if (!validateOperationalReadiness(report)) {
+        throw new Error("operational readiness unavailable");
+      }
+      state.liveReadiness = report;
+      renderTables();
+      const blocking = report.blocking_reasons.length;
+      setReadinessPageStatus(
+        report.status === "ready"
+          ? "Ready: all production checks passed."
+          : "Attention: " + blocking + " blocking " + (blocking === 1 ? "reason." : "reasons."),
+        report.status === "ready" ? "is-valid" : "is-invalid",
+      );
+      setStatus(report.status === "ready" ? "Ready" : "Attention", report.status === "ready" ? "is-valid" : "is-invalid");
+    } catch (error) {
+      setReadinessPageStatus(
+        "Live readiness unavailable; current rows are unchanged.",
+        "is-invalid",
+      );
+    } finally {
+      state.liveReadinessLoading = false;
+      updateLiveReadinessControls();
+    }
+  }
+
   function mergeLiveRunRows(existing, additions) {
     const rows = [];
     const seen = Object.create(null);
@@ -590,6 +635,73 @@
         schedule.interval_seconds >= 1
       );
     });
+  }
+
+  function validateOperationalReadiness(report) {
+    const reasons = [
+      "service_not_ready", "state_layout_not_current", "workflow_artifacts_attention",
+      "workflow_artifacts_unavailable", "audit_integrity_not_valid",
+      "audit_integrity_unavailable", "offline_backup_unavailable",
+    ];
+    if (
+      !report ||
+      typeof report !== "object" ||
+      report.schema_version !== OPERATIONAL_READINESS_SCHEMA ||
+      Object.keys(report).sort().join(",") !==
+        "blocking_reasons,checks,operator_notes,schema_version,status,service" ||
+      ["ready", "attention"].indexOf(report.status) === -1 ||
+      !report.service ||
+      typeof report.service !== "object" ||
+      Object.keys(report.service).sort().join(",") !==
+        "ready,scheduler_lease_owned,state_layout_version,status,storage" ||
+      ["starting", "ready", "draining", "stopped"].indexOf(report.service.status) === -1 ||
+      typeof report.service.ready !== "boolean" ||
+      report.service.storage !== "sqlite" ||
+      report.service.state_layout_version !== "skill2workflow-sqlite-layout-0.1.0" ||
+      typeof report.service.scheduler_lease_owned !== "boolean" ||
+      !report.checks ||
+      typeof report.checks !== "object" ||
+      Object.keys(report.checks).sort().join(",") !==
+        "audit_integrity,offline_backup,workflow_artifacts" ||
+      !report.checks.workflow_artifacts ||
+      typeof report.checks.workflow_artifacts !== "object" ||
+      Object.keys(report.checks.workflow_artifacts).sort().join(",") !== "issue_count,status" ||
+      ["clean", "attention", "unavailable"].indexOf(report.checks.workflow_artifacts.status) === -1 ||
+      (report.checks.workflow_artifacts.status === "unavailable"
+        ? report.checks.workflow_artifacts.issue_count !== null
+        : !Number.isInteger(report.checks.workflow_artifacts.issue_count) ||
+          report.checks.workflow_artifacts.issue_count < 0) ||
+      !report.checks.audit_integrity ||
+      typeof report.checks.audit_integrity !== "object" ||
+      Object.keys(report.checks.audit_integrity).sort().join(",") !== "status" ||
+      ["valid", "invalid", "legacy_unsealed", "unavailable"].indexOf(report.checks.audit_integrity.status) === -1 ||
+      !report.checks.offline_backup ||
+      typeof report.checks.offline_backup !== "object" ||
+      Object.keys(report.checks.offline_backup).sort().join(",") !==
+        "active_scheduler_lease,status" ||
+      ["ready", "blocked", "unavailable"].indexOf(report.checks.offline_backup.status) === -1 ||
+      (report.checks.offline_backup.status === "unavailable"
+        ? report.checks.offline_backup.active_scheduler_lease !== null
+        : typeof report.checks.offline_backup.active_scheduler_lease !== "boolean") ||
+      !Array.isArray(report.blocking_reasons) ||
+      report.blocking_reasons.length > reasons.length ||
+      report.blocking_reasons.some(function (reason) {
+        return reasons.indexOf(reason) === -1;
+      }) ||
+      new Set(report.blocking_reasons).size !== report.blocking_reasons.length ||
+      !Array.isArray(report.operator_notes) ||
+      report.operator_notes.length > 1 ||
+      report.operator_notes.some(function (note) {
+        return note !== "offline_backup_requires_stop";
+      }) ||
+      (report.checks.offline_backup.status === "blocked" &&
+        JSON.stringify(report.operator_notes) !== JSON.stringify(["offline_backup_requires_stop"])) ||
+      (report.checks.offline_backup.status !== "blocked" && report.operator_notes.length !== 0) ||
+      report.status !== (report.blocking_reasons.length ? "attention" : "ready")
+    ) {
+      return false;
+    }
+    return true;
   }
 
   function isSafeCursor(cursor) {
@@ -839,9 +951,11 @@
         els.loadOlderRuns.disabled = true;
         els.loadOlderAudit.disabled = true;
         els.loadLiveSchedules.disabled = true;
+        els.loadLiveReadiness.disabled = true;
         setRunPageStatus("", "");
         setAuditPageStatus("", "");
         setSchedulePageStatus("", "");
+        setReadinessPageStatus("", "");
         setServiceStatus("Live service: static mode", "");
         renderDetail();
         return;
@@ -852,6 +966,7 @@
       updateRunPageControls();
       updateAuditPageControls();
       updateLiveScheduleControls();
+      updateLiveReadinessControls();
       if (!response.ok) {
         throw new Error("service probe unavailable");
       }
@@ -873,6 +988,7 @@
       updateRunPageControls();
       updateAuditPageControls();
       updateLiveScheduleControls();
+      updateLiveReadinessControls();
       setServiceStatus("Live service: unavailable", "is-invalid");
       renderDetail();
     }
@@ -944,6 +1060,9 @@
       state.liveSchedules = null;
       state.liveSchedulesLoading = false;
       setSchedulePageStatus("", "");
+      state.liveReadiness = null;
+      state.liveReadinessLoading = false;
+      setReadinessPageStatus("", "");
     }
     if (label === "Live Service Snapshot") {
       state.lastLiveLoadedAt = new Date().toISOString();
@@ -981,6 +1100,7 @@
     updateRunPageControls();
     updateAuditPageControls();
     updateLiveScheduleControls();
+    updateLiveReadinessControls();
     if (state.selected.kind === "run" && label === "Live Service Snapshot") {
       loadLiveRunDetail(state.selected.value.run_id);
     }
@@ -1004,9 +1124,12 @@
     state.liveAuditPageLoading = false;
     state.liveSchedules = null;
     state.liveSchedulesLoading = false;
+    state.liveReadiness = null;
+    state.liveReadinessLoading = false;
     setRunPageStatus("", "");
     setAuditPageStatus("", "");
     setSchedulePageStatus("", "");
+    setReadinessPageStatus("", "");
     state.selected = {
       kind: "error",
       value: Object.assign({ label: label }, details || {}),
@@ -1014,6 +1137,7 @@
     setStatus("Invalid", "is-invalid");
     render();
     updateLiveScheduleControls();
+    updateLiveReadinessControls();
   }
 
   function validateSnapshot(snapshot) {
@@ -1274,6 +1398,62 @@
       },
       "schedule",
     );
+    renderTable(
+      els.readinessRows,
+      filterRows(readinessRows(state.liveReadiness)),
+      function (check) {
+        return [
+          linkCell(check.check),
+          pillCell(check.status),
+          textCell(check.details),
+        ];
+      },
+      "readiness",
+    );
+  }
+
+  function readinessRows(report) {
+    if (!report) return [];
+    const service = report.service;
+    const artifacts = report.checks.workflow_artifacts;
+    const audit = report.checks.audit_integrity;
+    const backup = report.checks.offline_backup;
+    const rows = [
+      {
+        check: "service",
+        status: service.ready ? "ready" : service.status,
+        details:
+          service.storage + "; layout " + service.state_layout_version +
+          "; scheduler lease " + (service.scheduler_lease_owned ? "owned" : "not owned"),
+      },
+      {
+        check: "workflow artifacts",
+        status: artifacts.status,
+        details: artifacts.issue_count === null
+          ? "issue count unavailable"
+          : String(artifacts.issue_count) + " issue(s)",
+      },
+      {
+        check: "audit integrity",
+        status: audit.status,
+        details: "SQLite audit-chain verification",
+      },
+      {
+        check: "offline backup",
+        status: backup.status,
+        details: backup.status === "blocked"
+          ? "stop service before offline backup"
+          : backup.status === "ready" ? "backup preflight passed" : "backup preflight unavailable",
+      },
+    ];
+    if (report.blocking_reasons.length) {
+      rows.push({
+        check: "blocking reasons",
+        status: "attention",
+        details: report.blocking_reasons.join(", "),
+      });
+    }
+    return rows;
   }
 
   function renderOperatorTables(insights) {
@@ -1514,6 +1694,9 @@
         ["Next Run", formatDate(value.next_run_at || "")],
       ];
     }
+    if (value.check && value.status) {
+      return [["Check", value.check], ["Status", value.status], ["Details", value.details || ""]];
+    }
     if (value.type) {
       return [["Type", value.type], ["Workflow", value.workflow_id || ""], ["Run", value.run_id || ""], ["Time", formatDate(value.timestamp || "")]];
     }
@@ -1538,6 +1721,7 @@
     if (selected.kind === "recent event") return value.type || "Recent Event";
     if (selected.kind === "connector event") return value.type || "Connector Event";
     if (selected.kind === "schedule") return value.schedule_id || "Schedule";
+    if (selected.kind === "readiness") return value.check || "Readiness";
     if (selected.kind === "version change") return value.workflow_id || "Version Change";
     return "Snapshot";
   }
@@ -1579,6 +1763,11 @@
     els.schedulePageStatus.className = "schedule-page-status" + (className ? " " + className : "");
   }
 
+  function setReadinessPageStatus(text, className) {
+    els.readinessPageStatus.textContent = text;
+    els.readinessPageStatus.className = "readiness-page-status" + (className ? " " + className : "");
+  }
+
   function updateRunPageControls() {
     const enabled = isLiveSnapshot() && state.liveRunPageHasMore;
     els.loadOlderRuns.disabled = !enabled || state.liveRunPageLoading;
@@ -1601,6 +1790,14 @@
     els.loadLiveSchedules.textContent = state.liveSchedulesLoading
       ? "Loading Schedules…"
       : "Load Live Schedules";
+  }
+
+  function updateLiveReadinessControls() {
+    const enabled = state.liveModeConfigured && isLiveSnapshot();
+    els.loadLiveReadiness.disabled = !enabled || state.liveReadinessLoading;
+    els.loadLiveReadiness.textContent = state.liveReadinessLoading
+      ? "Loading Readiness…"
+      : "Load Live Readiness";
   }
 
   function emptySnapshot() {

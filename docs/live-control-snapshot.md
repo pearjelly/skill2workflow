@@ -179,6 +179,14 @@ last-run metadata. This is read-only discovery: no schedule mutation,
 dispatch claim, trigger input, lease identity, credential, or provider payload
 crosses the UI boundary, and static/file snapshots never expose the control.
 
+The live console can also explicitly load the aggregate production-readiness
+report through its fixed `GET /api/v1/operational-readiness` proxy. The browser
+accepts only the `skill2workflow-operational-readiness-0.1.0` contract and
+renders service, workflow-artifact, audit-integrity, offline-backup, and
+blocking-reason rows. This remains read-only and value-free: paths, workflow
+content, run identifiers, lease identities, credentials, and provider data are
+excluded; static/file snapshots never expose the control.
+
 ## Verification
 
 Run the real-process drill:
@@ -195,9 +203,9 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-216 add
+The live console remains a single-team operator boundary. Loops 211-217 add
 only the existing human-gate resume decision, cooperative cancellation, and
-redacted run-detail/run-discovery/audit-discovery/schedule-discovery reads; the UI excludes browser credential
+redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
 automatic retries, provider reconciliation, and hosted TLS. Network exposure

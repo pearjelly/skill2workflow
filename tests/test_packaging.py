@@ -152,13 +152,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
         self.assertIn("--version", guide)
         self.assertIn("wheel metadata", guide)
-        self.assertIn("- Completed delivery loops: 1-216", roadmap)
+        self.assertIn("- Completed delivery loops: 1-217", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 216 is complete with bounded live recurring-schedule discovery",
+            "- Active loop: None; Loop 217 is complete with live production-readiness diagnostics",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-216 are complete", readme)
+        self.assertIn("Delivery Loops 1-217 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

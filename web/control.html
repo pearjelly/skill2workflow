@@ -24,6 +24,7 @@
           <button id="load-older-runs" type="button" disabled>Load Older Runs</button>
           <button id="load-older-audit" type="button" disabled>Load Older Audit</button>
           <button id="load-live-schedules" type="button" disabled>Load Live Schedules</button>
+          <button id="load-live-readiness" type="button" disabled>Load Live Readiness</button>
           <label class="file-action">
             <input id="snapshot-file" type="file" accept="application/json,.json" />
             Load Snapshot
@@ -63,6 +64,7 @@
         <span id="run-page-status" class="run-page-status" aria-live="polite"></span>
         <span id="audit-page-status" class="run-page-status" aria-live="polite"></span>
         <span id="schedule-page-status" class="run-page-status" aria-live="polite"></span>
+        <span id="readiness-page-status" class="run-page-status" aria-live="polite"></span>
       </section>
 
       <section class="workspace" aria-label="Control plane inspector">
@@ -75,6 +77,7 @@
             <button class="tab" type="button" data-view="audit">Audit</button>
             <button class="tab" type="button" data-view="connectors">Connectors</button>
             <button class="tab" type="button" data-view="schedules">Schedules</button>
+            <button class="tab" type="button" data-view="readiness">Readiness</button>
             <button class="tab" type="button" data-view="versions">Compare</button>
           </nav>
 
@@ -230,6 +233,19 @@
                 </tr>
               </thead>
               <tbody id="schedule-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrap" data-panel="readiness" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>Check</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody id="readiness-rows"></tbody>
             </table>
           </div>
 
