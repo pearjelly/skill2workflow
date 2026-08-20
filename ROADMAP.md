@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-219
+- Completed delivery loops: 1-220
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 219 is complete with live workflow-plan review
+- Active loop: None; Loop 220 is complete with live empty-trigger preflight
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-219 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-220 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5772,9 +5772,45 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 220: Live Empty-Trigger Preflight
+
+**Status:** Complete.
+
+**Prior basis:** Loop 219 let operators understand a selected live version's
+execution plan, but the console still offered no safe way to check whether an
+empty trigger would satisfy its declared input and connector mappings before a
+real trigger was attempted.
+
+**Outcome:** The selected-version review now offers **Check Empty Trigger**
+through one fixed same-origin
+`POST /api/v1/workflow-preflights/{workflow_id}/{version}` proxy. The UI sends
+only `{}`, validates the existing
+`skill2workflow-workflow-preflight-0.1.0` contract, and shows readiness,
+missing-input/mapping blockers, connector counts, and issue codes. Static,
+example, and file snapshots keep the action disabled.
+
+**Evidence:** UI integration tests prove exact path parsing, exact empty-body
+forwarding, server-side Authorization, `no-store`, and the value-free response
+boundary. Control UI contract tests cover the live-only action and strict
+schema checks. The installed UI guide, live-control guide, Changelog, README,
+and this Roadmap record that no business input is accepted; the full UI,
+package, reproducible-build, secret-hygiene, external-connector, full-suite,
+and Production Baseline gates remain the release checks.
+
+**Safety boundary:** This is bounded, read-only trigger admission inspection.
+It does not accept or persist business input, create a run, resolve
+credentials, invoke connectors, or mutate Workflow, schedule, audit, or
+runtime state.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 219 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 220 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5960,6 +5996,7 @@ This rolling queue is ordered. Loop 219 is complete and there is no active deliv
 | Loop 217: Live Production-Readiness Diagnostics | Complete | Let operators inspect actionable service, artifact, audit, backup, and blocking-reason checks from the live console without mutation or value exposure | Fixed operational-readiness proxy, exact schema validation, readiness table, UI/route tests, docs, and full gates |
 | Loop 218: Live Published-Workflow Inventory | Complete | Let operators inspect current published versions, aliases, lifecycle status, and checksums from the live console without Workflow content exposure | Fixed workflow-inventory proxy, exact 100-item redacted contract, live registry table, UI/route tests, docs, and full gates |
 | Loop 219: Live Workflow-Plan Review | Complete | Let operators review a selected live version's topology, gates, connector side effects, retries, and timeouts without executing it or exposing values | Fixed workflow-explanation proxy, exact bounded redacted contract, selection review action, UI/route tests, docs, and full gates |
+| Loop 220: Live Empty-Trigger Preflight | Complete | Let operators check a selected version's empty-trigger input and mapping readiness without accepting business values or starting a run | Fixed preflight proxy, exact empty-body contract, value-free readiness review, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

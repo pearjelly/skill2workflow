@@ -203,6 +203,14 @@ policy, connector-side-effect, retry, timeout, and human-gate metadata. It
 does not invoke connectors or resolve credentials, and it excludes Workflow
 values, instructions, artifact paths, trigger inputs, and provider data.
 
+The selected-version review also offers a no-input preflight through the fixed
+`POST /api/v1/workflow-preflights/{workflow_id}/{version}` proxy. The browser
+sends exactly `{}` and accepts only the
+`skill2workflow-workflow-preflight-0.1.0` value-free contract, showing whether
+the empty trigger is ready, missing required fields, or blocked by mappings.
+It never accepts business input, resolves credentials, invokes connectors, or
+creates a run.
+
 ## Verification
 
 Run the real-process drill:
@@ -219,7 +227,7 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-219 add
+The live console remains a single-team operator boundary. Loops 211-220 add
 only the existing human-gate resume decision, cooperative cancellation, and
 redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination

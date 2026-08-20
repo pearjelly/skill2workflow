@@ -612,9 +612,14 @@ tbody tr.is-selected {
   color: var(--red);
 }
 
+.workflow-review-buttons {
+  display: flex;
+  gap: 8px;
+}
+
 .workflow-explanation-actions button {
   min-height: 32px;
-  width: 100%;
+  flex: 1;
   border: 1px solid rgba(23, 105, 170, 0.35);
   border-radius: 6px;
   background: #ffffff;

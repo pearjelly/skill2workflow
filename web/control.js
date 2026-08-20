@@ -11,6 +11,7 @@
   const LIVE_OPERATIONAL_READINESS_URL = "/api/v1/operational-readiness";
   const LIVE_WORKFLOW_INVENTORY_URL = "/api/v1/workflows";
   const LIVE_WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/";
+  const LIVE_WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
   const AUDIT_PAGE_SCHEMA = "skill2workflow-audit-event-list-0.1.0";
@@ -18,6 +19,7 @@
   const OPERATIONAL_READINESS_SCHEMA = "skill2workflow-operational-readiness-0.1.0";
   const WORKFLOW_INVENTORY_SCHEMA = "skill2workflow-workflow-inventory-0.1.0";
   const WORKFLOW_EXPLANATION_SCHEMA = "skill2workflow-workflow-explanation-0.1.0";
+  const WORKFLOW_PREFLIGHT_SCHEMA = "skill2workflow-workflow-preflight-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
   const LIVE_AUDIT_ROWS_MAX = 500;
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
@@ -56,6 +58,10 @@
     liveWorkflowExplanationKey: "",
     liveWorkflowExplanationLoading: false,
     liveWorkflowExplanationError: false,
+    liveWorkflowPreflight: null,
+    liveWorkflowPreflightKey: "",
+    liveWorkflowPreflightLoading: false,
+    liveWorkflowPreflightError: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -96,6 +102,8 @@
     els.workflowExplanationActions = document.getElementById("workflow-explanation-actions");
     els.workflowExplanationStatus = document.getElementById("workflow-explanation-status");
     els.loadWorkflowExplanation = document.getElementById("load-workflow-explanation");
+    els.workflowPreflightStatus = document.getElementById("workflow-preflight-status");
+    els.loadWorkflowPreflight = document.getElementById("load-workflow-preflight");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -140,6 +148,7 @@
     els.loadLiveReadiness.addEventListener("click", loadLiveReadiness);
     els.loadLiveWorkflows.addEventListener("click", loadLiveWorkflows);
     els.loadWorkflowExplanation.addEventListener("click", loadLiveWorkflowExplanation);
+    els.loadWorkflowPreflight.addEventListener("click", loadLiveWorkflowPreflight);
     els.approveRun.addEventListener("click", function () {
       decideSelectedRun(true);
     });
@@ -502,6 +511,60 @@
     } finally {
       state.liveWorkflowExplanationLoading = false;
       updateWorkflowExplanationControls();
+    }
+  }
+
+  async function loadLiveWorkflowPreflight() {
+    const workflow = selectedLiveWorkflow();
+    if (!workflow || state.liveWorkflowPreflightLoading) {
+      return;
+    }
+    const key = workflow.workflow_id + "@" + workflow.version;
+    state.liveWorkflowPreflightLoading = true;
+    state.liveWorkflowPreflightError = false;
+    updateWorkflowPreflightControls();
+    setWorkflowPreflightStatus("Checking the empty trigger shape…", "");
+    try {
+      const url =
+        LIVE_WORKFLOW_PREFLIGHT_PREFIX +
+        encodeURIComponent(workflow.workflow_id) +
+        "/" +
+        encodeURIComponent(workflow.version);
+      const response = await fetch(url, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      if (!response.ok) {
+        throw new Error("workflow preflight unavailable");
+      }
+      const report = await response.json();
+      if (!validateWorkflowPreflight(report, workflow)) {
+        throw new Error("workflow preflight unavailable");
+      }
+      state.liveWorkflowPreflight = report;
+      state.liveWorkflowPreflightKey = key;
+      renderDetail();
+      setWorkflowPreflightStatus(
+        report.ready
+          ? "Empty trigger is ready; no connector or credential was invoked."
+          : "Empty trigger is blocked; review missing input or mapping requirements.",
+        report.ready ? "is-valid" : "is-invalid",
+      );
+      setStatus(report.ready ? "Preflight Ready" : "Preflight Blocked", report.ready ? "is-valid" : "is-invalid");
+    } catch (error) {
+      state.liveWorkflowPreflight = null;
+      state.liveWorkflowPreflightKey = key;
+      state.liveWorkflowPreflightError = true;
+      renderDetail();
+      setWorkflowPreflightStatus(
+        "Preflight unavailable; metadata remains visible.",
+        "is-invalid",
+      );
+    } finally {
+      state.liveWorkflowPreflightLoading = false;
+      updateWorkflowPreflightControls();
     }
   }
 
@@ -1026,6 +1089,105 @@
       (policies.workflow_timeout_ms === null || isNonNegativeInteger(policies.workflow_timeout_ms));
   }
 
+  function validateWorkflowPreflight(report, selected) {
+    if (
+      !isObject(report) ||
+      report.schema_version !== WORKFLOW_PREFLIGHT_SCHEMA ||
+      !hasExactKeys(report, ["schema_version", "workflow", "ready", "input", "summary", "nodes", "issues", "safety"]) ||
+      !isObject(report.workflow) ||
+      !hasExactKeys(report.workflow, ["id", "version", "status"]) ||
+      report.workflow.id !== selected.workflow_id ||
+      report.workflow.version !== selected.version ||
+      ["published", "deprecated"].indexOf(report.workflow.status) === -1 ||
+      typeof report.ready !== "boolean" ||
+      !isObject(report.input) ||
+      !hasExactKeys(report.input, [
+        "provided", "status", "provided_property_count", "declared_property_count",
+        "required_property_count", "missing_required_count", "unknown_property_count",
+        "error_code", "error_path",
+      ]) ||
+      report.input.provided !== false ||
+      report.input.provided_property_count !== 0 ||
+      ["valid", "invalid"].indexOf(report.input.status) === -1 ||
+      !["provided_property_count", "declared_property_count", "required_property_count", "missing_required_count", "unknown_property_count"].every(function (field) {
+        return isNonNegativeInteger(report.input[field]) && report.input[field] <= 128;
+      }) ||
+      (report.input.status === "valid" && (report.input.error_code !== null || report.input.error_path !== null)) ||
+      (report.input.status === "invalid" && (!isBoundedString(report.input.error_code, 128) || !Array.isArray(report.input.error_path))) ||
+      (report.input.error_code !== null && !isSafeWorkflowRef(report.input.error_code)) ||
+      (report.input.error_path !== null && (!Array.isArray(report.input.error_path) || report.input.error_path.length > 16 || report.input.error_path.some(function (part) {
+        return (typeof part !== "string" && !Number.isInteger(part)) || typeof part === "boolean";
+      }))) ||
+      !isObject(report.summary) ||
+      !hasExactKeys(report.summary, ["node_count", "connector_node_count", "side_effecting_node_count", "mapping_count", "blocked_node_count", "issue_count"]) ||
+      !["node_count", "connector_node_count", "side_effecting_node_count", "mapping_count", "blocked_node_count", "issue_count"].every(function (field) {
+        return isNonNegativeInteger(report.summary[field]);
+      }) ||
+      !Array.isArray(report.nodes) || report.nodes.length > 1000 ||
+      report.summary.node_count !== report.nodes.length ||
+      !Array.isArray(report.issues) || report.issues.length > 64 ||
+      report.summary.issue_count !== report.issues.length ||
+      !isObject(report.safety) ||
+      !hasExactKeys(report.safety, ["side_effect_free", "connector_calls", "credentials_resolved", "raw_values_included"]) ||
+      report.safety.side_effect_free !== true ||
+      report.safety.connector_calls !== false ||
+      report.safety.credentials_resolved !== false ||
+      report.safety.raw_values_included !== false
+    ) {
+      return false;
+    }
+    let connectorCount = 0;
+    let sideEffectCount = 0;
+    let mappingCount = 0;
+    let blockedCount = 0;
+    if (!report.nodes.every(function (node) {
+      if (!isObject(node) || !hasExactKeys(node, ["id", "type", "connector", "input_mapping"]) ||
+        !isSafeWorkflowRef(node.id) || !isBoundedString(node.type, 128) ||
+        !isObject(node.input_mapping) || !hasExactKeys(node.input_mapping, ["status", "mapping_count", "mapped_count", "missing_required_count", "missing_optional_count"]) ||
+        ["not_applicable", "ready", "skipped", "blocked"].indexOf(node.input_mapping.status) === -1 ||
+        !["mapping_count", "mapped_count", "missing_required_count", "missing_optional_count"].every(function (field) {
+          return isNonNegativeInteger(node.input_mapping[field]);
+        }) || node.input_mapping.mapping_count > 2000 ||
+        node.input_mapping.mapped_count + node.input_mapping.missing_required_count + node.input_mapping.missing_optional_count !== node.input_mapping.mapping_count
+      ) {
+        return false;
+      }
+      mappingCount += node.input_mapping.mapping_count;
+      if (node.input_mapping.status === "blocked") blockedCount += 1;
+      if (node.connector === null) return true;
+      if (!isObject(node.connector) || !hasExactKeys(node.connector, ["id", "kind", "external_side_effect", "credential_handle_count", "credentials_resolved"]) ||
+        !isSafeWorkflowRef(node.connector.id) || !isStringAtMost(node.connector.kind, 128) ||
+        typeof node.connector.external_side_effect !== "boolean" ||
+        !isNonNegativeInteger(node.connector.credential_handle_count) ||
+        node.connector.credentials_resolved !== false
+      ) {
+        return false;
+      }
+      connectorCount += 1;
+      if (node.connector.external_side_effect) sideEffectCount += 1;
+      return true;
+    })) {
+      return false;
+    }
+    if (!report.issues.every(function (issue) {
+      return isObject(issue) && hasExactKeys(issue, ["code", "severity", "node_id", "path"]) &&
+        ["input_invalid", "required_mapping_input_missing"].indexOf(issue.code) !== -1 &&
+        issue.severity === "error" &&
+        (issue.node_id === null || isSafeWorkflowRef(issue.node_id)) &&
+        Array.isArray(issue.path) && issue.path.length <= 16 &&
+        issue.path.every(function (part) {
+          return (typeof part === "string" && part.length <= 128) || (Number.isInteger(part) && typeof part !== "boolean");
+        });
+    })) {
+      return false;
+    }
+    return report.summary.connector_node_count === connectorCount &&
+      report.summary.side_effecting_node_count === sideEffectCount &&
+      report.summary.mapping_count === mappingCount &&
+      report.summary.blocked_node_count === blockedCount &&
+      report.ready === (report.input.status === "valid" && report.issues.length === 0);
+  }
+
   function isObject(value) {
     return Boolean(value) && typeof value === "object" && !Array.isArray(value);
   }
@@ -1393,6 +1555,10 @@
     state.liveWorkflowExplanationKey = "";
     state.liveWorkflowExplanationLoading = false;
     state.liveWorkflowExplanationError = false;
+    state.liveWorkflowPreflight = null;
+    state.liveWorkflowPreflightKey = "";
+    state.liveWorkflowPreflightLoading = false;
+    state.liveWorkflowPreflightError = false;
     state.liveRunRows = null;
     state.liveRunPageCursor = "";
     state.liveRunPageHasMore = Boolean(
@@ -1491,6 +1657,10 @@
     state.liveWorkflowExplanationKey = "";
     state.liveWorkflowExplanationLoading = false;
     state.liveWorkflowExplanationError = false;
+    state.liveWorkflowPreflight = null;
+    state.liveWorkflowPreflightKey = "";
+    state.liveWorkflowPreflightLoading = false;
+    state.liveWorkflowPreflightError = false;
     setRunPageStatus("", "");
     setAuditPageStatus("", "");
     setSchedulePageStatus("", "");
@@ -1923,6 +2093,10 @@
         state.liveWorkflowExplanationKey = "";
         state.liveWorkflowExplanationLoading = false;
         state.liveWorkflowExplanationError = false;
+        state.liveWorkflowPreflight = null;
+        state.liveWorkflowPreflightKey = "";
+        state.liveWorkflowPreflightLoading = false;
+        state.liveWorkflowPreflightError = false;
         renderTables();
         renderDetail();
         if (kind === "run" && isLiveSnapshot()) {
@@ -1979,8 +2153,14 @@
     els.loadWorkflowExplanation.textContent = state.liveWorkflowExplanationLoading
       ? "Loading Review…"
       : "Review Workflow Plan";
+    els.loadWorkflowPreflight.disabled =
+      !visible || state.liveWorkflowPreflightLoading;
+    els.loadWorkflowPreflight.textContent = state.liveWorkflowPreflightLoading
+      ? "Checking Trigger…"
+      : "Check Empty Trigger";
     if (!visible) {
       setWorkflowExplanationStatus("Select a live workflow version to review its plan.", "");
+      setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
       return;
     }
     const key = workflow.workflow_id + "@" + workflow.version;
@@ -1992,6 +2172,21 @@
       setWorkflowExplanationStatus("Read-only review loaded; no connector or credential was invoked.", "is-valid");
     } else {
       setWorkflowExplanationStatus("Review topology, gates, side effects, retries, and timeouts before execution.", "");
+    }
+    if (state.liveWorkflowPreflightLoading && state.liveWorkflowPreflightKey === key) {
+      setWorkflowPreflightStatus("Checking the empty trigger shape…", "");
+    } else if (state.liveWorkflowPreflightError && state.liveWorkflowPreflightKey === key) {
+      setWorkflowPreflightStatus("Preflight unavailable; metadata remains visible.", "is-invalid");
+    } else if (state.liveWorkflowPreflight && state.liveWorkflowPreflightKey === key) {
+      const report = state.liveWorkflowPreflight;
+      setWorkflowPreflightStatus(
+        report.ready
+          ? "Empty trigger is ready; no connector or credential was invoked."
+          : "Empty trigger is blocked; review missing input or mapping requirements.",
+        report.ready ? "is-valid" : "is-invalid",
+      );
+    } else {
+      setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
     }
   }
 
@@ -2066,13 +2261,17 @@
         : value;
     const workflow = selectedLiveWorkflow();
     const workflowKey = workflow ? workflow.workflow_id + "@" + workflow.version : "";
-    const withExplanation =
-      workflow &&
-      state.liveWorkflowExplanation &&
-      state.liveWorkflowExplanationKey === workflowKey
-        ? { metadata: detail, redacted_workflow_plan: state.liveWorkflowExplanation }
-        : detail;
-    els.detailJson.textContent = JSON.stringify(withExplanation, null, 2);
+    const detailEnvelope = { metadata: detail };
+    let hasEnvelope = false;
+    if (workflow && state.liveWorkflowExplanation && state.liveWorkflowExplanationKey === workflowKey) {
+      detailEnvelope.redacted_workflow_plan = state.liveWorkflowExplanation;
+      hasEnvelope = true;
+    }
+    if (workflow && state.liveWorkflowPreflight && state.liveWorkflowPreflightKey === workflowKey) {
+      detailEnvelope.redacted_empty_trigger_preflight = state.liveWorkflowPreflight;
+      hasEnvelope = true;
+    }
+    els.detailJson.textContent = JSON.stringify(hasEnvelope ? detailEnvelope : detail, null, 2);
     renderStatusGrid(value);
   }
 
@@ -2207,6 +2406,11 @@
     els.workflowExplanationStatus.className = className || "";
   }
 
+  function setWorkflowPreflightStatus(text, className) {
+    els.workflowPreflightStatus.textContent = text;
+    els.workflowPreflightStatus.className = className || "";
+  }
+
   function updateRunPageControls() {
     const enabled = isLiveSnapshot() && state.liveRunPageHasMore;
     els.loadOlderRuns.disabled = !enabled || state.liveRunPageLoading;
@@ -2254,6 +2458,15 @@
     els.loadWorkflowExplanation.textContent = state.liveWorkflowExplanationLoading
       ? "Loading Review…"
       : "Review Workflow Plan";
+  }
+
+  function updateWorkflowPreflightControls() {
+    const workflow = selectedLiveWorkflow();
+    els.loadWorkflowPreflight.disabled =
+      !workflow || state.liveWorkflowPreflightLoading;
+    els.loadWorkflowPreflight.textContent = state.liveWorkflowPreflightLoading
+      ? "Checking Trigger…"
+      : "Check Empty Trigger";
   }
 
   function emptySnapshot() {

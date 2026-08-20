@@ -117,6 +117,13 @@ class ControlUiContractTests(TestCase):
         self.assertIn("WORKFLOW_EXPLANATION_SCHEMA", javascript)
         self.assertIn("side_effect_free", javascript)
         self.assertIn(".workflow-explanation-actions", css)
+        self.assertIn('id="load-workflow-preflight"', html)
+        self.assertIn("Check Empty Trigger", html)
+        self.assertIn("/api/v1/workflow-preflights/", javascript)
+        self.assertIn("loadLiveWorkflowPreflight", javascript)
+        self.assertIn("validateWorkflowPreflight", javascript)
+        self.assertIn("WORKFLOW_PREFLIGHT_SCHEMA", javascript)
+        self.assertIn("empty JSON object", javascript)
         self.assertIn(".run-cancel-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):

@@ -128,6 +128,13 @@ review. The review contains no Workflow values, instructions, artifact paths,
 credentials, trigger inputs, or provider data, and it never invokes a
 connector; static, example, and file snapshots keep the action disabled.
 
+The same review card offers **Check Empty Trigger**. It sends only the fixed
+empty JSON object `{}` to `/api/v1/workflow-preflights/{workflow_id}/{version}`
+and validates the `skill2workflow-workflow-preflight-0.1.0` response. Operators
+can see whether the empty trigger is ready, which required inputs or mappings
+would block it, and how many connector nodes are involved. No business input is
+accepted by this UI action, and the preflight is side-effect-free.
+
 This live mode adds only the existing human-gate resume and cooperative
 cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider

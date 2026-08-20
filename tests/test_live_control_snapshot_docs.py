@@ -77,9 +77,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         )
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-219 are complete", readme)
+        self.assertIn("Delivery Loops 1-220 are complete", readme)
         self.assertIn("docs/live-control-snapshot.md", readme)
-        self.assertIn("- Completed delivery loops: 1-219", roadmap)
+        self.assertIn("- Completed delivery loops: 1-220", roadmap)
         self.assertIn(
             "| Loop 55: Authenticated Live Operator Snapshot | Complete |",
             roadmap,
@@ -106,3 +106,6 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         self.assertIn("Review Workflow Plan", installed_ui)
         self.assertIn("workflow-explanations/{workflow_id}/{version}", guide)
         self.assertIn("skill2workflow-workflow-explanation-0.1.0", guide)
+        self.assertIn("Check Empty Trigger", installed_ui)
+        self.assertIn("workflow-preflights/{workflow_id}/{version}", guide)
+        self.assertIn("skill2workflow-workflow-preflight-0.1.0", guide)

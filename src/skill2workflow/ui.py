@@ -18,6 +18,8 @@ from .service_client import (
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
+    MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES,
+    MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES,
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     ServiceActionError,
@@ -30,6 +32,7 @@ from .service_client import (
     fetch_service_probe,
     fetch_workflow_inventory,
     fetch_workflow_explanation,
+    fetch_workflow_preflight,
     post_run_resume,
     post_run_cancel,
     service_endpoint,
@@ -48,6 +51,9 @@ _WORKFLOW_INVENTORY_PATH = "/api/v1/workflows"
 _WORKFLOW_INVENTORY_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES
 _WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/"
 _WORKFLOW_EXPLANATION_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES
+_WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/"
+_WORKFLOW_PREFLIGHT_MAX_REQUEST_BYTES = min(16, MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES)
+_WORKFLOW_PREFLIGHT_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES
 _SUPPORT_BUNDLE_PATH = "/api/v1/support-bundle"
 _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
 _LIVE_RESUME_PREFIX = "/api/v1/runs/"
@@ -224,6 +230,22 @@ def serve_ui(
 
         def do_POST(self):
             parsed = urlsplit(self.path)
+            if parsed.path.startswith(_WORKFLOW_PREFLIGHT_PREFIX):
+                if parsed.query:
+                    self._write_json(
+                        404,
+                        {"error": "workflow preflight path is not available"},
+                    )
+                    return
+                references = _parse_live_workflow_preflight_path(parsed.path)
+                if references is None:
+                    self._write_json(
+                        404,
+                        {"error": "workflow preflight path is not available"},
+                    )
+                    return
+                self._serve_workflow_preflight(*references)
+                return
             if parsed.path.startswith(_LIVE_RESUME_PREFIX):
                 if parsed.query:
                     self._write_json(
@@ -370,6 +392,81 @@ def serve_ui(
                 self._write_json(503, {"error": "workflow explanation unavailable"})
                 return
             self._write_json(200, body, content_type="application/json")
+
+        def _serve_workflow_preflight(self, workflow_id, version):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow preflight is not configured"})
+                return
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(
+                    400,
+                    {"error": "workflow preflight body must be an empty JSON object"},
+                )
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(
+                    400,
+                    {"error": "workflow preflight body must be an empty JSON object"},
+                )
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(
+                    400,
+                    {"error": "workflow preflight body must be an empty JSON object"},
+                )
+                return
+            if content_length > _WORKFLOW_PREFLIGHT_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "workflow preflight body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(
+                    400,
+                    {"error": "workflow preflight body must be an empty JSON object"},
+                )
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if payload != {}:
+                self._write_json(
+                    400,
+                    {"error": "workflow preflight body must be an empty JSON object"},
+                )
+                return
+            try:
+                report = fetch_workflow_preflight(
+                    configured_service_url,
+                    token_file,
+                    workflow_id,
+                    version,
+                    input_present=False,
+                )
+                response_body = json.dumps(
+                    report,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(response_body) > _WORKFLOW_PREFLIGHT_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow preflight unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "workflow version not found"})
+                else:
+                    self._write_json(503, {"error": "workflow preflight unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "workflow preflight unavailable"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
 
         def _serve_support_bundle(self):
             configured_service_url = getattr(self.server, "live_service_url", None)
@@ -683,9 +780,19 @@ def _is_safe_live_run_id(value: str) -> bool:
 def _parse_live_workflow_explanation_path(path: str):
     """Accept exactly two safe, encoded Workflow reference components."""
 
-    if not path.startswith(_WORKFLOW_EXPLANATION_PREFIX):
+    return _parse_live_workflow_reference_path(path, _WORKFLOW_EXPLANATION_PREFIX)
+
+
+def _parse_live_workflow_preflight_path(path: str):
+    """Accept exactly two safe, encoded Workflow references for preflight."""
+
+    return _parse_live_workflow_reference_path(path, _WORKFLOW_PREFLIGHT_PREFIX)
+
+
+def _parse_live_workflow_reference_path(path: str, prefix: str):
+    if not path.startswith(prefix):
         return None
-    suffix = path[len(_WORKFLOW_EXPLANATION_PREFIX) :]
+    suffix = path[len(prefix) :]
     parts = suffix.split("/")
     if len(parts) != 2 or any(not part for part in parts):
         return None

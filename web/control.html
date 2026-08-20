@@ -306,7 +306,11 @@
           <section id="workflow-explanation-actions" class="workflow-explanation-actions" hidden aria-live="polite">
             <strong>Workflow review</strong>
             <p id="workflow-explanation-status">Select a live workflow version to review its plan.</p>
-            <button id="load-workflow-explanation" type="button">Review Workflow Plan</button>
+            <div class="workflow-review-buttons">
+              <button id="load-workflow-explanation" type="button">Review Workflow Plan</button>
+              <button id="load-workflow-preflight" type="button">Check Empty Trigger</button>
+            </div>
+            <p id="workflow-preflight-status">The preflight sends only an empty JSON object.</p>
           </section>
           <pre id="detail-json">{}</pre>
         </aside>

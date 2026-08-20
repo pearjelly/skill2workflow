@@ -76,6 +76,8 @@ inspect artifact, audit, backup, and blocking-reason checks. It can also load
 the redacted published-version inventory with aliases and checksum prefixes.
 Selecting one of those versions also enables a value-free workflow-plan review
 covering topology, human gates, connector side effects, retries, and timeouts.
+It can also run a no-input preflight to expose missing required fields or
+blocked mappings before any real trigger is attempted.
 
 ## Visual Overview
 
@@ -872,7 +874,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-219 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-220 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring

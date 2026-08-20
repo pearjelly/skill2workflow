@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded **Check Empty Trigger** action to the live Workflow review.
+  It sends only `{}` through a fixed authenticated preflight proxy and reports
+  input/mapping readiness without accepting business values, resolving
+  credentials, invoking connectors, or creating a run.
+
 - Added a bounded **Review Workflow Plan** action to the live control-plane
   UI. It uses a fixed same-origin proxy for the existing authenticated,
   side-effect-free explanation contract and shows topology, gates, connector
