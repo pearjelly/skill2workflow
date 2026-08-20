@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded **Load Live Workflows** view to the live control-plane UI.
+  It reuses the authenticated redacted published-version inventory through a
+  fixed server-side proxy and shows lifecycle status, aliases, and recognition
+  checksum prefixes without exposing Workflow content, paths, credentials,
+  trigger inputs, or provider data.
+
 - Added a bounded **Load Live Readiness** view to the live control-plane UI.
   It reuses the authenticated operational-readiness contract through a fixed
   server-side proxy and renders service, artifact, audit, backup, and blocking

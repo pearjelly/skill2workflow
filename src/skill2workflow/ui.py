@@ -16,6 +16,7 @@ from .service import read_service_bearer_token
 from .service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
+    MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     ServiceActionError,
@@ -26,6 +27,7 @@ from .service_client import (
     fetch_operational_readiness,
     fetch_support_bundle,
     fetch_service_probe,
+    fetch_workflow_inventory,
     post_run_resume,
     post_run_cancel,
     service_endpoint,
@@ -40,6 +42,8 @@ _SERVICE_PROBE_PATH = "/api/v1/service-probe"
 _SERVICE_PROBE_MAX_RESPONSE_BYTES = MAX_SERVICE_PROBE_RESPONSE_BYTES
 _OPERATIONAL_READINESS_PATH = "/api/v1/operational-readiness"
 _OPERATIONAL_READINESS_MAX_RESPONSE_BYTES = MAX_OPERATIONAL_READINESS_RESPONSE_BYTES
+_WORKFLOW_INVENTORY_PATH = "/api/v1/workflows"
+_WORKFLOW_INVENTORY_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES
 _SUPPORT_BUNDLE_PATH = "/api/v1/support-bundle"
 _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
 _LIVE_RESUME_PREFIX = "/api/v1/runs/"
@@ -178,6 +182,15 @@ def serve_ui(
                     {"error": "operational readiness path does not accept query parameters"},
                 )
                 return
+            if self.path == _WORKFLOW_INVENTORY_PATH:
+                self._serve_workflow_inventory()
+                return
+            if self.path.startswith(_WORKFLOW_INVENTORY_PATH + "?"):
+                self._write_json(
+                    404,
+                    {"error": "workflow inventory path does not accept query parameters"},
+                )
+                return
             if self.path == _SUPPORT_BUNDLE_PATH:
                 self._serve_support_bundle()
                 return
@@ -284,6 +297,26 @@ def serve_ui(
                     raise ValueError("operational readiness unavailable")
             except Exception:
                 self._write_json(503, {"error": "operational readiness unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
+        def _serve_workflow_inventory(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow inventory is not configured"})
+                return
+            try:
+                inventory = fetch_workflow_inventory(configured_service_url, token_file)
+                body = json.dumps(
+                    inventory,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _WORKFLOW_INVENTORY_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow inventory unavailable")
+            except Exception:
+                self._write_json(503, {"error": "workflow inventory unavailable"})
                 return
             self._write_json(200, body, content_type="application/json")
 

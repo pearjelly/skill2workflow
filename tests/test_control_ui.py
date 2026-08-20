@@ -98,6 +98,16 @@ class ControlUiContractTests(TestCase):
         self.assertIn(".audit-page-status", css)
         self.assertIn(".schedule-page-status", css)
         self.assertIn(".readiness-page-status", css)
+        self.assertIn('id="load-live-workflows"', html)
+        self.assertIn("Load Live Workflows", html)
+        self.assertIn("/api/v1/workflows", javascript)
+        self.assertIn("loadLiveWorkflows", javascript)
+        self.assertIn("validateWorkflowInventory", javascript)
+        self.assertIn("WORKFLOW_INVENTORY_SCHEMA", javascript)
+        self.assertIn('data-view="live-workflows"', html)
+        self.assertIn('id="live-workflow-rows"', html)
+        self.assertIn('id="workflow-page-status"', html)
+        self.assertIn(".workflow-page-status", css)
         self.assertIn(".run-cancel-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):

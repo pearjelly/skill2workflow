@@ -25,6 +25,7 @@
           <button id="load-older-audit" type="button" disabled>Load Older Audit</button>
           <button id="load-live-schedules" type="button" disabled>Load Live Schedules</button>
           <button id="load-live-readiness" type="button" disabled>Load Live Readiness</button>
+          <button id="load-live-workflows" type="button" disabled>Load Live Workflows</button>
           <label class="file-action">
             <input id="snapshot-file" type="file" accept="application/json,.json" />
             Load Snapshot
@@ -65,6 +66,7 @@
         <span id="audit-page-status" class="run-page-status" aria-live="polite"></span>
         <span id="schedule-page-status" class="run-page-status" aria-live="polite"></span>
         <span id="readiness-page-status" class="run-page-status" aria-live="polite"></span>
+        <span id="workflow-page-status" class="run-page-status" aria-live="polite"></span>
       </section>
 
       <section class="workspace" aria-label="Control plane inspector">
@@ -78,6 +80,7 @@
             <button class="tab" type="button" data-view="connectors">Connectors</button>
             <button class="tab" type="button" data-view="schedules">Schedules</button>
             <button class="tab" type="button" data-view="readiness">Readiness</button>
+            <button class="tab" type="button" data-view="live-workflows">Live Registry</button>
             <button class="tab" type="button" data-view="versions">Compare</button>
           </nav>
 
@@ -246,6 +249,21 @@
                 </tr>
               </thead>
               <tbody id="readiness-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrap" data-panel="live-workflows" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>Workflow</th>
+                  <th>Version</th>
+                  <th>Status</th>
+                  <th>Aliases</th>
+                  <th>Checksum</th>
+                </tr>
+              </thead>
+              <tbody id="live-workflow-rows"></tbody>
             </table>
           </div>
 

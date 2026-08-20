@@ -9,11 +9,13 @@
   const LIVE_AUDIT_PAGE_URL = "/api/v1/audit-page";
   const LIVE_SCHEDULE_LIST_URL = "/api/v1/recurring-schedules";
   const LIVE_OPERATIONAL_READINESS_URL = "/api/v1/operational-readiness";
+  const LIVE_WORKFLOW_INVENTORY_URL = "/api/v1/workflows";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
   const AUDIT_PAGE_SCHEMA = "skill2workflow-audit-event-list-0.1.0";
   const SCHEDULE_LIST_SCHEMA = "skill2workflow-recurring-schedule-list-0.1.0";
   const OPERATIONAL_READINESS_SCHEMA = "skill2workflow-operational-readiness-0.1.0";
+  const WORKFLOW_INVENTORY_SCHEMA = "skill2workflow-workflow-inventory-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
   const LIVE_AUDIT_ROWS_MAX = 500;
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
@@ -46,6 +48,8 @@
     liveSchedulesLoading: false,
     liveReadiness: null,
     liveReadinessLoading: false,
+    liveWorkflowInventory: null,
+    liveWorkflowInventoryLoading: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -70,6 +74,7 @@
     els.loadOlderAudit = document.getElementById("load-older-audit");
     els.loadLiveSchedules = document.getElementById("load-live-schedules");
     els.loadLiveReadiness = document.getElementById("load-live-readiness");
+    els.loadLiveWorkflows = document.getElementById("load-live-workflows");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
@@ -81,6 +86,7 @@
     els.auditPageStatus = document.getElementById("audit-page-status");
     els.schedulePageStatus = document.getElementById("schedule-page-status");
     els.readinessPageStatus = document.getElementById("readiness-page-status");
+    els.workflowPageStatus = document.getElementById("workflow-page-status");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -99,6 +105,7 @@
     els.connectorRows = document.getElementById("connector-rows");
     els.scheduleRows = document.getElementById("schedule-rows");
     els.readinessRows = document.getElementById("readiness-rows");
+    els.liveWorkflowRows = document.getElementById("live-workflow-rows");
     els.versionRows = document.getElementById("version-rows");
     els.detailTitle = document.getElementById("detail-title");
     els.statusGrid = document.getElementById("status-grid");
@@ -122,6 +129,7 @@
     els.loadOlderAudit.addEventListener("click", loadOlderAudit);
     els.loadLiveSchedules.addEventListener("click", loadLiveSchedules);
     els.loadLiveReadiness.addEventListener("click", loadLiveReadiness);
+    els.loadLiveWorkflows.addEventListener("click", loadLiveWorkflows);
     els.approveRun.addEventListener("click", function () {
       decideSelectedRun(true);
     });
@@ -402,6 +410,41 @@
     } finally {
       state.liveReadinessLoading = false;
       updateLiveReadinessControls();
+    }
+  }
+
+  async function loadLiveWorkflows() {
+    if (!isLiveSnapshot() || !state.liveModeConfigured || state.liveWorkflowInventoryLoading) {
+      return;
+    }
+    state.liveWorkflowInventoryLoading = true;
+    updateLiveWorkflowControls();
+    setWorkflowPageStatus("Loading live workflows…", "");
+    try {
+      const response = await fetch(LIVE_WORKFLOW_INVENTORY_URL, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("workflow inventory unavailable");
+      }
+      const inventory = await response.json();
+      if (!validateWorkflowInventory(inventory)) {
+        throw new Error("workflow inventory unavailable");
+      }
+      state.liveWorkflowInventory = inventory;
+      renderTables();
+      setWorkflowPageStatus(
+        "Loaded " + inventory.window.returned + " of " + inventory.window.total +
+          " workflow versions" + (inventory.window.truncated ? " (truncated)." : "."),
+        "is-valid",
+      );
+      setStatus("Loaded", "is-valid");
+    } catch (error) {
+      setWorkflowPageStatus(
+        "Live workflows unavailable; current rows are unchanged.",
+        "is-invalid",
+      );
+    } finally {
+      state.liveWorkflowInventoryLoading = false;
+      updateLiveWorkflowControls();
     }
   }
 
@@ -704,6 +747,66 @@
     return true;
   }
 
+  function validateWorkflowInventory(inventory) {
+    if (
+      !inventory ||
+      typeof inventory !== "object" ||
+      inventory.schema_version !== WORKFLOW_INVENTORY_SCHEMA ||
+      Object.keys(inventory).sort().join(",") !== "schema_version,summary,versions,window" ||
+      !inventory.summary ||
+      typeof inventory.summary !== "object" ||
+      Object.keys(inventory.summary).sort().join(",") !== "status_counts,total" ||
+      !Number.isInteger(inventory.summary.total) ||
+      inventory.summary.total < 0 ||
+      !inventory.summary.status_counts ||
+      typeof inventory.summary.status_counts !== "object" ||
+      Object.keys(inventory.summary.status_counts).sort().join(",") !== "deprecated,other,published" ||
+      Object.values(inventory.summary.status_counts).some(function (value) {
+        return !Number.isInteger(value) || value < 0;
+      }) ||
+      Object.values(inventory.summary.status_counts).reduce(function (total, value) {
+        return total + value;
+      }, 0) !== inventory.summary.total ||
+      !Array.isArray(inventory.versions) ||
+      inventory.versions.length > 100 ||
+      !inventory.window ||
+      typeof inventory.window !== "object" ||
+      Object.keys(inventory.window).sort().join(",") !== "max_items,returned,total,truncated" ||
+      inventory.window.max_items !== 100 ||
+      !Number.isInteger(inventory.window.total) ||
+      inventory.window.total < 0 ||
+      !Number.isInteger(inventory.window.returned) ||
+      inventory.window.returned !== inventory.versions.length ||
+      inventory.window.returned > inventory.window.total ||
+      typeof inventory.window.truncated !== "boolean" ||
+      inventory.window.truncated !== (inventory.window.returned < inventory.window.total) ||
+      inventory.window.total !== inventory.summary.total
+    ) {
+      return false;
+    }
+    return inventory.versions.every(function (version) {
+      return (
+        version &&
+        typeof version === "object" &&
+        Object.keys(version).sort().join(",") === "aliases,checksum,status,version,workflow_id" &&
+        typeof version.workflow_id === "string" &&
+        version.workflow_id.length > 0 &&
+        version.workflow_id.length <= 128 &&
+        typeof version.version === "string" &&
+        version.version.length > 0 &&
+        version.version.length <= 128 &&
+        ["published", "deprecated", "other"].indexOf(version.status) !== -1 &&
+        Array.isArray(version.aliases) &&
+        version.aliases.length <= 16 &&
+        version.aliases.every(function (alias) {
+          return typeof alias === "string" && alias.length > 0 && alias.length <= 64;
+        }) &&
+        typeof version.checksum === "string" &&
+        /^[0-9a-f]{64}$/.test(version.checksum)
+      );
+    });
+  }
+
   function isSafeCursor(cursor) {
     return typeof cursor === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(cursor);
   }
@@ -952,10 +1055,12 @@
         els.loadOlderAudit.disabled = true;
         els.loadLiveSchedules.disabled = true;
         els.loadLiveReadiness.disabled = true;
+        els.loadLiveWorkflows.disabled = true;
         setRunPageStatus("", "");
         setAuditPageStatus("", "");
         setSchedulePageStatus("", "");
         setReadinessPageStatus("", "");
+        setWorkflowPageStatus("", "");
         setServiceStatus("Live service: static mode", "");
         renderDetail();
         return;
@@ -967,6 +1072,7 @@
       updateAuditPageControls();
       updateLiveScheduleControls();
       updateLiveReadinessControls();
+      updateLiveWorkflowControls();
       if (!response.ok) {
         throw new Error("service probe unavailable");
       }
@@ -989,6 +1095,7 @@
       updateAuditPageControls();
       updateLiveScheduleControls();
       updateLiveReadinessControls();
+      updateLiveWorkflowControls();
       setServiceStatus("Live service: unavailable", "is-invalid");
       renderDetail();
     }
@@ -1063,6 +1170,9 @@
       state.liveReadiness = null;
       state.liveReadinessLoading = false;
       setReadinessPageStatus("", "");
+      state.liveWorkflowInventory = null;
+      state.liveWorkflowInventoryLoading = false;
+      setWorkflowPageStatus("", "");
     }
     if (label === "Live Service Snapshot") {
       state.lastLiveLoadedAt = new Date().toISOString();
@@ -1101,6 +1211,7 @@
     updateAuditPageControls();
     updateLiveScheduleControls();
     updateLiveReadinessControls();
+    updateLiveWorkflowControls();
     if (state.selected.kind === "run" && label === "Live Service Snapshot") {
       loadLiveRunDetail(state.selected.value.run_id);
     }
@@ -1126,10 +1237,13 @@
     state.liveSchedulesLoading = false;
     state.liveReadiness = null;
     state.liveReadinessLoading = false;
+    state.liveWorkflowInventory = null;
+    state.liveWorkflowInventoryLoading = false;
     setRunPageStatus("", "");
     setAuditPageStatus("", "");
     setSchedulePageStatus("", "");
     setReadinessPageStatus("", "");
+    setWorkflowPageStatus("", "");
     state.selected = {
       kind: "error",
       value: Object.assign({ label: label }, details || {}),
@@ -1138,6 +1252,7 @@
     render();
     updateLiveScheduleControls();
     updateLiveReadinessControls();
+    updateLiveWorkflowControls();
   }
 
   function validateSnapshot(snapshot) {
@@ -1410,6 +1525,20 @@
       },
       "readiness",
     );
+    renderTable(
+      els.liveWorkflowRows,
+      filterRows((state.liveWorkflowInventory && state.liveWorkflowInventory.versions) || []),
+      function (version) {
+        return [
+          linkCell(version.workflow_id),
+          textCell(version.version),
+          pillCell(version.status),
+          textCell(version.aliases.join(", ") || "—"),
+          linkCell(version.checksum.slice(0, 12)),
+        ];
+      },
+      "live workflow",
+    );
   }
 
   function readinessRows(report) {
@@ -1674,7 +1803,7 @@
 
   function detailPairs(value) {
     if (!value || typeof value !== "object") return [["Type", "Empty"]];
-    if (value.workflow_id && value.version) {
+    if (value.workflow_id && value.version && !Array.isArray(value.aliases)) {
       return [["Workflow", value.workflow_id], ["Version", value.version], ["Status", value.status || ""], ["Checksum", shorten(value.checksum || "")]];
     }
     if (value.kind && value.severity) {
@@ -1696,6 +1825,15 @@
     }
     if (value.check && value.status) {
       return [["Check", value.check], ["Status", value.status], ["Details", value.details || ""]];
+    }
+    if (value.workflow_id && value.version && value.checksum) {
+      return [
+        ["Workflow", value.workflow_id],
+        ["Version", value.version],
+        ["Status", value.status || ""],
+        ["Aliases", (value.aliases || []).join(", ") || "—"],
+        ["Checksum", value.checksum],
+      ];
     }
     if (value.type) {
       return [["Type", value.type], ["Workflow", value.workflow_id || ""], ["Run", value.run_id || ""], ["Time", formatDate(value.timestamp || "")]];
@@ -1722,6 +1860,7 @@
     if (selected.kind === "connector event") return value.type || "Connector Event";
     if (selected.kind === "schedule") return value.schedule_id || "Schedule";
     if (selected.kind === "readiness") return value.check || "Readiness";
+    if (selected.kind === "live workflow") return value.workflow_id + "@" + value.version;
     if (selected.kind === "version change") return value.workflow_id || "Version Change";
     return "Snapshot";
   }
@@ -1768,6 +1907,11 @@
     els.readinessPageStatus.className = "readiness-page-status" + (className ? " " + className : "");
   }
 
+  function setWorkflowPageStatus(text, className) {
+    els.workflowPageStatus.textContent = text;
+    els.workflowPageStatus.className = "workflow-page-status" + (className ? " " + className : "");
+  }
+
   function updateRunPageControls() {
     const enabled = isLiveSnapshot() && state.liveRunPageHasMore;
     els.loadOlderRuns.disabled = !enabled || state.liveRunPageLoading;
@@ -1798,6 +1942,14 @@
     els.loadLiveReadiness.textContent = state.liveReadinessLoading
       ? "Loading Readiness…"
       : "Load Live Readiness";
+  }
+
+  function updateLiveWorkflowControls() {
+    const enabled = state.liveModeConfigured && isLiveSnapshot();
+    els.loadLiveWorkflows.disabled = !enabled || state.liveWorkflowInventoryLoading;
+    els.loadLiveWorkflows.textContent = state.liveWorkflowInventoryLoading
+      ? "Loading Workflows…"
+      : "Load Live Workflows";
   }
 
   function emptySnapshot() {

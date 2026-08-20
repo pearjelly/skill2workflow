@@ -187,6 +187,14 @@ blocking-reason rows. This remains read-only and value-free: paths, workflow
 content, run identifiers, lease identities, credentials, and provider data are
 excluded; static/file snapshots never expose the control.
 
+The live console can also explicitly load the redacted published-version
+inventory through its fixed `GET /api/v1/workflows` proxy. The browser accepts
+only the `skill2workflow-workflow-inventory-0.1.0` contract and renders at most
+100 versions with lifecycle status, aliases, and recognition-only checksum
+prefixes. Workflow content, artifact paths, timestamps, credentials, trigger
+inputs, and provider data remain outside the UI boundary; static/file snapshots
+never expose the control.
+
 ## Verification
 
 Run the real-process drill:
@@ -203,9 +211,9 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-217 add
+The live console remains a single-team operator boundary. Loops 211-218 add
 only the existing human-gate resume decision, cooperative cancellation, and
-redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness reads; the UI excludes browser credential
+redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
 automatic retries, provider reconciliation, and hosted TLS. Network exposure

@@ -112,6 +112,14 @@ rows. The report is read-only and value-free: it contains no paths, workflow
 content, run identifiers, lease identities, credentials, or provider data.
 Static, example, and file snapshots keep the control disabled.
 
+The **Load Live Workflows** action exposes the existing redacted published
+version inventory through the fixed same-origin `/api/v1/workflows` route. It
+validates the `skill2workflow-workflow-inventory-0.1.0` contract and displays
+at most 100 versions with lifecycle status, stable aliases, and a shortened
+checksum for recognition. Workflow names/DSL, artifact paths, timestamps,
+credentials, trigger inputs, and provider data never enter the browser;
+static, example, and file snapshots keep the control disabled.
+
 This live mode adds only the existing human-gate resume and cooperative
 cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider
