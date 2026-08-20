@@ -78,7 +78,9 @@ Selecting one of those versions also enables a value-free workflow-plan review
 covering topology, human gates, connector side effects, retries, and timeouts.
 It can also run a no-input preflight to expose missing required fields or
 blocked mappings before any real trigger is attempted, and compare two versions
-of the same workflow through a bounded, value-free structural diff.
+of the same workflow through a bounded, value-free structural diff. Selecting
+a live recurring schedule also exposes bounded dispatch evidence, including
+older pages and uncertain outcomes, without adding a replay or mutation path.
 
 ## Visual Overview
 
@@ -202,6 +204,7 @@ explicit connector boundaries. It currently supports:
 - Inspect compact, bounded published-workflow inventory without workflow content
 - Explain a workflow before execution with a bounded, side-effect-free, value-free plan using the fixed `skill2workflow-workflow-explanation-0.1.0` contract
 - Compare two published versions of one workflow through the bounded, authenticated, value-free `skill2workflow-workflow-diff-0.1.0` contract
+- Inspect cursor-paged recurring dispatch outcomes, including `uncertain` records, through a bounded authenticated value-free live-console read
 - Preflight trigger input and HTTP request mappings with a bounded, side-effect-free, value-free admission report using the fixed `skill2workflow-workflow-preflight-0.1.0` contract
 - Create, verify, structurally diff, preflight, explicitly publish, and safely run deterministic, secret-checked Workflow DSL bundles through existing local contracts with explicit side-effect consent
 - Drain due schedule work in explicitly bounded side-effect batches
@@ -876,7 +879,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-221 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-222 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -948,6 +951,11 @@ Loop 216 adds bounded live recurring-schedule discovery to the same console.
 Operators can inspect schedule status, next-run timing, and compact last-run
 metadata through the existing redacted inventory contract; schedule mutation
 and trigger inputs remain outside the browser boundary.
+
+Loop 222 extends that live schedule view with cursor-paged, redacted dispatch
+evidence. Operators can inspect completed, failed, skipped, and uncertain
+outcomes and load older pages through fixed authenticated routes; the UI does
+not claim, replay, review, or mutate dispatch state.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

@@ -660,6 +660,54 @@ tbody tr.is-selected {
   min-width: 132px;
 }
 
+.schedule-dispatch-actions {
+  padding: 12px;
+  border: 1px solid rgba(118, 84, 25, 0.3);
+  border-radius: 7px;
+  background: #fff8e8;
+}
+
+.schedule-dispatch-actions strong {
+  display: block;
+  font-size: 13px;
+}
+
+.schedule-dispatch-actions p {
+  margin: 5px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.schedule-dispatch-actions p.is-valid {
+  color: var(--green);
+}
+
+.schedule-dispatch-actions p.is-invalid {
+  color: var(--red);
+}
+
+.schedule-dispatch-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.schedule-dispatch-actions button {
+  min-height: 32px;
+  flex: 1;
+  border: 1px solid rgba(118, 84, 25, 0.35);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #765419;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.schedule-dispatch-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 #detail-json {
   min-height: 0;
   margin: 0;

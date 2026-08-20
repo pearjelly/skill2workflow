@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added **Load Dispatch Evidence** to the live schedule view. Operators can
+  inspect bounded redacted recurring-dispatch pages and load older evidence
+  through fixed same-origin routes, including `uncertain` outcomes, without
+  claiming, replaying, reviewing, or mutating a dispatch.
+
 - Added **Compare Versions** to the live Workflow review. Operators can select
   another version of the same workflow and fetch a bounded structural diff
   through a fixed authenticated proxy. The browser accepts only the exact

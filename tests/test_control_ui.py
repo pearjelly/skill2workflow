@@ -132,6 +132,14 @@ class ControlUiContractTests(TestCase):
         self.assertIn("validateWorkflowDiff", javascript)
         self.assertIn("WORKFLOW_DIFF_SCHEMA", javascript)
         self.assertIn(".workflow-diff-controls", css)
+        self.assertIn('id="schedule-dispatch-actions"', html)
+        self.assertIn('id="load-schedule-dispatches"', html)
+        self.assertIn('id="load-older-schedule-dispatches"', html)
+        self.assertIn("/api/v1/recurring-schedule-dispatch-pages/", javascript)
+        self.assertIn("loadLiveScheduleDispatches", javascript)
+        self.assertIn("validateRecurringScheduleDispatchPage", javascript)
+        self.assertIn("SCHEDULE_DISPATCH_PAGE_SCHEMA", javascript)
+        self.assertIn(".schedule-dispatch-actions", css)
         self.assertIn(".run-cancel-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):

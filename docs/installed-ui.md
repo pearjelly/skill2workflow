@@ -104,6 +104,17 @@ compact last-run metadata. Trigger inputs, scheduler lease details,
 credentials, and provider payloads never enter the browser; static, example,
 and file snapshots keep the control disabled.
 
+Selecting a live schedule also enables **Load Dispatch Evidence**. The first
+click reaches only the fixed same-origin
+`/api/v1/recurring-schedule-dispatch-pages/{schedule_id}` route; **Load Older Dispatches**
+follows the fixed opaque cursor route without accepting arbitrary
+queries. The browser validates the bounded
+`skill2workflow-recurring-schedule-dispatch-page-0.1.0` contract, retains at
+most 500 dispatch records, and highlights `uncertain` outcomes. This is
+read-only evidence: it never claims, replays, reviews, or mutates a dispatch,
+and it excludes trigger inputs, credentials, lease identities, and provider
+payloads.
+
 The live console also exposes **Load Live Readiness**. It calls only the fixed
 same-origin `/api/v1/operational-readiness` route and validates the
 `skill2workflow-operational-readiness-0.1.0` contract before rendering the

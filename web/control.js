@@ -8,6 +8,7 @@
   const LIVE_RUN_PAGE_URL = "/api/v1/run-page";
   const LIVE_AUDIT_PAGE_URL = "/api/v1/audit-page";
   const LIVE_SCHEDULE_LIST_URL = "/api/v1/recurring-schedules";
+  const LIVE_SCHEDULE_DISPATCH_PAGE_PREFIX = "/api/v1/recurring-schedule-dispatch-pages/";
   const LIVE_OPERATIONAL_READINESS_URL = "/api/v1/operational-readiness";
   const LIVE_WORKFLOW_INVENTORY_URL = "/api/v1/workflows";
   const LIVE_WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/";
@@ -17,6 +18,7 @@
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
   const AUDIT_PAGE_SCHEMA = "skill2workflow-audit-event-list-0.1.0";
   const SCHEDULE_LIST_SCHEMA = "skill2workflow-recurring-schedule-list-0.1.0";
+  const SCHEDULE_DISPATCH_PAGE_SCHEMA = "skill2workflow-recurring-schedule-dispatch-page-0.1.0";
   const OPERATIONAL_READINESS_SCHEMA = "skill2workflow-operational-readiness-0.1.0";
   const WORKFLOW_INVENTORY_SCHEMA = "skill2workflow-workflow-inventory-0.1.0";
   const WORKFLOW_EXPLANATION_SCHEMA = "skill2workflow-workflow-explanation-0.1.0";
@@ -52,6 +54,13 @@
     liveAuditPageLoading: false,
     liveSchedules: null,
     liveSchedulesLoading: false,
+    liveScheduleDispatchPage: null,
+    liveScheduleDispatchRows: null,
+    liveScheduleDispatchScheduleId: "",
+    liveScheduleDispatchCursor: "",
+    liveScheduleDispatchHasMore: false,
+    liveScheduleDispatchLoading: false,
+    liveScheduleDispatchError: false,
     liveReadiness: null,
     liveReadinessLoading: false,
     liveWorkflowInventory: null,
@@ -103,6 +112,10 @@
     els.runPageStatus = document.getElementById("run-page-status");
     els.auditPageStatus = document.getElementById("audit-page-status");
     els.schedulePageStatus = document.getElementById("schedule-page-status");
+    els.scheduleDispatchActions = document.getElementById("schedule-dispatch-actions");
+    els.scheduleDispatchStatus = document.getElementById("schedule-dispatch-status");
+    els.loadScheduleDispatches = document.getElementById("load-schedule-dispatches");
+    els.loadOlderScheduleDispatches = document.getElementById("load-older-schedule-dispatches");
     els.readinessPageStatus = document.getElementById("readiness-page-status");
     els.workflowPageStatus = document.getElementById("workflow-page-status");
     els.workflowExplanationActions = document.getElementById("workflow-explanation-actions");
@@ -154,6 +167,12 @@
     els.loadOlderRuns.addEventListener("click", loadOlderRuns);
     els.loadOlderAudit.addEventListener("click", loadOlderAudit);
     els.loadLiveSchedules.addEventListener("click", loadLiveSchedules);
+    els.loadScheduleDispatches.addEventListener("click", function () {
+      loadLiveScheduleDispatches({ reset: true });
+    });
+    els.loadOlderScheduleDispatches.addEventListener("click", function () {
+      loadLiveScheduleDispatches({ reset: false });
+    });
     els.loadLiveReadiness.addEventListener("click", loadLiveReadiness);
     els.loadLiveWorkflows.addEventListener("click", loadLiveWorkflows);
     els.loadWorkflowExplanation.addEventListener("click", loadLiveWorkflowExplanation);
@@ -411,6 +430,79 @@
     }
   }
 
+  async function loadLiveScheduleDispatches(options) {
+    const schedule = selectedLiveSchedule();
+    const reset = Boolean(options && options.reset);
+    if (!schedule || state.liveScheduleDispatchLoading || (!reset && !state.liveScheduleDispatchHasMore)) {
+      return;
+    }
+    const scheduleId = schedule.schedule_id;
+    const cursor = reset ? "" : state.liveScheduleDispatchCursor;
+    state.liveScheduleDispatchLoading = true;
+    state.liveScheduleDispatchError = false;
+    if (reset) {
+      state.liveScheduleDispatchRows = null;
+      state.liveScheduleDispatchPage = null;
+      state.liveScheduleDispatchCursor = "";
+      state.liveScheduleDispatchHasMore = false;
+    }
+    state.liveScheduleDispatchScheduleId = scheduleId;
+    updateLiveScheduleDispatchControls();
+    setScheduleDispatchStatus(
+      cursor ? "Loading older dispatch evidence…" : "Loading bounded dispatch evidence…",
+      "",
+    );
+    try {
+      const url = LIVE_SCHEDULE_DISPATCH_PAGE_PREFIX + encodeURIComponent(scheduleId) +
+        (cursor ? "/" + encodeURIComponent(cursor) : "");
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("schedule dispatch page unavailable");
+      }
+      const page = await response.json();
+      if (!validateRecurringScheduleDispatchPage(page, scheduleId)) {
+        throw new Error("schedule dispatch page unavailable");
+      }
+      state.liveScheduleDispatchPage = page;
+      state.liveScheduleDispatchRows = mergeLiveScheduleDispatchRows(
+        state.liveScheduleDispatchRows || [],
+        page.dispatches,
+      );
+      state.liveScheduleDispatchCursor = page.window.next_cursor || "";
+      state.liveScheduleDispatchHasMore = Boolean(page.window.has_more && page.window.next_cursor);
+      renderDetail();
+      setScheduleDispatchStatus(
+        "Loaded " + state.liveScheduleDispatchRows.length + " retained dispatch records" +
+          (state.liveScheduleDispatchHasMore ? "; older evidence available." : "."),
+        "is-valid",
+      );
+      setStatus("Loaded", "is-valid");
+    } catch (error) {
+      state.liveScheduleDispatchError = true;
+      renderDetail();
+      setScheduleDispatchStatus(
+        "Dispatch evidence unavailable; schedule metadata remains visible.",
+        "is-invalid",
+      );
+    } finally {
+      state.liveScheduleDispatchLoading = false;
+      updateLiveScheduleDispatchControls();
+    }
+  }
+
+  function mergeLiveScheduleDispatchRows(existing, additions) {
+    const rows = [];
+    const seen = Object.create(null);
+    (existing || []).concat(additions || []).forEach(function (dispatch) {
+      if (!dispatch || typeof dispatch.dispatch_id !== "string" || seen[dispatch.dispatch_id]) {
+        return;
+      }
+      seen[dispatch.dispatch_id] = true;
+      rows.push(dispatch);
+    });
+    return rows.slice(-500);
+  }
+
   async function loadLiveReadiness() {
     if (!isLiveSnapshot() || !state.liveModeConfigured || state.liveReadinessLoading) {
       return;
@@ -650,6 +742,26 @@
     return workflow;
   }
 
+  function selectedLiveSchedule() {
+    if (
+      !isLiveSnapshot() ||
+      !state.selected ||
+      state.selected.kind !== "schedule" ||
+      !state.selected.value
+    ) {
+      return null;
+    }
+    const schedule = state.selected.value;
+    if (!isSafeScheduleRef(schedule.schedule_id)) {
+      return null;
+    }
+    return schedule;
+  }
+
+  function isSafeScheduleRef(value) {
+    return typeof value === "string" && /^[A-Za-z0-9_.-]{1,128}$/.test(value);
+  }
+
   function mergeLiveRunRows(existing, additions) {
     const rows = [];
     const seen = Object.create(null);
@@ -879,6 +991,58 @@
         Number.isInteger(schedule.interval_seconds) &&
         schedule.interval_seconds >= 1
       );
+    });
+  }
+
+  function validateRecurringScheduleDispatchPage(page, scheduleId) {
+    const statuses = ["claimed", "completed", "failed", "skipped", "uncertain", "other"];
+    const dispatchFields = [
+      "coalesced_occurrences", "completed_at", "dispatch_id", "error_type",
+      "run_id", "scheduled_for", "schedule_id", "status", "trigger_id",
+    ];
+    if (
+      !isObject(page) ||
+      page.schema_version !== SCHEDULE_DISPATCH_PAGE_SCHEMA ||
+      !hasExactKeys(page, ["schema_version", "schedule_id", "summary", "dispatches", "window"]) ||
+      page.schedule_id !== scheduleId ||
+      !isObject(page.summary) ||
+      !hasExactKeys(page.summary, ["total", "status_counts"]) ||
+      !isNonNegativeInteger(page.summary.total) ||
+      !isObject(page.summary.status_counts) ||
+      Object.keys(page.summary.status_counts).sort().join(",") !== statuses.slice().sort().join(",") ||
+      Object.values(page.summary.status_counts).some(function (value) { return !isNonNegativeInteger(value); }) ||
+      Object.values(page.summary.status_counts).reduce(function (total, value) { return total + value; }, 0) !== page.summary.total ||
+      !Array.isArray(page.dispatches) ||
+      page.dispatches.length > 100 ||
+      !isObject(page.window) ||
+      !hasExactKeys(page.window, ["max_items", "total", "returned", "has_more", "next_cursor"]) ||
+      page.window.max_items !== 100 ||
+      !isNonNegativeInteger(page.window.total) ||
+      !isNonNegativeInteger(page.window.returned) ||
+      page.window.returned !== page.dispatches.length ||
+      page.window.returned > page.window.total ||
+      page.window.returned > page.window.max_items ||
+      typeof page.window.has_more !== "boolean" ||
+      typeof page.window.next_cursor !== "string" ||
+      page.window.next_cursor.length > 512 ||
+      (page.window.next_cursor && !isSafeDispatchCursor(page.window.next_cursor)) ||
+      page.window.has_more !== Boolean(page.window.next_cursor) ||
+      page.window.total !== page.summary.total
+    ) {
+      return false;
+    }
+    return page.dispatches.every(function (dispatch) {
+      return isObject(dispatch) &&
+        Object.keys(dispatch).sort().join(",") === dispatchFields.slice().sort().join(",") &&
+        isSafeWorkflowRef(dispatch.dispatch_id) &&
+        dispatch.schedule_id === scheduleId &&
+        isStringAtMost(dispatch.run_id, 128) &&
+        isStringAtMost(dispatch.trigger_id, 128) &&
+        isStringAtMost(dispatch.scheduled_for, 256) &&
+        isStringAtMost(dispatch.completed_at, 256) &&
+        statuses.indexOf(dispatch.status) !== -1 &&
+        isStringAtMost(dispatch.error_type, 64) &&
+        isNonNegativeInteger(dispatch.coalesced_occurrences);
     });
   }
 
@@ -1364,6 +1528,10 @@
     return typeof cursor === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(cursor);
   }
 
+  function isSafeDispatchCursor(cursor) {
+    return typeof cursor === "string" && /^[A-Za-z0-9_-]{1,512}$/.test(cursor);
+  }
+
   async function decideSelectedRun(approved) {
     const run = selectedWaitingRun();
     if (!run || state.humanGateLoading) {
@@ -1728,6 +1896,13 @@
       snapshot.window.audit_events.truncated
     );
     state.liveAuditPageLoading = false;
+    state.liveScheduleDispatchPage = null;
+    state.liveScheduleDispatchRows = null;
+    state.liveScheduleDispatchScheduleId = "";
+    state.liveScheduleDispatchCursor = "";
+    state.liveScheduleDispatchHasMore = false;
+    state.liveScheduleDispatchLoading = false;
+    state.liveScheduleDispatchError = false;
     if (label !== "Live Service Snapshot") {
       state.liveSchedules = null;
       state.liveSchedulesLoading = false;
@@ -1800,6 +1975,13 @@
     state.liveAuditPageLoading = false;
     state.liveSchedules = null;
     state.liveSchedulesLoading = false;
+    state.liveScheduleDispatchPage = null;
+    state.liveScheduleDispatchRows = null;
+    state.liveScheduleDispatchScheduleId = "";
+    state.liveScheduleDispatchCursor = "";
+    state.liveScheduleDispatchHasMore = false;
+    state.liveScheduleDispatchLoading = false;
+    state.liveScheduleDispatchError = false;
     state.liveReadiness = null;
     state.liveReadinessLoading = false;
     state.liveWorkflowInventory = null;
@@ -2256,6 +2438,13 @@
         state.liveWorkflowPreflightKey = "";
         state.liveWorkflowPreflightLoading = false;
         state.liveWorkflowPreflightError = false;
+        state.liveScheduleDispatchPage = null;
+        state.liveScheduleDispatchRows = null;
+        state.liveScheduleDispatchScheduleId = "";
+        state.liveScheduleDispatchCursor = "";
+        state.liveScheduleDispatchHasMore = false;
+        state.liveScheduleDispatchLoading = false;
+        state.liveScheduleDispatchError = false;
         renderTables();
         renderDetail();
         if (kind === "run" && isLiveSnapshot()) {
@@ -2300,7 +2489,35 @@
     renderHumanGateActions();
     renderRunCancelActions();
     renderWorkflowExplanationActions();
+    renderScheduleDispatchActions();
     renderRunDetailStatus(selected);
+  }
+
+  function renderScheduleDispatchActions() {
+    const schedule = selectedLiveSchedule();
+    const visible = Boolean(schedule);
+    els.scheduleDispatchActions.hidden = !visible;
+    updateLiveScheduleDispatchControls();
+    if (!visible) {
+      setScheduleDispatchStatus("Select a live schedule to inspect dispatch evidence.", "");
+      return;
+    }
+    if (state.liveScheduleDispatchLoading && state.liveScheduleDispatchScheduleId === schedule.schedule_id) {
+      setScheduleDispatchStatus(
+        state.liveScheduleDispatchCursor ? "Loading older dispatch evidence…" : "Loading bounded dispatch evidence…",
+        "",
+      );
+    } else if (state.liveScheduleDispatchError && state.liveScheduleDispatchScheduleId === schedule.schedule_id) {
+      setScheduleDispatchStatus("Dispatch evidence unavailable; schedule metadata remains visible.", "is-invalid");
+    } else if (state.liveScheduleDispatchPage && state.liveScheduleDispatchScheduleId === schedule.schedule_id) {
+      const uncertain = state.liveScheduleDispatchPage.summary.status_counts.uncertain;
+      setScheduleDispatchStatus(
+        "Loaded " + state.liveScheduleDispatchRows.length + " retained records; " + uncertain + " uncertain in the reported total.",
+        uncertain ? "is-invalid" : "is-valid",
+      );
+    } else {
+      setScheduleDispatchStatus("Load bounded redacted dispatch outcomes; no replay or mutation is available.", "");
+    }
   }
 
   function renderWorkflowExplanationActions() {
@@ -2470,6 +2687,15 @@
       detailEnvelope.redacted_workflow_diff = state.liveWorkflowDiff;
       hasEnvelope = true;
     }
+    const schedule = selectedLiveSchedule();
+    if (
+      schedule &&
+      state.liveScheduleDispatchPage &&
+      state.liveScheduleDispatchScheduleId === schedule.schedule_id
+    ) {
+      detailEnvelope.redacted_schedule_dispatch_page = state.liveScheduleDispatchPage;
+      hasEnvelope = true;
+    }
     els.detailJson.textContent = JSON.stringify(hasEnvelope ? detailEnvelope : detail, null, 2);
     renderStatusGrid(value);
   }
@@ -2615,6 +2841,11 @@
     els.workflowDiffStatus.className = className || "";
   }
 
+  function setScheduleDispatchStatus(text, className) {
+    els.scheduleDispatchStatus.textContent = text;
+    els.scheduleDispatchStatus.className = className || "";
+  }
+
   function updateRunPageControls() {
     const enabled = isLiveSnapshot() && state.liveRunPageHasMore;
     els.loadOlderRuns.disabled = !enabled || state.liveRunPageLoading;
@@ -2637,6 +2868,22 @@
     els.loadLiveSchedules.textContent = state.liveSchedulesLoading
       ? "Loading Schedules…"
       : "Load Live Schedules";
+  }
+
+  function updateLiveScheduleDispatchControls() {
+    const schedule = selectedLiveSchedule();
+    const sameSchedule = Boolean(
+      schedule && state.liveScheduleDispatchScheduleId === schedule.schedule_id
+    );
+    const loading = state.liveScheduleDispatchLoading;
+    els.loadScheduleDispatches.disabled = !schedule || loading;
+    els.loadScheduleDispatches.textContent = loading && !state.liveScheduleDispatchCursor
+      ? "Loading Dispatches…"
+      : "Load Dispatch Evidence";
+    els.loadOlderScheduleDispatches.disabled = !schedule || !sameSchedule || loading || !state.liveScheduleDispatchHasMore;
+    els.loadOlderScheduleDispatches.textContent = loading && state.liveScheduleDispatchCursor
+      ? "Loading Older…"
+      : "Load Older Dispatches";
   }
 
   function updateLiveReadinessControls() {

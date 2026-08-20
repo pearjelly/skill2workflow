@@ -179,6 +179,16 @@ last-run metadata. This is read-only discovery: no schedule mutation,
 dispatch claim, trigger input, lease identity, credential, or provider payload
 crosses the UI boundary, and static/file snapshots never expose the control.
 
+Selecting a live schedule can load bounded redacted dispatch evidence through
+the fixed `GET
+/api/v1/recurring-schedule-dispatch-pages/{schedule_id}` proxy. Older pages
+use the fixed `/api/v1/recurring-schedule-dispatch-pages/{schedule_id}/{cursor}`
+route; the browser sends no arbitrary query or service path. It validates the
+`skill2workflow-recurring-schedule-dispatch-page-0.1.0` contract, retains at
+most 500 records, and surfaces `uncertain` counts. The action is read-only and
+does not claim, replay, review, or mutate dispatch state; trigger inputs,
+credentials, lease identities, and provider payloads remain excluded.
+
 The live console can also explicitly load the aggregate production-readiness
 report through its fixed `GET /api/v1/operational-readiness` proxy. The browser
 accepts only the `skill2workflow-operational-readiness-0.1.0` contract and
@@ -235,7 +245,7 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-221 add
+The live console remains a single-team operator boundary. Loops 211-222 add
 only the existing human-gate resume decision, cooperative cancellation, and
 redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation/workflow-diff reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination

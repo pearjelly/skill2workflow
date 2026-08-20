@@ -16,6 +16,8 @@ from .service import read_service_bearer_token
 from .service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
+    MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS,
+    MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
@@ -26,6 +28,7 @@ from .service_client import (
     ServiceActionError,
     fetch_audit_events,
     fetch_recurring_schedule_list,
+    fetch_recurring_schedule_dispatch_page,
     fetch_run_detail,
     fetch_run_page,
     fetch_operational_readiness,
@@ -75,6 +78,9 @@ _LIVE_AUDIT_PAGE_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 _LIVE_AUDIT_PAGE_MAX_ITEMS = 100
 _LIVE_SCHEDULE_LIST_PATH = "/api/v1/recurring-schedules"
 _LIVE_SCHEDULE_LIST_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
+_LIVE_SCHEDULE_DISPATCH_PAGE_PREFIX = "/api/v1/recurring-schedule-dispatch-pages/"
+_LIVE_SCHEDULE_DISPATCH_PAGE_MAX_ITEMS = MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS
+_LIVE_SCHEDULE_DISPATCH_PAGE_MAX_RESPONSE_BYTES = MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES
 
 
 def find_ui_root() -> Path:
@@ -158,6 +164,22 @@ def serve_ui(
                     self._write_json(404, {"error": "schedule list path is not available"})
                     return
                 self._serve_live_schedule_list()
+                return
+            if parsed.path.startswith(_LIVE_SCHEDULE_DISPATCH_PAGE_PREFIX):
+                if parsed.query:
+                    self._write_json(
+                        404,
+                        {"error": "schedule dispatch page path is not available"},
+                    )
+                    return
+                references = _parse_live_schedule_dispatch_page_path(parsed.path)
+                if references is None:
+                    self._write_json(
+                        404,
+                        {"error": "schedule dispatch page path is not available"},
+                    )
+                    return
+                self._serve_live_schedule_dispatch_page(*references)
                 return
             if parsed.path.startswith(_LIVE_RUN_DETAIL_PREFIX):
                 run_id = parsed.path[len(_LIVE_RUN_DETAIL_PREFIX) :]
@@ -644,6 +666,38 @@ def serve_ui(
                 return
             self._write_json(200, body, content_type="application/json")
 
+        def _serve_live_schedule_dispatch_page(self, schedule_id, cursor):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "schedule dispatch page is not configured"})
+                return
+            try:
+                page = fetch_recurring_schedule_dispatch_page(
+                    configured_service_url,
+                    token_file,
+                    schedule_id=schedule_id,
+                    max_items=_LIVE_SCHEDULE_DISPATCH_PAGE_MAX_ITEMS,
+                    cursor=cursor,
+                )
+                body = json.dumps(
+                    page,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _LIVE_SCHEDULE_DISPATCH_PAGE_MAX_RESPONSE_BYTES:
+                    raise ValueError("schedule dispatch page unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "schedule not found"})
+                else:
+                    self._write_json(503, {"error": "schedule dispatch page unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "schedule dispatch page unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
         def _serve_live_resume(self, run_id):
             configured_service_url = getattr(self.server, "live_service_url", None)
             token_file = getattr(self.server, "live_auth_token_file", None)
@@ -833,6 +887,35 @@ def _parse_live_workflow_explanation_path(path: str):
     """Accept exactly two safe, encoded Workflow reference components."""
 
     return _parse_live_workflow_reference_path(path, _WORKFLOW_EXPLANATION_PREFIX)
+
+
+def _parse_live_schedule_dispatch_page_path(path: str):
+    """Accept a schedule id and optional fixed-safe dispatch cursor."""
+
+    if not path.startswith(_LIVE_SCHEDULE_DISPATCH_PAGE_PREFIX):
+        return None
+    suffix = path[len(_LIVE_SCHEDULE_DISPATCH_PAGE_PREFIX) :]
+    parts = suffix.split("/")
+    if len(parts) not in {1, 2} or any(not part for part in parts):
+        return None
+    values = tuple(unquote(part) for part in parts)
+    schedule_id = values[0]
+    if (
+        not schedule_id
+        or len(schedule_id) > 128
+        or not all(char.isalnum() or char in {"-", "_", "."} for char in schedule_id)
+    ):
+        return None
+    cursor = values[1] if len(values) == 2 else ""
+    if cursor and (
+        len(cursor) > 512
+        or not all(
+            char in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+            for char in cursor
+        )
+    ):
+        return None
+    return schedule_id, cursor
 
 
 def _parse_live_workflow_preflight_path(path: str):
