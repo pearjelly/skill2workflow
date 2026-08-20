@@ -71,6 +71,15 @@ class ControlUiContractTests(TestCase):
         self.assertIn("validateLiveAuditPage", javascript)
         self.assertIn("AUDIT_PAGE_SCHEMA", javascript)
         self.assertIn("LIVE_AUDIT_ROWS_MAX = 500", javascript)
+        self.assertIn('id="load-live-schedules"', html)
+        self.assertIn("Load Live Schedules", html)
+        self.assertIn("/api/v1/recurring-schedules", javascript)
+        self.assertIn("loadLiveSchedules", javascript)
+        self.assertIn("validateLiveScheduleList", javascript)
+        self.assertIn("SCHEDULE_LIST_SCHEMA", javascript)
+        self.assertIn('data-view="schedules"', html)
+        self.assertIn('id="schedule-rows"', html)
+        self.assertIn('id="schedule-page-status"', html)
         self.assertIn(".snapshot-scope.is-bounded", css)
         self.assertIn(".snapshot-scope.is-truncated", css)
         self.assertIn(".service-status.is-valid", css)
@@ -78,6 +87,7 @@ class ControlUiContractTests(TestCase):
         self.assertIn(".run-detail-status", css)
         self.assertIn(".run-page-status", css)
         self.assertIn(".audit-page-status", css)
+        self.assertIn(".schedule-page-status", css)
         self.assertIn(".run-cancel-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):

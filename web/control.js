@@ -7,9 +7,11 @@
   const LIVE_RUN_DETAIL_PREFIX = "/api/v1/runs/";
   const LIVE_RUN_PAGE_URL = "/api/v1/run-page";
   const LIVE_AUDIT_PAGE_URL = "/api/v1/audit-page";
+  const LIVE_SCHEDULE_LIST_URL = "/api/v1/recurring-schedules";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
   const AUDIT_PAGE_SCHEMA = "skill2workflow-audit-event-list-0.1.0";
+  const SCHEDULE_LIST_SCHEMA = "skill2workflow-recurring-schedule-list-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
   const LIVE_AUDIT_ROWS_MAX = 500;
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
@@ -38,6 +40,8 @@
     liveAuditPageCursor: "",
     liveAuditPageHasMore: false,
     liveAuditPageLoading: false,
+    liveSchedules: null,
+    liveSchedulesLoading: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -60,6 +64,7 @@
     els.downloadBundle = document.getElementById("download-bundle");
     els.loadOlderRuns = document.getElementById("load-older-runs");
     els.loadOlderAudit = document.getElementById("load-older-audit");
+    els.loadLiveSchedules = document.getElementById("load-live-schedules");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
@@ -69,6 +74,7 @@
     els.serviceStatus = document.getElementById("service-status");
     els.runPageStatus = document.getElementById("run-page-status");
     els.auditPageStatus = document.getElementById("audit-page-status");
+    els.schedulePageStatus = document.getElementById("schedule-page-status");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -85,6 +91,7 @@
     els.nodeOverlayRows = document.getElementById("node-overlay-rows");
     els.auditRows = document.getElementById("audit-rows");
     els.connectorRows = document.getElementById("connector-rows");
+    els.scheduleRows = document.getElementById("schedule-rows");
     els.versionRows = document.getElementById("version-rows");
     els.detailTitle = document.getElementById("detail-title");
     els.statusGrid = document.getElementById("status-grid");
@@ -106,6 +113,7 @@
     els.downloadBundle.addEventListener("click", downloadSupportBundle);
     els.loadOlderRuns.addEventListener("click", loadOlderRuns);
     els.loadOlderAudit.addEventListener("click", loadOlderAudit);
+    els.loadLiveSchedules.addEventListener("click", loadLiveSchedules);
     els.approveRun.addEventListener("click", function () {
       decideSelectedRun(true);
     });
@@ -317,6 +325,41 @@
     }
   }
 
+  async function loadLiveSchedules() {
+    if (!isLiveSnapshot() || !state.liveModeConfigured || state.liveSchedulesLoading) {
+      return;
+    }
+    state.liveSchedulesLoading = true;
+    updateLiveScheduleControls();
+    setSchedulePageStatus("Loading live schedules…", "");
+    try {
+      const response = await fetch(LIVE_SCHEDULE_LIST_URL, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("schedule list unavailable");
+      }
+      const page = await response.json();
+      if (!validateLiveScheduleList(page)) {
+        throw new Error("schedule list unavailable");
+      }
+      state.liveSchedules = page.schedules;
+      renderTables();
+      setSchedulePageStatus(
+        "Loaded " + page.window.returned + " of " + page.window.total +
+          " schedules" + (page.window.truncated ? " (truncated)." : "."),
+        "is-valid",
+      );
+      setStatus("Loaded", "is-valid");
+    } catch (error) {
+      setSchedulePageStatus(
+        "Live schedules unavailable; current rows are unchanged.",
+        "is-invalid",
+      );
+    } finally {
+      state.liveSchedulesLoading = false;
+      updateLiveScheduleControls();
+    }
+  }
+
   function mergeLiveRunRows(existing, additions) {
     const rows = [];
     const seen = Object.create(null);
@@ -475,6 +518,76 @@
         }) &&
         typeof event.approved === "boolean" &&
         typeof event.has_error === "boolean"
+      );
+    });
+  }
+
+  function validateLiveScheduleList(page) {
+    const scheduleFields = [
+      "enabled", "interval_seconds", "last_run_id", "last_scheduled_for",
+      "last_trigger_id", "missed_run_policy", "next_run_at", "schedule_id",
+      "starts_at", "status", "workflow_id", "workflow_version",
+    ];
+    if (
+      !page ||
+      typeof page !== "object" ||
+      page.schema_version !== SCHEDULE_LIST_SCHEMA ||
+      Object.keys(page).sort().join(",") !== "schedules,schema_version,summary,window" ||
+      !page.summary ||
+      typeof page.summary !== "object" ||
+      Object.keys(page.summary).sort().join(",") !== "status_counts,total" ||
+      !Number.isInteger(page.summary.total) ||
+      page.summary.total < 0 ||
+      !page.summary.status_counts ||
+      typeof page.summary.status_counts !== "object" ||
+      Object.keys(page.summary.status_counts).sort().join(",") !== "active,disabled,other" ||
+      Object.values(page.summary.status_counts).some(function (value) {
+        return !Number.isInteger(value) || value < 0;
+      }) ||
+      Object.values(page.summary.status_counts).reduce(function (total, value) {
+        return total + value;
+      }, 0) !== page.summary.total ||
+      !Array.isArray(page.schedules) ||
+      page.schedules.length > 100 ||
+      !page.window ||
+      typeof page.window !== "object" ||
+      Object.keys(page.window).sort().join(",") !==
+        "max_items,returned,total,truncated" ||
+      page.window.max_items !== 100 ||
+      !Number.isInteger(page.window.total) ||
+      page.window.total < 0 ||
+      !Number.isInteger(page.window.returned) ||
+      page.window.returned !== page.schedules.length ||
+      page.window.returned > page.window.total ||
+      typeof page.window.truncated !== "boolean" ||
+      page.window.truncated !== (page.window.returned < page.window.total) ||
+      page.window.total !== page.summary.total
+    ) {
+      return false;
+    }
+    return page.schedules.every(function (schedule) {
+      return (
+        schedule &&
+        typeof schedule === "object" &&
+        Object.keys(schedule).sort().join(",") === scheduleFields.join(",") &&
+        typeof schedule.schedule_id === "string" &&
+        schedule.schedule_id.length > 0 &&
+        schedule.schedule_id.length <= 128 &&
+        typeof schedule.workflow_id === "string" &&
+        schedule.workflow_id.length <= 128 &&
+        typeof schedule.workflow_version === "string" &&
+        schedule.workflow_version.length <= 128 &&
+        ["active", "disabled", "other"].indexOf(schedule.status) !== -1 &&
+        typeof schedule.enabled === "boolean" &&
+        ["starts_at", "next_run_at", "last_scheduled_for"].every(function (field) {
+          return typeof schedule[field] === "string" && schedule[field].length <= 256;
+        }) &&
+        ["last_run_id", "last_trigger_id"].every(function (field) {
+          return typeof schedule[field] === "string" && schedule[field].length <= 128;
+        }) &&
+        ["latest", "skip"].indexOf(schedule.missed_run_policy) !== -1 &&
+        Number.isInteger(schedule.interval_seconds) &&
+        schedule.interval_seconds >= 1
       );
     });
   }
@@ -725,8 +838,10 @@
         els.downloadBundle.disabled = true;
         els.loadOlderRuns.disabled = true;
         els.loadOlderAudit.disabled = true;
+        els.loadLiveSchedules.disabled = true;
         setRunPageStatus("", "");
         setAuditPageStatus("", "");
+        setSchedulePageStatus("", "");
         setServiceStatus("Live service: static mode", "");
         renderDetail();
         return;
@@ -736,6 +851,7 @@
       els.downloadBundle.disabled = false;
       updateRunPageControls();
       updateAuditPageControls();
+      updateLiveScheduleControls();
       if (!response.ok) {
         throw new Error("service probe unavailable");
       }
@@ -756,6 +872,7 @@
       els.downloadBundle.disabled = false;
       updateRunPageControls();
       updateAuditPageControls();
+      updateLiveScheduleControls();
       setServiceStatus("Live service: unavailable", "is-invalid");
       renderDetail();
     }
@@ -823,6 +940,11 @@
       snapshot.window.audit_events.truncated
     );
     state.liveAuditPageLoading = false;
+    if (label !== "Live Service Snapshot") {
+      state.liveSchedules = null;
+      state.liveSchedulesLoading = false;
+      setSchedulePageStatus("", "");
+    }
     if (label === "Live Service Snapshot") {
       state.lastLiveLoadedAt = new Date().toISOString();
       state.liveRefreshError = false;
@@ -858,6 +980,7 @@
     render();
     updateRunPageControls();
     updateAuditPageControls();
+    updateLiveScheduleControls();
     if (state.selected.kind === "run" && label === "Live Service Snapshot") {
       loadLiveRunDetail(state.selected.value.run_id);
     }
@@ -879,14 +1002,18 @@
     state.liveAuditPageCursor = "";
     state.liveAuditPageHasMore = false;
     state.liveAuditPageLoading = false;
+    state.liveSchedules = null;
+    state.liveSchedulesLoading = false;
     setRunPageStatus("", "");
     setAuditPageStatus("", "");
+    setSchedulePageStatus("", "");
     state.selected = {
       kind: "error",
       value: Object.assign({ label: label }, details || {}),
     };
     setStatus("Invalid", "is-invalid");
     render();
+    updateLiveScheduleControls();
   }
 
   function validateSnapshot(snapshot) {
@@ -1131,6 +1258,22 @@
       },
       "connector",
     );
+    renderTable(
+      els.scheduleRows,
+      filterRows(state.liveSchedules || []),
+      function (schedule) {
+        return [
+          linkCell(schedule.schedule_id || ""),
+          textCell((schedule.workflow_id || "") + "@" + (schedule.workflow_version || "")),
+          pillCell(schedule.status || ""),
+          textCell(String(Boolean(schedule.enabled))),
+          textCell(formatDate(schedule.next_run_at || "")),
+          textCell(formatInterval(schedule.interval_seconds)),
+          textCell(schedule.last_run_id || "—"),
+        ];
+      },
+      "schedule",
+    );
   }
 
   function renderOperatorTables(insights) {
@@ -1363,6 +1506,14 @@
     if (value.run_id) {
       return [["Run", value.run_id], ["Workflow", value.workflow_id || ""], ["Status", value.status || ""], ["Events", String(value.event_count || 0)]];
     }
+    if (value.schedule_id) {
+      return [
+        ["Schedule", value.schedule_id],
+        ["Workflow", value.workflow_id || ""],
+        ["Status", value.status || ""],
+        ["Next Run", formatDate(value.next_run_at || "")],
+      ];
+    }
     if (value.type) {
       return [["Type", value.type], ["Workflow", value.workflow_id || ""], ["Run", value.run_id || ""], ["Time", formatDate(value.timestamp || "")]];
     }
@@ -1386,6 +1537,7 @@
     if (selected.kind === "attention") return value.kind || "Attention";
     if (selected.kind === "recent event") return value.type || "Recent Event";
     if (selected.kind === "connector event") return value.type || "Connector Event";
+    if (selected.kind === "schedule") return value.schedule_id || "Schedule";
     if (selected.kind === "version change") return value.workflow_id || "Version Change";
     return "Snapshot";
   }
@@ -1422,6 +1574,11 @@
     els.auditPageStatus.className = "audit-page-status" + (className ? " " + className : "");
   }
 
+  function setSchedulePageStatus(text, className) {
+    els.schedulePageStatus.textContent = text;
+    els.schedulePageStatus.className = "schedule-page-status" + (className ? " " + className : "");
+  }
+
   function updateRunPageControls() {
     const enabled = isLiveSnapshot() && state.liveRunPageHasMore;
     els.loadOlderRuns.disabled = !enabled || state.liveRunPageLoading;
@@ -1436,6 +1593,14 @@
     els.loadOlderAudit.textContent = state.liveAuditPageLoading
       ? "Loading Audit…"
       : "Load Older Audit";
+  }
+
+  function updateLiveScheduleControls() {
+    const enabled = state.liveModeConfigured && isLiveSnapshot();
+    els.loadLiveSchedules.disabled = !enabled || state.liveSchedulesLoading;
+    els.loadLiveSchedules.textContent = state.liveSchedulesLoading
+      ? "Loading Schedules…"
+      : "Load Live Schedules";
   }
 
   function emptySnapshot() {
@@ -1510,6 +1675,15 @@
   function formatDelta(value) {
     const number = Number(value || 0);
     return (number > 0 ? "+" : "") + String(number);
+  }
+
+  function formatInterval(value) {
+    const seconds = Number(value || 0);
+    if (!Number.isFinite(seconds) || seconds < 1) return "";
+    if (seconds % 86400 === 0) return String(seconds / 86400) + "d";
+    if (seconds % 3600 === 0) return String(seconds / 3600) + "h";
+    if (seconds % 60 === 0) return String(seconds / 60) + "m";
+    return String(seconds) + "s";
   }
 
   function shorten(value) {

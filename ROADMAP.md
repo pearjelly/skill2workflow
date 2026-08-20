@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-215
+- Completed delivery loops: 1-216
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 215 is complete with bounded live audit discovery
+- Active loop: None; Loop 216 is complete with bounded live recurring-schedule discovery
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-215 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-216 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5622,9 +5622,47 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 216: Bounded Live Recurring-Schedule Discovery
+
+**Status:** Complete.
+
+**Prior basis:** Loop 215 completed the live run and audit evidence path, but
+the installed console still could not show whether recurring workflows were
+enabled, when they would run next, or what their compact last-run outcome was.
+Operators had to leave the console and use the protected CLI even though the
+service already exposed a bounded redacted schedule inventory.
+
+**Outcome:** A configured live console now exposes **Load Live Schedules** and
+one fixed same-origin `GET /api/v1/recurring-schedules` proxy. The UI process
+reuses the existing authenticated
+`skill2workflow-recurring-schedule-list-0.1.0` contract, validates the exact
+100-item response, and renders schedule status, enablement, next-run timing,
+interval, missed-run policy, and compact last-run metadata. Static, example,
+and file snapshots keep the control disabled.
+
+**Evidence:** UI integration tests prove the fixed route, bounded redacted
+response, server-side Authorization forwarding, `no-store`, and token
+non-disclosure. Control UI contract tests cover the explicit live-only control,
+schema/window validation, schedule table, and static boundary. The installed
+UI guide, live-control guide, Changelog, and README link the view to the
+existing service inventory contract; the full UI, package, reproducible-build,
+secret-hygiene, external-connector, full-suite, and Production Baseline gates
+remain the release checks.
+
+**Safety boundary:** This is bounded, read-only schedule discovery. It does
+not enable, disable, create, delete, claim, dispatch, or rewrite schedules; it
+does not expose trigger inputs, scheduler lease identities, credentials,
+provider payloads, arbitrary service paths, or a second execution authority.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 215 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 216 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5806,6 +5844,7 @@ This rolling queue is ordered. Loop 215 is complete and there is no active deliv
 | Loop 213: Bounded Live Run Discovery | Complete | Let operators find older runs from the live console without arbitrary queries or unbounded browser state | Fixed cursor-page proxy, 100-item pages, 500-row client cap, schema/window validation, UI/route tests, docs, and full gates |
 | Loop 214: Confirmation-Protected Live Cooperative Cancellation | Complete | Let operators request cooperative cancellation for one selected non-terminal live run without exposing credentials or adding arbitrary mutation proxying | Fixed cancel proxy, exact empty object, non-terminal guard, confirmation, UI/route tests, docs, and full gates |
 | Loop 215: Bounded Live Audit Discovery | Complete | Let operators inspect older redacted audit events from the live console without arbitrary filters or unbounded browser state | Fixed audit-page proxy, 100-event pages, 500-row cap, cursor/schema validation, UI/route tests, docs, and full gates |
+| Loop 216: Bounded Live Recurring-Schedule Discovery | Complete | Let operators inspect recurring schedule health and next-run timing from the live console without schedule mutation or trigger-input exposure | Fixed schedule inventory proxy, exact 100-item redacted contract, schedule table, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

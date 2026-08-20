@@ -69,7 +69,9 @@ token file, the same console can inspect bounded live state, download a
 redacted support bundle, inspect a bounded run-detail evidence tail, discover
 older runs and audit events through fixed cursor pages, and confirm one selected
 waiting human gate or request cooperative cancellation for one non-terminal run
-through fixed, confirmation-protected actions.
+through fixed, confirmation-protected actions. It can also inspect the existing
+bounded recurring-schedule inventory without exposing trigger inputs or
+credentials.
 
 ## Visual Overview
 
@@ -866,7 +868,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-215 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-216 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -933,6 +935,11 @@ does not claim forceful provider termination, rollback, or reconciliation.
 Loop 215 adds bounded live audit discovery to the same console. Operators can
 load older redacted audit events through a fixed cursor page, with server-side
 token handling, no arbitrary filters, and a 500-event browser cap.
+
+Loop 216 adds bounded live recurring-schedule discovery to the same console.
+Operators can inspect schedule status, next-run timing, and compact last-run
+metadata through the existing redacted inventory contract; schedule mutation
+and trigger inputs remain outside the browser boundary.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

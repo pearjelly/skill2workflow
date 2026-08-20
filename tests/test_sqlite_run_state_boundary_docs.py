@@ -26,6 +26,6 @@ class SqliteRunStateBoundaryDocsTests(TestCase):
     def test_roadmap_and_readme_promote_loop_174(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Completed delivery loops: 1-215", roadmap)
-        self.assertIn("Loop 215 is complete with bounded live audit discovery", roadmap)
-        self.assertIn("Delivery Loops 1-215 are complete", readme)
+        self.assertIn("Completed delivery loops: 1-216", roadmap)
+        self.assertIn("Loop 216 is complete with bounded live recurring-schedule discovery", roadmap)
+        self.assertIn("Delivery Loops 1-216 are complete", readme)

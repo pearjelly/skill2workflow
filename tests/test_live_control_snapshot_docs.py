@@ -66,14 +66,17 @@ class LiveControlSnapshotDocumentationTests(TestCase):
             encoding="utf-8"
         )
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+        installed_ui = (ROOT / "docs" / "installed-ui.md").read_text(
+            encoding="utf-8"
+        )
         release = (ROOT / "docs" / "release-process.md").read_text(
             encoding="utf-8"
         )
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-215 are complete", readme)
+        self.assertIn("Delivery Loops 1-216 are complete", readme)
         self.assertIn("docs/live-control-snapshot.md", readme)
-        self.assertIn("- Completed delivery loops: 1-215", roadmap)
+        self.assertIn("- Completed delivery loops: 1-216", roadmap)
         self.assertIn(
             "| Loop 55: Authenticated Live Operator Snapshot | Complete |",
             roadmap,
@@ -86,5 +89,8 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         self.assertIn("control-snapshot-0.1.0.schema.json", stability)
         self.assertIn("live `window` semantics", stability)
         self.assertIn("Loop 215: Bounded Live Audit Discovery", roadmap)
+        self.assertIn("Loop 216: Bounded Live Recurring-Schedule Discovery", roadmap)
         self.assertIn("/api/v1/audit-page", installed_ui)
         self.assertIn("Load Older Audit", changelog)
+        self.assertIn("Load Live Schedules", installed_ui)
+        self.assertIn("/api/v1/recurring-schedules", installed_ui)

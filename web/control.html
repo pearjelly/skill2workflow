@@ -23,6 +23,7 @@
           <button id="download-bundle" type="button" disabled>Download Support Bundle</button>
           <button id="load-older-runs" type="button" disabled>Load Older Runs</button>
           <button id="load-older-audit" type="button" disabled>Load Older Audit</button>
+          <button id="load-live-schedules" type="button" disabled>Load Live Schedules</button>
           <label class="file-action">
             <input id="snapshot-file" type="file" accept="application/json,.json" />
             Load Snapshot
@@ -61,6 +62,7 @@
         <span id="service-status" class="service-status">Live service: static mode</span>
         <span id="run-page-status" class="run-page-status" aria-live="polite"></span>
         <span id="audit-page-status" class="run-page-status" aria-live="polite"></span>
+        <span id="schedule-page-status" class="run-page-status" aria-live="polite"></span>
       </section>
 
       <section class="workspace" aria-label="Control plane inspector">
@@ -72,6 +74,7 @@
             <button class="tab" type="button" data-view="nodes">Nodes</button>
             <button class="tab" type="button" data-view="audit">Audit</button>
             <button class="tab" type="button" data-view="connectors">Connectors</button>
+            <button class="tab" type="button" data-view="schedules">Schedules</button>
             <button class="tab" type="button" data-view="versions">Compare</button>
           </nav>
 
@@ -210,6 +213,23 @@
                 </tr>
               </thead>
               <tbody id="connector-rows"></tbody>
+            </table>
+          </div>
+
+          <div class="table-wrap" data-panel="schedules" hidden>
+            <table>
+              <thead>
+                <tr>
+                  <th>Schedule</th>
+                  <th>Workflow</th>
+                  <th>Status</th>
+                  <th>Enabled</th>
+                  <th>Next Run</th>
+                  <th>Interval</th>
+                  <th>Last Run</th>
+                </tr>
+              </thead>
+              <tbody id="schedule-rows"></tbody>
             </table>
           </div>
 

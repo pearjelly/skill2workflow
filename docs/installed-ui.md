@@ -95,6 +95,15 @@ without forwarding browser-authored filters. The browser validates the
 sequence-cursor response, deduplicates events, and retains at most 500 rows;
 static, example, and file snapshots never expose the control.
 
+The live console can also load the existing redacted recurring-schedule
+inventory with **Load Live Schedules**. It calls only the fixed same-origin
+`/api/v1/recurring-schedules` route, validates the
+`skill2workflow-recurring-schedule-list-0.1.0` contract, and displays at most
+100 schedule rows with status, next-run, interval, missed-run policy, and
+compact last-run metadata. Trigger inputs, scheduler lease details,
+credentials, and provider payloads never enter the browser; static, example,
+and file snapshots keep the control disabled.
+
 This live mode adds only the existing human-gate resume and cooperative
 cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider

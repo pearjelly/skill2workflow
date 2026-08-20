@@ -82,7 +82,8 @@ input {
 }
 
 .run-page-status,
-.audit-page-status {
+.audit-page-status,
+.schedule-page-status {
   margin-left: 8px;
   color: var(--muted);
   font-size: 12px;
@@ -91,12 +92,14 @@ input {
 }
 
 .run-page-status.is-invalid,
-.audit-page-status.is-invalid {
+.audit-page-status.is-invalid,
+.schedule-page-status.is-invalid {
   color: var(--red);
 }
 
 .run-page-status.is-valid,
-.audit-page-status.is-valid {
+.audit-page-status.is-valid,
+.schedule-page-status.is-valid {
   color: var(--green);
 }
 

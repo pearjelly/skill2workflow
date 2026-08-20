@@ -171,6 +171,14 @@ deduplicates sequence numbers and caps retained live audit rows at 500. No raw
 payload, provider error, credential, or arbitrary service query crosses this
 boundary.
 
+The live console can explicitly load the existing redacted recurring-schedule
+inventory through its fixed `GET /api/v1/recurring-schedules` proxy. The
+browser accepts the exact `skill2workflow-recurring-schedule-list-0.1.0`
+contract and renders at most 100 schedule rows with next-run and compact
+last-run metadata. This is read-only discovery: no schedule mutation,
+dispatch claim, trigger input, lease identity, credential, or provider payload
+crosses the UI boundary, and static/file snapshots never expose the control.
+
 ## Verification
 
 Run the real-process drill:
@@ -187,9 +195,9 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-215 add
+The live console remains a single-team operator boundary. Loops 211-216 add
 only the existing human-gate resume decision, cooperative cancellation, and
-redacted run-detail/run-discovery/audit-discovery reads; the UI excludes browser credential
+redacted run-detail/run-discovery/audit-discovery/schedule-discovery reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
 automatic retries, provider reconciliation, and hosted TLS. Network exposure

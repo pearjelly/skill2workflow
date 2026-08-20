@@ -814,3 +814,104 @@ class UiTests(TestCase):
             upstream.shutdown()
             upstream.server_close()
             upstream_thread.join(timeout=2)
+
+    def test_live_proxy_exposes_fixed_schedule_inventory_without_browser_token(self):
+        observed = {}
+        page = {
+            "schema_version": "skill2workflow-recurring-schedule-list-0.1.0",
+            "summary": {
+                "total": 1,
+                "status_counts": {"active": 1, "disabled": 0, "other": 0},
+            },
+            "schedules": [
+                {
+                    "schedule_id": "schedule_demo",
+                    "workflow_id": "workflow_demo",
+                    "workflow_version": "0.1.0",
+                    "status": "active",
+                    "enabled": True,
+                    "starts_at": "2026-08-20T00:00:00Z",
+                    "next_run_at": "2026-08-20T01:00:00Z",
+                    "interval_seconds": 3600,
+                    "missed_run_policy": "latest",
+                    "last_scheduled_for": "",
+                    "last_run_id": "",
+                    "last_trigger_id": "",
+                }
+            ],
+            "window": {
+                "max_items": 100,
+                "total": 1,
+                "returned": 1,
+                "truncated": False,
+            },
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                body = json.dumps(page, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text(
+                    "ui-test-token-012345678901234567890123456789\n",
+                    encoding="utf-8",
+                )
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+
+                def ready(server):
+                    ui_port["value"] = server.server_port
+
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1",
+                        "port": 0,
+                        "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file,
+                        "ready_callback": ready,
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{ui_port['value']}/api/v1/recurring-schedules",
+                    timeout=2,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(payload["schedules"][0]["schedule_id"], "schedule_demo")
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(observed["path"], "/api/v1/recurring-schedules")
+                self.assertEqual(
+                    observed["authorization"],
+                    "Bearer ui-test-token-012345678901234567890123456789",
+                )
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)

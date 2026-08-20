@@ -19,6 +19,7 @@ from .service_client import (
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     ServiceActionError,
     fetch_audit_events,
+    fetch_recurring_schedule_list,
     fetch_run_detail,
     fetch_run_page,
     fetch_support_bundle,
@@ -50,6 +51,8 @@ _LIVE_RUN_PAGE_MAX_ITEMS = 100
 _LIVE_AUDIT_PAGE_PATH = "/api/v1/audit-page"
 _LIVE_AUDIT_PAGE_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 _LIVE_AUDIT_PAGE_MAX_ITEMS = 100
+_LIVE_SCHEDULE_LIST_PATH = "/api/v1/recurring-schedules"
+_LIVE_SCHEDULE_LIST_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 
 
 def find_ui_root() -> Path:
@@ -127,6 +130,12 @@ def serve_ui(
                     self._write_json(404, {"error": "audit page path is not available"})
                     return
                 self._serve_live_audit_page(cursor)
+                return
+            if parsed.path == _LIVE_SCHEDULE_LIST_PATH:
+                if parsed.query:
+                    self._write_json(404, {"error": "schedule list path is not available"})
+                    return
+                self._serve_live_schedule_list()
                 return
             if parsed.path.startswith(_LIVE_RUN_DETAIL_PREFIX):
                 run_id = parsed.path[len(_LIVE_RUN_DETAIL_PREFIX) :]
@@ -343,6 +352,29 @@ def serve_ui(
                     raise ValueError("audit page unavailable")
             except Exception:
                 self._write_json(503, {"error": "audit page unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
+        def _serve_live_schedule_list(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "schedule list is not configured"})
+                return
+            try:
+                page = fetch_recurring_schedule_list(
+                    configured_service_url,
+                    token_file,
+                )
+                body = json.dumps(
+                    page,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _LIVE_SCHEDULE_LIST_MAX_RESPONSE_BYTES:
+                    raise ValueError("schedule list unavailable")
+            except Exception:
+                self._write_json(503, {"error": "schedule list unavailable"})
                 return
             self._write_json(200, body, content_type="application/json")
 

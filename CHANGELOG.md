@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded **Load Live Schedules** view to the live control-plane UI.
+  It reuses the existing redacted recurring-schedule inventory through a fixed
+  server-side proxy, keeps the token server-side, and exposes no schedule
+  mutation, trigger input, lease identity, credential, or provider payload.
+
 - Added a bounded **Load Older Audit** control to the live control-plane UI.
   It reuses the existing redacted audit-event cursor contract through a fixed
   server-side proxy, deduplicates sequence numbers, caps browser retention at
