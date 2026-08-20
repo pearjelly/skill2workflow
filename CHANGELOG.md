@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded **Load Older Audit** control to the live control-plane UI.
+  It reuses the existing redacted audit-event cursor contract through a fixed
+  server-side proxy, deduplicates sequence numbers, caps browser retention at
+  500 events, and forwards no browser-authored filters or credentials.
+
 - Added a confirmation-protected **Cancel run** action to the live control-plane
   UI for `created`, `running`, and `waiting` runs. It reuses durable
   cooperative cancellation and never claims forceful termination, rollback, or

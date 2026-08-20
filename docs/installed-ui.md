@@ -87,6 +87,14 @@ contract, retains at most 500 rows in browser memory, and never accepts a
 user-authored service path or filter. Static, example, and file snapshots keep
 the control disabled.
 
+When the live `audit_events` window is truncated, **Load Older Audit** provides
+the same bounded handoff for the existing redacted
+`skill2workflow-audit-event-list-0.1.0` contract. Each click reaches only the
+fixed same-origin `/api/v1/audit-page` route, which requests a 100-event page
+without forwarding browser-authored filters. The browser validates the
+sequence-cursor response, deduplicates events, and retains at most 500 rows;
+static, example, and file snapshots never expose the control.
+
 This live mode adds only the existing human-gate resume and cooperative
 cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider

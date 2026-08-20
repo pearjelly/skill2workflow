@@ -48,6 +48,10 @@ class LiveControlSnapshotDocumentationTests(TestCase):
             "1` through `1000",
             "rejected for `--service-url`",
             "live_control_snapshot_smoke.py",
+            "Load Older Audit",
+            "GET /api/v1/audit-page",
+            "100-item redacted",
+            "retained live audit rows at 500",
         ):
             self.assertIn(phrase, guide)
 
@@ -55,6 +59,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
+        installed_ui = (ROOT / "docs" / "installed-ui.md").read_text(
+            encoding="utf-8"
+        )
         observability = (ROOT / "docs" / "observability.md").read_text(
             encoding="utf-8"
         )
@@ -64,9 +71,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         )
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-214 are complete", readme)
+        self.assertIn("Delivery Loops 1-215 are complete", readme)
         self.assertIn("docs/live-control-snapshot.md", readme)
-        self.assertIn("- Completed delivery loops: 1-214", roadmap)
+        self.assertIn("- Completed delivery loops: 1-215", roadmap)
         self.assertIn(
             "| Loop 55: Authenticated Live Operator Snapshot | Complete |",
             roadmap,
@@ -78,3 +85,6 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         self.assertIn("skill2workflow-control-snapshot-0.1.0", stability)
         self.assertIn("control-snapshot-0.1.0.schema.json", stability)
         self.assertIn("live `window` semantics", stability)
+        self.assertIn("Loop 215: Bounded Live Audit Discovery", roadmap)
+        self.assertIn("/api/v1/audit-page", installed_ui)
+        self.assertIn("Load Older Audit", changelog)

@@ -18,6 +18,7 @@ from .service_client import (
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     ServiceActionError,
+    fetch_audit_events,
     fetch_run_detail,
     fetch_run_page,
     fetch_support_bundle,
@@ -46,6 +47,9 @@ _LIVE_RUN_DETAIL_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 _LIVE_RUN_PAGE_PATH = "/api/v1/run-page"
 _LIVE_RUN_PAGE_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 _LIVE_RUN_PAGE_MAX_ITEMS = 100
+_LIVE_AUDIT_PAGE_PATH = "/api/v1/audit-page"
+_LIVE_AUDIT_PAGE_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
+_LIVE_AUDIT_PAGE_MAX_ITEMS = 100
 
 
 def find_ui_root() -> Path:
@@ -115,6 +119,14 @@ def serve_ui(
                     self._write_json(404, {"error": "run page path is not available"})
                     return
                 self._serve_live_run_page(cursor)
+                return
+            if parsed.path == _LIVE_AUDIT_PAGE_PATH:
+                try:
+                    cursor = _parse_live_audit_page_cursor(parsed.query)
+                except ValueError:
+                    self._write_json(404, {"error": "audit page path is not available"})
+                    return
+                self._serve_live_audit_page(cursor)
                 return
             if parsed.path.startswith(_LIVE_RUN_DETAIL_PREFIX):
                 run_id = parsed.path[len(_LIVE_RUN_DETAIL_PREFIX) :]
@@ -306,6 +318,31 @@ def serve_ui(
                     raise ValueError("run page unavailable")
             except Exception:
                 self._write_json(503, {"error": "run page unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
+        def _serve_live_audit_page(self, cursor):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "audit page is not configured"})
+                return
+            try:
+                page = fetch_audit_events(
+                    configured_service_url,
+                    token_file,
+                    max_items=_LIVE_AUDIT_PAGE_MAX_ITEMS,
+                    cursor=cursor,
+                )
+                body = json.dumps(
+                    page,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _LIVE_AUDIT_PAGE_MAX_RESPONSE_BYTES:
+                    raise ValueError("audit page unavailable")
+            except Exception:
+                self._write_json(503, {"error": "audit page unavailable"})
                 return
             self._write_json(200, body, content_type="application/json")
 
@@ -512,4 +549,25 @@ def _parse_live_run_page_cursor(query: str) -> str:
         or any(char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" for char in cursor)
     ):
         raise ValueError("run page cursor is invalid")
+    return cursor
+
+
+def _parse_live_audit_page_cursor(query: str) -> str:
+    """Accept only one opaque cursor for the fixed live audit-page proxy."""
+
+    if not query:
+        return ""
+    try:
+        values = parse_qs(query, keep_blank_values=True, strict_parsing=True)
+    except ValueError as error:
+        raise ValueError("audit page query is invalid") from error
+    if set(values) != {"cursor"} or len(values["cursor"]) != 1:
+        raise ValueError("audit page query is invalid")
+    cursor = values["cursor"][0]
+    if (
+        not cursor
+        or len(cursor) > 128
+        or any(char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_" for char in cursor)
+    ):
+        raise ValueError("audit page cursor is invalid")
     return cursor

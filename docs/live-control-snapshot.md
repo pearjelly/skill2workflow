@@ -162,6 +162,15 @@ This is the existing cooperative cancellation contract: an in-flight provider
 call may finish, no external effect is rolled back, and terminal runs are not
 rewritten. Static, example, and file snapshots never expose the control.
 
+The live Audit view can also discover history beyond the snapshot tail through
+the explicit **Load Older Audit** control. It calls only the UI's fixed
+`GET /api/v1/audit-page` route, which accepts no query or one validated opaque
+cursor and always requests the service's 100-item redacted
+`skill2workflow-audit-event-list-0.1.0` page without filters. The browser
+deduplicates sequence numbers and caps retained live audit rows at 500. No raw
+payload, provider error, credential, or arbitrary service query crosses this
+boundary.
+
 ## Verification
 
 Run the real-process drill:
@@ -178,9 +187,9 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-214 add
+The live console remains a single-team operator boundary. Loops 211-215 add
 only the existing human-gate resume decision, cooperative cancellation, and
-redacted run-detail/discovery reads; the UI excludes browser credential
+redacted run-detail/run-discovery/audit-discovery reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
 automatic retries, provider reconciliation, and hosted TLS. Network exposure

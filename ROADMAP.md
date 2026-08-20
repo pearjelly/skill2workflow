@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-214
+- Completed delivery loops: 1-215
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 214 is complete with confirmation-protected live cooperative cancellation
+- Active loop: None; Loop 215 is complete with bounded live audit discovery
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-214 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-215 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5584,9 +5584,47 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 215: Bounded Live Audit Discovery
+
+**Status:** Complete.
+
+**Prior basis:** Loop 214 completed the live list → inspect → decide → cancel
+path, but the Audit view still exposed only the newest snapshot tail. Operators
+could see that the redacted audit window was truncated yet had to leave the
+installed console to inspect older evidence.
+
+**Outcome:** A truncated live Audit view now enables **Load Older Audit**. Each
+explicit click reaches one fixed same-origin `GET /api/v1/audit-page` proxy,
+which reuses the existing redacted
+`skill2workflow-audit-event-list-0.1.0` contract with a 100-event cursor page
+and no filters. The browser validates the sequence-cursor response,
+deduplicates events, and retains at most 500 live audit rows. Static, example,
+and file snapshots remain read-only and never expose the control.
+
+**Evidence:** UI integration tests prove the fixed proxy path, upstream
+`max_items=100` request, server-side Authorization forwarding, and token
+non-disclosure. Control UI contract tests cover the explicit button, page
+schema/window validation, cursor handling, 500-row client bound, and static
+boundary. Documentation and the installed package contract link the behavior
+to the existing redacted audit-event schema; the full UI, package,
+reproducible-build, secret-hygiene, external-connector, full-suite, and
+Production Baseline gates remain the release checks.
+
+**Safety boundary:** This is bounded, read-only audit discovery. It does not
+accept browser-authored filters, proxy arbitrary paths, export raw state,
+store credentials, append audit events, or claim complete history after the
+fixed 500-row client cap. The service remains the source of truth for cursor
+ordering and redaction.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 214 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 215 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5767,6 +5805,7 @@ This rolling queue is ordered. Loop 214 is complete and there is no active deliv
 | Loop 212: Bounded Live Run-Detail Evidence | Complete | Let operators inspect the existing redacted event tail before a live human-gate decision without exposing credentials or raw state | Fixed run-detail proxy, 50-event/64 KiB bounds, schema/window validation, UI/route tests, docs, and full gates |
 | Loop 213: Bounded Live Run Discovery | Complete | Let operators find older runs from the live console without arbitrary queries or unbounded browser state | Fixed cursor-page proxy, 100-item pages, 500-row client cap, schema/window validation, UI/route tests, docs, and full gates |
 | Loop 214: Confirmation-Protected Live Cooperative Cancellation | Complete | Let operators request cooperative cancellation for one selected non-terminal live run without exposing credentials or adding arbitrary mutation proxying | Fixed cancel proxy, exact empty object, non-terminal guard, confirmation, UI/route tests, docs, and full gates |
+| Loop 215: Bounded Live Audit Discovery | Complete | Let operators inspect older redacted audit events from the live console without arbitrary filters or unbounded browser state | Fixed audit-page proxy, 100-event pages, 500-row cap, cursor/schema validation, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
