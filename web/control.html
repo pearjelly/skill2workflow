@@ -311,6 +311,12 @@
               <button id="load-workflow-preflight" type="button">Check Empty Trigger</button>
             </div>
             <p id="workflow-preflight-status">The preflight sends only an empty JSON object.</p>
+            <div class="workflow-diff-controls">
+              <label for="workflow-diff-target">Compare selected version →</label>
+              <select id="workflow-diff-target" aria-label="Workflow version to compare"></select>
+              <button id="load-workflow-diff" type="button">Compare Versions</button>
+            </div>
+            <p id="workflow-diff-status">Select another version of this workflow to review a structural diff.</p>
           </section>
           <pre id="detail-json">{}</pre>
         </aside>

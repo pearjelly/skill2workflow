@@ -17,6 +17,7 @@ from .service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
+    MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES,
     MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES,
@@ -32,6 +33,7 @@ from .service_client import (
     fetch_service_probe,
     fetch_workflow_inventory,
     fetch_workflow_explanation,
+    fetch_workflow_diff,
     fetch_workflow_preflight,
     post_run_resume,
     post_run_cancel,
@@ -51,6 +53,8 @@ _WORKFLOW_INVENTORY_PATH = "/api/v1/workflows"
 _WORKFLOW_INVENTORY_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES
 _WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/"
 _WORKFLOW_EXPLANATION_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES
+_WORKFLOW_DIFF_PREFIX = "/api/v1/workflow-diffs/"
+_WORKFLOW_DIFF_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES
 _WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/"
 _WORKFLOW_PREFLIGHT_MAX_REQUEST_BYTES = min(16, MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES)
 _WORKFLOW_PREFLIGHT_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES
@@ -216,6 +220,22 @@ def serve_ui(
                     )
                     return
                 self._serve_workflow_explanation(*references)
+                return
+            if parsed.path.startswith(_WORKFLOW_DIFF_PREFIX):
+                if parsed.query:
+                    self._write_json(
+                        404,
+                        {"error": "workflow diff path is not available"},
+                    )
+                    return
+                references = _parse_live_workflow_diff_path(parsed.path)
+                if references is None:
+                    self._write_json(
+                        404,
+                        {"error": "workflow diff path is not available"},
+                    )
+                    return
+                self._serve_workflow_diff(*references)
                 return
             if self.path == _SUPPORT_BUNDLE_PATH:
                 self._serve_support_bundle()
@@ -390,6 +410,38 @@ def serve_ui(
                 return
             except Exception:
                 self._write_json(503, {"error": "workflow explanation unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
+        def _serve_workflow_diff(self, workflow_id, from_version, to_version):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow diff is not configured"})
+                return
+            try:
+                diff = fetch_workflow_diff(
+                    configured_service_url,
+                    token_file,
+                    workflow_id,
+                    from_version,
+                    to_version,
+                )
+                body = json.dumps(
+                    diff,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _WORKFLOW_DIFF_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow diff unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "workflow version not found"})
+                else:
+                    self._write_json(503, {"error": "workflow diff unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "workflow diff unavailable"})
                 return
             self._write_json(200, body, content_type="application/json")
 
@@ -789,12 +841,22 @@ def _parse_live_workflow_preflight_path(path: str):
     return _parse_live_workflow_reference_path(path, _WORKFLOW_PREFLIGHT_PREFIX)
 
 
-def _parse_live_workflow_reference_path(path: str, prefix: str):
+def _parse_live_workflow_diff_path(path: str):
+    """Accept exactly three safe, encoded Workflow diff references."""
+
+    return _parse_live_workflow_reference_path(
+        path,
+        _WORKFLOW_DIFF_PREFIX,
+        component_count=3,
+    )
+
+
+def _parse_live_workflow_reference_path(path: str, prefix: str, *, component_count: int = 2):
     if not path.startswith(prefix):
         return None
     suffix = path[len(prefix) :]
     parts = suffix.split("/")
-    if len(parts) != 2 or any(not part for part in parts):
+    if len(parts) != component_count or any(not part for part in parts):
         return None
     values = tuple(unquote(part) for part in parts)
     if any(

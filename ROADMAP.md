@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-220
+- Completed delivery loops: 1-221
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 220 is complete with live empty-trigger preflight
+- Active loop: None; Loop 221 is complete with live Workflow version diff review
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-220 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-221 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5808,9 +5808,47 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 221: Live Workflow Version Diff Review
+
+**Status:** Complete.
+
+**Prior basis:** Loop 220 let operators check a selected live version's empty
+trigger shape and mapping readiness, but the console still offered no safe way
+to compare the selected release with another version before deciding whether
+to promote or trigger it.
+
+**Outcome:** The selected-version review now offers **Compare Versions** for
+another version of the same workflow through one fixed same-origin
+`GET /api/v1/workflow-diffs/{workflow_id}/{from_version}/{to_version}` proxy.
+The UI validates the exact `skill2workflow-workflow-diff-0.1.0` contract and
+renders only changed structural sections plus bounded node/edge identifiers.
+The server keeps the ingress token, caps the response at 64 KiB, and performs
+no execution or mutation.
+
+**Evidence:** UI integration tests prove exact three-component path parsing,
+server-side Authorization forwarding, `no-store`, and the value-free diff
+response boundary. Control UI contract tests cover same-workflow version
+selection, the fixed route, and strict schema validation. The installed UI
+guide, live-control guide, Changelog, README, and this Roadmap record the
+operator contract; the full UI, package, reproducible-build, secret-hygiene,
+external-connector, full-suite, and Production Baseline gates remain the
+release checks.
+
+**Safety boundary:** This is bounded, read-only release comparison. It does
+not execute, trigger, publish, promote, deprecate, repair, or mutate a
+Workflow; it does not resolve credentials or invoke connectors, and it does
+not expose Workflow values, instructions, artifact paths, trigger inputs, or
+provider data.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 220 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 221 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5997,6 +6035,7 @@ This rolling queue is ordered. Loop 220 is complete and there is no active deliv
 | Loop 218: Live Published-Workflow Inventory | Complete | Let operators inspect current published versions, aliases, lifecycle status, and checksums from the live console without Workflow content exposure | Fixed workflow-inventory proxy, exact 100-item redacted contract, live registry table, UI/route tests, docs, and full gates |
 | Loop 219: Live Workflow-Plan Review | Complete | Let operators review a selected live version's topology, gates, connector side effects, retries, and timeouts without executing it or exposing values | Fixed workflow-explanation proxy, exact bounded redacted contract, selection review action, UI/route tests, docs, and full gates |
 | Loop 220: Live Empty-Trigger Preflight | Complete | Let operators check a selected version's empty-trigger input and mapping readiness without accepting business values or starting a run | Fixed preflight proxy, exact empty-body contract, value-free readiness review, UI/route tests, docs, and full gates |
+| Loop 221: Live Workflow Version Diff Review | Complete | Let operators compare two versions of one live workflow without exposing values or mutating runtime state | Fixed three-component diff proxy, exact bounded redacted contract, same-workflow target selection, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

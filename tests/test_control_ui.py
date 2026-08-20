@@ -124,6 +124,14 @@ class ControlUiContractTests(TestCase):
         self.assertIn("validateWorkflowPreflight", javascript)
         self.assertIn("WORKFLOW_PREFLIGHT_SCHEMA", javascript)
         self.assertIn("empty JSON object", javascript)
+        self.assertIn('id="workflow-diff-target"', html)
+        self.assertIn('id="load-workflow-diff"', html)
+        self.assertIn("Compare Versions", html)
+        self.assertIn("/api/v1/workflow-diffs/", javascript)
+        self.assertIn("loadLiveWorkflowDiff", javascript)
+        self.assertIn("validateWorkflowDiff", javascript)
+        self.assertIn("WORKFLOW_DIFF_SCHEMA", javascript)
+        self.assertIn(".workflow-diff-controls", css)
         self.assertIn(".run-cancel-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):

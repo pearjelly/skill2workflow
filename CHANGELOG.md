@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added **Compare Versions** to the live Workflow review. Operators can select
+  another version of the same workflow and fetch a bounded structural diff
+  through a fixed authenticated proxy. The browser accepts only the exact
+  `skill2workflow-workflow-diff-0.1.0` contract; workflow values, credentials,
+  provider data, and execution remain outside the UI boundary.
+
 - Added a bounded **Check Empty Trigger** action to the live Workflow review.
   It sends only `{}` through a fixed authenticated preflight proxy and reports
   input/mapping readiness without accepting business values, resolving

@@ -11,6 +11,7 @@
   const LIVE_OPERATIONAL_READINESS_URL = "/api/v1/operational-readiness";
   const LIVE_WORKFLOW_INVENTORY_URL = "/api/v1/workflows";
   const LIVE_WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/";
+  const LIVE_WORKFLOW_DIFF_PREFIX = "/api/v1/workflow-diffs/";
   const LIVE_WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
@@ -19,6 +20,7 @@
   const OPERATIONAL_READINESS_SCHEMA = "skill2workflow-operational-readiness-0.1.0";
   const WORKFLOW_INVENTORY_SCHEMA = "skill2workflow-workflow-inventory-0.1.0";
   const WORKFLOW_EXPLANATION_SCHEMA = "skill2workflow-workflow-explanation-0.1.0";
+  const WORKFLOW_DIFF_SCHEMA = "skill2workflow-workflow-diff-0.1.0";
   const WORKFLOW_PREFLIGHT_SCHEMA = "skill2workflow-workflow-preflight-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
   const LIVE_AUDIT_ROWS_MAX = 500;
@@ -58,6 +60,10 @@
     liveWorkflowExplanationKey: "",
     liveWorkflowExplanationLoading: false,
     liveWorkflowExplanationError: false,
+    liveWorkflowDiff: null,
+    liveWorkflowDiffKey: "",
+    liveWorkflowDiffLoading: false,
+    liveWorkflowDiffError: false,
     liveWorkflowPreflight: null,
     liveWorkflowPreflightKey: "",
     liveWorkflowPreflightLoading: false,
@@ -102,6 +108,9 @@
     els.workflowExplanationActions = document.getElementById("workflow-explanation-actions");
     els.workflowExplanationStatus = document.getElementById("workflow-explanation-status");
     els.loadWorkflowExplanation = document.getElementById("load-workflow-explanation");
+    els.workflowDiffTarget = document.getElementById("workflow-diff-target");
+    els.workflowDiffStatus = document.getElementById("workflow-diff-status");
+    els.loadWorkflowDiff = document.getElementById("load-workflow-diff");
     els.workflowPreflightStatus = document.getElementById("workflow-preflight-status");
     els.loadWorkflowPreflight = document.getElementById("load-workflow-preflight");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
@@ -148,6 +157,13 @@
     els.loadLiveReadiness.addEventListener("click", loadLiveReadiness);
     els.loadLiveWorkflows.addEventListener("click", loadLiveWorkflows);
     els.loadWorkflowExplanation.addEventListener("click", loadLiveWorkflowExplanation);
+    els.loadWorkflowDiff.addEventListener("click", loadLiveWorkflowDiff);
+    els.workflowDiffTarget.addEventListener("change", function () {
+      state.liveWorkflowDiff = null;
+      state.liveWorkflowDiffKey = "";
+      state.liveWorkflowDiffError = false;
+      renderDetail();
+    });
     els.loadWorkflowPreflight.addEventListener("click", loadLiveWorkflowPreflight);
     els.approveRun.addEventListener("click", function () {
       decideSelectedRun(true);
@@ -511,6 +527,53 @@
     } finally {
       state.liveWorkflowExplanationLoading = false;
       updateWorkflowExplanationControls();
+    }
+  }
+
+  async function loadLiveWorkflowDiff() {
+    const workflow = selectedLiveWorkflow();
+    const targetVersion = els.workflowDiffTarget.value;
+    if (!workflow || !isSafeWorkflowRef(targetVersion) || targetVersion === workflow.version || state.liveWorkflowDiffLoading) {
+      return;
+    }
+    const key = workflow.workflow_id + "@" + workflow.version + "@" + targetVersion;
+    state.liveWorkflowDiffLoading = true;
+    state.liveWorkflowDiffError = false;
+    updateWorkflowDiffControls();
+    setWorkflowDiffStatus("Loading bounded structural diff…", "");
+    try {
+      const url =
+        LIVE_WORKFLOW_DIFF_PREFIX +
+        encodeURIComponent(workflow.workflow_id) +
+        "/" +
+        encodeURIComponent(workflow.version) +
+        "/" +
+        encodeURIComponent(targetVersion);
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("workflow diff unavailable");
+      }
+      const diff = await response.json();
+      if (!validateWorkflowDiff(diff, workflow, targetVersion)) {
+        throw new Error("workflow diff unavailable");
+      }
+      state.liveWorkflowDiff = diff;
+      state.liveWorkflowDiffKey = key;
+      renderDetail();
+      setWorkflowDiffStatus(
+        "Structural diff loaded; no connector, credential, or workflow execution was invoked.",
+        "is-valid",
+      );
+      setStatus("Compared", "is-valid");
+    } catch (error) {
+      state.liveWorkflowDiff = null;
+      state.liveWorkflowDiffKey = key;
+      state.liveWorkflowDiffError = true;
+      renderDetail();
+      setWorkflowDiffStatus("Workflow diff unavailable; version metadata remains visible.", "is-invalid");
+    } finally {
+      state.liveWorkflowDiffLoading = false;
+      updateWorkflowDiffControls();
     }
   }
 
@@ -1057,6 +1120,90 @@
     });
   }
 
+  function validateWorkflowDiff(diff, selected, targetVersion) {
+    const sections = ["workflow", "entry", "input_schema", "policies", "nodes", "edges", "other"];
+    if (
+      !isObject(diff) ||
+      diff.schema_version !== WORKFLOW_DIFF_SCHEMA ||
+      !hasExactKeys(diff, ["schema_version", "workflow_id", "from", "to", "changed", "changes"]) ||
+      diff.workflow_id !== selected.workflow_id ||
+      typeof diff.changed !== "boolean" ||
+      !isObject(diff.from) ||
+      !hasExactKeys(diff.from, ["version", "status", "checksum", "aliases"]) ||
+      diff.from.version !== selected.version ||
+      !isPublishedOrDeprecated(diff.from.status) ||
+      !isChecksum(diff.from.checksum) ||
+      !validateWorkflowAliases(diff.from.aliases) ||
+      !isObject(diff.to) ||
+      !hasExactKeys(diff.to, ["version", "status", "checksum", "aliases"]) ||
+      diff.to.version !== targetVersion ||
+      !isPublishedOrDeprecated(diff.to.status) ||
+      !isChecksum(diff.to.checksum) ||
+      !validateWorkflowAliases(diff.to.aliases) ||
+      !isObject(diff.changes) ||
+      !hasExactKeys(diff.changes, [
+        "sections", "workflow_changed", "entry_changed", "input_schema_changed",
+        "policies_changed", "other_changed", "nodes", "edges",
+      ]) ||
+      !Array.isArray(diff.changes.sections) ||
+      diff.changes.sections.length > sections.length ||
+      diff.changes.sections.some(function (section) { return sections.indexOf(section) === -1; }) ||
+      !isUnique(diff.changes.sections) ||
+      !["workflow_changed", "entry_changed", "input_schema_changed", "policies_changed", "other_changed"].every(function (field) {
+        return typeof diff.changes[field] === "boolean";
+      }) ||
+      !validateDiffNames(diff.changes.nodes) ||
+      !validateDiffNames(diff.changes.edges)
+    ) {
+      return false;
+    }
+    const changedSections = {
+      workflow: diff.changes.workflow_changed,
+      entry: diff.changes.entry_changed,
+      input_schema: diff.changes.input_schema_changed,
+      policies: diff.changes.policies_changed,
+      nodes: diff.changes.nodes.added.length > 0 || diff.changes.nodes.removed.length > 0 || diff.changes.nodes.changed.length > 0,
+      edges: diff.changes.edges.added.length > 0 || diff.changes.edges.removed.length > 0 || diff.changes.edges.changed.length > 0,
+      other: diff.changes.other_changed,
+    };
+    return sections.every(function (section) {
+      return diff.changes.sections.indexOf(section) !== -1 === changedSections[section];
+    }) && diff.changed === diff.changes.sections.length > 0;
+  }
+
+  function isPublishedOrDeprecated(status) {
+    return status === "published" || status === "deprecated";
+  }
+
+  function isChecksum(value) {
+    return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+  }
+
+  function validateWorkflowAliases(aliases) {
+    return Array.isArray(aliases) && aliases.length <= 16 && aliases.every(function (alias) {
+      return isBoundedString(alias, 64);
+    }) && isSortedUnique(aliases);
+  }
+
+  function validateDiffNames(change) {
+    return isObject(change) && hasExactKeys(change, ["added", "removed", "changed"]) &&
+      ["added", "removed", "changed"].every(function (field) {
+        return Array.isArray(change[field]) && change[field].length <= 1000 &&
+          change[field].every(function (name) { return isBoundedString(name, 128); }) &&
+          isSortedUnique(change[field]);
+      });
+  }
+
+  function isSortedUnique(values) {
+    return values.every(function (value, index) {
+      return index === 0 || values[index - 1] < value;
+    });
+  }
+
+  function isUnique(values) {
+    return new Set(values).size === values.length;
+  }
+
   function validateExplanationInputContract(contract) {
     if (!isObject(contract) || !hasExactKeys(contract, [
       "present", "type", "required", "properties", "additional_properties",
@@ -1555,6 +1702,10 @@
     state.liveWorkflowExplanationKey = "";
     state.liveWorkflowExplanationLoading = false;
     state.liveWorkflowExplanationError = false;
+    state.liveWorkflowDiff = null;
+    state.liveWorkflowDiffKey = "";
+    state.liveWorkflowDiffLoading = false;
+    state.liveWorkflowDiffError = false;
     state.liveWorkflowPreflight = null;
     state.liveWorkflowPreflightKey = "";
     state.liveWorkflowPreflightLoading = false;
@@ -1657,6 +1808,10 @@
     state.liveWorkflowExplanationKey = "";
     state.liveWorkflowExplanationLoading = false;
     state.liveWorkflowExplanationError = false;
+    state.liveWorkflowDiff = null;
+    state.liveWorkflowDiffKey = "";
+    state.liveWorkflowDiffLoading = false;
+    state.liveWorkflowDiffError = false;
     state.liveWorkflowPreflight = null;
     state.liveWorkflowPreflightKey = "";
     state.liveWorkflowPreflightLoading = false;
@@ -2093,6 +2248,10 @@
         state.liveWorkflowExplanationKey = "";
         state.liveWorkflowExplanationLoading = false;
         state.liveWorkflowExplanationError = false;
+        state.liveWorkflowDiff = null;
+        state.liveWorkflowDiffKey = "";
+        state.liveWorkflowDiffLoading = false;
+        state.liveWorkflowDiffError = false;
         state.liveWorkflowPreflight = null;
         state.liveWorkflowPreflightKey = "";
         state.liveWorkflowPreflightLoading = false;
@@ -2148,6 +2307,7 @@
     const workflow = selectedLiveWorkflow();
     const visible = Boolean(workflow);
     els.workflowExplanationActions.hidden = !visible;
+    renderWorkflowDiffChoices(workflow);
     els.loadWorkflowExplanation.disabled =
       !visible || state.liveWorkflowExplanationLoading;
     els.loadWorkflowExplanation.textContent = state.liveWorkflowExplanationLoading
@@ -2161,6 +2321,7 @@
     if (!visible) {
       setWorkflowExplanationStatus("Select a live workflow version to review its plan.", "");
       setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
+      setWorkflowDiffStatus("Select another version of this workflow to review a structural diff.", "");
       return;
     }
     const key = workflow.workflow_id + "@" + workflow.version;
@@ -2188,6 +2349,39 @@
     } else {
       setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
     }
+    const diffKey = workflow.workflow_id + "@" + workflow.version + "@" + els.workflowDiffTarget.value;
+    if (state.liveWorkflowDiffLoading && state.liveWorkflowDiffKey === diffKey) {
+      setWorkflowDiffStatus("Loading bounded structural diff…", "");
+    } else if (state.liveWorkflowDiffError && state.liveWorkflowDiffKey === diffKey) {
+      setWorkflowDiffStatus("Workflow diff unavailable; version metadata remains visible.", "is-invalid");
+    } else if (state.liveWorkflowDiff && state.liveWorkflowDiffKey === diffKey) {
+      setWorkflowDiffStatus("Structural diff loaded; no connector, credential, or workflow execution was invoked.", "is-valid");
+    } else if (!els.workflowDiffTarget.value) {
+      setWorkflowDiffStatus("Load Live Workflows with at least two versions of this workflow first.", "");
+    } else {
+      setWorkflowDiffStatus("Compare release structure without exposing workflow values.", "");
+    }
+  }
+
+  function renderWorkflowDiffChoices(workflow) {
+    const current = els.workflowDiffTarget.value;
+    els.workflowDiffTarget.replaceChildren();
+    const versions = workflow && state.liveWorkflowInventory && Array.isArray(state.liveWorkflowInventory.versions)
+      ? state.liveWorkflowInventory.versions.filter(function (version) {
+        return version && version.workflow_id === workflow.workflow_id &&
+          version.version !== workflow.version && isSafeWorkflowRef(version.version);
+      })
+      : [];
+    versions.forEach(function (version) {
+      const option = document.createElement("option");
+      option.value = version.version;
+      option.textContent = version.version + " (" + version.status + ")";
+      els.workflowDiffTarget.appendChild(option);
+    });
+    if (versions.some(function (version) { return version.version === current; })) {
+      els.workflowDiffTarget.value = current;
+    }
+    updateWorkflowDiffControls(versions.length > 0);
   }
 
   function renderRunDetailStatus(selected) {
@@ -2269,6 +2463,11 @@
     }
     if (workflow && state.liveWorkflowPreflight && state.liveWorkflowPreflightKey === workflowKey) {
       detailEnvelope.redacted_empty_trigger_preflight = state.liveWorkflowPreflight;
+      hasEnvelope = true;
+    }
+    const diffKey = workflow ? workflow.workflow_id + "@" + workflow.version + "@" + els.workflowDiffTarget.value : "";
+    if (workflow && state.liveWorkflowDiff && state.liveWorkflowDiffKey === diffKey) {
+      detailEnvelope.redacted_workflow_diff = state.liveWorkflowDiff;
       hasEnvelope = true;
     }
     els.detailJson.textContent = JSON.stringify(hasEnvelope ? detailEnvelope : detail, null, 2);
@@ -2411,6 +2610,11 @@
     els.workflowPreflightStatus.className = className || "";
   }
 
+  function setWorkflowDiffStatus(text, className) {
+    els.workflowDiffStatus.textContent = text;
+    els.workflowDiffStatus.className = className || "";
+  }
+
   function updateRunPageControls() {
     const enabled = isLiveSnapshot() && state.liveRunPageHasMore;
     els.loadOlderRuns.disabled = !enabled || state.liveRunPageLoading;
@@ -2467,6 +2671,18 @@
     els.loadWorkflowPreflight.textContent = state.liveWorkflowPreflightLoading
       ? "Checking Trigger…"
       : "Check Empty Trigger";
+  }
+
+  function updateWorkflowDiffControls(hasTarget) {
+    const workflow = selectedLiveWorkflow();
+    const available = typeof hasTarget === "boolean"
+      ? hasTarget
+      : Boolean(workflow && els.workflowDiffTarget.value);
+    els.workflowDiffTarget.disabled = !workflow || !available || state.liveWorkflowDiffLoading;
+    els.loadWorkflowDiff.disabled = !workflow || !available || state.liveWorkflowDiffLoading;
+    els.loadWorkflowDiff.textContent = state.liveWorkflowDiffLoading
+      ? "Comparing…"
+      : "Compare Versions";
   }
 
   function emptySnapshot() {

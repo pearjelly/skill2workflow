@@ -633,6 +633,33 @@ tbody tr.is-selected {
   opacity: 0.55;
 }
 
+.workflow-diff-controls {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.workflow-diff-controls label {
+  color: var(--muted);
+}
+
+.workflow-diff-controls select {
+  min-height: 32px;
+  min-width: 0;
+  border: 1px solid rgba(23, 105, 170, 0.35);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 0 8px;
+}
+
+.workflow-diff-controls button {
+  min-width: 132px;
+}
+
 #detail-json {
   min-height: 0;
   margin: 0;

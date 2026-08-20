@@ -135,6 +135,14 @@ can see whether the empty trigger is ready, which required inputs or mappings
 would block it, and how many connector nodes are involved. No business input is
 accepted by this UI action, and the preflight is side-effect-free.
 
+The review card also offers **Compare Versions** after the inventory contains
+at least two versions of the selected workflow. It calls only the fixed
+same-origin `GET /api/v1/workflow-diffs/{workflow_id}/{from_version}/{to_version}`
+route and validates the bounded
+`skill2workflow-workflow-diff-0.1.0` contract. The result lists changed
+structural sections and bounded node/edge identifiers; it does not include
+Workflow values, credentials, provider data, or execution side effects.
+
 This live mode adds only the existing human-gate resume and cooperative
 cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider

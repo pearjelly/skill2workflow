@@ -211,6 +211,14 @@ the empty trigger is ready, missing required fields, or blocked by mappings.
 It never accepts business input, resolves credentials, invokes connectors, or
 creates a run.
 
+The selected-version review can also compare another version of the same
+workflow through the fixed `GET
+/api/v1/workflow-diffs/{workflow_id}/{from_version}/{to_version}` proxy. The
+browser accepts only the bounded
+`skill2workflow-workflow-diff-0.1.0` contract and renders changed sections plus
+bounded node/edge identifiers. The diff is read-only and value-free: it does
+not expose Workflow content, credentials, provider data, or execution state.
+
 ## Verification
 
 Run the real-process drill:
@@ -227,9 +235,9 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-220 add
+The live console remains a single-team operator boundary. Loops 211-221 add
 only the existing human-gate resume decision, cooperative cancellation, and
-redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation reads; the UI excludes browser credential
+redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation/workflow-diff reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
 automatic retries, provider reconciliation, and hosted TLS. Network exposure
