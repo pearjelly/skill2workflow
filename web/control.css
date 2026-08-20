@@ -585,6 +585,49 @@ tbody tr.is-selected {
   opacity: 0.55;
 }
 
+.workflow-explanation-actions {
+  padding: 12px;
+  border: 1px solid rgba(23, 105, 170, 0.28);
+  border-radius: 7px;
+  background: var(--blue-soft);
+}
+
+.workflow-explanation-actions strong {
+  display: block;
+  font-size: 13px;
+}
+
+.workflow-explanation-actions p {
+  margin: 5px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.workflow-explanation-actions p.is-valid {
+  color: var(--green);
+}
+
+.workflow-explanation-actions p.is-invalid {
+  color: var(--red);
+}
+
+.workflow-explanation-actions button {
+  min-height: 32px;
+  width: 100%;
+  border: 1px solid rgba(23, 105, 170, 0.35);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--blue);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.workflow-explanation-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 #detail-json {
   min-height: 0;
   margin: 0;

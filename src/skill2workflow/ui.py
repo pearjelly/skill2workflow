@@ -8,7 +8,7 @@ from functools import partial
 from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Callable, Optional
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
@@ -16,6 +16,7 @@ from .service import read_service_bearer_token
 from .service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
+    MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
@@ -28,6 +29,7 @@ from .service_client import (
     fetch_support_bundle,
     fetch_service_probe,
     fetch_workflow_inventory,
+    fetch_workflow_explanation,
     post_run_resume,
     post_run_cancel,
     service_endpoint,
@@ -44,6 +46,8 @@ _OPERATIONAL_READINESS_PATH = "/api/v1/operational-readiness"
 _OPERATIONAL_READINESS_MAX_RESPONSE_BYTES = MAX_OPERATIONAL_READINESS_RESPONSE_BYTES
 _WORKFLOW_INVENTORY_PATH = "/api/v1/workflows"
 _WORKFLOW_INVENTORY_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES
+_WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/"
+_WORKFLOW_EXPLANATION_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES
 _SUPPORT_BUNDLE_PATH = "/api/v1/support-bundle"
 _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
 _LIVE_RESUME_PREFIX = "/api/v1/runs/"
@@ -191,6 +195,22 @@ def serve_ui(
                     {"error": "workflow inventory path does not accept query parameters"},
                 )
                 return
+            if parsed.path.startswith(_WORKFLOW_EXPLANATION_PREFIX):
+                if parsed.query:
+                    self._write_json(
+                        404,
+                        {"error": "workflow explanation path is not available"},
+                    )
+                    return
+                references = _parse_live_workflow_explanation_path(parsed.path)
+                if references is None:
+                    self._write_json(
+                        404,
+                        {"error": "workflow explanation path is not available"},
+                    )
+                    return
+                self._serve_workflow_explanation(*references)
+                return
             if self.path == _SUPPORT_BUNDLE_PATH:
                 self._serve_support_bundle()
                 return
@@ -317,6 +337,37 @@ def serve_ui(
                     raise ValueError("workflow inventory unavailable")
             except Exception:
                 self._write_json(503, {"error": "workflow inventory unavailable"})
+                return
+            self._write_json(200, body, content_type="application/json")
+
+        def _serve_workflow_explanation(self, workflow_id, version):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow explanation is not configured"})
+                return
+            try:
+                explanation = fetch_workflow_explanation(
+                    configured_service_url,
+                    token_file,
+                    workflow_id,
+                    version,
+                )
+                body = json.dumps(
+                    explanation,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(body) > _WORKFLOW_EXPLANATION_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow explanation unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "workflow version not found"})
+                else:
+                    self._write_json(503, {"error": "workflow explanation unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "workflow explanation unavailable"})
                 return
             self._write_json(200, body, content_type="application/json")
 
@@ -627,6 +678,31 @@ def _is_safe_live_run_id(value: str) -> bool:
         and 5 <= len(value) <= 128
         and all(char.isascii() and (char.isalnum() or char in {"_", "-"}) for char in value)
     )
+
+
+def _parse_live_workflow_explanation_path(path: str):
+    """Accept exactly two safe, encoded Workflow reference components."""
+
+    if not path.startswith(_WORKFLOW_EXPLANATION_PREFIX):
+        return None
+    suffix = path[len(_WORKFLOW_EXPLANATION_PREFIX) :]
+    parts = suffix.split("/")
+    if len(parts) != 2 or any(not part for part in parts):
+        return None
+    values = tuple(unquote(part) for part in parts)
+    if any(
+        not value
+        or len(value) > 128
+        or any(
+            ord(char) < 0x20
+            or ord(char) == 0x7F
+            or char in {"/", "?", "#"}
+            for char in value
+        )
+        for value in values
+    ):
+        return None
+    return values
 
 
 def _parse_live_run_page_cursor(query: str) -> str:

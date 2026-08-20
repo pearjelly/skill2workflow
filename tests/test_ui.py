@@ -10,6 +10,7 @@ from unittest import TestCase
 from skill2workflow.cli import main
 from skill2workflow.ui import (
     _parse_live_audit_page_cursor,
+    _parse_live_workflow_explanation_path,
     _parse_live_run_page_cursor,
     find_ui_root,
     serve_ui,
@@ -20,6 +21,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_live_workflow_explanation_path_parser_accepts_only_two_safe_components(self):
+        self.assertEqual(
+            _parse_live_workflow_explanation_path(
+                "/api/v1/workflow-explanations/workflow_demo/0.1.0"
+            ),
+            ("workflow_demo", "0.1.0"),
+        )
+        for path in (
+            "/api/v1/workflow-explanations/workflow_demo",
+            "/api/v1/workflow-explanations/workflow_demo/0.1.0/extra",
+            "/api/v1/workflow-explanations/workflow%2Fdemo/0.1.0",
+            "/api/v1/workflow-explanations/workflow_demo/0.1.0%3Fdebug",
+        ):
+            with self.subTest(path=path):
+                self.assertIsNone(_parse_live_workflow_explanation_path(path))
+
     def test_live_run_page_cursor_parser_accepts_only_one_opaque_cursor(self):
         self.assertEqual(_parse_live_run_page_cursor(""), "")
         self.assertEqual(_parse_live_run_page_cursor("cursor=abc-123"), "abc-123")
@@ -1094,6 +1111,139 @@ class UiTests(TestCase):
                 ui_thread.join(timeout=2)
                 self.assertFalse(ui_thread.is_alive())
                 self.assertEqual(observed["path"], "/api/v1/workflows")
+                self.assertEqual(
+                    observed["authorization"],
+                    "Bearer ui-test-token-012345678901234567890123456789",
+                )
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)
+
+    def test_live_proxy_exposes_workflow_explanation_without_browser_token(self):
+        observed = {}
+        explanation = {
+            "schema_version": "skill2workflow-workflow-explanation-0.1.0",
+            "workflow": {"id": "workflow_demo", "version": "0.1.0", "status": "published"},
+            "entry": "start",
+            "summary": {
+                "node_count": 2,
+                "edge_count": 1,
+                "human_gate_count": 0,
+                "connector_node_count": 0,
+                "side_effecting_node_count": 0,
+                "terminal_node_count": 1,
+                "retrying_node_count": 0,
+                "timed_node_count": 0,
+                "input_property_count": 0,
+                "required_input_count": 0,
+            },
+            "nodes": [
+                {
+                    "id": "start",
+                    "type": "start",
+                    "transitions": {"success": "end", "failure": None, "fallback": None},
+                    "connector": None,
+                    "external_side_effect": False,
+                    "retry": {"max_attempts": 0, "backoff_ms": 0},
+                    "timeout_ms": None,
+                },
+                {
+                    "id": "end",
+                    "type": "end",
+                    "transitions": {"success": None, "failure": None, "fallback": None},
+                    "connector": None,
+                    "external_side_effect": False,
+                    "retry": {"max_attempts": 0, "backoff_ms": 0},
+                    "timeout_ms": None,
+                },
+            ],
+            "edges": [{"from": "start", "to": "end", "label": "next", "conditioned": False}],
+            "input_contract": {
+                "present": False,
+                "type": "object",
+                "required": [],
+                "properties": [],
+                "additional_properties": True,
+            },
+            "policies": {
+                "default_retry": {"max_attempts": 0, "backoff_ms": 0},
+                "default_timeout_ms": None,
+                "workflow_timeout_ms": None,
+            },
+            "safety": {
+                "side_effect_free": True,
+                "connector_calls": False,
+                "credentials_resolved": False,
+                "raw_values_included": False,
+            },
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                body = json.dumps(explanation, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text(
+                    "ui-test-token-012345678901234567890123456789\n",
+                    encoding="utf-8",
+                )
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+
+                def ready(server):
+                    ui_port["value"] = server.server_port
+
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1",
+                        "port": 0,
+                        "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file,
+                        "ready_callback": ready,
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                with urllib.request.urlopen(
+                    "http://127.0.0.1:{}/api/v1/workflow-explanations/workflow_demo/0.1.0".format(
+                        ui_port["value"]
+                    ),
+                    timeout=2,
+                ) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(payload["workflow"]["id"], "workflow_demo")
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(
+                    observed["path"],
+                    "/api/v1/workflow-explanations/workflow_demo/0.1.0",
+                )
                 self.assertEqual(
                     observed["authorization"],
                     "Bearer ui-test-token-012345678901234567890123456789",

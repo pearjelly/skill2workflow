@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-218
+- Completed delivery loops: 1-219
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 218 is complete with live published-workflow inventory
+- Active loop: None; Loop 219 is complete with live workflow-plan review
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-218 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-219 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5735,9 +5735,46 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 219: Live Workflow-Plan Review
+
+**Status:** Complete.
+
+**Prior basis:** Loop 218 made current published versions discoverable in the
+live console, but an operator still had to leave the console to understand a
+selected version's topology, human gates, connector side effects, retries, and
+deadlines before approving a run or investigating a release.
+
+**Outcome:** Selecting a live Registry version now enables **Review Workflow
+Plan** through one fixed same-origin
+`GET /api/v1/workflow-explanations/{workflow_id}/{version}` proxy. The UI
+validates the existing `skill2workflow-workflow-explanation-0.1.0` contract,
+including bounded nodes/edges and the side-effect-free safety flags, then
+renders the redacted plan in the selection detail. Static, example, and file
+snapshots keep the action disabled.
+
+**Evidence:** UI integration tests prove exact two-component path parsing,
+server-side Authorization forwarding, `no-store`, and the value-free response
+boundary. Control UI contract tests cover the live-only action, exact schema
+validation, and static boundary. The installed UI guide, live-control guide,
+Changelog, README, and this Roadmap record the operator contract; the full UI,
+package, reproducible-build, secret-hygiene, external-connector, full-suite,
+and Production Baseline gates remain the release checks.
+
+**Safety boundary:** This is bounded, read-only workflow explanation. It does
+not execute, trigger, publish, promote, deprecate, repair, or mutate a
+Workflow; it does not resolve credentials or invoke connectors, and it does
+not expose Workflow values, instructions, artifact paths, trigger inputs, or
+provider data.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 218 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 219 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -5922,6 +5959,7 @@ This rolling queue is ordered. Loop 218 is complete and there is no active deliv
 | Loop 216: Bounded Live Recurring-Schedule Discovery | Complete | Let operators inspect recurring schedule health and next-run timing from the live console without schedule mutation or trigger-input exposure | Fixed schedule inventory proxy, exact 100-item redacted contract, schedule table, UI/route tests, docs, and full gates |
 | Loop 217: Live Production-Readiness Diagnostics | Complete | Let operators inspect actionable service, artifact, audit, backup, and blocking-reason checks from the live console without mutation or value exposure | Fixed operational-readiness proxy, exact schema validation, readiness table, UI/route tests, docs, and full gates |
 | Loop 218: Live Published-Workflow Inventory | Complete | Let operators inspect current published versions, aliases, lifecycle status, and checksums from the live console without Workflow content exposure | Fixed workflow-inventory proxy, exact 100-item redacted contract, live registry table, UI/route tests, docs, and full gates |
+| Loop 219: Live Workflow-Plan Review | Complete | Let operators review a selected live version's topology, gates, connector side effects, retries, and timeouts without executing it or exposing values | Fixed workflow-explanation proxy, exact bounded redacted contract, selection review action, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

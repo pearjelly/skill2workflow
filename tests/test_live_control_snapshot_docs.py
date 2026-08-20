@@ -62,6 +62,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         installed_ui = (ROOT / "docs" / "installed-ui.md").read_text(
             encoding="utf-8"
         )
+        guide = (ROOT / "docs" / "live-control-snapshot.md").read_text(
+            encoding="utf-8"
+        )
         observability = (ROOT / "docs" / "observability.md").read_text(
             encoding="utf-8"
         )
@@ -74,9 +77,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         )
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-218 are complete", readme)
+        self.assertIn("Delivery Loops 1-219 are complete", readme)
         self.assertIn("docs/live-control-snapshot.md", readme)
-        self.assertIn("- Completed delivery loops: 1-218", roadmap)
+        self.assertIn("- Completed delivery loops: 1-219", roadmap)
         self.assertIn(
             "| Loop 55: Authenticated Live Operator Snapshot | Complete |",
             roadmap,
@@ -97,6 +100,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         self.assertIn("Load Live Readiness", installed_ui)
         self.assertIn("/api/v1/operational-readiness", installed_ui)
         self.assertIn("Loop 217: Live Production-Readiness Diagnostics", roadmap)
-        self.assertIn("Loop 218: Live Published-Workflow Inventory", roadmap)
+        self.assertIn("Loop 219: Live Workflow-Plan Review", roadmap)
         self.assertIn("Load Live Workflows", installed_ui)
         self.assertIn("/api/v1/workflows", installed_ui)
+        self.assertIn("Review Workflow Plan", installed_ui)
+        self.assertIn("workflow-explanations/{workflow_id}/{version}", guide)
+        self.assertIn("skill2workflow-workflow-explanation-0.1.0", guide)

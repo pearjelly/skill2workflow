@@ -120,6 +120,14 @@ checksum for recognition. Workflow names/DSL, artifact paths, timestamps,
 credentials, trigger inputs, and provider data never enter the browser;
 static, example, and file snapshots keep the control disabled.
 
+Selecting a live version enables **Review Workflow Plan** through the fixed
+same-origin `/api/v1/workflow-explanations/{workflow_id}/{version}` route. The
+browser accepts only the `skill2workflow-workflow-explanation-0.1.0` contract
+within its bounded 64 KiB response and renders a read-only topology and policy
+review. The review contains no Workflow values, instructions, artifact paths,
+credentials, trigger inputs, or provider data, and it never invokes a
+connector; static, example, and file snapshots keep the action disabled.
+
 This live mode adds only the existing human-gate resume and cooperative
 cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider

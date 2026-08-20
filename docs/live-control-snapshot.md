@@ -195,6 +195,14 @@ prefixes. Workflow content, artifact paths, timestamps, credentials, trigger
 inputs, and provider data remain outside the UI boundary; static/file snapshots
 never expose the control.
 
+Selecting a version from the live Registry can load its value-free execution
+plan through the fixed `GET /api/v1/workflow-explanations/{workflow_id}/{version}`
+proxy. The browser validates the
+`skill2workflow-workflow-explanation-0.1.0` contract and bounded topology,
+policy, connector-side-effect, retry, timeout, and human-gate metadata. It
+does not invoke connectors or resolve credentials, and it excludes Workflow
+values, instructions, artifact paths, trigger inputs, and provider data.
+
 ## Verification
 
 Run the real-process drill:
@@ -211,9 +219,9 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-218 add
+The live console remains a single-team operator boundary. Loops 211-219 add
 only the existing human-gate resume decision, cooperative cancellation, and
-redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory reads; the UI excludes browser credential
+redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
 automatic retries, provider reconciliation, and hosted TLS. Network exposure

@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a bounded **Review Workflow Plan** action to the live control-plane
+  UI. It uses a fixed same-origin proxy for the existing authenticated,
+  side-effect-free explanation contract and shows topology, gates, connector
+  side effects, retries, and timeouts without exposing Workflow values,
+  credentials, or invoking a connector.
+
 - Added a bounded **Load Live Workflows** view to the live control-plane UI.
   It reuses the authenticated redacted published-version inventory through a
   fixed server-side proxy and shows lifecycle status, aliases, and recognition
