@@ -50,6 +50,8 @@ class InstalledUiDocumentationTests(TestCase):
         self.assertIn("skill2workflow-recurring-schedule-dispatch-page-0.1.0", docs)
         self.assertIn("Record Review", docs)
         self.assertIn("recurring-schedule-dispatch-reviews/{dispatch_id}", docs)
+        self.assertIn("Promote to production", docs)
+        self.assertIn("/api/v1/workflow-promotions", docs)
         self.assertIn("Installed UI", guide)
         self.assertIn('"share/skill2workflow/web"', pyproject)
         self.assertIn("Loop 206: Installed Static UI Launcher", roadmap)
@@ -70,3 +72,4 @@ class InstalledUiDocumentationTests(TestCase):
         self.assertIn("Loop 221: Live Workflow Version Diff Review", roadmap)
         self.assertIn("Loop 222: Live Recurring-Dispatch Evidence", roadmap)
         self.assertIn("Loop 223: Live Uncertain-Dispatch Review", roadmap)
+        self.assertIn("Loop 224: Live Workflow Promotion", roadmap)

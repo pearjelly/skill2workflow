@@ -15,6 +15,7 @@
   const LIVE_WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/";
   const LIVE_WORKFLOW_DIFF_PREFIX = "/api/v1/workflow-diffs/";
   const LIVE_WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/";
+  const LIVE_WORKFLOW_PROMOTION_URL = "/api/v1/workflow-promotions";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
   const AUDIT_PAGE_SCHEMA = "skill2workflow-audit-event-list-0.1.0";
@@ -26,6 +27,7 @@
   const WORKFLOW_EXPLANATION_SCHEMA = "skill2workflow-workflow-explanation-0.1.0";
   const WORKFLOW_DIFF_SCHEMA = "skill2workflow-workflow-diff-0.1.0";
   const WORKFLOW_PREFLIGHT_SCHEMA = "skill2workflow-workflow-preflight-0.1.0";
+  const WORKFLOW_PROMOTION_SCHEMA = "skill2workflow-workflow-promotion-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
   const LIVE_AUDIT_ROWS_MAX = 500;
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
@@ -81,6 +83,8 @@
     liveWorkflowPreflightKey: "",
     liveWorkflowPreflightLoading: false,
     liveWorkflowPreflightError: false,
+    liveWorkflowPromotionLoading: false,
+    liveWorkflowPromotionError: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -134,6 +138,8 @@
     els.loadWorkflowDiff = document.getElementById("load-workflow-diff");
     els.workflowPreflightStatus = document.getElementById("workflow-preflight-status");
     els.loadWorkflowPreflight = document.getElementById("load-workflow-preflight");
+    els.promoteWorkflow = document.getElementById("promote-workflow");
+    els.workflowPromotionStatus = document.getElementById("workflow-promotion-status");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -195,6 +201,7 @@
       renderDetail();
     });
     els.loadWorkflowPreflight.addEventListener("click", loadLiveWorkflowPreflight);
+    els.promoteWorkflow.addEventListener("click", promoteLiveWorkflow);
     els.approveRun.addEventListener("click", function () {
       decideSelectedRun(true);
     });
@@ -736,6 +743,66 @@
     }
   }
 
+  async function promoteLiveWorkflow() {
+    const workflow = selectedLiveWorkflow();
+    const promotion = liveWorkflowPromotionTarget(workflow);
+    if (!promotion || state.liveWorkflowPromotionLoading) {
+      return;
+    }
+    if (typeof window.confirm === "function" && !window.confirm(
+      "Promote " + workflow.workflow_id + "@" + workflow.version +
+      " to the production alias? This changes the next alias-based trigger target."
+    )) {
+      return;
+    }
+    state.liveWorkflowPromotionLoading = true;
+    state.liveWorkflowPromotionError = false;
+    updateWorkflowPromotionControls();
+    setWorkflowPromotionStatus("Recording the compare-and-swap promotion…", "");
+    try {
+      const response = await fetch(LIVE_WORKFLOW_PROMOTION_URL, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workflow_id: workflow.workflow_id,
+          version: workflow.version,
+          alias: "production",
+          expected_current_version: promotion.expectedCurrentVersion,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("workflow promotion unavailable");
+      }
+      const result = await response.json();
+      if (!validateWorkflowPromotion(result, workflow)) {
+        throw new Error("workflow promotion unavailable");
+      }
+      setWorkflowPromotionStatus(
+        "Production alias promoted; reload the inventory to confirm the new target.",
+        "is-valid",
+      );
+      setStatus("Promoted", "is-valid");
+      await loadLiveWorkflows();
+      const refreshed = state.liveWorkflowInventory && state.liveWorkflowInventory.versions.find(function (item) {
+        return item && item.workflow_id === workflow.workflow_id && item.version === workflow.version;
+      });
+      if (refreshed) {
+        state.selected = { kind: "live workflow", value: refreshed };
+        render();
+      }
+    } catch (error) {
+      state.liveWorkflowPromotionError = true;
+      setWorkflowPromotionStatus(
+        "Promotion unavailable or stale; the production alias was not assumed to change.",
+        "is-invalid",
+      );
+    } finally {
+      state.liveWorkflowPromotionLoading = false;
+      updateWorkflowPromotionControls();
+    }
+  }
+
   function selectedLiveWorkflow() {
     if (
       !isLiveSnapshot() ||
@@ -753,6 +820,38 @@
       return null;
     }
     return workflow;
+  }
+
+  function liveWorkflowPromotionTarget(workflow) {
+    if (
+      !workflow || workflow.status !== "published" ||
+      !state.liveWorkflowInventory || !Array.isArray(state.liveWorkflowInventory.versions)
+    ) {
+      return null;
+    }
+    const versions = state.liveWorkflowInventory.versions.filter(function (item) {
+      return item && item.workflow_id === workflow.workflow_id;
+    });
+    const current = versions.filter(function (item) {
+      return Array.isArray(item.aliases) && item.aliases.indexOf("production") !== -1;
+    });
+    if (current.length > 1 || (current.length === 1 && current[0].version === workflow.version)) {
+      return null;
+    }
+    return {
+      expectedCurrentVersion: current.length === 1 ? current[0].version : "",
+    };
+  }
+
+  function validateWorkflowPromotion(result, workflow) {
+    return isObject(result) &&
+      result.schema_version === WORKFLOW_PROMOTION_SCHEMA &&
+      hasExactKeys(result, ["schema_version", "workflow_id", "version", "alias", "status", "checksum"]) &&
+      result.workflow_id === workflow.workflow_id &&
+      result.version === workflow.version &&
+      result.alias === "production" &&
+      result.status === "promoted" &&
+      typeof result.checksum === "string" && /^[0-9a-f]{64}$/.test(result.checksum);
   }
 
   function selectedLiveSchedule() {
@@ -1909,6 +2008,8 @@
     state.liveWorkflowPreflightKey = "";
     state.liveWorkflowPreflightLoading = false;
     state.liveWorkflowPreflightError = false;
+    state.liveWorkflowPromotionLoading = false;
+    state.liveWorkflowPromotionError = false;
     state.liveRunRows = null;
     state.liveRunPageCursor = "";
     state.liveRunPageHasMore = Boolean(
@@ -2023,6 +2124,8 @@
     state.liveWorkflowExplanationKey = "";
     state.liveWorkflowExplanationLoading = false;
     state.liveWorkflowExplanationError = false;
+    state.liveWorkflowPromotionLoading = false;
+    state.liveWorkflowPromotionError = false;
     state.liveWorkflowDiff = null;
     state.liveWorkflowDiffKey = "";
     state.liveWorkflowDiffLoading = false;
@@ -2471,6 +2574,8 @@
         state.liveWorkflowPreflightKey = "";
         state.liveWorkflowPreflightLoading = false;
         state.liveWorkflowPreflightError = false;
+        state.liveWorkflowPromotionLoading = false;
+        state.liveWorkflowPromotionError = false;
         state.liveScheduleDispatchPage = null;
         state.liveScheduleDispatchRows = null;
         state.liveScheduleDispatchScheduleId = "";
@@ -2640,6 +2745,7 @@
     const visible = Boolean(workflow);
     els.workflowExplanationActions.hidden = !visible;
     renderWorkflowDiffChoices(workflow);
+    updateWorkflowPromotionControls();
     els.loadWorkflowExplanation.disabled =
       !visible || state.liveWorkflowExplanationLoading;
     els.loadWorkflowExplanation.textContent = state.liveWorkflowExplanationLoading
@@ -2654,6 +2760,7 @@
       setWorkflowExplanationStatus("Select a live workflow version to review its plan.", "");
       setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
       setWorkflowDiffStatus("Select another version of this workflow to review a structural diff.", "");
+      setWorkflowPromotionStatus("Select a published version that is not already the production target.", "");
       return;
     }
     const key = workflow.workflow_id + "@" + workflow.version;
@@ -2692,6 +2799,20 @@
       setWorkflowDiffStatus("Load Live Workflows with at least two versions of this workflow first.", "");
     } else {
       setWorkflowDiffStatus("Compare release structure without exposing workflow values.", "");
+    }
+    const promotion = liveWorkflowPromotionTarget(workflow);
+    if (state.liveWorkflowPromotionLoading) {
+      setWorkflowPromotionStatus("Recording the compare-and-swap promotion…", "");
+    } else if (state.liveWorkflowPromotionError) {
+      setWorkflowPromotionStatus("Promotion unavailable or stale; the production alias was not assumed to change.", "is-invalid");
+    } else if (!state.liveWorkflowInventory) {
+      setWorkflowPromotionStatus("Load Live Workflows before changing the production alias.", "");
+    } else if (workflow.status !== "published") {
+      setWorkflowPromotionStatus("Only published versions can receive the production alias.", "");
+    } else if (!promotion) {
+      setWorkflowPromotionStatus("This version is already the production target or the alias state is ambiguous.", "");
+    } else {
+      setWorkflowPromotionStatus("Promotion uses the observed production target as a compare-and-swap precondition.", "");
     }
   }
 
@@ -2956,6 +3077,11 @@
     els.workflowDiffStatus.className = className || "";
   }
 
+  function setWorkflowPromotionStatus(text, className) {
+    els.workflowPromotionStatus.textContent = text;
+    els.workflowPromotionStatus.className = className || "";
+  }
+
   function setScheduleDispatchStatus(text, className) {
     els.scheduleDispatchStatus.textContent = text;
     els.scheduleDispatchStatus.className = className || "";
@@ -3075,6 +3201,15 @@
     els.loadWorkflowDiff.textContent = state.liveWorkflowDiffLoading
       ? "Comparing…"
       : "Compare Versions";
+  }
+
+  function updateWorkflowPromotionControls() {
+    const workflow = selectedLiveWorkflow();
+    const target = liveWorkflowPromotionTarget(workflow);
+    els.promoteWorkflow.disabled = !target || state.liveWorkflowPromotionLoading;
+    els.promoteWorkflow.textContent = state.liveWorkflowPromotionLoading
+      ? "Promoting…"
+      : "Promote to production";
   }
 
   function emptySnapshot() {

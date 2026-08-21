@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-223
+- Completed delivery loops: 1-224
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 223 is complete with live uncertain-dispatch review
+- Active loop: None; Loop 224 is complete with live workflow promotion
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-223 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-224 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5922,9 +5922,47 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 224: Live Workflow Promotion
+
+**Status:** Complete.
+
+**Prior basis:** Loop 221 let operators compare published versions and Loop
+220 let them check empty-trigger readiness, but the live console still forced
+the final stable-alias change through a separate CLI workflow. That split made
+the reviewed release path harder to follow and encouraged copying identifiers
+between tools.
+
+**Outcome:** Selecting a published live version now offers **Promote to
+production** through the fixed same-origin
+`POST /api/v1/workflow-promotions` proxy. The browser requires explicit
+confirmation and sends only the workflow id, version, fixed `production` alias,
+and the observed current alias target. The service reuses the existing
+compare-and-swap promotion boundary; stale or ambiguous inventory fails closed
+and the UI never accepts Workflow content, trigger input, credentials, or an
+arbitrary alias.
+
+**Evidence:** UI integration tests prove server-side Authorization forwarding,
+the exact promotion body, `no-store`, and the redacted response contract.
+Control UI contract tests cover the fixed route, confirmation action, and
+strict schema validation. The installed UI guide, live-control guide,
+Changelog, README, and this Roadmap record the operator boundary; the full UI,
+package, reproducible-build, secret-hygiene, external-connector, full-suite,
+and Production Baseline gates remain the release checks.
+
+**Safety boundary:** This is a reviewed stable-alias mutation, not Workflow
+publication or execution. It does not accept a Workflow document, trigger a
+run, resolve credentials, invoke connectors, mutate arbitrary aliases, or
+bypass the service's compare-and-swap precondition.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 223 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 224 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6114,6 +6152,7 @@ This rolling queue is ordered. Loop 223 is complete and there is no active deliv
 | Loop 221: Live Workflow Version Diff Review | Complete | Let operators compare two versions of one live workflow without exposing values or mutating runtime state | Fixed three-component diff proxy, exact bounded redacted contract, same-workflow target selection, UI/route tests, docs, and full gates |
 | Loop 222: Live Recurring-Dispatch Evidence | Complete | Let operators inspect cursor-paged recurring dispatch outcomes, including uncertain records, without claiming or replaying work | Fixed schedule/cursor proxy, exact bounded redacted contract, 500-row browser cap, UI/route tests, docs, and full gates |
 | Loop 223: Live Uncertain-Dispatch Review | Complete | Let operators record one explicit conclusion for an uncertain dispatch without replaying or claiming work | Fixed confirmation-protected review proxy, outcome allowlist, CAS/audit reuse, UI/route tests, docs, and full gates |
+| Loop 224: Live Workflow Promotion | Complete | Let operators promote one reviewed published version to the fixed production alias without leaving the live console | Fixed confirmation-protected promotion proxy, observed-alias CAS precondition, strict UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

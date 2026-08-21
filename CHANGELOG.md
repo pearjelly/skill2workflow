@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a confirmation-protected **Promote to production** action for a
+  selected published live workflow version. It uses the observed production
+  alias target as a compare-and-swap precondition through a fixed authenticated
+  proxy and never accepts arbitrary aliases, workflow payloads, credentials, or
+  trigger input.
+
 - Added a confirmation-protected **Record Review** action for an uncertain
   recurring dispatch in the live console. It sends only the selected
   server-provided completion timestamp and a fixed outcome allowlist through a

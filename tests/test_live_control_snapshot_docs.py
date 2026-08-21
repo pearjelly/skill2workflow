@@ -77,9 +77,9 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         )
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-223 are complete", readme)
+        self.assertIn("Delivery Loops 1-224 are complete", readme)
         self.assertIn("docs/live-control-snapshot.md", readme)
-        self.assertIn("- Completed delivery loops: 1-223", roadmap)
+        self.assertIn("- Completed delivery loops: 1-224", roadmap)
         self.assertIn(
             "| Loop 55: Authenticated Live Operator Snapshot | Complete |",
             roadmap,
@@ -117,3 +117,5 @@ class LiveControlSnapshotDocumentationTests(TestCase):
         self.assertIn("Load Dispatch Evidence", installed_ui)
         self.assertIn("recurring-schedule-dispatch-reviews/{dispatch_id}", guide)
         self.assertIn("Record Review", installed_ui)
+        self.assertIn("workflow-promotions", guide)
+        self.assertIn("Promote to production", installed_ui)

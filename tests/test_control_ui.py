@@ -148,6 +148,14 @@ class ControlUiContractTests(TestCase):
         self.assertIn("validateRecurringScheduleDispatchReview", javascript)
         self.assertIn("SCHEDULE_DISPATCH_REVIEW_SCHEMA", javascript)
         self.assertIn(".run-cancel-actions", css)
+        self.assertIn('id="promote-workflow"', html)
+        self.assertIn("Promote to production", html)
+        self.assertIn("/api/v1/workflow-promotions", javascript)
+        self.assertIn("promoteLiveWorkflow", javascript)
+        self.assertIn("validateWorkflowPromotion", javascript)
+        self.assertIn("WORKFLOW_PROMOTION_SCHEMA", javascript)
+        self.assertIn("expectedCurrentVersion", javascript)
+        self.assertIn(".workflow-promotion-controls", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):
         guide = (ROOT / "docs" / "live-control-snapshot.md").read_text(

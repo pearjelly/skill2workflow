@@ -23,6 +23,8 @@ from .service_client import (
     MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
+    MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES,
+    MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES,
     MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES,
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
@@ -41,6 +43,7 @@ from .service_client import (
     fetch_workflow_explanation,
     fetch_workflow_diff,
     fetch_workflow_preflight,
+    post_workflow_promotion,
     post_run_resume,
     post_run_cancel,
     service_endpoint,
@@ -64,6 +67,9 @@ _WORKFLOW_DIFF_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES
 _WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/"
 _WORKFLOW_PREFLIGHT_MAX_REQUEST_BYTES = min(16, MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES)
 _WORKFLOW_PREFLIGHT_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES
+_WORKFLOW_PROMOTION_PATH = "/api/v1/workflow-promotions"
+_WORKFLOW_PROMOTION_MAX_REQUEST_BYTES = min(512, MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES)
+_WORKFLOW_PROMOTION_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES
 _SUPPORT_BUNDLE_PATH = "/api/v1/support-bundle"
 _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
 _LIVE_RESUME_PREFIX = "/api/v1/runs/"
@@ -130,11 +136,12 @@ def serve_ui(
     service_url: Optional[str] = None,
     auth_token_file: Optional[Path] = None,
 ) -> None:
-    """Serve the UI, optionally adding one authenticated read-only live route.
+    """Serve the UI, optionally adding fixed authenticated live routes.
 
     Static mode never accesses runtime state. Live mode is opt-in and keeps the
-    Bearer token server-side: the browser can request only the fixed snapshot
-    path, while the UI process reads the owner-only token file per request.
+    Bearer token server-side: the browser can request only the fixed documented
+    snapshot, diagnostics, and confirmation-protected operator-action paths,
+    while the UI process reads the owner-only token file per request.
     """
 
     if str(host).lower() not in _LOOPBACK_HOSTS:
@@ -281,6 +288,15 @@ def serve_ui(
 
         def do_POST(self):
             parsed = urlsplit(self.path)
+            if parsed.path == _WORKFLOW_PROMOTION_PATH:
+                if parsed.query:
+                    self._write_json(
+                        404,
+                        {"error": "workflow promotion path is not available"},
+                    )
+                    return
+                self._serve_live_workflow_promotion()
+                return
             if parsed.path.startswith(_LIVE_SCHEDULE_DISPATCH_REVIEW_PREFIX):
                 if parsed.query:
                     self._write_json(
@@ -816,6 +832,82 @@ def serve_ui(
                 return
             self._write_json(200, response_body, content_type="application/json")
 
+        def _serve_live_workflow_promotion(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow promotion is not configured"})
+                return
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(400, {"error": "workflow promotion body is malformed"})
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(400, {"error": "workflow promotion body is malformed"})
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(400, {"error": "workflow promotion body is malformed"})
+                return
+            if content_length > _WORKFLOW_PROMOTION_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "workflow promotion body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(400, {"error": "workflow promotion body is malformed"})
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != {
+                    "workflow_id",
+                    "version",
+                    "alias",
+                    "expected_current_version",
+                }
+                or any(not isinstance(payload.get(field), str) for field in payload)
+                or payload.get("alias") != "production"
+                or not _is_safe_workflow_ref(payload.get("workflow_id"), allow_empty=False)
+                or not _is_safe_workflow_ref(payload.get("version"), allow_empty=False)
+                or not _is_safe_workflow_ref(payload.get("expected_current_version"), allow_empty=True)
+            ):
+                self._write_json(400, {"error": "workflow promotion body is malformed"})
+                return
+            try:
+                response = post_workflow_promotion(
+                    configured_service_url,
+                    token_file,
+                    payload["workflow_id"],
+                    payload["version"],
+                    alias="production",
+                    expected_current_version=payload["expected_current_version"],
+                )
+                response_body = json.dumps(
+                    response,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(response_body) > _WORKFLOW_PROMOTION_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow promotion unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "workflow version not found"})
+                elif error.status_code == 409:
+                    self._write_json(409, {"error": "workflow promotion conflict"})
+                else:
+                    self._write_json(503, {"error": "workflow promotion unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "workflow promotion unavailable"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
+
         def _serve_live_resume(self, run_id):
             configured_service_url = getattr(self.server, "live_service_url", None)
             token_file = getattr(self.server, "live_auth_token_file", None)
@@ -1052,6 +1144,19 @@ def _parse_live_schedule_dispatch_review_path(path: str):
     ):
         return None
     return dispatch_id
+
+
+def _is_safe_workflow_ref(value, *, allow_empty):
+    """Match the service workflow-reference boundary for fixed UI bodies."""
+
+    if not isinstance(value, str) or len(value) > 128:
+        return False
+    if not allow_empty and not value:
+        return False
+    return not any(
+        ord(char) < 0x20 or ord(char) == 0x7F or char in {"/", "?", "#"}
+        for char in value
+    )
 
 
 def _parse_live_workflow_preflight_path(path: str):

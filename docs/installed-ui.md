@@ -163,8 +163,17 @@ route and validates the bounded
 structural sections and bounded node/edge identifiers; it does not include
 Workflow values, credentials, provider data, or execution side effects.
 
-This live mode adds only the existing human-gate resume and cooperative
-cancellation mutations. It does not add TLS, public ingress, RBAC, workflow
+The same review card offers **Promote to production** for a selected published
+version. The operator must confirm in the browser; the UI sends only the
+workflow id/version, the fixed `production` alias, and the observed current
+alias target to `POST /api/v1/workflow-promotions`. The service applies its
+existing compare-and-swap boundary, so stale inventory fails closed. This
+action accepts no workflow payload, trigger input, credential, or arbitrary
+alias.
+
+This live mode adds only the existing human-gate resume, cooperative
+cancellation, and fixed production-alias promotion mutations. It does not add
+TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider
 reconciliation. Keep the UI on loopback or place it behind an
 operator-managed HTTPS boundary when serving a wider network.

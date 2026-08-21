@@ -82,6 +82,10 @@ of the same workflow through a bounded, value-free structural diff. Selecting
 a live recurring schedule also exposes bounded dispatch evidence, including
 older pages and uncertain outcomes, and can record a fixed, confirmation-
 protected review conclusion without adding a replay or claim path.
+Selecting a published live workflow version also enables a fixed,
+confirmation-protected promotion to the `production` alias using a
+compare-and-swap precondition; the UI never accepts an arbitrary alias or
+workflow payload.
 
 ## Visual Overview
 
@@ -881,7 +885,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-223 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-224 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring

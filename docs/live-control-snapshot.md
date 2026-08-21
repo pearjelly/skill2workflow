@@ -238,6 +238,15 @@ browser accepts only the bounded
 bounded node/edge identifiers. The diff is read-only and value-free: it does
 not expose Workflow content, credentials, provider data, or execution state.
 
+Selecting a published version also offers a confirmation-protected
+**Promote to production** action through the fixed
+`POST /api/v1/workflow-promotions` proxy. The browser sends only the selected
+workflow id/version, the fixed `production` alias, and the observed current
+alias target. The service reuses its compare-and-swap promotion contract;
+stale inventory returns a conflict and the UI does not assume success. The
+action never accepts workflow content, trigger input, credentials, or arbitrary
+aliases.
+
 ## Verification
 
 Run the real-process drill:
@@ -254,9 +263,10 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-223 add
-only the existing human-gate resume decision, cooperative cancellation, and
-redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation/workflow-diff reads; the UI excludes browser credential
+The live console remains a single-team operator boundary. Loops 211-224 add
+only the existing human-gate resume decision, cooperative cancellation,
+redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation/workflow-diff reads, and a fixed
+production-alias promotion; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
 automatic retries, provider reconciliation, and hosted TLS. Network exposure
