@@ -14,6 +14,7 @@ from skill2workflow.ui import (
     _parse_live_workflow_diff_path,
     _parse_live_workflow_preflight_path,
     _parse_live_schedule_dispatch_page_path,
+    _parse_live_schedule_dispatch_review_path,
     _parse_live_run_page_cursor,
     find_ui_root,
     serve_ui,
@@ -91,6 +92,21 @@ class UiTests(TestCase):
         ):
             with self.subTest(path=path):
                 self.assertIsNone(_parse_live_schedule_dispatch_page_path(path))
+
+    def test_live_schedule_dispatch_review_path_parser_accepts_only_one_safe_id(self):
+        self.assertEqual(
+            _parse_live_schedule_dispatch_review_path(
+                "/api/v1/recurring-schedule-dispatch-reviews/dispatch_demo"
+            ),
+            "dispatch_demo",
+        )
+        for path in (
+            "/api/v1/recurring-schedule-dispatch-reviews",
+            "/api/v1/recurring-schedule-dispatch-reviews/dispatch_demo/extra",
+            "/api/v1/recurring-schedule-dispatch-reviews/dispatch%2Fdemo",
+        ):
+            with self.subTest(path=path):
+                self.assertIsNone(_parse_live_schedule_dispatch_review_path(path))
 
     def test_live_run_page_cursor_parser_accepts_only_one_opaque_cursor(self):
         self.assertEqual(_parse_live_run_page_cursor(""), "")
@@ -1090,6 +1106,112 @@ class UiTests(TestCase):
                 self.assertEqual(
                     observed["path"],
                     "/api/v1/recurring-schedules/schedule_demo/dispatch-pages?max_items=100&cursor=cursor-1",
+                )
+                self.assertEqual(
+                    observed["authorization"],
+                    "Bearer ui-test-token-012345678901234567890123456789",
+                )
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)
+
+    def test_live_proxy_records_schedule_dispatch_review_without_browser_token(self):
+        observed = {}
+        review = {
+            "schema_version": "skill2workflow-recurring-schedule-dispatch-review-0.1.0",
+            "dispatch_id": "dispatch_demo",
+            "schedule_id": "schedule_demo",
+            "scheduled_for": "2026-08-20T01:00:00Z",
+            "status": "uncertain",
+            "expected_completed_at": "2026-08-20T01:00:05Z",
+            "outcome": "effect_confirmed",
+            "reviewed_at": "2026-08-20T02:00:00Z",
+            "changed": True,
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                content_length = int(self.headers.get("Content-Length", "0"))
+                observed["body"] = json.loads(self.rfile.read(content_length).decode("utf-8"))
+                body = json.dumps(review, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text(
+                    "ui-test-token-012345678901234567890123456789\n",
+                    encoding="utf-8",
+                )
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+
+                def ready(server):
+                    ui_port["value"] = server.server_port
+
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1",
+                        "port": 0,
+                        "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file,
+                        "ready_callback": ready,
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                request = urllib.request.Request(
+                    "http://127.0.0.1:{}/api/v1/recurring-schedule-dispatch-reviews/dispatch_demo".format(
+                        ui_port["value"]
+                    ),
+                    data=json.dumps(
+                        {
+                            "expected_completed_at": "2026-08-20T01:00:05Z",
+                            "outcome": "effect_confirmed",
+                        },
+                        separators=(",", ":"),
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(response.status, 200)
+                    self.assertTrue(payload["changed"])
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(
+                    observed["path"],
+                    "/api/v1/recurring-schedule-dispatches/dispatch_demo/review",
+                )
+                self.assertEqual(
+                    observed["body"],
+                    {
+                        "expected_completed_at": "2026-08-20T01:00:05Z",
+                        "outcome": "effect_confirmed",
+                    },
                 )
                 self.assertEqual(
                     observed["authorization"],

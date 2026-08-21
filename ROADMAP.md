@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-222
+- Completed delivery loops: 1-223
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 222 is complete with live recurring dispatch evidence
+- Active loop: None; Loop 223 is complete with live uncertain-dispatch review
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-222 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-223 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5884,9 +5884,47 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 223: Live Uncertain-Dispatch Review
+
+**Status:** Complete.
+
+**Prior basis:** Loop 222 let operators see uncertain recurring dispatches in
+the live console, but resolving the operational question still required
+leaving the UI for the existing protected review client.
+
+**Outcome:** An uncertain record now exposes **Record Review** with a browser
+confirmation and a fixed outcome allowlist: `effect_confirmed`,
+`effect_not_observed`, or `no_conclusion`. The UI sends only the selected
+record's server-provided completion timestamp and dispatch id through the
+fixed authenticated
+`POST /api/v1/recurring-schedule-dispatch-reviews/{dispatch_id}` proxy. The
+service reuses its existing compare-and-swap precondition and audit event;
+stale or already-reviewed records fail closed. The dispatch remains
+`uncertain`, and no replay or claim capability is added.
+
+**Evidence:** UI integration tests prove exact dispatch-id path parsing,
+allowlisted body construction, server-side Authorization forwarding,
+`no-store`, and the redacted review response boundary. Control UI contract
+tests cover confirmation controls and strict review-schema validation. The
+installed UI guide, live-control guide, Changelog, README, and this Roadmap
+record the non-replay safety boundary; the full UI, package,
+reproducible-build, secret-hygiene, external-connector, full-suite, and
+Production Baseline gates remain the release checks.
+
+**Safety boundary:** This is an explicit operator conclusion, not a provider
+reconciliation or execution command. It does not claim, replay, cancel, or
+mutate a dispatch; it does not accept arbitrary reason text, credentials,
+trigger inputs, lease identities, or provider payloads.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 222 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 223 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6075,6 +6113,7 @@ This rolling queue is ordered. Loop 222 is complete and there is no active deliv
 | Loop 220: Live Empty-Trigger Preflight | Complete | Let operators check a selected version's empty-trigger input and mapping readiness without accepting business values or starting a run | Fixed preflight proxy, exact empty-body contract, value-free readiness review, UI/route tests, docs, and full gates |
 | Loop 221: Live Workflow Version Diff Review | Complete | Let operators compare two versions of one live workflow without exposing values or mutating runtime state | Fixed three-component diff proxy, exact bounded redacted contract, same-workflow target selection, UI/route tests, docs, and full gates |
 | Loop 222: Live Recurring-Dispatch Evidence | Complete | Let operators inspect cursor-paged recurring dispatch outcomes, including uncertain records, without claiming or replaying work | Fixed schedule/cursor proxy, exact bounded redacted contract, 500-row browser cap, UI/route tests, docs, and full gates |
+| Loop 223: Live Uncertain-Dispatch Review | Complete | Let operators record one explicit conclusion for an uncertain dispatch without replaying or claiming work | Fixed confirmation-protected review proxy, outcome allowlist, CAS/audit reuse, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

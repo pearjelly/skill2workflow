@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a confirmation-protected **Record Review** action for an uncertain
+  recurring dispatch in the live console. It sends only the selected
+  server-provided completion timestamp and a fixed outcome allowlist through a
+  CAS-protected review route; it never replays, claims, or changes dispatch
+  state.
+
 - Added **Load Dispatch Evidence** to the live schedule view. Operators can
   inspect bounded redacted recurring-dispatch pages and load older evidence
   through fixed same-origin routes, including `uncertain` outcomes, without

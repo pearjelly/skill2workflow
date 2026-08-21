@@ -18,6 +18,8 @@ from .service_client import (
     MAX_OPERATIONAL_READINESS_RESPONSE_BYTES,
     MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS,
     MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES,
+    MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_REQUEST_BYTES,
+    MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
@@ -29,6 +31,7 @@ from .service_client import (
     fetch_audit_events,
     fetch_recurring_schedule_list,
     fetch_recurring_schedule_dispatch_page,
+    post_recurring_schedule_dispatch_review,
     fetch_run_detail,
     fetch_run_page,
     fetch_operational_readiness,
@@ -81,6 +84,12 @@ _LIVE_SCHEDULE_LIST_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 _LIVE_SCHEDULE_DISPATCH_PAGE_PREFIX = "/api/v1/recurring-schedule-dispatch-pages/"
 _LIVE_SCHEDULE_DISPATCH_PAGE_MAX_ITEMS = MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_ITEMS
 _LIVE_SCHEDULE_DISPATCH_PAGE_MAX_RESPONSE_BYTES = MAX_RECURRING_SCHEDULE_DISPATCH_PAGE_RESPONSE_BYTES
+_LIVE_SCHEDULE_DISPATCH_REVIEW_PREFIX = "/api/v1/recurring-schedule-dispatch-reviews/"
+_LIVE_SCHEDULE_DISPATCH_REVIEW_MAX_REQUEST_BYTES = min(
+    512,
+    MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_REQUEST_BYTES,
+)
+_LIVE_SCHEDULE_DISPATCH_REVIEW_MAX_RESPONSE_BYTES = MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES
 
 
 def find_ui_root() -> Path:
@@ -272,6 +281,22 @@ def serve_ui(
 
         def do_POST(self):
             parsed = urlsplit(self.path)
+            if parsed.path.startswith(_LIVE_SCHEDULE_DISPATCH_REVIEW_PREFIX):
+                if parsed.query:
+                    self._write_json(
+                        404,
+                        {"error": "schedule dispatch review path is not available"},
+                    )
+                    return
+                dispatch_id = _parse_live_schedule_dispatch_review_path(parsed.path)
+                if dispatch_id is None:
+                    self._write_json(
+                        404,
+                        {"error": "schedule dispatch review path is not available"},
+                    )
+                    return
+                self._serve_live_schedule_dispatch_review(dispatch_id)
+                return
             if parsed.path.startswith(_WORKFLOW_PREFLIGHT_PREFIX):
                 if parsed.query:
                     self._write_json(
@@ -698,6 +723,99 @@ def serve_ui(
                 return
             self._write_json(200, body, content_type="application/json")
 
+        def _serve_live_schedule_dispatch_review(self, dispatch_id):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "schedule dispatch review is not configured"})
+                return
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(
+                    400,
+                    {"error": "dispatch review body must contain expected timestamp and outcome"},
+                )
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(
+                    400,
+                    {"error": "dispatch review body must contain expected timestamp and outcome"},
+                )
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(
+                    400,
+                    {"error": "dispatch review body must contain expected timestamp and outcome"},
+                )
+                return
+            if content_length > _LIVE_SCHEDULE_DISPATCH_REVIEW_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "dispatch review body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(
+                    400,
+                    {"error": "dispatch review body must contain expected timestamp and outcome"},
+                )
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != {"expected_completed_at", "outcome"}
+                or not isinstance(payload.get("expected_completed_at"), str)
+                or not isinstance(payload.get("outcome"), str)
+                or not payload.get("expected_completed_at")
+                or len(payload["expected_completed_at"]) > 64
+                or any(
+                    ord(char) < 0x20 or ord(char) == 0x7F
+                    for char in payload["expected_completed_at"]
+                )
+                or payload["outcome"] not in {
+                    "effect_confirmed",
+                    "effect_not_observed",
+                    "no_conclusion",
+                }
+            ):
+                self._write_json(
+                    400,
+                    {"error": "dispatch review body must contain expected timestamp and outcome"},
+                )
+                return
+            try:
+                review = post_recurring_schedule_dispatch_review(
+                    configured_service_url,
+                    token_file,
+                    dispatch_id,
+                    expected_completed_at=payload["expected_completed_at"],
+                    outcome=payload["outcome"],
+                )
+                response_body = json.dumps(
+                    review,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(response_body) > _LIVE_SCHEDULE_DISPATCH_REVIEW_MAX_RESPONSE_BYTES:
+                    raise ValueError("dispatch review unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "dispatch review not found"})
+                elif error.status_code == 409:
+                    self._write_json(409, {"error": "dispatch review conflict"})
+                else:
+                    self._write_json(503, {"error": "dispatch review unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "dispatch review unavailable"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
+
         def _serve_live_resume(self, run_id):
             configured_service_url = getattr(self.server, "live_service_url", None)
             token_file = getattr(self.server, "live_auth_token_file", None)
@@ -916,6 +1034,24 @@ def _parse_live_schedule_dispatch_page_path(path: str):
     ):
         return None
     return schedule_id, cursor
+
+
+def _parse_live_schedule_dispatch_review_path(path: str):
+    """Accept exactly one safe dispatch id for the protected review action."""
+
+    if not path.startswith(_LIVE_SCHEDULE_DISPATCH_REVIEW_PREFIX):
+        return None
+    suffix = path[len(_LIVE_SCHEDULE_DISPATCH_REVIEW_PREFIX) :]
+    if not suffix or "/" in suffix:
+        return None
+    dispatch_id = unquote(suffix)
+    if (
+        not dispatch_id
+        or len(dispatch_id) > 128
+        or not all(char.isalnum() or char in {"-", "_", "."} for char in dispatch_id)
+    ):
+        return None
+    return dispatch_id
 
 
 def _parse_live_workflow_preflight_path(path: str):

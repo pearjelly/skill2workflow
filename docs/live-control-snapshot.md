@@ -189,6 +189,15 @@ most 500 records, and surfaces `uncertain` counts. The action is read-only and
 does not claim, replay, review, or mutate dispatch state; trigger inputs,
 credentials, lease identities, and provider payloads remain excluded.
 
+For an `uncertain` record, the live console can record one explicit conclusion
+through the fixed `POST
+/api/v1/recurring-schedule-dispatch-reviews/{dispatch_id}` proxy. The browser
+sends only the record's server-provided completion timestamp and one of the
+three fixed outcomes: `effect_confirmed`, `effect_not_observed`, or
+`no_conclusion`. Browser confirmation and the service's existing
+compare-and-swap precondition are required. The review is auditable but does
+not claim, replay, or change the dispatch state.
+
 The live console can also explicitly load the aggregate production-readiness
 report through its fixed `GET /api/v1/operational-readiness` proxy. The browser
 accepts only the `skill2workflow-operational-readiness-0.1.0` contract and
@@ -245,7 +254,7 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-222 add
+The live console remains a single-team operator boundary. Loops 211-223 add
 only the existing human-gate resume decision, cooperative cancellation, and
 redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation/workflow-diff reads; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination

@@ -140,6 +140,13 @@ class ControlUiContractTests(TestCase):
         self.assertIn("validateRecurringScheduleDispatchPage", javascript)
         self.assertIn("SCHEDULE_DISPATCH_PAGE_SCHEMA", javascript)
         self.assertIn(".schedule-dispatch-actions", css)
+        self.assertIn('id="schedule-dispatch-review-target"', html)
+        self.assertIn('id="schedule-dispatch-review-outcome"', html)
+        self.assertIn('id="review-schedule-dispatch"', html)
+        self.assertIn("/api/v1/recurring-schedule-dispatch-reviews/", javascript)
+        self.assertIn("reviewLiveScheduleDispatch", javascript)
+        self.assertIn("validateRecurringScheduleDispatchReview", javascript)
+        self.assertIn("SCHEDULE_DISPATCH_REVIEW_SCHEMA", javascript)
         self.assertIn(".run-cancel-actions", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):

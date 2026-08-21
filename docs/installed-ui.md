@@ -115,6 +115,15 @@ read-only evidence: it never claims, replays, reviews, or mutates a dispatch,
 and it excludes trigger inputs, credentials, lease identities, and provider
 payloads.
 
+If a loaded dispatch page contains an `uncertain` record, the review card also
+offers **Record Review**. The operator chooses one of the fixed conclusions
+`effect_confirmed`, `effect_not_observed`, or `no_conclusion`; the UI reuses the
+record's server-provided completion timestamp and requires browser confirmation
+before calling the fixed authenticated
+`/api/v1/recurring-schedule-dispatch-reviews/{dispatch_id}` route. The service
+performs its existing compare-and-swap check and preserves the `uncertain`
+dispatch status. A review never replays, claims, or mutates dispatch execution.
+
 The live console also exposes **Load Live Readiness**. It calls only the fixed
 same-origin `/api/v1/operational-readiness` route and validates the
 `skill2workflow-operational-readiness-0.1.0` contract before rendering the

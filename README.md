@@ -80,7 +80,8 @@ It can also run a no-input preflight to expose missing required fields or
 blocked mappings before any real trigger is attempted, and compare two versions
 of the same workflow through a bounded, value-free structural diff. Selecting
 a live recurring schedule also exposes bounded dispatch evidence, including
-older pages and uncertain outcomes, without adding a replay or mutation path.
+older pages and uncertain outcomes, and can record a fixed, confirmation-
+protected review conclusion without adding a replay or claim path.
 
 ## Visual Overview
 
@@ -205,6 +206,7 @@ explicit connector boundaries. It currently supports:
 - Explain a workflow before execution with a bounded, side-effect-free, value-free plan using the fixed `skill2workflow-workflow-explanation-0.1.0` contract
 - Compare two published versions of one workflow through the bounded, authenticated, value-free `skill2workflow-workflow-diff-0.1.0` contract
 - Inspect cursor-paged recurring dispatch outcomes, including `uncertain` records, through a bounded authenticated value-free live-console read
+- Record a compare-and-swap conclusion for one `uncertain` dispatch from the live console without replaying or claiming work
 - Preflight trigger input and HTTP request mappings with a bounded, side-effect-free, value-free admission report using the fixed `skill2workflow-workflow-preflight-0.1.0` contract
 - Create, verify, structurally diff, preflight, explicitly publish, and safely run deterministic, secret-checked Workflow DSL bundles through existing local contracts with explicit side-effect consent
 - Drain due schedule work in explicitly bounded side-effect batches
@@ -879,7 +881,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-222 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-223 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring

@@ -325,6 +325,18 @@
               <button id="load-schedule-dispatches" type="button">Load Dispatch Evidence</button>
               <button id="load-older-schedule-dispatches" type="button">Load Older Dispatches</button>
             </div>
+            <div class="schedule-dispatch-review">
+              <label for="schedule-dispatch-review-target">Uncertain dispatch</label>
+              <select id="schedule-dispatch-review-target" aria-label="Uncertain dispatch to review"></select>
+              <label for="schedule-dispatch-review-outcome">Conclusion</label>
+              <select id="schedule-dispatch-review-outcome" aria-label="Dispatch review conclusion">
+                <option value="effect_confirmed">Effect confirmed</option>
+                <option value="effect_not_observed">Effect not observed</option>
+                <option value="no_conclusion">No conclusion</option>
+              </select>
+              <button id="review-schedule-dispatch" type="button">Record Review</button>
+            </div>
+            <p id="schedule-dispatch-review-status">Only uncertain dispatches can receive an explicit conclusion.</p>
           </section>
           <pre id="detail-json">{}</pre>
         </aside>

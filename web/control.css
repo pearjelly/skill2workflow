@@ -692,6 +692,40 @@ tbody tr.is-selected {
   gap: 8px;
 }
 
+.schedule-dispatch-review {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr);
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(118, 84, 25, 0.2);
+  font-size: 12px;
+}
+
+.schedule-dispatch-review label {
+  color: var(--muted);
+}
+
+.schedule-dispatch-review select {
+  min-height: 32px;
+  min-width: 0;
+  border: 1px solid rgba(118, 84, 25, 0.35);
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--ink);
+  padding: 0 8px;
+}
+
+.schedule-dispatch-review button {
+  grid-column: 1 / -1;
+}
+
+.schedule-dispatch-review select:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .schedule-dispatch-actions button {
   min-height: 32px;
   flex: 1;
