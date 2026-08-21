@@ -12,7 +12,7 @@ from collections import Counter, deque
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .artifact_io import read_workflow_artifact
 from .state_layout import ensure_current_state_layout
@@ -1429,10 +1429,16 @@ class SqliteControlStore:
         version: str,
         *,
         deprecated_at: str,
+        expected_checksum: str = "",
+        expected_aliases: Optional[List[str]] = None,
         audit_event: AuditEvent,
     ) -> WorkflowRecord:
         """Deprecate one registry record and its audit row atomically."""
 
+        if not isinstance(expected_checksum, str) or bool(expected_checksum) != (
+            expected_aliases is not None
+        ):
+            raise ValueError("workflow deprecation precondition is incomplete")
         key = _workflow_record_key(workflow_id, version)
         with self._connection() as connection:
             connection.execute("begin immediate")
@@ -1449,6 +1455,14 @@ class SqliteControlStore:
             record = dict(current)
             was_deprecated = record.get("status") == "deprecated"
             aliases = _sqlite_record_aliases(record)
+            if expected_checksum:
+                if expected_aliases is None:
+                    raise ValueError("workflow deprecation precondition is incomplete")
+                if (
+                    str(record.get("checksum", "")) != str(expected_checksum)
+                    or sorted(aliases) != sorted(str(alias) for alias in expected_aliases)
+                ):
+                    raise ValueError("workflow deprecation precondition failed")
             changed = bool(aliases) or not was_deprecated
             if aliases:
                 record.pop("aliases", None)

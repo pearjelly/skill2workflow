@@ -156,6 +156,14 @@ class ControlUiContractTests(TestCase):
         self.assertIn("WORKFLOW_PROMOTION_SCHEMA", javascript)
         self.assertIn("expectedCurrentVersion", javascript)
         self.assertIn(".workflow-promotion-controls", css)
+        self.assertIn('id="deprecate-workflow"', html)
+        self.assertIn("Deprecate version", html)
+        self.assertIn("/api/v1/workflow-deprecations", javascript)
+        self.assertIn("deprecateLiveWorkflow", javascript)
+        self.assertIn("validateWorkflowDeprecation", javascript)
+        self.assertIn("WORKFLOW_DEPRECATION_SCHEMA", javascript)
+        self.assertIn("expectedChecksum", javascript)
+        self.assertIn(".workflow-deprecation-controls", css)
 
     def test_live_snapshot_guide_warns_ui_users_about_window_scope(self):
         guide = (ROOT / "docs" / "live-control-snapshot.md").read_text(

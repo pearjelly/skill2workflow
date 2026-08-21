@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sysconfig
 from functools import partial
 from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -22,6 +23,8 @@ from .service_client import (
     MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES,
+    MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES,
+    MAX_REMOTE_WORKFLOW_DEPRECATION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES,
     MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES,
@@ -44,6 +47,7 @@ from .service_client import (
     fetch_workflow_diff,
     fetch_workflow_preflight,
     post_workflow_promotion,
+    post_workflow_deprecation,
     post_run_resume,
     post_run_cancel,
     service_endpoint,
@@ -70,6 +74,10 @@ _WORKFLOW_PREFLIGHT_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_
 _WORKFLOW_PROMOTION_PATH = "/api/v1/workflow-promotions"
 _WORKFLOW_PROMOTION_MAX_REQUEST_BYTES = min(512, MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES)
 _WORKFLOW_PROMOTION_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES
+_WORKFLOW_DEPRECATION_PATH = "/api/v1/workflow-deprecations"
+_WORKFLOW_DEPRECATION_MAX_REQUEST_BYTES = min(512, MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES)
+_WORKFLOW_DEPRECATION_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_DEPRECATION_RESPONSE_BYTES
+_WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 _SUPPORT_BUNDLE_PATH = "/api/v1/support-bundle"
 _SUPPORT_BUNDLE_MAX_RESPONSE_BYTES = MAX_SUPPORT_BUNDLE_RESPONSE_BYTES
 _LIVE_RESUME_PREFIX = "/api/v1/runs/"
@@ -296,6 +304,15 @@ def serve_ui(
                     )
                     return
                 self._serve_live_workflow_promotion()
+                return
+            if parsed.path == _WORKFLOW_DEPRECATION_PATH:
+                if parsed.query:
+                    self._write_json(
+                        404,
+                        {"error": "workflow deprecation path is not available"},
+                    )
+                    return
+                self._serve_live_workflow_deprecation()
                 return
             if parsed.path.startswith(_LIVE_SCHEDULE_DISPATCH_REVIEW_PREFIX):
                 if parsed.query:
@@ -905,6 +922,86 @@ def serve_ui(
                 return
             except Exception:
                 self._write_json(503, {"error": "workflow promotion unavailable"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
+
+        def _serve_live_workflow_deprecation(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow deprecation is not configured"})
+                return
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(400, {"error": "workflow deprecation body is malformed"})
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(400, {"error": "workflow deprecation body is malformed"})
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(400, {"error": "workflow deprecation body is malformed"})
+                return
+            if content_length > _WORKFLOW_DEPRECATION_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "workflow deprecation body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(400, {"error": "workflow deprecation body is malformed"})
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if (
+                not isinstance(payload, dict)
+                or set(payload)
+                != {"workflow_id", "version", "expected_checksum", "expected_aliases"}
+                or not _is_safe_workflow_ref(payload.get("workflow_id"), allow_empty=False)
+                or not _is_safe_workflow_ref(payload.get("version"), allow_empty=False)
+                or not isinstance(payload.get("expected_checksum"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", payload.get("expected_checksum", ""))
+                or not isinstance(payload.get("expected_aliases"), list)
+                or len(payload["expected_aliases"]) > 16
+                or any(
+                    not isinstance(alias, str)
+                    or not _WORKFLOW_ALIAS_PATTERN.fullmatch(alias)
+                    for alias in payload["expected_aliases"]
+                )
+                or len(set(payload["expected_aliases"]))
+                != len(payload["expected_aliases"])
+            ):
+                self._write_json(400, {"error": "workflow deprecation body is malformed"})
+                return
+            try:
+                response = post_workflow_deprecation(
+                    configured_service_url,
+                    token_file,
+                    payload["workflow_id"],
+                    payload["version"],
+                    expected_checksum=payload["expected_checksum"],
+                    expected_aliases=payload["expected_aliases"],
+                )
+                response_body = json.dumps(
+                    response,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(response_body) > _WORKFLOW_DEPRECATION_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow deprecation unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 404:
+                    self._write_json(404, {"error": "workflow version not found"})
+                elif error.status_code == 409:
+                    self._write_json(409, {"error": "workflow deprecation conflict"})
+                else:
+                    self._write_json(503, {"error": "workflow deprecation unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "workflow deprecation unavailable"})
                 return
             self._write_json(200, response_body, content_type="application/json")
 

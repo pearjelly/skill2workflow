@@ -14,6 +14,12 @@ release; Roadmap loop completion alone does not publish a new version.
   proxy and never accepts arbitrary aliases, workflow payloads, credentials, or
   trigger input.
 
+- Added a confirmation-protected **Deprecate version** action for a selected
+  live workflow version with no active alias. It sends the observed checksum
+  and complete alias set through a fixed authenticated proxy; a stale inventory
+  receives a conflict and cannot silently retire a version that changed during
+  review. Immutable artifacts remain available for audit and rollback review.
+
 - Added a confirmation-protected **Record Review** action for an uncertain
   recurring dispatch in the live console. It sends only the selected
   server-provided completion timestamp and a fixed outcome allowlist through a

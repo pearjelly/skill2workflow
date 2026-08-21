@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-224
+- Completed delivery loops: 1-225
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 224 is complete with live workflow promotion
+- Active loop: None; Loop 225 is complete with CAS-protected live workflow deprecation
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-224 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-225 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5960,9 +5960,48 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 225: CAS-Protected Live Workflow Deprecation
+
+**Status:** Complete.
+
+**Prior basis:** Loop 224 connected live production promotion to the console,
+but the existing deprecation route still accepted a legacy request with no
+inventory precondition. An operator acting on stale metadata could therefore
+retire a version after another operator had changed its alias state.
+
+**Outcome:** The local control plane, SQLite transaction, authenticated
+service, installed client, and live UI now support an optional exact
+checksum-plus-alias-set compare-and-swap guard. The legacy deprecation request
+remains compatible, while protected callers fail with `409` before mutation
+when the published artifact metadata or aliases differ. The live console adds
+confirmation-protected **Deprecate version**, only enables it for published
+versions with no active alias, keeps the ingress token server-side, refreshes
+the redacted inventory after success, and leaves immutable artifacts intact.
+
+**Evidence:** Control-plane JSON/SQLite tests cover current metadata acceptance
+and stale checksum/alias rejection. Service and client tests cover the protected
+request body and `409` conflict. UI integration and contract tests cover exact
+server-side forwarding, response bounds, `no-store`, confirmation controls,
+and strict redacted response validation. The remote-deprecation guide, service
+contract, stability notes, README, Changelog, and this Roadmap document the
+legacy compatibility and CAS safety boundary.
+
+**Safety boundary:** This is a protected registry lifecycle mutation. It does
+not delete artifacts, publish or promote a replacement, trigger or cancel a
+run, rewrite in-flight executions, export Workflow content, resolve
+credentials, or claim exactly-once external effects.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest \
+  tests.test_control_plane tests.test_service tests.test_service_client \
+  tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 224 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 225 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6153,6 +6192,7 @@ This rolling queue is ordered. Loop 224 is complete and there is no active deliv
 | Loop 222: Live Recurring-Dispatch Evidence | Complete | Let operators inspect cursor-paged recurring dispatch outcomes, including uncertain records, without claiming or replaying work | Fixed schedule/cursor proxy, exact bounded redacted contract, 500-row browser cap, UI/route tests, docs, and full gates |
 | Loop 223: Live Uncertain-Dispatch Review | Complete | Let operators record one explicit conclusion for an uncertain dispatch without replaying or claiming work | Fixed confirmation-protected review proxy, outcome allowlist, CAS/audit reuse, UI/route tests, docs, and full gates |
 | Loop 224: Live Workflow Promotion | Complete | Let operators promote one reviewed published version to the fixed production alias without leaving the live console | Fixed confirmation-protected promotion proxy, observed-alias CAS precondition, strict UI/route tests, docs, and full gates |
+| Loop 225: CAS-Protected Live Workflow Deprecation | Complete | Let operators retire one reviewed published version without allowing stale inventory to override a concurrent alias or artifact change | Optional checksum-plus-alias CAS across local/SQLite/service/client paths, confirmation-protected UI action, strict UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
@@ -6405,7 +6445,7 @@ The project is a runnable local-first harness across all five approved architect
 | Ingestion and compilation | Parse structured `SKILL.md` files into Skill IR, compile Workflow DSL, validate against the schema, and report structured errors |
 | Authoring | Render Workflow DSL as LiteGraph JSON, inspect run overlays, and write back allowlisted visual edits without making the graph authoritative |
 | Runtime | Execute and resume durable runs with JSON or SQLite state, bounded active timeout policy, human gates, retry/recovery policy, run context, connector events, and verifiable SQLite audit evidence |
-| Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish/promote/deprecate/inventory bounded versions through the authenticated service, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, write a redacted support bundle, rotate the local ingress token atomically, preflight retention policy and trigger inputs/mappings through authenticated service diagnostics, inspect bounded local and protected remote backup inventories (including cursor-paged older evidence) and retention plans, inspect bounded redacted local workflow inventory, and consume aggregate operational readiness through the authenticated service |
+| Control plane | Transactionally publish/deprecate immutable workflow versions and promote stable SQLite aliases, publish/promote/deprecate/inventory bounded versions through the authenticated service, protect live deprecation with checksum-plus-alias compare-and-swap guards, inspect registry/file artifact consistency, trigger runs from CLI/webhook/schedules with SQLite idempotency, query audit evidence, export read-only operator snapshots, inspect redacted runs, write a redacted support bundle, rotate the local ingress token atomically, preflight retention policy and trigger inputs/mappings through authenticated service diagnostics, inspect bounded local and protected remote backup inventories (including cursor-paged older evidence) and retention plans, inspect bounded redacted local workflow inventory, and consume aggregate operational readiness through the authenticated service |
 | Extensions and safety | Run built-in and explicitly loaded connectors behind manifest, bounded descriptor-bound fixture loading, credential-handle, input-mapping, audit-redaction, and secret-hygiene boundaries |
 
 Important boundaries:

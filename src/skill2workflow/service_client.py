@@ -9,7 +9,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 
 from .backup import (
@@ -125,6 +125,7 @@ MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
+MAX_REMOTE_WORKFLOW_DEPRECATION_ALIASES = 16
 MAX_REMOTE_WORKFLOW_INVENTORY_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_WORKFLOW_EXPLANATION_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
@@ -919,19 +920,50 @@ def post_workflow_deprecation(
     token_file: Path,
     workflow_id: str,
     version: str,
+    *,
+    expected_checksum: str = "",
+    expected_aliases: Optional[List[str]] = None,
 ) -> Dict[str, object]:
-    """Deprecate one published workflow version through the service boundary."""
+    """Deprecate one published version, optionally guarded by inventory CAS."""
 
     normalized_workflow_id = _validate_workflow_ref(workflow_id, "workflow_id")
     normalized_version = _validate_workflow_ref(version, "version")
+    if not isinstance(expected_checksum, str):
+        raise ValueError("expected_checksum must be a string")
+    if not expected_checksum and expected_aliases is None:
+        body_payload = {
+            "workflow_id": normalized_workflow_id,
+            "version": normalized_version,
+        }
+    else:
+        if not expected_checksum or expected_aliases is None:
+            raise ValueError("workflow deprecation precondition is incomplete")
+        if not _is_hex_digest(expected_checksum):
+            raise ValueError("expected_checksum must be a lowercase SHA-256 digest")
+        if (
+            not isinstance(expected_aliases, list)
+            or len(expected_aliases) > MAX_REMOTE_WORKFLOW_DEPRECATION_ALIASES
+        ):
+            raise ValueError("expected_aliases must be a list of at most 16 aliases")
+        normalized_aliases = []
+        seen_aliases = set()
+        for alias in expected_aliases:
+            normalized_alias = _validate_workflow_alias(alias)
+            if normalized_alias in seen_aliases:
+                raise ValueError("expected_aliases must be unique")
+            seen_aliases.add(normalized_alias)
+            normalized_aliases.append(normalized_alias)
+        body_payload = {
+            "workflow_id": normalized_workflow_id,
+            "version": normalized_version,
+            "expected_checksum": expected_checksum,
+            "expected_aliases": sorted(normalized_aliases),
+        }
     payload = _post_json(
         service_url,
         token_file,
         "/api/v1/workflow-deprecations",
-        {
-            "workflow_id": normalized_workflow_id,
-            "version": normalized_version,
-        },
+        body_payload,
         conflict_message="workflow deprecation rejected",
         not_found_message="workflow version not found",
         max_request_bytes=MAX_REMOTE_WORKFLOW_DEPRECATION_REQUEST_BYTES,

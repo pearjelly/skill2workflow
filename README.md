@@ -885,7 +885,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-224 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-225 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1143,6 +1143,9 @@ Loop 90 adds [remote Workflow deprecation](docs/remote-workflow-deprecation.md):
 the installed `service-workflow-deprecate` command retires one published version
 through the authenticated service, removes its stable aliases, preserves the
 immutable artifact, and returns a fixed redacted summary with idempotent replay.
+The protected form also compares the observed checksum and complete alias set
+inside the registry transaction, so stale operator inventory cannot retire a
+version that changed during review.
 
 Loop 91 adds [remote Workflow inventory](docs/remote-workflow-inventory.md):
 the installed `service-workflows` command discovers bounded published-version

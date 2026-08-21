@@ -1085,6 +1085,55 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(stored["workflow"]["status"], "published")
         self.assertEqual(audit_types, ["workflow_published", "workflow_deprecated"])
 
+    def test_deprecate_compare_and_swap_rejects_stale_checksum_and_aliases(self):
+        for storage in ("json", "sqlite"):
+            with self.subTest(storage=storage), TemporaryDirectory() as tmp:
+                control = LocalControlPlane(Path(tmp), storage=storage)
+                first = control.publish_workflow(_workflow(version="1.0.0"))
+                second = control.publish_workflow(_workflow(version="2.0.0"))
+                control.promote_workflow("workflow_control", "1.0.0")
+
+                control.promote_workflow("workflow_control", "2.0.0")
+                with self.assertRaisesRegex(ValueError, "precondition failed"):
+                    control.deprecate_workflow(
+                        "workflow_control",
+                        "2.0.0",
+                        expected_checksum=str(second["checksum"]),
+                        expected_aliases=[],
+                    )
+
+                current = next(
+                    item
+                    for item in control.list_workflows()
+                    if item.get("workflow_id") == "workflow_control"
+                    and item.get("version") == "2.0.0"
+                )
+                self.assertEqual(current["status"], "published")
+                self.assertEqual(current["aliases"], ["production"])
+
+                with self.assertRaisesRegex(ValueError, "precondition failed"):
+                    control.deprecate_workflow(
+                        "workflow_control",
+                        "2.0.0",
+                        expected_checksum=str(first["checksum"]),
+                        expected_aliases=["production"],
+                    )
+
+    def test_deprecate_compare_and_swap_accepts_current_metadata(self):
+        for storage in ("json", "sqlite"):
+            with self.subTest(storage=storage), TemporaryDirectory() as tmp:
+                control = LocalControlPlane(Path(tmp), storage=storage)
+                published = control.publish_workflow(_workflow(version="1.0.0"))
+                result = control.deprecate_workflow(
+                    "workflow_control",
+                    "1.0.0",
+                    expected_checksum=published["checksum"],
+                    expected_aliases=[],
+                )
+
+                self.assertEqual(result["status"], "deprecated")
+                self.assertNotIn("aliases", result)
+
     def test_workflow_alias_promotion_resolves_triggers_and_pins_replays(self):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)

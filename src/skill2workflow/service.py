@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import re
 import signal
 import socket
 import sqlite3
@@ -132,6 +133,8 @@ MAX_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_DEPRECATION_RESPONSE_BYTES = 16 * 1024
+MAX_WORKFLOW_DEPRECATION_ALIASES = 16
+_WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 MAX_WORKFLOW_INVENTORY_RESPONSE_BYTES = 64 * 1024
 MAX_WORKFLOW_EXPLANATION_RESPONSE_BYTES = MAX_WORKFLOW_EXPLANATION_BYTES
 MAX_RETENTION_READINESS_RESPONSE_BYTES = 16 * 1024
@@ -2834,19 +2837,44 @@ def _handler_for(service: RuntimeService):
             try:
                 body = read_request_body(self)
                 payload = json.loads(body.decode("utf-8"))
-                fields = {"workflow_id", "version"}
+                base_fields = {"workflow_id", "version"}
+                cas_fields = base_fields | {"expected_checksum", "expected_aliases"}
                 if (
                     not isinstance(payload, dict)
-                    or set(payload) != fields
+                    or set(payload) not in (base_fields, cas_fields)
                     or any(
                         not isinstance(payload.get(field), str) or not payload.get(field)
-                        for field in fields
+                        for field in base_fields
                     )
                 ):
                     raise ValueError("workflow deprecation request is malformed")
+                expected_checksum = ""
+                expected_aliases = None
+                if set(payload) == cas_fields:
+                    expected_checksum = payload.get("expected_checksum")
+                    expected_aliases = payload.get("expected_aliases")
+                    if (
+                        not isinstance(expected_checksum, str)
+                        or len(expected_checksum) != 64
+                        or any(
+                            char not in "0123456789abcdef"
+                            for char in expected_checksum
+                        )
+                        or not isinstance(expected_aliases, list)
+                        or len(expected_aliases) > MAX_WORKFLOW_DEPRECATION_ALIASES
+                        or any(
+                            not isinstance(alias, str)
+                            or not _WORKFLOW_ALIAS_PATTERN.fullmatch(alias)
+                            for alias in expected_aliases
+                        )
+                        or len(set(expected_aliases)) != len(expected_aliases)
+                    ):
+                        raise ValueError("workflow deprecation request is malformed")
                 record = service.control_plane.deprecate_workflow(
                     payload["workflow_id"],
                     payload["version"],
+                    expected_checksum=expected_checksum,
+                    expected_aliases=expected_aliases,
                 )
                 response = {
                     "schema_version": WORKFLOW_DEPRECATION_SCHEMA_VERSION,
@@ -2864,7 +2892,10 @@ def _handler_for(service: RuntimeService):
             except WebhookError as error:
                 self._send_json(error.status_code, {"error": str(error)})
             except ValueError as error:
-                if "version not found" in str(error).lower():
+                message = str(error).lower()
+                if "precondition failed" in message:
+                    self._send_json(409, {"error": "workflow deprecation conflict"})
+                elif "version not found" in message:
                     self._send_json(404, {"error": "workflow version not found"})
                 else:
                     self._send_json(400, {"error": "workflow deprecation rejected"})

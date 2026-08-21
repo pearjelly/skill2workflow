@@ -16,6 +16,7 @@
   const LIVE_WORKFLOW_DIFF_PREFIX = "/api/v1/workflow-diffs/";
   const LIVE_WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/";
   const LIVE_WORKFLOW_PROMOTION_URL = "/api/v1/workflow-promotions";
+  const LIVE_WORKFLOW_DEPRECATION_URL = "/api/v1/workflow-deprecations";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
   const AUDIT_PAGE_SCHEMA = "skill2workflow-audit-event-list-0.1.0";
@@ -28,6 +29,7 @@
   const WORKFLOW_DIFF_SCHEMA = "skill2workflow-workflow-diff-0.1.0";
   const WORKFLOW_PREFLIGHT_SCHEMA = "skill2workflow-workflow-preflight-0.1.0";
   const WORKFLOW_PROMOTION_SCHEMA = "skill2workflow-workflow-promotion-0.1.0";
+  const WORKFLOW_DEPRECATION_SCHEMA = "skill2workflow-workflow-deprecation-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
   const LIVE_AUDIT_ROWS_MAX = 500;
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
@@ -85,6 +87,8 @@
     liveWorkflowPreflightError: false,
     liveWorkflowPromotionLoading: false,
     liveWorkflowPromotionError: false,
+    liveWorkflowDeprecationLoading: false,
+    liveWorkflowDeprecationError: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -140,6 +144,8 @@
     els.loadWorkflowPreflight = document.getElementById("load-workflow-preflight");
     els.promoteWorkflow = document.getElementById("promote-workflow");
     els.workflowPromotionStatus = document.getElementById("workflow-promotion-status");
+    els.deprecateWorkflow = document.getElementById("deprecate-workflow");
+    els.workflowDeprecationStatus = document.getElementById("workflow-deprecation-status");
     els.tabs = Array.from(document.querySelectorAll(".tab"));
     els.panels = Array.from(document.querySelectorAll("[data-panel]"));
     els.metricWorkflows = document.getElementById("metric-workflows");
@@ -202,6 +208,7 @@
     });
     els.loadWorkflowPreflight.addEventListener("click", loadLiveWorkflowPreflight);
     els.promoteWorkflow.addEventListener("click", promoteLiveWorkflow);
+    els.deprecateWorkflow.addEventListener("click", deprecateLiveWorkflow);
     els.approveRun.addEventListener("click", function () {
       decideSelectedRun(true);
     });
@@ -803,6 +810,66 @@
     }
   }
 
+  async function deprecateLiveWorkflow() {
+    const workflow = selectedLiveWorkflow();
+    const deprecation = liveWorkflowDeprecationTarget(workflow);
+    if (!deprecation || state.liveWorkflowDeprecationLoading) {
+      return;
+    }
+    if (typeof window.confirm === "function" && !window.confirm(
+      "Deprecate " + workflow.workflow_id + "@" + workflow.version +
+      "? This keeps the immutable artifact but prevents new starts through this version."
+    )) {
+      return;
+    }
+    state.liveWorkflowDeprecationLoading = true;
+    state.liveWorkflowDeprecationError = false;
+    updateWorkflowDeprecationControls();
+    setWorkflowDeprecationStatus("Recording the checksum-and-alias compare-and-swap…", "");
+    try {
+      const response = await fetch(LIVE_WORKFLOW_DEPRECATION_URL, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workflow_id: workflow.workflow_id,
+          version: workflow.version,
+          expected_checksum: deprecation.expectedChecksum,
+          expected_aliases: deprecation.expectedAliases,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("workflow deprecation unavailable");
+      }
+      const result = await response.json();
+      if (!validateWorkflowDeprecation(result, workflow)) {
+        throw new Error("workflow deprecation unavailable");
+      }
+      setWorkflowDeprecationStatus(
+        "Version deprecated; its immutable artifact remains available for audit and rollback review.",
+        "is-valid",
+      );
+      setStatus("Deprecated", "is-valid");
+      await loadLiveWorkflows();
+      const refreshed = state.liveWorkflowInventory && state.liveWorkflowInventory.versions.find(function (item) {
+        return item && item.workflow_id === workflow.workflow_id && item.version === workflow.version;
+      });
+      if (refreshed) {
+        state.selected = { kind: "live workflow", value: refreshed };
+        render();
+      }
+    } catch (error) {
+      state.liveWorkflowDeprecationError = true;
+      setWorkflowDeprecationStatus(
+        "Deprecation unavailable or stale; the version was not assumed to change.",
+        "is-invalid",
+      );
+    } finally {
+      state.liveWorkflowDeprecationLoading = false;
+      updateWorkflowDeprecationControls();
+    }
+  }
+
   function selectedLiveWorkflow() {
     if (
       !isLiveSnapshot() ||
@@ -843,6 +910,21 @@
     };
   }
 
+  function liveWorkflowDeprecationTarget(workflow) {
+    if (
+      !workflow || workflow.status !== "published" ||
+      !state.liveWorkflowInventory || !Array.isArray(state.liveWorkflowInventory.versions) ||
+      !Array.isArray(workflow.aliases) || workflow.aliases.length !== 0 ||
+      typeof workflow.checksum !== "string" || !/^[0-9a-f]{64}$/.test(workflow.checksum)
+    ) {
+      return null;
+    }
+    return {
+      expectedChecksum: workflow.checksum,
+      expectedAliases: [],
+    };
+  }
+
   function validateWorkflowPromotion(result, workflow) {
     return isObject(result) &&
       result.schema_version === WORKFLOW_PROMOTION_SCHEMA &&
@@ -851,6 +933,17 @@
       result.version === workflow.version &&
       result.alias === "production" &&
       result.status === "promoted" &&
+      typeof result.checksum === "string" && /^[0-9a-f]{64}$/.test(result.checksum);
+  }
+
+  function validateWorkflowDeprecation(result, workflow) {
+    return isObject(result) &&
+      result.schema_version === WORKFLOW_DEPRECATION_SCHEMA &&
+      hasExactKeys(result, ["schema_version", "workflow_id", "version", "status", "checksum"]) &&
+      result.workflow_id === workflow.workflow_id &&
+      result.version === workflow.version &&
+      result.status === "deprecated" &&
+      result.checksum === workflow.checksum &&
       typeof result.checksum === "string" && /^[0-9a-f]{64}$/.test(result.checksum);
   }
 
@@ -1292,13 +1385,8 @@
         version.version.length > 0 &&
         version.version.length <= 128 &&
         ["published", "deprecated", "other"].indexOf(version.status) !== -1 &&
-        Array.isArray(version.aliases) &&
-        version.aliases.length <= 16 &&
-        version.aliases.every(function (alias) {
-          return typeof alias === "string" && alias.length > 0 && alias.length <= 64;
-        }) &&
-        typeof version.checksum === "string" &&
-        /^[0-9a-f]{64}$/.test(version.checksum)
+        validateWorkflowAliases(version.aliases) &&
+        isChecksum(version.checksum)
       );
     });
   }
@@ -2010,6 +2098,8 @@
     state.liveWorkflowPreflightError = false;
     state.liveWorkflowPromotionLoading = false;
     state.liveWorkflowPromotionError = false;
+    state.liveWorkflowDeprecationLoading = false;
+    state.liveWorkflowDeprecationError = false;
     state.liveRunRows = null;
     state.liveRunPageCursor = "";
     state.liveRunPageHasMore = Boolean(
@@ -2126,6 +2216,8 @@
     state.liveWorkflowExplanationError = false;
     state.liveWorkflowPromotionLoading = false;
     state.liveWorkflowPromotionError = false;
+    state.liveWorkflowDeprecationLoading = false;
+    state.liveWorkflowDeprecationError = false;
     state.liveWorkflowDiff = null;
     state.liveWorkflowDiffKey = "";
     state.liveWorkflowDiffLoading = false;
@@ -2576,6 +2668,8 @@
         state.liveWorkflowPreflightError = false;
         state.liveWorkflowPromotionLoading = false;
         state.liveWorkflowPromotionError = false;
+        state.liveWorkflowDeprecationLoading = false;
+        state.liveWorkflowDeprecationError = false;
         state.liveScheduleDispatchPage = null;
         state.liveScheduleDispatchRows = null;
         state.liveScheduleDispatchScheduleId = "";
@@ -2746,6 +2840,7 @@
     els.workflowExplanationActions.hidden = !visible;
     renderWorkflowDiffChoices(workflow);
     updateWorkflowPromotionControls();
+    updateWorkflowDeprecationControls();
     els.loadWorkflowExplanation.disabled =
       !visible || state.liveWorkflowExplanationLoading;
     els.loadWorkflowExplanation.textContent = state.liveWorkflowExplanationLoading
@@ -2761,6 +2856,7 @@
       setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
       setWorkflowDiffStatus("Select another version of this workflow to review a structural diff.", "");
       setWorkflowPromotionStatus("Select a published version that is not already the production target.", "");
+      setWorkflowDeprecationStatus("Select a published version with no active alias before deprecating it.", "");
       return;
     }
     const key = workflow.workflow_id + "@" + workflow.version;
@@ -2813,6 +2909,22 @@
       setWorkflowPromotionStatus("This version is already the production target or the alias state is ambiguous.", "");
     } else {
       setWorkflowPromotionStatus("Promotion uses the observed production target as a compare-and-swap precondition.", "");
+    }
+    const deprecation = liveWorkflowDeprecationTarget(workflow);
+    if (state.liveWorkflowDeprecationLoading) {
+      setWorkflowDeprecationStatus("Recording the checksum-and-alias compare-and-swap…", "");
+    } else if (state.liveWorkflowDeprecationError) {
+      setWorkflowDeprecationStatus("Deprecation unavailable or stale; the version was not assumed to change.", "is-invalid");
+    } else if (!state.liveWorkflowInventory) {
+      setWorkflowDeprecationStatus("Load Live Workflows before changing version status.", "");
+    } else if (workflow.status !== "published") {
+      setWorkflowDeprecationStatus("Only published versions can be deprecated.", "");
+    } else if (!Array.isArray(workflow.aliases) || workflow.aliases.length) {
+      setWorkflowDeprecationStatus("Remove every alias before deprecating a version; production remains protected.", "");
+    } else if (!deprecation) {
+      setWorkflowDeprecationStatus("The observed version metadata is not safe to use for deprecation.", "is-invalid");
+    } else {
+      setWorkflowDeprecationStatus("Deprecation uses the observed checksum and alias set as compare-and-swap guards.", "");
     }
   }
 
@@ -3082,6 +3194,11 @@
     els.workflowPromotionStatus.className = className || "";
   }
 
+  function setWorkflowDeprecationStatus(text, className) {
+    els.workflowDeprecationStatus.textContent = text;
+    els.workflowDeprecationStatus.className = className || "";
+  }
+
   function setScheduleDispatchStatus(text, className) {
     els.scheduleDispatchStatus.textContent = text;
     els.scheduleDispatchStatus.className = className || "";
@@ -3210,6 +3327,15 @@
     els.promoteWorkflow.textContent = state.liveWorkflowPromotionLoading
       ? "Promoting…"
       : "Promote to production";
+  }
+
+  function updateWorkflowDeprecationControls() {
+    const workflow = selectedLiveWorkflow();
+    const target = liveWorkflowDeprecationTarget(workflow);
+    els.deprecateWorkflow.disabled = !target || state.liveWorkflowDeprecationLoading;
+    els.deprecateWorkflow.textContent = state.liveWorkflowDeprecationLoading
+      ? "Deprecating…"
+      : "Deprecate version";
   }
 
   function emptySnapshot() {

@@ -684,6 +684,30 @@ tbody tr.is-selected {
   opacity: 0.55;
 }
 
+.workflow-deprecation-controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(151, 61, 61, 0.2);
+}
+
+.workflow-deprecation-controls button {
+  min-height: 32px;
+  flex: 1;
+  border: 1px solid rgba(151, 61, 61, 0.35);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #973d3d;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.workflow-deprecation-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .schedule-dispatch-actions {
   padding: 12px;
   border: 1px solid rgba(118, 84, 25, 0.3);

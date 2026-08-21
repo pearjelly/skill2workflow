@@ -171,9 +171,16 @@ existing compare-and-swap boundary, so stale inventory fails closed. This
 action accepts no workflow payload, trigger input, credential, or arbitrary
 alias.
 
+The review card also offers **Deprecate version** for a published version with
+no active alias. The operator must confirm in the browser; the UI sends the
+observed checksum and complete alias set to
+`POST /api/v1/workflow-deprecations`. The service checks both values in the
+same registry transaction, so stale inventory fails closed. The immutable
+artifact remains available for audit and rollback review.
+
 This live mode adds only the existing human-gate resume, cooperative
-cancellation, and fixed production-alias promotion mutations. It does not add
-TLS, public ingress, RBAC, workflow
+cancellation, fixed production-alias promotion, and CAS-protected version
+deprecation mutations. It does not add TLS, public ingress, RBAC, workflow
 publication, automatic retries, forceful termination, or provider
 reconciliation. Keep the UI on loopback or place it behind an
 operator-managed HTTPS boundary when serving a wider network.

@@ -810,6 +810,17 @@ def _main(argv=None) -> int:
     )
     service_deprecation_cmd.add_argument("workflow_id")
     service_deprecation_cmd.add_argument("--version", required=True)
+    service_deprecation_cmd.add_argument(
+        "--expected-checksum",
+        default="",
+        help="Require the observed published artifact checksum before deprecation",
+    )
+    service_deprecation_cmd.add_argument(
+        "--expected-alias",
+        dest="expected_aliases",
+        action="append",
+        help="Require the observed alias set before deprecation; repeat for multiple aliases",
+    )
     service_deprecation_cmd.add_argument("--service-url", required=True)
     service_deprecation_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
@@ -1703,12 +1714,19 @@ def _main(argv=None) -> int:
         )
 
     if args.command == "service-workflow-deprecate":
+        deprecation_kwargs = {}
+        if args.expected_checksum or args.expected_aliases is not None:
+            deprecation_kwargs = {
+                "expected_checksum": args.expected_checksum,
+                "expected_aliases": args.expected_aliases,
+            }
         return _service_action(
             lambda: post_workflow_deprecation(
                 args.service_url,
                 args.auth_token_file,
                 args.workflow_id,
                 args.version,
+                **deprecation_kwargs,
             )
         )
 

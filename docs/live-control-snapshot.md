@@ -247,6 +247,13 @@ stale inventory returns a conflict and the UI does not assume success. The
 action never accepts workflow content, trigger input, credentials, or arbitrary
 aliases.
 
+The same review card offers confirmation-protected **Deprecate version** only
+when the selected published version has no active alias. The browser sends the
+observed checksum and complete alias set through the fixed
+`POST /api/v1/workflow-deprecations` proxy. The service checks both values in
+the same transaction; stale inventory returns a conflict, and the immutable
+artifact remains available for audit and rollback review.
+
 ## Verification
 
 Run the real-process drill:
@@ -263,10 +270,10 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-224 add
+The live console remains a single-team operator boundary. Loops 211-225 add
 only the existing human-gate resume decision, cooperative cancellation,
 redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation/workflow-diff reads, and a fixed
-production-alias promotion; the UI excludes browser credential
+production-alias promotion and CAS-protected version deprecation; the UI excludes browser credential
 storage, CORS, workflow publication, forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,
 automatic retries, provider reconciliation, and hosted TLS. Network exposure

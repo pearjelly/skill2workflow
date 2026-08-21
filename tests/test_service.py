@@ -3959,6 +3959,55 @@ class RuntimeServiceTests(TestCase):
         )
         self.assertFalse(thread.is_alive())
 
+    def test_remote_workflow_deprecation_rejects_stale_compare_and_swap(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            published = control.publish_workflow(_workflow())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}),
+                        ready.set(),
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            try:
+                control.promote_workflow("workflow_service", "0.1.0")
+                with self.assertRaisesRegex(ServiceActionError, "workflow deprecation rejected") as raised:
+                    post_workflow_deprecation(
+                        base_url,
+                        config.auth_token_file,
+                        "workflow_service",
+                        "0.1.0",
+                        expected_checksum=published["checksum"],
+                        expected_aliases=[],
+                    )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+
+            self.assertEqual(raised.exception.status_code, 409)
+            record = next(
+                item
+                for item in LocalControlPlane(state_dir, storage="sqlite").list_workflows()
+                if item.get("version") == "0.1.0"
+            )
+            self.assertEqual(record["status"], "published")
+            self.assertEqual(record["aliases"], ["production"])
+            self.assertFalse(thread.is_alive())
+
     def test_remote_workflow_inventory_is_authenticated_bounded_and_read_only(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -13,7 +13,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from pathlib import PurePosixPath
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from .connectors import default_connectors
 from .compiler import validate_workflow
@@ -158,14 +158,32 @@ class LocalControlPlane:
                     pass
             raise
 
-    def deprecate_workflow(self, workflow_id: str, version: str) -> WorkflowRecord:
-        """Mark a published workflow version as deprecated without mutating its artifact."""
+    def deprecate_workflow(
+        self,
+        workflow_id: str,
+        version: str,
+        *,
+        expected_checksum: str = "",
+        expected_aliases: Optional[List[str]] = None,
+    ) -> WorkflowRecord:
+        """Deprecate a version without mutating its artifact.
+
+        ``expected_checksum`` plus ``expected_aliases`` form an optional
+        compare-and-swap guard.  The legacy call remains supported for local
+        scripts, while protected callers can fail closed when their inventory
+        is stale.
+        """
+        normalized_checksum, normalized_aliases = _normalize_deprecation_precondition(
+            expected_checksum, expected_aliases
+        )
         if self.storage == "sqlite" and hasattr(self.store, "deprecate_workflow_record"):
             deprecated_at = _now()
             return self.store.deprecate_workflow_record(
                 workflow_id,
                 version,
                 deprecated_at=deprecated_at,
+                expected_checksum=normalized_checksum,
+                expected_aliases=normalized_aliases,
                 audit_event={
                     "type": "workflow_deprecated",
                     "workflow_id": workflow_id,
@@ -180,6 +198,14 @@ class LocalControlPlane:
             raise ValueError(f"workflow version not found: {workflow_id}@{version}")
 
         record = dict(index[key])
+        if normalized_checksum:
+            current_checksum = str(record.get("checksum", ""))
+            current_aliases = sorted(_record_aliases(record))
+            if (
+                current_checksum != normalized_checksum
+                or current_aliases != normalized_aliases
+            ):
+                raise ValueError("workflow deprecation precondition failed")
         was_deprecated = record.get("status") == "deprecated"
         aliases_removed = bool(_record_aliases(record))
         if aliases_removed:
@@ -1357,6 +1383,38 @@ def _record_key(workflow_id: str, version: str) -> str:
 
 _WORKFLOW_ALIAS_PATTERN = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 MAX_WORKFLOW_ALIAS_BYTES = 64
+
+
+def _normalize_deprecation_precondition(
+    expected_checksum: str,
+    expected_aliases: Optional[List[str]],
+) -> Tuple[str, Optional[List[str]]]:
+    """Validate and canonicalize the optional deprecation CAS fields."""
+
+    if not isinstance(expected_checksum, str):
+        raise ValueError("expected_checksum must be a string")
+    if not expected_checksum and expected_aliases is None:
+        return "", None
+    if not expected_checksum or expected_aliases is None:
+        raise ValueError("workflow deprecation precondition is incomplete")
+    if (
+        len(expected_checksum) != 64
+        or any(char not in "0123456789abcdef" for char in expected_checksum)
+    ):
+        raise ValueError("expected_checksum must be a lowercase SHA-256 digest")
+    if not isinstance(expected_aliases, list) or len(expected_aliases) > 16:
+        raise ValueError("expected_aliases must be a list of at most 16 aliases")
+    normalized = []
+    seen = set()
+    for alias in expected_aliases:
+        if not isinstance(alias, str):
+            raise ValueError("expected_aliases must contain strings")
+        normalized_alias = _normalize_workflow_alias(alias)
+        if normalized_alias in seen:
+            raise ValueError("expected_aliases must be unique")
+        seen.add(normalized_alias)
+        normalized.append(normalized_alias)
+    return expected_checksum, sorted(normalized)
 
 
 def _normalize_workflow_alias(alias: str) -> str:
