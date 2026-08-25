@@ -885,7 +885,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-225 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-226 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -962,6 +962,14 @@ Loop 222 extends that live schedule view with cursor-paged, redacted dispatch
 evidence. Operators can inspect completed, failed, skipped, and uncertain
 outcomes and load older pages through fixed authenticated routes; the UI does
 not claim, replay, review, or mutate dispatch state.
+
+Loop 226 completes the live Workflow lifecycle entry point with a
+confirmation-protected **Publish Staged Workflow** action. After loading a
+live snapshot, operators can stage one local Workflow DSL JSON document within
+the existing 1 MiB publication bound; the UI keeps the ingress token
+server-side, forwards only the fixed publication envelope, and refreshes the
+redacted version inventory on success. Publishing creates an immutable version
+only: it neither promotes an alias nor starts a run.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

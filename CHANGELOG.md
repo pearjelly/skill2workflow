@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a confirmation-protected **Publish Staged Workflow** action to the
+  installed live control-plane UI. It accepts one bounded local Workflow DSL
+  JSON document, forwards only the fixed publication envelope through a
+  server-side-token proxy, validates the compact redacted result, refreshes
+  inventory, and never promotes an alias or starts a run.
+
 - Added a confirmation-protected **Promote to production** action for a
   selected published live workflow version. It uses the observed production
   alias target as a compare-and-swap precondition through a fixed authenticated

@@ -3,6 +3,7 @@ import os
 import threading
 import tempfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import urllib.error
 import urllib.request
 from pathlib import Path
 from unittest import TestCase
@@ -1509,6 +1510,147 @@ class UiTests(TestCase):
             upstream.shutdown()
             upstream.server_close()
             upstream_thread.join(timeout=2)
+
+    def test_live_proxy_publishes_workflow_without_browser_token(self):
+        observed = {}
+        release = {
+            "schema_version": "skill2workflow-workflow-release-0.1.0",
+            "workflow_id": "workflow_demo",
+            "version": "0.3.0",
+            "status": "published",
+            "checksum": "c" * 64,
+        }
+        workflow = {
+            "schema_version": "0.1.0",
+            "workflow": {"id": "workflow_demo", "version": "0.3.0"},
+            "entry": "start",
+            "nodes": [],
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                observed["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                body = json.dumps(release, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text(
+                    "ui-test-token-012345678901234567890123456789\n",
+                    encoding="utf-8",
+                )
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+
+                def ready(server):
+                    ui_port["value"] = server.server_port
+
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1",
+                        "port": 0,
+                        "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file,
+                        "ready_callback": ready,
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{ui_port['value']}/api/v1/workflow-releases",
+                    data=json.dumps({"workflow": workflow}, separators=(",", ":")).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(payload, release)
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(observed["path"], "/api/v1/workflow-releases")
+                self.assertEqual(observed["body"], {"workflow": workflow})
+                self.assertEqual(
+                    observed["authorization"],
+                    "Bearer ui-test-token-012345678901234567890123456789",
+                )
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)
+
+    def test_live_proxy_rejects_malformed_workflow_publication_before_upstream(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / "ingress.token"
+            token_file.write_text(
+                "ui-test-token-012345678901234567890123456789\n",
+                encoding="utf-8",
+            )
+            os.chmod(token_file, 0o600)
+            ui_port = {}
+
+            def ready(server):
+                ui_port["value"] = server.server_port
+
+            ui_thread = threading.Thread(
+                target=serve_ui,
+                kwargs={
+                    "host": "127.0.0.1",
+                    "port": 0,
+                    "once": True,
+                    "service_url": "http://127.0.0.1:1",
+                    "auth_token_file": token_file,
+                    "ready_callback": ready,
+                },
+                daemon=True,
+            )
+            ui_thread.start()
+            for _ in range(100):
+                if "value" in ui_port:
+                    break
+                ui_thread.join(0.01)
+            self.assertIn("value", ui_port)
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{ui_port['value']}/api/v1/workflow-releases",
+                data=b'{"workflow":[]}',
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as raised:
+                urllib.request.urlopen(request, timeout=2)
+            error = raised.exception
+            try:
+                self.assertEqual(error.code, 400)
+                self.assertEqual(
+                    json.loads(error.read().decode("utf-8")),
+                    {"error": "workflow publication body is malformed"},
+                )
+            finally:
+                error.close()
+            ui_thread.join(timeout=2)
+            self.assertFalse(ui_thread.is_alive())
 
     def test_live_proxy_deprecates_workflow_with_compare_and_swap_without_browser_token(self):
         observed = {}

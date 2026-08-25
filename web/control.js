@@ -15,6 +15,7 @@
   const LIVE_WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/";
   const LIVE_WORKFLOW_DIFF_PREFIX = "/api/v1/workflow-diffs/";
   const LIVE_WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/";
+  const LIVE_WORKFLOW_RELEASE_URL = "/api/v1/workflow-releases";
   const LIVE_WORKFLOW_PROMOTION_URL = "/api/v1/workflow-promotions";
   const LIVE_WORKFLOW_DEPRECATION_URL = "/api/v1/workflow-deprecations";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
@@ -28,12 +29,14 @@
   const WORKFLOW_EXPLANATION_SCHEMA = "skill2workflow-workflow-explanation-0.1.0";
   const WORKFLOW_DIFF_SCHEMA = "skill2workflow-workflow-diff-0.1.0";
   const WORKFLOW_PREFLIGHT_SCHEMA = "skill2workflow-workflow-preflight-0.1.0";
+  const WORKFLOW_RELEASE_SCHEMA = "skill2workflow-workflow-release-0.1.0";
   const WORKFLOW_PROMOTION_SCHEMA = "skill2workflow-workflow-promotion-0.1.0";
   const WORKFLOW_DEPRECATION_SCHEMA = "skill2workflow-workflow-deprecation-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
   const LIVE_AUDIT_ROWS_MAX = 500;
   const SERVICE_PROBE_SCHEMA = "skill2workflow-service-probe-0.1.0";
   const AUTO_REFRESH_INTERVAL_MS = 10000;
+  const MAX_WORKFLOW_RELEASE_BYTES = 1024 * 1024;
   const state = {
     snapshot: null,
     view: "operator",
@@ -85,6 +88,9 @@
     liveWorkflowPreflightKey: "",
     liveWorkflowPreflightLoading: false,
     liveWorkflowPreflightError: false,
+    liveWorkflowReleaseCandidate: null,
+    liveWorkflowReleaseLoading: false,
+    liveWorkflowReleaseError: false,
     liveWorkflowPromotionLoading: false,
     liveWorkflowPromotionError: false,
     liveWorkflowDeprecationLoading: false,
@@ -114,6 +120,9 @@
     els.loadLiveSchedules = document.getElementById("load-live-schedules");
     els.loadLiveReadiness = document.getElementById("load-live-readiness");
     els.loadLiveWorkflows = document.getElementById("load-live-workflows");
+    els.workflowReleaseFileAction = document.getElementById("workflow-release-file-action");
+    els.workflowReleaseFile = document.getElementById("workflow-release-file");
+    els.publishWorkflow = document.getElementById("publish-workflow");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
     els.status = document.getElementById("status-pill");
@@ -198,6 +207,8 @@
     els.scheduleDispatchReviewOutcome.addEventListener("change", updateLiveScheduleDispatchReviewControls);
     els.loadLiveReadiness.addEventListener("click", loadLiveReadiness);
     els.loadLiveWorkflows.addEventListener("click", loadLiveWorkflows);
+    els.workflowReleaseFile.addEventListener("change", stageWorkflowReleaseFile);
+    els.publishWorkflow.addEventListener("click", publishStagedWorkflow);
     els.loadWorkflowExplanation.addEventListener("click", loadLiveWorkflowExplanation);
     els.loadWorkflowDiff.addEventListener("click", loadLiveWorkflowDiff);
     els.workflowDiffTarget.addEventListener("change", function () {
@@ -748,6 +759,114 @@
       state.liveWorkflowPreflightLoading = false;
       updateWorkflowPreflightControls();
     }
+  }
+
+  async function stageWorkflowReleaseFile(event) {
+    if (!state.liveModeConfigured || !isLiveSnapshot() || state.liveWorkflowReleaseLoading) {
+      return;
+    }
+    const file = event.target.files && event.target.files[0];
+    if (!file) {
+      return;
+    }
+    state.liveWorkflowReleaseCandidate = null;
+    state.liveWorkflowReleaseLoading = true;
+    state.liveWorkflowReleaseError = false;
+    updateWorkflowReleaseControls();
+    setStatus("Staging", "");
+    try {
+      if (typeof file.size !== "number" || file.size < 1 || file.size > MAX_WORKFLOW_RELEASE_BYTES) {
+        throw new Error("workflow publication body is too large");
+      }
+      const workflow = JSON.parse(await file.text());
+      const candidate = buildWorkflowReleaseCandidate(workflow);
+      if (!candidate) {
+        throw new Error("workflow publication body is malformed");
+      }
+      state.liveWorkflowReleaseCandidate = candidate;
+      setStatus("Workflow staged", "is-valid");
+    } catch (error) {
+      state.liveWorkflowReleaseError = true;
+      setStatus("Workflow rejected", "is-invalid");
+    } finally {
+      event.target.value = "";
+      state.liveWorkflowReleaseLoading = false;
+      updateWorkflowReleaseControls();
+    }
+  }
+
+  function buildWorkflowReleaseCandidate(workflow) {
+    if (!isObject(workflow) || !isObject(workflow.workflow) ||
+      workflow.schema_version !== "0.1.0" ||
+      !isSafeWorkflowRef(workflow.workflow.id) ||
+      !isSafeWorkflowRef(workflow.workflow.version)) {
+      return null;
+    }
+    let body;
+    try {
+      body = JSON.stringify({ workflow: workflow });
+    } catch (error) {
+      return null;
+    }
+    if (!body || new TextEncoder().encode(body).length > MAX_WORKFLOW_RELEASE_BYTES) {
+      return null;
+    }
+    return {
+      workflow: workflow,
+      workflowId: workflow.workflow.id,
+      version: workflow.workflow.version,
+    };
+  }
+
+  async function publishStagedWorkflow() {
+    const candidate = state.liveWorkflowReleaseCandidate;
+    if (!candidate || !state.liveModeConfigured || !isLiveSnapshot() || state.liveWorkflowReleaseLoading) {
+      return;
+    }
+    if (typeof window.confirm === "function" && !window.confirm(
+      "Publish " + candidate.workflowId + "@" + candidate.version +
+      "? This creates an immutable version but does not promote an alias or execute it."
+    )) {
+      return;
+    }
+    state.liveWorkflowReleaseLoading = true;
+    state.liveWorkflowReleaseError = false;
+    updateWorkflowReleaseControls();
+    setStatus("Publishing", "");
+    try {
+      const response = await fetch(LIVE_WORKFLOW_RELEASE_URL, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflow: candidate.workflow }),
+      });
+      if (!response.ok) {
+        throw new Error("workflow publication unavailable");
+      }
+      const result = await response.json();
+      if (!validateWorkflowRelease(result, candidate)) {
+        throw new Error("workflow publication unavailable");
+      }
+      state.liveWorkflowReleaseCandidate = null;
+      setStatus("Published", "is-valid");
+      await loadLiveWorkflows();
+    } catch (error) {
+      state.liveWorkflowReleaseError = true;
+      setStatus("Publication unavailable", "is-invalid");
+    } finally {
+      state.liveWorkflowReleaseLoading = false;
+      updateWorkflowReleaseControls();
+    }
+  }
+
+  function validateWorkflowRelease(result, candidate) {
+    return isObject(result) &&
+      result.schema_version === WORKFLOW_RELEASE_SCHEMA &&
+      hasExactKeys(result, ["schema_version", "workflow_id", "version", "status", "checksum"]) &&
+      result.workflow_id === candidate.workflowId &&
+      result.version === candidate.version &&
+      result.status === "published" &&
+      isChecksum(result.checksum);
   }
 
   async function promoteLiveWorkflow() {
@@ -2001,6 +2120,7 @@
         setReadinessPageStatus("", "");
         setWorkflowPageStatus("", "");
         setServiceStatus("Live service: static mode", "");
+        updateWorkflowReleaseControls();
         renderDetail();
         return;
       }
@@ -2012,6 +2132,7 @@
       updateLiveScheduleControls();
       updateLiveReadinessControls();
       updateLiveWorkflowControls();
+      updateWorkflowReleaseControls();
       if (!response.ok) {
         throw new Error("service probe unavailable");
       }
@@ -2035,6 +2156,7 @@
       updateLiveScheduleControls();
       updateLiveReadinessControls();
       updateLiveWorkflowControls();
+      updateWorkflowReleaseControls();
       setServiceStatus("Live service: unavailable", "is-invalid");
       renderDetail();
     }
@@ -2137,6 +2259,9 @@
       state.liveWorkflowInventory = null;
       state.liveWorkflowInventoryLoading = false;
       setWorkflowPageStatus("", "");
+      state.liveWorkflowReleaseCandidate = null;
+      state.liveWorkflowReleaseLoading = false;
+      state.liveWorkflowReleaseError = false;
     }
     if (label === "Live Service Snapshot") {
       state.lastLiveLoadedAt = new Date().toISOString();
@@ -2176,6 +2301,7 @@
     updateLiveScheduleControls();
     updateLiveReadinessControls();
     updateLiveWorkflowControls();
+    updateWorkflowReleaseControls();
     if (state.selected.kind === "run" && label === "Live Service Snapshot") {
       loadLiveRunDetail(state.selected.value.run_id);
     }
@@ -2226,6 +2352,9 @@
     state.liveWorkflowPreflightKey = "";
     state.liveWorkflowPreflightLoading = false;
     state.liveWorkflowPreflightError = false;
+    state.liveWorkflowReleaseCandidate = null;
+    state.liveWorkflowReleaseLoading = false;
+    state.liveWorkflowReleaseError = false;
     setRunPageStatus("", "");
     setAuditPageStatus("", "");
     setSchedulePageStatus("", "");
@@ -3288,6 +3417,18 @@
     els.loadLiveWorkflows.textContent = state.liveWorkflowInventoryLoading
       ? "Loading Workflows…"
       : "Load Live Workflows";
+  }
+
+  function updateWorkflowReleaseControls() {
+    const enabled = state.liveModeConfigured && isLiveSnapshot();
+    const loading = state.liveWorkflowReleaseLoading;
+    els.workflowReleaseFile.disabled = !enabled || loading;
+    els.workflowReleaseFileAction.classList.toggle("is-disabled", !enabled || loading);
+    els.workflowReleaseFileAction.setAttribute("aria-disabled", String(!enabled || loading));
+    els.publishWorkflow.disabled = !enabled || !state.liveWorkflowReleaseCandidate || loading;
+    els.publishWorkflow.textContent = loading
+      ? "Publishing Workflow…"
+      : "Publish Staged Workflow";
   }
 
   function updateWorkflowExplanationControls() {

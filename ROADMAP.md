@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-225
+- Completed delivery loops: 1-226
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 225 is complete with CAS-protected live workflow deprecation
+- Active loop: None; Loop 226 is complete with confirmation-protected live workflow publication
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-225 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-226 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -5999,9 +5999,48 @@ PYTHONPATH=src python3 -m unittest \
   tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 226: Confirmation-Protected Live Workflow Publication
+
+**Status:** Complete.
+
+**Prior basis:** The live console could inspect the redacted registry, review a
+version's plan and empty trigger, compare releases, promote a reviewed version,
+and deprecate an unaliased version. Publishing a newly reviewed Workflow DSL
+artifact still required leaving the console for the installed CLI, breaking the
+otherwise controlled lifecycle handoff.
+
+**Outcome:** The installed live control-plane UI now exposes **Stage Workflow**
+and **Publish Staged Workflow** only after a live snapshot is loaded. It reads
+one local JSON document, checks the existing 1 MiB publication envelope and
+safe workflow id/version before confirmation, retains it only in browser memory,
+and forwards only the exact `{"workflow": <object>}` body through a fixed
+same-origin route. The UI process continues to read the ingress token
+server-side; the existing authenticated service validates the DSL and performs
+its immutable SQLite publication transaction. The compact redacted response is
+validated before the UI refreshes inventory and discards the staged document.
+
+**Evidence:** UI integration covers exact envelope forwarding to the existing
+publication route, server-side Bearer authentication, `no-store`, and strict
+redacted response handling. Browser contract tests cover the staged-file bound,
+confirmation flow, fixed endpoint, and no-promotion/no-execution message.
+Installed UI, live-control snapshot, stability, README, Changelog, and this
+Roadmap record the publication boundary.
+
+**Safety boundary:** This adds one reviewed immutable-version publication path.
+It does not make the browser a Workflow DSL authority, display the staged
+document, create credentials, promote an alias, trigger execution, accept
+arbitrary proxy paths, delete artifacts, provide RBAC, or claim exactly-once
+external effects.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 225 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 226 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6193,6 +6232,7 @@ This rolling queue is ordered. Loop 225 is complete and there is no active deliv
 | Loop 223: Live Uncertain-Dispatch Review | Complete | Let operators record one explicit conclusion for an uncertain dispatch without replaying or claiming work | Fixed confirmation-protected review proxy, outcome allowlist, CAS/audit reuse, UI/route tests, docs, and full gates |
 | Loop 224: Live Workflow Promotion | Complete | Let operators promote one reviewed published version to the fixed production alias without leaving the live console | Fixed confirmation-protected promotion proxy, observed-alias CAS precondition, strict UI/route tests, docs, and full gates |
 | Loop 225: CAS-Protected Live Workflow Deprecation | Complete | Let operators retire one reviewed published version without allowing stale inventory to override a concurrent alias or artifact change | Optional checksum-plus-alias CAS across local/SQLite/service/client paths, confirmation-protected UI action, strict UI/route tests, docs, and full gates |
+| Loop 226: Confirmation-Protected Live Workflow Publication | Complete | Let operators publish one reviewed local Workflow DSL document from the live console without exposing ingress credentials or automatically activating it | Fixed bounded publication proxy, server-side token, confirmation, redacted response validation, inventory refresh, UI/route tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

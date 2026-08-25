@@ -140,6 +140,20 @@ checksum for recognition. Workflow names/DSL, artifact paths, timestamps,
 credentials, trigger inputs, and provider data never enter the browser;
 static, example, and file snapshots keep the control disabled.
 
+After loading a live snapshot, **Stage Workflow** accepts one local Workflow
+DSL JSON document. The browser rejects empty or invalid JSON, missing basic
+workflow id/version metadata, and over-1 MiB input before it can reach the UI
+process; it keeps the staged document only in browser memory and identifies
+its bounded workflow id and version for the confirmation dialog. **Publish
+Staged Workflow** then sends only the fixed
+`{"workflow": <object>}` envelope to `/api/v1/workflow-releases`; the UI
+process reads the ingress token server-side and forwards it to the existing
+publication route. A successful compact redacted result refreshes the live
+inventory, clears the staged document, and never promotes an alias or executes
+the workflow. The service remains the Workflow DSL validation and immutable
+publication authority. Do not include credentials, access tokens, or business
+payloads in the document.
+
 Selecting a live version enables **Review Workflow Plan** through the fixed
 same-origin `/api/v1/workflow-explanations/{workflow_id}/{version}` route. The
 browser accepts only the `skill2workflow-workflow-explanation-0.1.0` contract
@@ -179,10 +193,10 @@ same registry transaction, so stale inventory fails closed. The immutable
 artifact remains available for audit and rollback review.
 
 This live mode adds only the existing human-gate resume, cooperative
-cancellation, fixed production-alias promotion, and CAS-protected version
-deprecation mutations. It does not add TLS, public ingress, RBAC, workflow
-publication, automatic retries, forceful termination, or provider
-reconciliation. Keep the UI on loopback or place it behind an
+cancellation, fixed immutable Workflow publication, fixed production-alias
+promotion, and CAS-protected version deprecation mutations. It does not add
+TLS, public ingress, RBAC, automatic retries, forceful termination, or
+provider reconciliation. Keep the UI on loopback or place it behind an
 operator-managed HTTPS boundary when serving a wider network.
 
 Use `--once` for a bounded packaging or smoke-test request. The command does
