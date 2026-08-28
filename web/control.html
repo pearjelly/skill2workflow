@@ -315,8 +315,10 @@
             <div class="workflow-review-buttons">
               <button id="load-workflow-explanation" type="button">Review Workflow Plan</button>
               <button id="load-workflow-preflight" type="button">Check Empty Trigger</button>
+              <button id="trigger-workflow-empty" type="button" disabled>Start Empty Trigger</button>
             </div>
             <p id="workflow-preflight-status">The preflight sends only an empty JSON object.</p>
+            <p id="workflow-empty-trigger-status">A successful empty preflight is required before a confirmed start.</p>
             <div class="workflow-diff-controls">
               <label for="workflow-diff-target">Compare selected version →</label>
               <select id="workflow-diff-target" aria-label="Workflow version to compare"></select>

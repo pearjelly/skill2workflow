@@ -132,6 +132,11 @@ These surfaces should remain compatible during the `0.1.x` line:
   confirm its fixed server-side-token publication through the same 1 MiB
   contract. It refreshes redacted inventory after success and does not promote
   aliases or execute the staged document, documented in [`installed-ui.md`](installed-ui.md)
+- The installed live UI can start only a preflight-ready empty trigger for an
+  exact published version through the fixed `/api/v1/workflow-empty-triggers`
+  proxy. The proxy fixes `source` to `live-ui` and input to `{}`, requires an
+  explicit confirmation and an opaque idempotency key, and never accepts
+  aliases or business input.
 - Protected `POST /api/v1/workflow-promotions` and `service-workflow-promote` reuse the fixed `skill2workflow-workflow-promotion-0.1.0` redacted CAS promotion contract with a 1 MiB request bound, transactional SQLite alias mutation, and no artifact-path disclosure documented in [`remote-workflow-promotion.md`](remote-workflow-promotion.md)
 - Protected `GET /api/v1/workflow-diffs/{workflow_id}/{from_version}/{to_version}` and `service-workflow-diff` reuse the fixed `skill2workflow-workflow-diff-0.1.0` value-free structural review contract with a 64 KiB response bound and no state mutation documented in [`remote-workflow-diff.md`](remote-workflow-diff.md)
 - Protected `GET /api/v1/workflow-explanations/{workflow_id}/{version}` and `service-workflow-explain` reuse the fixed `skill2workflow-workflow-explanation-0.1.0` side-effect-free plan contract with a 64 KiB response bound and no connector, credential, instruction, or trigger-input values documented in [`workflow-explanation.md`](workflow-explanation.md)

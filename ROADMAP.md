@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-227
+- Completed delivery loops: 1-228
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 227 is complete with side-effect-free staged Workflow preflight
+- Active loop: None; Loop 228 is complete with confirmation-protected live empty triggering
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the staged-publication preflight evidence
+- Next decision: select the next Production Baseline loop after reviewing the live empty-trigger evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-227 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-228 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6080,9 +6080,48 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_service tests.test_service_client tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 228: Confirmation-Protected Live Empty Trigger
+
+**Status:** Complete.
+
+**Prior basis:** The live console could review a published version and prove
+that its empty trigger was ready, but the final no-input operational handoff
+still required an installed CLI invocation. Any browser action must preserve
+the normal trigger idempotency semantics without accepting business values or
+silently starting an external effect.
+
+**Outcome:** A selected published exact version now exposes **Start Empty
+Trigger** only after its current empty preflight is ready. Following an explicit
+confirmation, the browser submits only workflow id, exact version, and a
+cryptographically generated opaque idempotency key to a fixed same-origin UI
+route. The UI proxy fixes `source` to `live-ui` and input to `{}`, keeps the
+ingress token server-side, and calls the existing protected webhook client. A
+compact receipt is validated before rendering. If outcome delivery is uncertain,
+the visible manual retry reuses the same in-memory idempotency key and unchanged
+empty request; no automatic retry is attempted.
+
+**Evidence:** UI-proxy tests prove fixed `/webhooks/{id}/{version}` forwarding,
+server-side Bearer authentication, fixed `live-ui` source, exact empty input,
+`no-store`, strict compact receipt validation, and early rejection of a body
+that tries to add input. Browser contract tests cover the published-version and
+ready-preflight gates, confirmation wording, receipt validation, and same-key
+retry boundary. Installed UI, live-control snapshot, README, Changelog, and
+this Roadmap record the scope.
+
+**Safety boundary:** This runs only an exact published version with an empty
+input after confirmation. It does not accept aliases, business payloads,
+credentials, arbitrary sources or proxy paths, automatic retries, provider
+reconciliation, RBAC, or exactly-once external-effect claims.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 227 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 228 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6276,6 +6315,7 @@ This rolling queue is ordered. Loop 227 is complete and there is no active deliv
 | Loop 225: CAS-Protected Live Workflow Deprecation | Complete | Let operators retire one reviewed published version without allowing stale inventory to override a concurrent alias or artifact change | Optional checksum-plus-alias CAS across local/SQLite/service/client paths, confirmation-protected UI action, strict UI/route tests, docs, and full gates |
 | Loop 226: Confirmation-Protected Live Workflow Publication | Complete | Let operators publish one reviewed local Workflow DSL document from the live console without exposing ingress credentials or automatically activating it | Fixed bounded publication proxy, server-side token, confirmation, redacted response validation, inventory refresh, UI/route tests, docs, and full gates |
 | Loop 227: Side-Effect-Free Live Workflow Release Preflight | Complete | Validate one staged Workflow DSL document before immutable publication without storing or executing it | Fixed authenticated preflight proxy, server-side token, strict bounded value-free response, staged-control gate, UI/service tests, docs, and full gates |
+| Loop 228: Confirmation-Protected Live Empty Trigger | Complete | Let operators start one preflighted no-input published version from the live console without browser credentials or uncontrolled retries | Fixed source/empty-input proxy, confirmation, strict compact receipt, manual same-key retry, UI tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

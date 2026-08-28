@@ -1696,6 +1696,135 @@ class UiTests(TestCase):
             upstream.server_close()
             upstream_thread.join(timeout=2)
 
+    def test_live_proxy_starts_checked_empty_trigger_without_browser_token(self):
+        observed = {}
+        receipt = {
+            "trigger_id": "trigger_ui_001",
+            "workflow_id": "workflow_demo",
+            "workflow_version": "0.3.0",
+            "run_id": "run_ui_001",
+            "run_status": "waiting",
+            "source": "live-ui",
+            "idempotency_key": "live-ui-0123456789abcdef0123456789abcdef0123",
+            "input_keys": [],
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                observed["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                body = json.dumps(receipt, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text("ui-test-token-012345678901234567890123456789\n", encoding="utf-8")
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+
+                def ready(server):
+                    ui_port["value"] = server.server_port
+
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1", "port": 0, "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file, "ready_callback": ready,
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{ui_port['value']}/api/v1/workflow-empty-triggers",
+                    data=json.dumps(
+                        {
+                            "workflow_id": "workflow_demo", "version": "0.3.0",
+                            "idempotency_key": receipt["idempotency_key"],
+                        },
+                        separators=(",", ":"),
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}, method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(json.loads(response.read().decode("utf-8")), receipt)
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(observed["path"], "/webhooks/workflow_demo/0.3.0")
+                self.assertEqual(
+                    observed["body"],
+                    {"source": "live-ui", "idempotency_key": receipt["idempotency_key"], "input": {}},
+                )
+                self.assertEqual(observed["authorization"], "Bearer ui-test-token-012345678901234567890123456789")
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)
+
+    def test_live_proxy_rejects_nonempty_empty_trigger_body_before_upstream(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / "ingress.token"
+            token_file.write_text("ui-test-token-012345678901234567890123456789\n", encoding="utf-8")
+            os.chmod(token_file, 0o600)
+            ui_port = {}
+
+            def ready(server):
+                ui_port["value"] = server.server_port
+
+            ui_thread = threading.Thread(
+                target=serve_ui,
+                kwargs={
+                    "host": "127.0.0.1", "port": 0, "once": True,
+                    "service_url": "http://127.0.0.1:1", "auth_token_file": token_file,
+                    "ready_callback": ready,
+                },
+                daemon=True,
+            )
+            ui_thread.start()
+            for _ in range(100):
+                if "value" in ui_port:
+                    break
+                ui_thread.join(0.01)
+            self.assertIn("value", ui_port)
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{ui_port['value']}/api/v1/workflow-empty-triggers",
+                data=b'{"workflow_id":"workflow_demo","version":"0.3.0","idempotency_key":"live-ui-test","input":{"secret":"no"}}',
+                headers={"Content-Type": "application/json"}, method="POST",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as raised:
+                urllib.request.urlopen(request, timeout=2)
+            error = raised.exception
+            try:
+                self.assertEqual(error.code, 400)
+                self.assertEqual(
+                    json.loads(error.read().decode("utf-8")),
+                    {"error": "workflow empty trigger body is malformed"},
+                )
+            finally:
+                error.close()
+            ui_thread.join(timeout=2)
+            self.assertFalse(ui_thread.is_alive())
+
     def test_live_proxy_rejects_malformed_workflow_publication_before_upstream(self):
         with tempfile.TemporaryDirectory() as directory:
             token_file = Path(directory) / "ingress.token"

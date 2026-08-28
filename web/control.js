@@ -15,6 +15,7 @@
   const LIVE_WORKFLOW_EXPLANATION_PREFIX = "/api/v1/workflow-explanations/";
   const LIVE_WORKFLOW_DIFF_PREFIX = "/api/v1/workflow-diffs/";
   const LIVE_WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/";
+  const LIVE_WORKFLOW_EMPTY_TRIGGER_URL = "/api/v1/workflow-empty-triggers";
   const LIVE_WORKFLOW_RELEASE_URL = "/api/v1/workflow-releases";
   const LIVE_WORKFLOW_RELEASE_PREFLIGHT_URL = "/api/v1/workflow-release-preflights";
   const LIVE_WORKFLOW_PROMOTION_URL = "/api/v1/workflow-promotions";
@@ -90,6 +91,9 @@
     liveWorkflowPreflightKey: "",
     liveWorkflowPreflightLoading: false,
     liveWorkflowPreflightError: false,
+    liveWorkflowEmptyTriggerAttempt: null,
+    liveWorkflowEmptyTriggerLoading: false,
+    liveWorkflowEmptyTriggerError: false,
     liveWorkflowReleaseCandidate: null,
     liveWorkflowReleasePreflightLoading: false,
     liveWorkflowReleaseLoading: false,
@@ -155,6 +159,8 @@
     els.loadWorkflowDiff = document.getElementById("load-workflow-diff");
     els.workflowPreflightStatus = document.getElementById("workflow-preflight-status");
     els.loadWorkflowPreflight = document.getElementById("load-workflow-preflight");
+    els.triggerWorkflowEmpty = document.getElementById("trigger-workflow-empty");
+    els.workflowEmptyTriggerStatus = document.getElementById("workflow-empty-trigger-status");
     els.promoteWorkflow = document.getElementById("promote-workflow");
     els.workflowPromotionStatus = document.getElementById("workflow-promotion-status");
     els.deprecateWorkflow = document.getElementById("deprecate-workflow");
@@ -223,6 +229,7 @@
       renderDetail();
     });
     els.loadWorkflowPreflight.addEventListener("click", loadLiveWorkflowPreflight);
+    els.triggerWorkflowEmpty.addEventListener("click", triggerLiveWorkflowEmpty);
     els.promoteWorkflow.addEventListener("click", promoteLiveWorkflow);
     els.deprecateWorkflow.addEventListener("click", deprecateLiveWorkflow);
     els.approveRun.addEventListener("click", function () {
@@ -764,6 +771,112 @@
       state.liveWorkflowPreflightLoading = false;
       updateWorkflowPreflightControls();
     }
+  }
+
+  function liveEmptyTriggerTarget() {
+    const workflow = selectedLiveWorkflow();
+    const key = workflow ? workflow.workflow_id + "@" + workflow.version : "";
+    if (
+      !workflow || workflow.status !== "published" ||
+      !state.liveWorkflowPreflight || state.liveWorkflowPreflightKey !== key ||
+      state.liveWorkflowPreflight.ready !== true
+    ) {
+      return null;
+    }
+    return { workflow: workflow, key: key };
+  }
+
+  function liveEmptyTriggerAttempt(target) {
+    const attempt = state.liveWorkflowEmptyTriggerAttempt;
+    if (
+      attempt && attempt.key === target.key &&
+      typeof attempt.idempotencyKey === "string" &&
+      /^live-ui-[A-Za-z0-9_-]{24,64}$/.test(attempt.idempotencyKey)
+    ) {
+      return attempt;
+    }
+    const bytes = new Uint8Array(18);
+    if (!window.crypto || typeof window.crypto.getRandomValues !== "function") {
+      return null;
+    }
+    window.crypto.getRandomValues(bytes);
+    const idempotencyKey = "live-ui-" + Array.from(bytes).map(function (value) {
+      return value.toString(16).padStart(2, "0");
+    }).join("");
+    const next = { key: target.key, idempotencyKey: idempotencyKey, receipt: null };
+    state.liveWorkflowEmptyTriggerAttempt = next;
+    return next;
+  }
+
+  async function triggerLiveWorkflowEmpty() {
+    const target = liveEmptyTriggerTarget();
+    if (!target || state.liveWorkflowEmptyTriggerLoading) {
+      return;
+    }
+    const attempt = liveEmptyTriggerAttempt(target);
+    if (!attempt) {
+      state.liveWorkflowEmptyTriggerError = true;
+      setWorkflowEmptyTriggerStatus("Secure idempotency key generation is unavailable; no run was started.", "is-invalid");
+      return;
+    }
+    const retry = Boolean(attempt.receipt === null && state.liveWorkflowEmptyTriggerError);
+    if (typeof window.confirm === "function" && !window.confirm(
+      (retry ? "Retry " : "Start ") + target.workflow.workflow_id + "@" + target.workflow.version +
+      " with an empty trigger? This may execute its configured workflow and side effects."
+    )) {
+      return;
+    }
+    state.liveWorkflowEmptyTriggerLoading = true;
+    state.liveWorkflowEmptyTriggerError = false;
+    updateWorkflowEmptyTriggerControls();
+    setWorkflowEmptyTriggerStatus(retry ? "Retrying the same idempotent empty trigger…" : "Starting the confirmed empty trigger…", "");
+    try {
+      const response = await fetch(LIVE_WORKFLOW_EMPTY_TRIGGER_URL, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workflow_id: target.workflow.workflow_id,
+          version: target.workflow.version,
+          idempotency_key: attempt.idempotencyKey,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error("workflow empty trigger unavailable");
+      }
+      const receipt = await response.json();
+      if (!validateWorkflowEmptyTrigger(receipt, target.workflow, attempt.idempotencyKey)) {
+        throw new Error("workflow empty trigger unavailable");
+      }
+      attempt.receipt = receipt;
+      setWorkflowEmptyTriggerStatus(
+        "Empty trigger accepted as " + receipt.run_id + " (" + receipt.run_status + ").",
+        "is-valid",
+      );
+      setStatus("Empty Trigger Started", "is-valid");
+      renderDetail();
+    } catch (error) {
+      state.liveWorkflowEmptyTriggerError = true;
+      setWorkflowEmptyTriggerStatus(
+        "Start outcome is unavailable; retry uses the same idempotency key and never changes input.",
+        "is-invalid",
+      );
+    } finally {
+      state.liveWorkflowEmptyTriggerLoading = false;
+      updateWorkflowEmptyTriggerControls();
+    }
+  }
+
+  function validateWorkflowEmptyTrigger(receipt, workflow, idempotencyKey) {
+    return isObject(receipt) && hasExactKeys(receipt, [
+      "trigger_id", "workflow_id", "workflow_version", "run_id", "run_status",
+      "source", "idempotency_key", "input_keys",
+    ]) && receipt.workflow_id === workflow.workflow_id &&
+      receipt.workflow_version === workflow.version && receipt.source === "live-ui" &&
+      receipt.idempotency_key === idempotencyKey &&
+      typeof receipt.trigger_id === "string" && /^trigger_[A-Za-z0-9_-]{1,123}$/.test(receipt.trigger_id) &&
+      isSafeRunId(receipt.run_id) && ["created", "running", "waiting", "completed", "failed", "cancelled", "interrupted"].indexOf(receipt.run_status) !== -1 &&
+      Array.isArray(receipt.input_keys) && receipt.input_keys.length === 0;
   }
 
   async function stageWorkflowReleaseFile(event) {
@@ -2297,6 +2410,9 @@
     state.liveWorkflowPreflightKey = "";
     state.liveWorkflowPreflightLoading = false;
     state.liveWorkflowPreflightError = false;
+    state.liveWorkflowEmptyTriggerAttempt = null;
+    state.liveWorkflowEmptyTriggerLoading = false;
+    state.liveWorkflowEmptyTriggerError = false;
     state.liveWorkflowPromotionLoading = false;
     state.liveWorkflowPromotionError = false;
     state.liveWorkflowDeprecationLoading = false;
@@ -2431,6 +2547,9 @@
     state.liveWorkflowPreflightKey = "";
     state.liveWorkflowPreflightLoading = false;
     state.liveWorkflowPreflightError = false;
+    state.liveWorkflowEmptyTriggerAttempt = null;
+    state.liveWorkflowEmptyTriggerLoading = false;
+    state.liveWorkflowEmptyTriggerError = false;
     state.liveWorkflowReleaseCandidate = null;
     state.liveWorkflowReleaseLoading = false;
     state.liveWorkflowReleaseError = false;
@@ -2874,6 +2993,9 @@
         state.liveWorkflowPreflightKey = "";
         state.liveWorkflowPreflightLoading = false;
         state.liveWorkflowPreflightError = false;
+        state.liveWorkflowEmptyTriggerAttempt = null;
+        state.liveWorkflowEmptyTriggerLoading = false;
+        state.liveWorkflowEmptyTriggerError = false;
         state.liveWorkflowPromotionLoading = false;
         state.liveWorkflowPromotionError = false;
         state.liveWorkflowDeprecationLoading = false;
@@ -3062,9 +3184,11 @@
     if (!visible) {
       setWorkflowExplanationStatus("Select a live workflow version to review its plan.", "");
       setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
+      setWorkflowEmptyTriggerStatus("A successful empty preflight is required before a confirmed start.", "");
       setWorkflowDiffStatus("Select another version of this workflow to review a structural diff.", "");
       setWorkflowPromotionStatus("Select a published version that is not already the production target.", "");
       setWorkflowDeprecationStatus("Select a published version with no active alias before deprecating it.", "");
+      updateWorkflowEmptyTriggerControls();
       return;
     }
     const key = workflow.workflow_id + "@" + workflow.version;
@@ -3091,6 +3215,22 @@
       );
     } else {
       setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
+    }
+    updateWorkflowEmptyTriggerControls();
+    const emptyTarget = liveEmptyTriggerTarget();
+    if (state.liveWorkflowEmptyTriggerLoading) {
+      setWorkflowEmptyTriggerStatus("Starting the confirmed empty trigger…", "");
+    } else if (state.liveWorkflowEmptyTriggerError && emptyTarget) {
+      setWorkflowEmptyTriggerStatus("Start outcome is unavailable; retry uses the same idempotency key and never changes input.", "is-invalid");
+    } else if (emptyTarget && state.liveWorkflowEmptyTriggerAttempt && state.liveWorkflowEmptyTriggerAttempt.receipt) {
+      const receipt = state.liveWorkflowEmptyTriggerAttempt.receipt;
+      setWorkflowEmptyTriggerStatus("Empty trigger accepted as " + receipt.run_id + " (" + receipt.run_status + ").", "is-valid");
+    } else if (!emptyTarget && workflow.status !== "published") {
+      setWorkflowEmptyTriggerStatus("Only published versions can start an empty trigger.", "");
+    } else if (!emptyTarget) {
+      setWorkflowEmptyTriggerStatus("Run Check Empty Trigger first; it must report ready before a confirmed start.", "");
+    } else {
+      setWorkflowEmptyTriggerStatus("This starts only the checked empty input after an explicit confirmation.", "");
     }
     const diffKey = workflow.workflow_id + "@" + workflow.version + "@" + els.workflowDiffTarget.value;
     if (state.liveWorkflowDiffLoading && state.liveWorkflowDiffKey === diffKey) {
@@ -3236,6 +3376,14 @@
     }
     if (workflow && state.liveWorkflowPreflight && state.liveWorkflowPreflightKey === workflowKey) {
       detailEnvelope.redacted_empty_trigger_preflight = state.liveWorkflowPreflight;
+      hasEnvelope = true;
+    }
+    if (
+      workflow && state.liveWorkflowEmptyTriggerAttempt &&
+      state.liveWorkflowEmptyTriggerAttempt.key === workflowKey &&
+      state.liveWorkflowEmptyTriggerAttempt.receipt
+    ) {
+      detailEnvelope.redacted_empty_trigger_receipt = state.liveWorkflowEmptyTriggerAttempt.receipt;
       hasEnvelope = true;
     }
     const diffKey = workflow ? workflow.workflow_id + "@" + workflow.version + "@" + els.workflowDiffTarget.value : "";
@@ -3531,6 +3679,22 @@
     els.loadWorkflowPreflight.textContent = state.liveWorkflowPreflightLoading
       ? "Checking Trigger…"
       : "Check Empty Trigger";
+    updateWorkflowEmptyTriggerControls();
+  }
+
+  function updateWorkflowEmptyTriggerControls() {
+    const target = liveEmptyTriggerTarget();
+    const loading = state.liveWorkflowEmptyTriggerLoading || state.liveWorkflowPreflightLoading;
+    const retry = Boolean(target && state.liveWorkflowEmptyTriggerError &&
+      state.liveWorkflowEmptyTriggerAttempt &&
+      state.liveWorkflowEmptyTriggerAttempt.key === target.key &&
+      state.liveWorkflowEmptyTriggerAttempt.receipt === null);
+    els.triggerWorkflowEmpty.disabled = !target || loading;
+    els.triggerWorkflowEmpty.textContent = state.liveWorkflowEmptyTriggerLoading
+      ? "Starting Empty Trigger…"
+      : retry
+      ? "Retry Empty Trigger"
+      : "Start Empty Trigger";
   }
 
   function updateWorkflowDiffControls(hasTarget) {

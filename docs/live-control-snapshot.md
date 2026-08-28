@@ -270,11 +270,12 @@ NDJSON without publishing private values in its evidence.
 
 ## Boundary
 
-The live console remains a single-team operator boundary. Loops 211-227 add
+The live console remains a single-team operator boundary. Loops 211-228 add
 only the existing human-gate resume decision, cooperative cancellation,
 redacted run-detail/run-discovery/audit-discovery/schedule-discovery/readiness/workflow-inventory/workflow-explanation/workflow-diff reads, and a fixed
 immutable Workflow publication with a required side-effect-free release
-preflight, production-alias promotion, and CAS-protected version deprecation;
+preflight, a confirmation-protected empty trigger for just-preflighted published
+versions, production-alias promotion, and CAS-protected version deprecation;
 the UI excludes browser credential storage, CORS,
 forceful termination, RBAC, pagination
 cursors beyond the fixed UI page, remote audit storage, multi-tenant filtering,

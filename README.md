@@ -885,7 +885,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-227 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-228 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -979,6 +979,13 @@ connector. A successful preflight enables the existing explicit publication
 confirmation, while an input-requiring workflow remains valid to publish.
 The same check is available to release automation as
 `service-workflow-release-preflight`.
+
+Loop 228 closes the remaining safe live-console handoff for no-input workflows:
+after a just-loaded ready empty preflight, a published exact version can start
+only through an explicit confirmation and a browser-generated idempotency key.
+The UI proxy fixes the source to `live-ui` and input to `{}`; uncertain manual
+retries reuse the same key, while aliases and arbitrary business inputs remain
+outside the browser boundary.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

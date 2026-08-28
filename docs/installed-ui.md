@@ -173,7 +173,17 @@ empty JSON object `{}` to `/api/v1/workflow-preflights/{workflow_id}/{version}`
 and validates the `skill2workflow-workflow-preflight-0.1.0` response. Operators
 can see whether the empty trigger is ready, which required inputs or mappings
 would block it, and how many connector nodes are involved. No business input is
-accepted by this UI action, and the preflight is side-effect-free.
+accepted by this UI action, and the preflight is side-effect-free. For a
+currently selected **published** version whose just-loaded empty preflight is
+ready, **Start Empty Trigger** becomes available. After a confirmation it sends
+only workflow id, exact version, and a browser-generated opaque idempotency key
+to `/api/v1/workflow-empty-triggers`; the UI process fixes `source` to
+`live-ui`, fixes input to `{}`, and keeps its ingress token server-side before
+using the normal protected trigger route. It never accepts aliases or business
+input. If the browser cannot determine the outcome, its explicit retry reuses
+the same in-memory key and unchanged empty request; it never automatically
+retries. The compact receipt contains identifiers and input keys only, and is
+shown in the selected workflow's redacted detail envelope.
 
 The review card also offers **Compare Versions** after the inventory contains
 at least two versions of the selected workflow. It calls only the fixed

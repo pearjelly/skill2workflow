@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a confirmation-protected **Start Empty Trigger** action for a selected
+  published version that has just passed its empty-trigger preflight. The live
+  proxy fixes the source and empty input, preserves its server-side ingress
+  token, validates the compact receipt, and permits only an explicit retry with
+  the same in-memory idempotency key after an uncertain outcome.
+
 - Added an authenticated, side-effect-free Workflow release preflight and a
   required **Check Staged Workflow** control before live publication. It
   validates the complete staged DSL document without persisting it, resolving
