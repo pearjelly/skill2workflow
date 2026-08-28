@@ -70,6 +70,7 @@ from .preflight import (
     MAX_WORKFLOW_PREFLIGHT_MAPPINGS,
     MAX_WORKFLOW_PREFLIGHT_NODES,
     WORKFLOW_PREFLIGHT_SCHEMA_VERSION,
+    WORKFLOW_RELEASE_PREFLIGHT_SCHEMA_VERSION,
 )
 from .service import (
     RUNTIME_INFO_SCHEMA_VERSION,
@@ -120,6 +121,8 @@ MAX_RUNTIME_INFO_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_TRIGGER_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_RELEASE_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTES = 16 * 1024
+MAX_REMOTE_WORKFLOW_RELEASE_PREFLIGHT_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
+MAX_REMOTE_WORKFLOW_RELEASE_PREFLIGHT_RESPONSE_BYTES = 64 * 1024
 MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES = MAX_REQUEST_BODY_BYTES
 MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES = 16 * 1024
 MAX_REMOTE_WORKFLOW_DIFF_RESPONSE_BYTES = 64 * 1024
@@ -867,6 +870,33 @@ def post_workflow_release(
         max_response_bytes=MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTES,
     )
     _validate_workflow_release_response(payload)
+    return payload
+
+
+def post_workflow_release_preflight(
+    service_url: str,
+    token_file: Path,
+    workflow: Dict[str, object],
+) -> Dict[str, object]:
+    """Validate one unpublished Workflow DSL document without storing it."""
+
+    if not isinstance(workflow, dict):
+        raise ValueError("workflow release preflight must be a JSON object")
+    workflow_id, version = _workflow_document_identity(workflow)
+    payload = _post_json(
+        service_url,
+        token_file,
+        "/api/v1/workflow-release-preflights",
+        {"workflow": workflow},
+        conflict_message="workflow release preflight unavailable",
+        max_request_bytes=MAX_REMOTE_WORKFLOW_RELEASE_PREFLIGHT_REQUEST_BYTES,
+        max_response_bytes=MAX_REMOTE_WORKFLOW_RELEASE_PREFLIGHT_RESPONSE_BYTES,
+    )
+    _validate_workflow_release_preflight_response(
+        payload,
+        workflow_id=workflow_id,
+        version=version,
+    )
     return payload
 
 
@@ -2196,6 +2226,77 @@ def _validate_workflow_preflight_response(
         raise ServiceActionError()
 
 
+def _validate_workflow_release_preflight_response(
+    payload: Dict[str, object],
+    *,
+    workflow_id: str,
+    version: str,
+) -> None:
+    """Reject responses outside the fixed unpublished-artifact contract."""
+
+    fields = {
+        "schema_version", "workflow", "document_valid", "empty_trigger_ready",
+        "summary", "issues", "safety",
+    }
+    if (
+        set(payload) != fields
+        or payload.get("schema_version") != WORKFLOW_RELEASE_PREFLIGHT_SCHEMA_VERSION
+        or payload.get("document_valid") is not True
+        or not isinstance(payload.get("empty_trigger_ready"), bool)
+    ):
+        raise ServiceActionError()
+    metadata = payload.get("workflow")
+    if (
+        not isinstance(metadata, dict)
+        or set(metadata) != {"id", "version"}
+        or metadata.get("id") != workflow_id
+        or metadata.get("version") != version
+    ):
+        raise ServiceActionError()
+    summary = payload.get("summary")
+    summary_fields = {
+        "node_count", "connector_node_count", "side_effecting_node_count",
+        "mapping_count", "blocked_node_count", "issue_count",
+    }
+    if (
+        not isinstance(summary, dict)
+        or set(summary) != summary_fields
+        or any(not _is_non_negative_integer(summary.get(field)) for field in summary_fields)
+        or summary["node_count"] > MAX_WORKFLOW_PREFLIGHT_NODES
+        or summary["connector_node_count"] > summary["node_count"]
+        or summary["side_effecting_node_count"] > summary["connector_node_count"]
+        or summary["blocked_node_count"] > summary["node_count"]
+        or summary["mapping_count"] > MAX_WORKFLOW_PREFLIGHT_NODES * MAX_WORKFLOW_PREFLIGHT_MAPPINGS
+    ):
+        raise ServiceActionError()
+    issues = payload.get("issues")
+    if (
+        not isinstance(issues, list)
+        or len(issues) > MAX_WORKFLOW_PREFLIGHT_ISSUES
+        or summary["issue_count"] != len(issues)
+    ):
+        raise ServiceActionError()
+    for issue in issues:
+        if (
+            not isinstance(issue, dict)
+            or set(issue) != {"code", "severity", "node_id", "path"}
+            or issue.get("code") not in {"input_invalid", "required_mapping_input_missing"}
+            or issue.get("severity") != "error"
+            or (issue.get("node_id") is not None and not _is_safe_workflow_ref(issue.get("node_id")))
+            or not isinstance(issue.get("path"), list)
+            or len(issue.get("path")) > 16
+            or any(not isinstance(part, (str, int)) or isinstance(part, bool) for part in issue["path"])
+        ):
+            raise ServiceActionError()
+    if payload.get("safety") != {
+        "side_effect_free": True,
+        "connector_calls": False,
+        "credentials_resolved": False,
+        "raw_values_included": False,
+    }:
+        raise ServiceActionError()
+
+
 def _is_safe_workflow_ref(value: object) -> bool:
     return (
         isinstance(value, str)
@@ -3321,6 +3422,20 @@ def _validate_run_id(run_id: str) -> str:
     ):
         raise ValueError("run_id must be a safe run identifier")
     return value
+
+
+def _workflow_document_identity(workflow: Dict[str, object]) -> tuple[str, str]:
+    metadata = workflow.get("workflow")
+    if not isinstance(metadata, dict):
+        raise ValueError("workflow.workflow must be a JSON object")
+    workflow_id = metadata.get("id")
+    version = metadata.get("version")
+    if not isinstance(workflow_id, str) or not isinstance(version, str):
+        raise ValueError("workflow identity must be present")
+    return (
+        _validate_workflow_ref(workflow_id, "workflow_id"),
+        _validate_workflow_ref(version, "version"),
+    )
 
 
 def _validate_workflow_ref(value: str, field: str) -> str:

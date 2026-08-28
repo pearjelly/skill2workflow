@@ -41,6 +41,7 @@ from .preflight import (
     MAX_WORKFLOW_PREFLIGHT_BYTES,
     MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS,
     build_workflow_preflight,
+    build_workflow_release_preflight,
 )
 from .dashboard import (
     MAX_LIVE_SNAPSHOT_BYTES,
@@ -105,6 +106,9 @@ SERVICE_SCHEMA_VERSION = "skill2workflow-service-0.2.0"
 RUNTIME_INFO_SCHEMA_VERSION = "skill2workflow-runtime-info-0.1.0"
 WORKFLOW_DSL_SCHEMA_VERSION = "0.1.0"
 WORKFLOW_RELEASE_SCHEMA_VERSION = "skill2workflow-workflow-release-0.1.0"
+WORKFLOW_RELEASE_PREFLIGHT_SCHEMA_VERSION = (
+    "skill2workflow-workflow-release-preflight-0.1.0"
+)
 WORKFLOW_PROMOTION_SCHEMA_VERSION = "skill2workflow-workflow-promotion-0.1.0"
 WORKFLOW_DIFF_SCHEMA_VERSION = "skill2workflow-workflow-diff-0.1.0"
 WORKFLOW_DEPRECATION_SCHEMA_VERSION = "skill2workflow-workflow-deprecation-0.1.0"
@@ -902,6 +906,8 @@ def _handler_for(service: RuntimeService):
                         self._handle_workflow_explanation(_workflow_explanation_parts(path))
                     elif self.command == "POST" and _workflow_preflight_parts(path) is not None:
                         self._handle_workflow_preflight(_workflow_preflight_parts(path))
+                    elif self.command == "POST" and path == "/api/v1/workflow-release-preflights":
+                        self._handle_workflow_release_preflight()
                     elif self.command == "POST" and path == "/api/v1/workflow-releases":
                         self._handle_workflow_release()
                     elif self.command == "POST" and path == "/api/v1/workflow-promotions":
@@ -2641,6 +2647,63 @@ def _handler_for(service: RuntimeService):
                 return
             self._send_json(200, payload)
 
+        def _handle_workflow_release_preflight(self):
+            """Validate one candidate Workflow DSL document without storing it."""
+
+            readiness_status, _ = service.readiness()
+            if readiness_status != 200:
+                self._send_json(503, {"error": "service is not ready"})
+                return
+            authenticated, reason = service.authenticator.authenticate(
+                self.headers.get("Authorization", "")
+            )
+            if not authenticated:
+                status_code = 503 if reason == "provider_unavailable" else 401
+                self._send_json(
+                    status_code,
+                    {
+                        "error": "authentication unavailable"
+                        if status_code == 503
+                        else "authentication required"
+                    },
+                    headers={"WWW-Authenticate": "Bearer"}
+                    if status_code == 401
+                    else None,
+                )
+                return
+            try:
+                body = read_request_body(self)
+                payload = json.loads(body.decode("utf-8"))
+                if (
+                    not isinstance(payload, dict)
+                    or set(payload) != {"workflow"}
+                    or not isinstance(payload.get("workflow"), dict)
+                ):
+                    raise ValueError(
+                        "workflow release preflight request must contain one workflow object"
+                    )
+                response = build_workflow_release_preflight(payload["workflow"])
+                if response.get("schema_version") != WORKFLOW_RELEASE_PREFLIGHT_SCHEMA_VERSION:
+                    raise ValueError("workflow release preflight schema is invalid")
+                encoded = json.dumps(response, ensure_ascii=False, indent=2).encode("utf-8")
+                if len(encoded) > MAX_WORKFLOW_PREFLIGHT_BYTES:
+                    raise ValueError("workflow release preflight exceeds response limit")
+            except WebhookError as error:
+                self._send_json(error.status_code, {"error": str(error)})
+            except (
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+                TypeError,
+                ValueError,
+                OverflowError,
+                RecursionError,
+            ):
+                self._send_json(400, {"error": "workflow release preflight rejected"})
+            except (OSError, sqlite3.Error):
+                self._send_json(503, {"error": "workflow release preflight unavailable"})
+            else:
+                self._send_json(200, response)
+
         def _handle_workflow_release(self):
             """Publish one validated immutable workflow through the service."""
 
@@ -3300,6 +3363,8 @@ def _request_route(method: str, path: str) -> str:
         return "workflow_explanation"
     if method == "POST" and _workflow_preflight_parts(path) is not None:
         return "workflow_preflight"
+    if method == "POST" and path == "/api/v1/workflow-release-preflights":
+        return "workflow_release_preflight"
     if method == "POST" and path == "/api/v1/workflow-releases":
         return "workflow_release"
     if method == "POST" and path == "/api/v1/workflow-promotions":

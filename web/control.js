@@ -16,6 +16,7 @@
   const LIVE_WORKFLOW_DIFF_PREFIX = "/api/v1/workflow-diffs/";
   const LIVE_WORKFLOW_PREFLIGHT_PREFIX = "/api/v1/workflow-preflights/";
   const LIVE_WORKFLOW_RELEASE_URL = "/api/v1/workflow-releases";
+  const LIVE_WORKFLOW_RELEASE_PREFLIGHT_URL = "/api/v1/workflow-release-preflights";
   const LIVE_WORKFLOW_PROMOTION_URL = "/api/v1/workflow-promotions";
   const LIVE_WORKFLOW_DEPRECATION_URL = "/api/v1/workflow-deprecations";
   const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
@@ -30,6 +31,7 @@
   const WORKFLOW_DIFF_SCHEMA = "skill2workflow-workflow-diff-0.1.0";
   const WORKFLOW_PREFLIGHT_SCHEMA = "skill2workflow-workflow-preflight-0.1.0";
   const WORKFLOW_RELEASE_SCHEMA = "skill2workflow-workflow-release-0.1.0";
+  const WORKFLOW_RELEASE_PREFLIGHT_SCHEMA = "skill2workflow-workflow-release-preflight-0.1.0";
   const WORKFLOW_PROMOTION_SCHEMA = "skill2workflow-workflow-promotion-0.1.0";
   const WORKFLOW_DEPRECATION_SCHEMA = "skill2workflow-workflow-deprecation-0.1.0";
   const LIVE_RUN_ROWS_MAX = 500;
@@ -89,6 +91,7 @@
     liveWorkflowPreflightLoading: false,
     liveWorkflowPreflightError: false,
     liveWorkflowReleaseCandidate: null,
+    liveWorkflowReleasePreflightLoading: false,
     liveWorkflowReleaseLoading: false,
     liveWorkflowReleaseError: false,
     liveWorkflowPromotionLoading: false,
@@ -122,6 +125,7 @@
     els.loadLiveWorkflows = document.getElementById("load-live-workflows");
     els.workflowReleaseFileAction = document.getElementById("workflow-release-file-action");
     els.workflowReleaseFile = document.getElementById("workflow-release-file");
+    els.preflightStagedWorkflow = document.getElementById("preflight-staged-workflow");
     els.publishWorkflow = document.getElementById("publish-workflow");
     els.snapshotFile = document.getElementById("snapshot-file");
     els.filterInput = document.getElementById("filter-input");
@@ -208,6 +212,7 @@
     els.loadLiveReadiness.addEventListener("click", loadLiveReadiness);
     els.loadLiveWorkflows.addEventListener("click", loadLiveWorkflows);
     els.workflowReleaseFile.addEventListener("change", stageWorkflowReleaseFile);
+    els.preflightStagedWorkflow.addEventListener("click", preflightStagedWorkflow);
     els.publishWorkflow.addEventListener("click", publishStagedWorkflow);
     els.loadWorkflowExplanation.addEventListener("click", loadLiveWorkflowExplanation);
     els.loadWorkflowDiff.addEventListener("click", loadLiveWorkflowDiff);
@@ -784,7 +789,7 @@
         throw new Error("workflow publication body is malformed");
       }
       state.liveWorkflowReleaseCandidate = candidate;
-      setStatus("Workflow staged", "is-valid");
+      setStatus("Workflow staged; check it before publishing", "is-valid");
     } catch (error) {
       state.liveWorkflowReleaseError = true;
       setStatus("Workflow rejected", "is-invalid");
@@ -815,12 +820,54 @@
       workflow: workflow,
       workflowId: workflow.workflow.id,
       version: workflow.workflow.version,
+      preflight: null,
     };
+  }
+
+  async function preflightStagedWorkflow() {
+    const candidate = state.liveWorkflowReleaseCandidate;
+    if (!candidate || !state.liveModeConfigured || !isLiveSnapshot() ||
+      state.liveWorkflowReleaseLoading || state.liveWorkflowReleasePreflightLoading) {
+      return;
+    }
+    candidate.preflight = null;
+    state.liveWorkflowReleasePreflightLoading = true;
+    state.liveWorkflowReleaseError = false;
+    updateWorkflowReleaseControls();
+    setStatus("Checking staged workflow", "");
+    try {
+      const response = await fetch(LIVE_WORKFLOW_RELEASE_PREFLIGHT_URL, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflow: candidate.workflow }),
+      });
+      if (!response.ok) {
+        throw new Error("workflow release preflight unavailable");
+      }
+      const result = await response.json();
+      if (!validateWorkflowReleasePreflight(result, candidate)) {
+        throw new Error("workflow release preflight unavailable");
+      }
+      candidate.preflight = result;
+      setStatus(
+        result.empty_trigger_ready
+          ? "Staged workflow validated; empty trigger is ready"
+          : "Staged workflow validated; empty trigger needs input",
+        "is-valid",
+      );
+    } catch (error) {
+      state.liveWorkflowReleaseError = true;
+      setStatus("Staged workflow validation unavailable", "is-invalid");
+    } finally {
+      state.liveWorkflowReleasePreflightLoading = false;
+      updateWorkflowReleaseControls();
+    }
   }
 
   async function publishStagedWorkflow() {
     const candidate = state.liveWorkflowReleaseCandidate;
-    if (!candidate || !state.liveModeConfigured || !isLiveSnapshot() || state.liveWorkflowReleaseLoading) {
+    if (!candidate || !candidate.preflight || !state.liveModeConfigured || !isLiveSnapshot() || state.liveWorkflowReleaseLoading || state.liveWorkflowReleasePreflightLoading) {
       return;
     }
     if (typeof window.confirm === "function" && !window.confirm(
@@ -867,6 +914,38 @@
       result.version === candidate.version &&
       result.status === "published" &&
       isChecksum(result.checksum);
+  }
+
+  function validateWorkflowReleasePreflight(result, candidate) {
+    if (!isObject(result) || result.schema_version !== WORKFLOW_RELEASE_PREFLIGHT_SCHEMA ||
+      !hasExactKeys(result, ["schema_version", "workflow", "document_valid", "empty_trigger_ready", "summary", "issues", "safety"]) ||
+      !isObject(result.workflow) || !hasExactKeys(result.workflow, ["id", "version"]) ||
+      result.workflow.id !== candidate.workflowId || result.workflow.version !== candidate.version ||
+      result.document_valid !== true || typeof result.empty_trigger_ready !== "boolean" ||
+      !isObject(result.summary) || !hasExactKeys(result.summary, ["node_count", "connector_node_count", "side_effecting_node_count", "mapping_count", "blocked_node_count", "issue_count"]) ||
+      !Array.isArray(result.issues) || result.issues.length > 64 ||
+      !isObject(result.safety) || !hasExactKeys(result.safety, ["side_effect_free", "connector_calls", "credentials_resolved", "raw_values_included"]) || result.safety.side_effect_free !== true ||
+      result.safety.connector_calls !== false || result.safety.credentials_resolved !== false ||
+      result.safety.raw_values_included !== false) {
+      return false;
+    }
+    const summary = result.summary;
+    if (!["node_count", "connector_node_count", "side_effecting_node_count", "mapping_count", "blocked_node_count", "issue_count"].every(function (field) {
+      return isNonNegativeInteger(summary[field]);
+    }) || summary.node_count > 1000 || summary.connector_node_count > summary.node_count ||
+      summary.side_effecting_node_count > summary.connector_node_count ||
+      summary.blocked_node_count > summary.node_count || summary.issue_count !== result.issues.length) {
+      return false;
+    }
+    return result.issues.every(function (issue) {
+      return isObject(issue) && hasExactKeys(issue, ["code", "severity", "node_id", "path"]) &&
+        ["input_invalid", "required_mapping_input_missing"].indexOf(issue.code) !== -1 &&
+        issue.severity === "error" && (issue.node_id === null || isSafeWorkflowRef(issue.node_id)) &&
+        Array.isArray(issue.path) && issue.path.length <= 16 && issue.path.every(function (part) {
+          return (typeof part === "string" && part.length <= 128) ||
+            (Number.isInteger(part) && typeof part !== "boolean");
+        });
+    });
   }
 
   async function promoteLiveWorkflow() {
@@ -3421,12 +3500,17 @@
 
   function updateWorkflowReleaseControls() {
     const enabled = state.liveModeConfigured && isLiveSnapshot();
-    const loading = state.liveWorkflowReleaseLoading;
+    const loading = state.liveWorkflowReleaseLoading || state.liveWorkflowReleasePreflightLoading;
     els.workflowReleaseFile.disabled = !enabled || loading;
     els.workflowReleaseFileAction.classList.toggle("is-disabled", !enabled || loading);
     els.workflowReleaseFileAction.setAttribute("aria-disabled", String(!enabled || loading));
-    els.publishWorkflow.disabled = !enabled || !state.liveWorkflowReleaseCandidate || loading;
-    els.publishWorkflow.textContent = loading
+    const candidate = state.liveWorkflowReleaseCandidate;
+    els.preflightStagedWorkflow.disabled = !enabled || !candidate || loading;
+    els.preflightStagedWorkflow.textContent = state.liveWorkflowReleasePreflightLoading
+      ? "Checking Staged Workflow…"
+      : "Check Staged Workflow";
+    els.publishWorkflow.disabled = !enabled || !candidate || !candidate.preflight || loading;
+    els.publishWorkflow.textContent = state.liveWorkflowReleaseLoading
       ? "Publishing Workflow…"
       : "Publish Staged Workflow";
   }

@@ -75,6 +75,7 @@ from .service_client import (
     post_run_cancel,
     post_run_resume,
     post_workflow_release,
+    post_workflow_release_preflight,
     post_workflow_promotion,
     post_workflow_deprecation,
     post_workflow_trigger,
@@ -788,6 +789,14 @@ def _main(argv=None) -> int:
     service_release_cmd.add_argument("workflow", type=Path)
     service_release_cmd.add_argument("--service-url", required=True)
     service_release_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    service_release_preflight_cmd = subparsers.add_parser(
+        "service-workflow-release-preflight",
+        help="Validate one unpublished Workflow DSL document through the authenticated service",
+    )
+    service_release_preflight_cmd.add_argument("workflow", type=Path)
+    service_release_preflight_cmd.add_argument("--service-url", required=True)
+    service_release_preflight_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_promotion_cmd = subparsers.add_parser(
         "service-workflow-promote",
@@ -1695,6 +1704,15 @@ def _main(argv=None) -> int:
     if args.command == "service-workflow-publish":
         return _service_action(
             lambda: post_workflow_release(
+                args.service_url,
+                args.auth_token_file,
+                _load_json(args.workflow),
+            )
+        )
+
+    if args.command == "service-workflow-release-preflight":
+        return _service_action(
+            lambda: post_workflow_release_preflight(
                 args.service_url,
                 args.auth_token_file,
                 _load_json(args.workflow),

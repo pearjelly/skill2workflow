@@ -1092,6 +1092,54 @@ class CliTests(TestCase):
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         publish.assert_called_once_with("https://service.example", token_file, workflow)
 
+    def test_service_workflow_release_preflight_command_loads_unpublished_workflow(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        workflow = _approval_workflow()
+        expected = {
+            "schema_version": "skill2workflow-workflow-release-preflight-0.1.0",
+            "workflow": {"id": "workflow_demo", "version": "0.1.0"},
+            "document_valid": True,
+            "empty_trigger_ready": False,
+            "summary": {
+                "node_count": 3,
+                "connector_node_count": 0,
+                "side_effecting_node_count": 0,
+                "mapping_count": 0,
+                "blocked_node_count": 0,
+                "issue_count": 1,
+            },
+            "issues": [],
+            "safety": {
+                "side_effect_free": True,
+                "connector_calls": False,
+                "credentials_resolved": False,
+                "raw_values_included": False,
+            },
+        }
+        with TemporaryDirectory() as tmp:
+            workflow_file = Path(tmp) / "workflow.json"
+            workflow_file.write_text(json.dumps(workflow), encoding="utf-8")
+            with patch(
+                "skill2workflow.cli.post_workflow_release_preflight",
+                return_value=expected,
+            ) as preflight:
+                with redirect_stdout(stdout):
+                    exit_code = main(
+                        [
+                            "service-workflow-release-preflight",
+                            str(workflow_file),
+                            "--service-url",
+                            "https://service.example",
+                            "--auth-token-file",
+                            str(token_file),
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        preflight.assert_called_once_with("https://service.example", token_file, workflow)
+
     def test_service_workflow_promote_command_uses_cas_options(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")

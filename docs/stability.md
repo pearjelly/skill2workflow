@@ -15,6 +15,11 @@ These surfaces should remain compatible during the `0.1.x` line:
 - CLI command names documented in `README.md` and `HARNESS.md`
 - Example workflow fixture validity under `examples/workflows/`
 - Published workflow artifact immutability
+- Authenticated release preflight uses the fixed
+  `skill2workflow-workflow-release-preflight-0.1.0` value-free response and
+  never stores a Workflow artifact, resolves a credential, or invokes a
+  connector before immutable publication; the stable CLI entry point is
+  `service-workflow-release-preflight`.
 - Published artifact checksum verification before read, promotion, trigger, or execution, documented in [`published-artifact-integrity.md`](published-artifact-integrity.md)
 - Published Workflow artifact publication and reads use a fixed 2 MiB UTF-8
   envelope with regular-file/no-follow descriptor identity and growth-race

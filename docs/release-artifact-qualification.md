@@ -35,7 +35,7 @@ The installed command set also includes the protected `service-resume`,
 `service-operational-readiness`, bounded
 `service-probe`, bounded `service-wait`, bounded `service-audit-integrity`, bounded
 `service-runtime-info`, protected
-`service-workflow-publish`, protected
+`service-workflow-release-preflight`, protected `service-workflow-publish`, protected
 `service-workflow-promote`, protected
 `service-workflows`, protected
 `service-workflow-diff`, protected

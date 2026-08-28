@@ -144,13 +144,19 @@ After loading a live snapshot, **Stage Workflow** accepts one local Workflow
 DSL JSON document. The browser rejects empty or invalid JSON, missing basic
 workflow id/version metadata, and over-1 MiB input before it can reach the UI
 process; it keeps the staged document only in browser memory and identifies
-its bounded workflow id and version for the confirmation dialog. **Publish
-Staged Workflow** then sends only the fixed
-`{"workflow": <object>}` envelope to `/api/v1/workflow-releases`; the UI
-process reads the ingress token server-side and forwards it to the existing
-publication route. A successful compact redacted result refreshes the live
-inventory, clears the staged document, and never promotes an alias or executes
-the workflow. The service remains the Workflow DSL validation and immutable
+its bounded workflow id and version. **Check Staged Workflow** is then required
+before publication. It sends only the fixed `{"workflow": <object>}` envelope
+to `/api/v1/workflow-release-preflights`; the authenticated service performs
+the full DSL validation plus a value-free empty-trigger analysis without
+persisting an artifact, resolving credentials, or invoking a connector. A
+workflow can still be structurally valid while its empty trigger needs input.
+
+Only a successfully checked candidate enables **Publish Staged Workflow**. It
+sends the same fixed envelope to `/api/v1/workflow-releases`; the UI process
+reads the ingress token server-side and forwards it to the existing publication
+route. A successful compact redacted result refreshes the live inventory,
+clears the staged document, and never promotes an alias or executes the
+workflow. The service remains the Workflow DSL validation and immutable
 publication authority. Do not include credentials, access tokens, or business
 payloads in the document.
 

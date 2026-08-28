@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added an authenticated, side-effect-free Workflow release preflight and a
+  required **Check Staged Workflow** control before live publication. It
+  validates the complete staged DSL document without persisting it, resolving
+  credentials, or invoking connectors, then returns only a bounded value-free
+  structural and empty-trigger-readiness report.
+
 - Added a confirmation-protected **Publish Staged Workflow** action to the
   installed live control-plane UI. It accepts one bounded local Workflow DSL
   JSON document, forwards only the fixed publication envelope through a

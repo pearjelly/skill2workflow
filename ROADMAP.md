@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-226
+- Completed delivery loops: 1-227
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 226 is complete with confirmation-protected live workflow publication
+- Active loop: None; Loop 227 is complete with side-effect-free staged Workflow preflight
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the production-boundary CI gate evidence
+- Next decision: select the next Production Baseline loop after reviewing the staged-publication preflight evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-226 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-227 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6038,9 +6038,51 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 227: Side-Effect-Free Live Workflow Release Preflight
+
+**Status:** Complete.
+
+**Prior basis:** Loop 226 gave the live console a bounded, confirmation-protected
+immutable publication path, but full DSL validation occurred only after the
+operator committed that publication. A structurally invalid staged artifact
+therefore failed at the last control step, while an input-requiring artifact
+could be mistakenly treated as unsuitable for publication.
+
+**Outcome:** The installed live control-plane UI now requires **Check Staged
+Workflow** before it enables publication. The fixed authenticated
+`/api/v1/workflow-release-preflights` route receives the same bounded
+`{"workflow": <object>}` envelope, validates the unpublished document using
+the execution preflight's structural rules, and returns only a bounded,
+value-free report. It neither creates an artifact nor records a workflow,
+resolves credentials, or invokes a connector. Its `empty_trigger_ready` field
+is informative: a document which requires trigger input remains valid to
+publish after the explicit operator confirmation.
+
+**Evidence:** Service and client tests prove authentication, malformed-body
+rejection, exact fixed endpoint/envelope, no stored workflow or audit mutation,
+and no raw title or input values in the result. UI-proxy tests prove that the
+ingress token remains server-side and the redacted response is `no-store`.
+Browser contract tests cover the staged-check control, strict schema validation,
+and the publication gate. The protected
+`service-workflow-release-preflight` CLI exposes the same endpoint for release
+automation. Installed UI, live-control snapshot, stability, README, Changelog,
+and this Roadmap record the boundary.
+
+**Safety boundary:** This adds an authenticated validation preview only. It
+does not store a draft, change the Workflow DSL authority, expose staged
+content, resolve credentials, call connectors, promote an alias, trigger a
+run, accept arbitrary proxy paths, provide RBAC, or claim exactly-once external
+effects.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_service tests.test_service_client tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 226 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 227 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6233,6 +6275,7 @@ This rolling queue is ordered. Loop 226 is complete and there is no active deliv
 | Loop 224: Live Workflow Promotion | Complete | Let operators promote one reviewed published version to the fixed production alias without leaving the live console | Fixed confirmation-protected promotion proxy, observed-alias CAS precondition, strict UI/route tests, docs, and full gates |
 | Loop 225: CAS-Protected Live Workflow Deprecation | Complete | Let operators retire one reviewed published version without allowing stale inventory to override a concurrent alias or artifact change | Optional checksum-plus-alias CAS across local/SQLite/service/client paths, confirmation-protected UI action, strict UI/route tests, docs, and full gates |
 | Loop 226: Confirmation-Protected Live Workflow Publication | Complete | Let operators publish one reviewed local Workflow DSL document from the live console without exposing ingress credentials or automatically activating it | Fixed bounded publication proxy, server-side token, confirmation, redacted response validation, inventory refresh, UI/route tests, docs, and full gates |
+| Loop 227: Side-Effect-Free Live Workflow Release Preflight | Complete | Validate one staged Workflow DSL document before immutable publication without storing or executing it | Fixed authenticated preflight proxy, server-side token, strict bounded value-free response, staged-control gate, UI/service tests, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

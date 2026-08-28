@@ -17,6 +17,9 @@ from .input_schema import InputSchemaValidationError, validate_trigger_input
 
 
 WORKFLOW_PREFLIGHT_SCHEMA_VERSION = "skill2workflow-workflow-preflight-0.1.0"
+WORKFLOW_RELEASE_PREFLIGHT_SCHEMA_VERSION = (
+    "skill2workflow-workflow-release-preflight-0.1.0"
+)
 MAX_WORKFLOW_PREFLIGHT_BYTES = 64 * 1024
 MAX_WORKFLOW_PREFLIGHT_NODES = 1000
 MAX_WORKFLOW_PREFLIGHT_MAPPINGS = 2000
@@ -138,6 +141,33 @@ def build_workflow_preflight(
             "credentials_resolved": False,
             "raw_values_included": False,
         },
+    }
+    _check_size(result)
+    return result
+
+
+def build_workflow_release_preflight(workflow: Dict[str, object]) -> Dict[str, object]:
+    """Validate one unpublished Workflow DSL document without storing it.
+
+    The release preflight deliberately reuses the execution preflight's
+    structural validation and value-free mapping analysis, but it is not an
+    execution admission result: a document with required trigger input remains
+    publishable even when its *empty* trigger is blocked.
+    """
+
+    report = build_workflow_preflight(workflow)
+    metadata = report["workflow"]
+    result: Dict[str, object] = {
+        "schema_version": WORKFLOW_RELEASE_PREFLIGHT_SCHEMA_VERSION,
+        "workflow": {
+            "id": metadata["id"],
+            "version": metadata["version"],
+        },
+        "document_valid": True,
+        "empty_trigger_ready": report["ready"],
+        "summary": report["summary"],
+        "issues": report["issues"],
+        "safety": report["safety"],
     }
     _check_size(result)
     return result

@@ -885,7 +885,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-226 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-227 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -970,6 +970,15 @@ the existing 1 MiB publication bound; the UI keeps the ingress token
 server-side, forwards only the fixed publication envelope, and refreshes the
 redacted version inventory on success. Publishing creates an immutable version
 only: it neither promotes an alias nor starts a run.
+
+Loop 227 adds a mandatory, authenticated **Check Staged Workflow** step before
+that live publication action. The service validates an unpublished DSL document
+and reports only bounded, value-free structural and empty-trigger readiness
+metadata; it does not write an artifact, resolve credentials, or call a
+connector. A successful preflight enables the existing explicit publication
+confirmation, while an input-requiring workflow remains valid to publish.
+The same check is available to release automation as
+`service-workflow-release-preflight`.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

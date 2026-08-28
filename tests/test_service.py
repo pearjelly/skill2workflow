@@ -37,6 +37,7 @@ from skill2workflow.service import (
 from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringScheduleStore
 from skill2workflow.service_client import (
     ServiceActionError,
+    post_workflow_release_preflight,
     post_workflow_release,
     post_workflow_promotion,
     post_workflow_deprecation,
@@ -3878,6 +3879,57 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(report["nodes"][1]["connector"]["credential_handle_count"], 1)
         self.assertFalse(report["safety"]["connector_calls"])
         self.assertNotIn("private", json.dumps(report, ensure_ascii=False))
+        self.assertEqual(audit_after, audit_count)
+        self.assertFalse(thread.is_alive())
+
+    def test_remote_workflow_release_preflight_validates_unpublished_document_without_writing(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            workflow = _workflow()
+            workflow["workflow"]["id"] = "workflow_unpublished"
+            workflow["nodes"][0]["title"] = "private staged title"
+            audit_count = len(control.list_audit_events())
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (holder.update({"service": service}), ready.set()),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            url = f"{base_url}/api/v1/workflow-release-preflights"
+            try:
+                denied_status, denied = _post_json(url, {"workflow": workflow})
+                malformed_status, malformed = _post_json(url, {"workflow": []}, token=AUTH_TOKEN)
+                report = post_workflow_release_preflight(
+                    base_url,
+                    config.auth_token_file,
+                    workflow,
+                )
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            audit_after = len(LocalControlPlane(state_dir, storage="sqlite").list_audit_events())
+            records = LocalControlPlane(state_dir, storage="sqlite").list_workflows()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "workflow release preflight rejected"})
+        self.assertEqual(report["workflow"], {"id": "workflow_unpublished", "version": "0.1.0"})
+        self.assertTrue(report["document_valid"])
+        self.assertTrue(report["empty_trigger_ready"])
+        self.assertNotIn("private", json.dumps(report, ensure_ascii=False))
+        self.assertEqual(records, [])
         self.assertEqual(audit_after, audit_count)
         self.assertFalse(thread.is_alive())
 

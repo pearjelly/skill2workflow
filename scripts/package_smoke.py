@@ -112,6 +112,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-workflow-explain",
     "preflight",
     "service-workflow-preflight",
+    "service-workflow-release-preflight",
     "service-workflow-publish",
     "service-workflow-promote",
     "service-workflow-deprecate",

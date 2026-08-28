@@ -21,6 +21,8 @@ class RemoteWorkflowReleaseDocumentationTests(TestCase):
 
         self.assertIn("Loop 86", guide)
         self.assertIn("service-workflow-publish", guide)
+        self.assertIn("service-workflow-release-preflight", guide)
+        self.assertIn("workflow-release-preflights", guide)
         self.assertIn("POST /api/v1/workflow-releases", guide)
         self.assertIn('"workflow": <Workflow DSL object>', guide)
         self.assertIn("1 MiB", guide)
@@ -32,3 +34,4 @@ class RemoteWorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("Loop 86 adds", readme)
         self.assertIn("workflow-releases", changelog)
         self.assertIn('"service-workflow-publish"', package_smoke)
+        self.assertIn('"service-workflow-release-preflight"', package_smoke)
