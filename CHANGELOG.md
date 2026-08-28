@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added **Review Started Run** to the live workflow review. An accepted,
+  validated trigger receipt can now open the existing bounded redacted run
+  detail directly, without re-triggering work, accepting a user-supplied run
+  id, or exposing input values.
+
 - Added a staged business-input live trigger path. Operators can upload one
   bounded non-secret JSON object, receive a value-free service preflight, and
   explicitly start the exact published version through a fixed server-side-token

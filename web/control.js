@@ -102,6 +102,7 @@
     liveWorkflowInputTriggerAttempt: null,
     liveWorkflowInputTriggerLoading: false,
     liveWorkflowInputTriggerError: false,
+    liveWorkflowTriggeredRun: null,
     liveWorkflowReleaseCandidate: null,
     liveWorkflowReleasePreflightLoading: false,
     liveWorkflowReleaseLoading: false,
@@ -175,6 +176,9 @@
     els.preflightWorkflowInput = document.getElementById("preflight-workflow-input");
     els.triggerWorkflowInput = document.getElementById("trigger-workflow-input");
     els.workflowInputTriggerStatus = document.getElementById("workflow-input-trigger-status");
+    els.workflowRunHandoffActions = document.getElementById("workflow-run-handoff-actions");
+    els.reviewTriggeredRun = document.getElementById("review-triggered-run");
+    els.workflowRunHandoffStatus = document.getElementById("workflow-run-handoff-status");
     els.promoteWorkflow = document.getElementById("promote-workflow");
     els.workflowPromotionStatus = document.getElementById("workflow-promotion-status");
     els.deprecateWorkflow = document.getElementById("deprecate-workflow");
@@ -247,6 +251,7 @@
     els.workflowInputFile.addEventListener("change", stageWorkflowInputFile);
     els.preflightWorkflowInput.addEventListener("click", preflightStagedWorkflowInput);
     els.triggerWorkflowInput.addEventListener("click", triggerStagedWorkflowInput);
+    els.reviewTriggeredRun.addEventListener("click", reviewTriggeredRun);
     els.promoteWorkflow.addEventListener("click", promoteLiveWorkflow);
     els.deprecateWorkflow.addEventListener("click", deprecateLiveWorkflow);
     els.approveRun.addEventListener("click", function () {
@@ -866,6 +871,7 @@
         throw new Error("workflow empty trigger unavailable");
       }
       attempt.receipt = receipt;
+      state.liveWorkflowTriggeredRun = { key: target.key, receipt: receipt };
       setWorkflowEmptyTriggerStatus(
         "Empty trigger accepted as " + receipt.run_id + " (" + receipt.run_status + ").",
         "is-valid",
@@ -1037,6 +1043,7 @@
         throw new Error("workflow input trigger unavailable");
       }
       attempt.receipt = receipt;
+      state.liveWorkflowTriggeredRun = { key: target.key, receipt: receipt };
       setWorkflowInputTriggerStatus("Staged input accepted as " + receipt.run_id + " (" + receipt.run_status + ").", "is-valid");
       setStatus("Staged Input Started", "is-valid");
       renderDetail();
@@ -1058,6 +1065,40 @@
       typeof receipt.trigger_id === "string" && /^trigger_[A-Za-z0-9_-]{1,123}$/.test(receipt.trigger_id) &&
       isSafeRunId(receipt.run_id) && ["created", "running", "waiting", "completed", "failed", "cancelled", "interrupted"].indexOf(receipt.run_status) !== -1 &&
       Array.isArray(receipt.input_keys) && receipt.input_keys.join("\u0000") === inputKeys.join("\u0000");
+  }
+
+  function liveWorkflowTriggeredRunTarget() {
+    const workflow = selectedLiveWorkflow();
+    const handoff = state.liveWorkflowTriggeredRun;
+    const key = workflow ? workflow.workflow_id + "@" + workflow.version : "";
+    if (!workflow || !handoff || handoff.key !== key || !handoff.receipt ||
+      !isSafeRunId(handoff.receipt.run_id) || handoff.receipt.workflow_id !== workflow.workflow_id ||
+      handoff.receipt.workflow_version !== workflow.version) {
+      return null;
+    }
+    return handoff.receipt;
+  }
+
+  function reviewTriggeredRun() {
+    const receipt = liveWorkflowTriggeredRunTarget();
+    if (!receipt || state.liveRunDetailLoading) return;
+    state.selected = {
+      kind: "run",
+      value: {
+        run_id: receipt.run_id,
+        workflow_id: receipt.workflow_id,
+        workflow_version: receipt.workflow_version,
+        status: receipt.run_status,
+      },
+    };
+    state.liveRunDetail = null;
+    state.liveRunDetailId = "";
+    state.liveRunDetailLoading = false;
+    state.liveRunDetailError = false;
+    state.runCancelLoading = false;
+    renderTables();
+    renderDetail();
+    loadLiveRunDetail(receipt.run_id);
   }
 
   async function stageWorkflowReleaseFile(event) {
@@ -2573,6 +2614,20 @@
       state.selected && state.selected.kind === "run" && state.selected.value
         ? state.selected.value.run_id
         : "";
+    const previousWorkflow =
+      state.sourceLabel === "Live Service Snapshot" &&
+      state.selected && state.selected.kind === "live workflow" && state.selected.value &&
+      isSafeWorkflowRef(state.selected.value.workflow_id) &&
+      isSafeWorkflowRef(state.selected.value.version)
+        ? {
+          workflow_id: state.selected.value.workflow_id,
+          version: state.selected.value.version,
+        }
+        : null;
+    const previousTriggeredRun = previousWorkflow && state.liveWorkflowTriggeredRun &&
+      state.liveWorkflowTriggeredRun.key === previousWorkflow.workflow_id + "@" + previousWorkflow.version
+      ? state.liveWorkflowTriggeredRun
+      : null;
     state.snapshot = snapshot;
     state.sourceLabel = label;
     state.liveRunDetail = null;
@@ -2600,6 +2655,7 @@
     state.liveWorkflowInputTriggerAttempt = null;
     state.liveWorkflowInputTriggerLoading = false;
     state.liveWorkflowInputTriggerError = false;
+    state.liveWorkflowTriggeredRun = null;
     state.liveWorkflowPromotionLoading = false;
     state.liveWorkflowPromotionError = false;
     state.liveWorkflowDeprecationLoading = false;
@@ -2666,6 +2722,16 @@
       });
       if (refreshedRun) {
         state.selected = { kind: "run", value: refreshedRun };
+      }
+    }
+    if (label === "Live Service Snapshot" && previousWorkflow && state.liveWorkflowInventory) {
+      const refreshedWorkflow = state.liveWorkflowInventory.versions.find(function (workflow) {
+        return workflow && workflow.workflow_id === previousWorkflow.workflow_id &&
+          workflow.version === previousWorkflow.version;
+      });
+      if (refreshedWorkflow) {
+        state.selected = { kind: "live workflow", value: refreshedWorkflow };
+        state.liveWorkflowTriggeredRun = previousTriggeredRun;
       }
     }
     setStatus("Loaded", "is-valid");
@@ -2742,6 +2808,7 @@
     state.liveWorkflowInputTriggerAttempt = null;
     state.liveWorkflowInputTriggerLoading = false;
     state.liveWorkflowInputTriggerError = false;
+    state.liveWorkflowTriggeredRun = null;
     state.liveWorkflowReleaseCandidate = null;
     state.liveWorkflowReleaseLoading = false;
     state.liveWorkflowReleaseError = false;
@@ -3193,6 +3260,7 @@
         state.liveWorkflowInputTriggerAttempt = null;
         state.liveWorkflowInputTriggerLoading = false;
         state.liveWorkflowInputTriggerError = false;
+        state.liveWorkflowTriggeredRun = null;
         state.liveWorkflowPromotionLoading = false;
         state.liveWorkflowPromotionError = false;
         state.liveWorkflowDeprecationLoading = false;
@@ -3383,11 +3451,13 @@
       setWorkflowPreflightStatus("The preflight sends only an empty JSON object.", "");
       setWorkflowEmptyTriggerStatus("A successful empty preflight is required before a confirmed start.", "");
       setWorkflowInputTriggerStatus("Stage a non-secret JSON object; it is retained as durable run context if started.", "");
+      setWorkflowRunHandoffStatus("After an accepted trigger, review its bounded redacted run evidence and continue through the established operator controls.", "");
       setWorkflowDiffStatus("Select another version of this workflow to review a structural diff.", "");
       setWorkflowPromotionStatus("Select a published version that is not already the production target.", "");
       setWorkflowDeprecationStatus("Select a published version with no active alias before deprecating it.", "");
       updateWorkflowEmptyTriggerControls();
       updateWorkflowInputTriggerControls();
+      updateWorkflowRunHandoffControls();
       return;
     }
     const key = workflow.workflow_id + "@" + workflow.version;
@@ -3453,6 +3523,16 @@
       setWorkflowInputTriggerStatus("Staged input is blocked; no run can be started.", "is-invalid");
     } else {
       setWorkflowInputTriggerStatus("Staged input is ready; explicit confirmation is still required.", "is-valid");
+    }
+    const triggeredRun = liveWorkflowTriggeredRunTarget();
+    updateWorkflowRunHandoffControls();
+    if (triggeredRun) {
+      setWorkflowRunHandoffStatus(
+        "Accepted run " + triggeredRun.run_id + " is ready for bounded redacted review.",
+        "is-valid",
+      );
+    } else {
+      setWorkflowRunHandoffStatus("After an accepted trigger, review its bounded redacted run evidence and continue through the established operator controls.", "");
     }
     const diffKey = workflow.workflow_id + "@" + workflow.version + "@" + els.workflowDiffTarget.value;
     if (state.liveWorkflowDiffLoading && state.liveWorkflowDiffKey === diffKey) {
@@ -3781,6 +3861,11 @@
     els.workflowInputTriggerStatus.className = className || "";
   }
 
+  function setWorkflowRunHandoffStatus(text, className) {
+    els.workflowRunHandoffStatus.textContent = text;
+    els.workflowRunHandoffStatus.className = className || "";
+  }
+
   function setWorkflowDiffStatus(text, className) {
     els.workflowDiffStatus.textContent = text;
     els.workflowDiffStatus.className = className || "";
@@ -3966,6 +4051,13 @@
       : retry
       ? "Retry Staged Input"
       : "Start Staged Input";
+  }
+
+  function updateWorkflowRunHandoffControls() {
+    const workflow = selectedLiveWorkflow();
+    const receipt = liveWorkflowTriggeredRunTarget();
+    els.workflowRunHandoffActions.hidden = !workflow;
+    els.reviewTriggeredRun.disabled = !receipt || state.liveRunDetailLoading;
   }
 
   function updateWorkflowDiffControls(hasTarget) {

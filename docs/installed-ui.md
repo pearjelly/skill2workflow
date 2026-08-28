@@ -200,6 +200,15 @@ business data in the JSON file. A manual retry after an uncertain outcome
 reuses the same in-memory key and unchanged staged input; the UI never retries
 automatically.
 
+After either live trigger is accepted, **Review Started Run** converts the
+validated compact receipt into a selection for the existing fixed
+`GET /api/v1/runs/{run_id}` route. It does not refresh, re-trigger, or infer a
+provider outcome. The next view contains only the bounded redacted run detail;
+the established human-gate and cooperative-cancel controls remain the only
+operator actions. A live snapshot refresh preserves this handoff only while the
+same browser session still has the same selected exact workflow version in its
+already loaded redacted inventory.
+
 The review card also offers **Compare Versions** after the inventory contains
 at least two versions of the selected workflow. It calls only the fixed
 same-origin `GET /api/v1/workflow-diffs/{workflow_id}/{from_version}/{to_version}`

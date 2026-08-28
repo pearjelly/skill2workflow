@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-229
+- Completed delivery loops: 1-230
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 229 is complete with staged-input live workflow triggering
+- Active loop: None; Loop 230 is complete with live trigger-to-run handoff
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the staged-input trigger evidence
+- Next decision: select the next Production Baseline loop after reviewing the live trigger-to-run handoff evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-229 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-230 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6159,9 +6159,43 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 230: Live Trigger-To-Run Handoff
+
+**Status:** Complete.
+
+**Prior basis:** The live console could safely issue an exact-version trigger
+and present its compact receipt, but an operator had to manually refresh and
+search the run table before inspecting the resulting execution.
+
+**Outcome:** Either accepted live trigger now records one validated compact
+receipt for its selected workflow version. **Review Started Run** turns that
+receipt into a local selection and requests the existing fixed bounded
+redacted run-detail route. A background snapshot refresh keeps the handoff only
+when the same session still selects the same exact version from its loaded
+redacted inventory. It does not re-trigger, infer a provider outcome, or add a
+new service route. Existing human-gate and cooperative-cancel controls remain
+the only available run mutations.
+
+**Evidence:** UI contract tests lock the receipt-bound handoff control and
+detail call. Existing run-detail proxy tests retain the server-side-token,
+fixed-path, no-body and bounded redacted-detail contracts. Documentation
+records the operator sequence and explicitly excludes provider reconciliation.
+
+**Safety boundary:** The handoff exists only for a receipt validated in the
+same browser session and matching the currently selected exact workflow
+version. It does not expose trigger input, accept a user-supplied run id,
+change a run, bypass the existing human-gate/cancel controls, or claim the
+provider outcome is reconciled.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 229 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 230 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6357,6 +6391,7 @@ This rolling queue is ordered. Loop 229 is complete and there is no active deliv
 | Loop 227: Side-Effect-Free Live Workflow Release Preflight | Complete | Validate one staged Workflow DSL document before immutable publication without storing or executing it | Fixed authenticated preflight proxy, server-side token, strict bounded value-free response, staged-control gate, UI/service tests, docs, and full gates |
 | Loop 228: Confirmation-Protected Live Empty Trigger | Complete | Let operators start one preflighted no-input published version from the live console without browser credentials or uncontrolled retries | Fixed source/empty-input proxy, confirmation, strict compact receipt, manual same-key retry, UI tests, docs, and full gates |
 | Loop 229: Staged-Input Live Workflow Trigger | Complete | Let operators preflight and start a published exact version with one explicit non-secret JSON input from the live console | Fixed staged-input proxies, value-free preflight, confirmation, server-side token, same-key retry, UI/docs/tests, and full gates |
+| Loop 230: Live Trigger-To-Run Handoff | Complete | Let operators move from one accepted exact-version trigger receipt into the bounded redacted run review without manually searching the run table | Receipt-bound local handoff, existing fixed run-detail route, UI/docs/tests, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

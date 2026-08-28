@@ -328,6 +328,10 @@
               <button id="trigger-workflow-input" type="button" disabled>Start Staged Input</button>
             </div>
             <p id="workflow-input-trigger-status">Stage a non-secret JSON object; it is retained as durable run context if started.</p>
+            <div id="workflow-run-handoff-actions" class="workflow-review-buttons" hidden>
+              <button id="review-triggered-run" type="button" disabled>Review Started Run</button>
+            </div>
+            <p id="workflow-run-handoff-status">After an accepted trigger, review its bounded redacted run evidence and continue through the established operator controls.</p>
             <div class="workflow-diff-controls">
               <label for="workflow-diff-target">Compare selected version →</label>
               <select id="workflow-diff-target" aria-label="Workflow version to compare"></select>
