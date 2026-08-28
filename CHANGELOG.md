@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a staged business-input live trigger path. Operators can upload one
+  bounded non-secret JSON object, receive a value-free service preflight, and
+  explicitly start the exact published version through a fixed server-side-token
+  proxy. The UI never renders input values; uncertain manual retries preserve
+  the same staged object and idempotency key.
+
 - Added a confirmation-protected **Start Empty Trigger** action for a selected
   published version that has just passed its empty-trigger preflight. The live
   proxy fixes the source and empty input, preserves its server-side ingress

@@ -319,6 +319,15 @@
             </div>
             <p id="workflow-preflight-status">The preflight sends only an empty JSON object.</p>
             <p id="workflow-empty-trigger-status">A successful empty preflight is required before a confirmed start.</p>
+            <div id="workflow-input-trigger-actions" class="workflow-review-buttons" hidden>
+              <label id="workflow-input-file-action" class="file-action is-disabled" aria-disabled="true">
+                <input id="workflow-input-file" type="file" accept="application/json,.json" disabled />
+                Stage Trigger Input
+              </label>
+              <button id="preflight-workflow-input" type="button" disabled>Check Staged Input</button>
+              <button id="trigger-workflow-input" type="button" disabled>Start Staged Input</button>
+            </div>
+            <p id="workflow-input-trigger-status">Stage a non-secret JSON object; it is retained as durable run context if started.</p>
             <div class="workflow-diff-controls">
               <label for="workflow-diff-target">Compare selected version →</label>
               <select id="workflow-diff-target" aria-label="Workflow version to compare"></select>

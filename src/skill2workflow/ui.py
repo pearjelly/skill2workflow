@@ -34,6 +34,7 @@ from .service_client import (
     MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES,
     MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES,
     MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES,
+    MAX_REMOTE_TRIGGER_REQUEST_BYTES,
     MAX_SERVICE_PROBE_RESPONSE_BYTES,
     MAX_SUPPORT_BUNDLE_RESPONSE_BYTES,
     ServiceActionError,
@@ -87,6 +88,12 @@ _WORKFLOW_RELEASE_PREFLIGHT_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_RELEASE_PRE
 _WORKFLOW_EMPTY_TRIGGER_PATH = "/api/v1/workflow-empty-triggers"
 _WORKFLOW_EMPTY_TRIGGER_MAX_REQUEST_BYTES = 512
 _WORKFLOW_EMPTY_TRIGGER_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
+_WORKFLOW_INPUT_PREFLIGHT_PATH = "/api/v1/workflow-input-preflights"
+_WORKFLOW_INPUT_PREFLIGHT_MAX_REQUEST_BYTES = MAX_REMOTE_WORKFLOW_PREFLIGHT_REQUEST_BYTES
+_WORKFLOW_INPUT_PREFLIGHT_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_PREFLIGHT_RESPONSE_BYTES
+_WORKFLOW_INPUT_TRIGGER_PATH = "/api/v1/workflow-input-triggers"
+_WORKFLOW_INPUT_TRIGGER_MAX_REQUEST_BYTES = MAX_REMOTE_TRIGGER_REQUEST_BYTES
+_WORKFLOW_INPUT_TRIGGER_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
 _WORKFLOW_PROMOTION_PATH = "/api/v1/workflow-promotions"
 _WORKFLOW_PROMOTION_MAX_REQUEST_BYTES = min(512, MAX_REMOTE_WORKFLOW_PROMOTION_REQUEST_BYTES)
 _WORKFLOW_PROMOTION_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_PROMOTION_RESPONSE_BYTES
@@ -312,6 +319,18 @@ def serve_ui(
 
         def do_POST(self):
             parsed = urlsplit(self.path)
+            if parsed.path == _WORKFLOW_INPUT_PREFLIGHT_PATH:
+                if parsed.query:
+                    self._write_json(404, {"error": "workflow input preflight path is not available"})
+                    return
+                self._serve_live_workflow_input_preflight()
+                return
+            if parsed.path == _WORKFLOW_INPUT_TRIGGER_PATH:
+                if parsed.query:
+                    self._write_json(404, {"error": "workflow input trigger path is not available"})
+                    return
+                self._serve_live_workflow_input_trigger()
+                return
             if parsed.path == _WORKFLOW_EMPTY_TRIGGER_PATH:
                 if parsed.query:
                     self._write_json(
@@ -891,6 +910,141 @@ def serve_ui(
                 self._write_json(503, {"error": "dispatch review unavailable"})
                 return
             self._write_json(200, response_body, content_type="application/json")
+
+        def _serve_live_workflow_input_preflight(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow input preflight is not configured"})
+                return
+            payload = self._read_live_workflow_input_body(
+                _WORKFLOW_INPUT_PREFLIGHT_MAX_REQUEST_BYTES,
+                {"workflow_id", "version", "input"},
+                "workflow input preflight",
+            )
+            if payload is None:
+                return
+            try:
+                response = fetch_workflow_preflight(
+                    configured_service_url,
+                    token_file,
+                    payload["workflow_id"],
+                    payload["version"],
+                    input_value=payload["input"],
+                    input_present=True,
+                )
+                response_body = json.dumps(response, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                if len(response_body) > _WORKFLOW_INPUT_PREFLIGHT_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow input preflight unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 400:
+                    self._write_json(400, {"error": "workflow input preflight rejected"})
+                elif error.status_code == 404:
+                    self._write_json(404, {"error": "workflow version not found"})
+                elif error.status_code == 413:
+                    self._write_json(413, {"error": "workflow input preflight body is too large"})
+                else:
+                    self._write_json(503, {"error": "workflow input preflight unavailable"})
+                return
+            except (TypeError, ValueError):
+                self._write_json(400, {"error": "workflow input preflight rejected"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "workflow input preflight unavailable"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
+
+        def _serve_live_workflow_input_trigger(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow input trigger is not configured"})
+                return
+            payload = self._read_live_workflow_input_body(
+                _WORKFLOW_INPUT_TRIGGER_MAX_REQUEST_BYTES,
+                {"workflow_id", "version", "idempotency_key", "input"},
+                "workflow input trigger",
+                require_idempotency_key=True,
+            )
+            if payload is None:
+                return
+            try:
+                response = post_workflow_trigger(
+                    configured_service_url,
+                    token_file,
+                    payload["workflow_id"],
+                    payload["version"],
+                    idempotency_key=payload["idempotency_key"],
+                    source="live-ui",
+                    trigger_input=payload["input"],
+                )
+                response_body = json.dumps(response, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+                if len(response_body) > _WORKFLOW_INPUT_TRIGGER_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow input trigger unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 400:
+                    self._write_json(400, {"error": "workflow input trigger rejected"})
+                elif error.status_code == 404:
+                    self._write_json(404, {"error": "workflow version not found"})
+                elif error.status_code == 409:
+                    self._write_json(409, {"error": "workflow input trigger idempotency conflict"})
+                elif error.status_code == 413:
+                    self._write_json(413, {"error": "workflow input trigger body is too large"})
+                else:
+                    self._write_json(503, {"error": "workflow input trigger unavailable"})
+                return
+            except (TypeError, ValueError):
+                self._write_json(400, {"error": "workflow input trigger rejected"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "workflow input trigger unavailable"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
+
+        def _read_live_workflow_input_body(
+            self,
+            max_request_bytes,
+            expected_fields,
+            action,
+            *,
+            require_idempotency_key=False,
+        ):
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(400, {"error": f"{action} body is malformed"})
+                return None
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(400, {"error": f"{action} body is malformed"})
+                return None
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(400, {"error": f"{action} body is malformed"})
+                return None
+            if content_length > max_request_bytes:
+                self._write_json(413, {"error": f"{action} body is too large"})
+                return None
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(400, {"error": f"{action} body is malformed"})
+                return None
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != expected_fields
+                or not _is_safe_workflow_ref(payload.get("workflow_id"), allow_empty=False)
+                or not _is_safe_workflow_ref(payload.get("version"), allow_empty=False)
+                or not isinstance(payload.get("input"), dict)
+                or (require_idempotency_key and not isinstance(payload.get("idempotency_key"), str))
+            ):
+                self._write_json(400, {"error": f"{action} body is malformed"})
+                return None
+            return payload
 
         def _serve_live_workflow_empty_trigger(self):
             configured_service_url = getattr(self.server, "live_service_url", None)

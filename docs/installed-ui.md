@@ -185,6 +185,21 @@ the same in-memory key and unchanged empty request; it never automatically
 retries. The compact receipt contains identifiers and input keys only, and is
 shown in the selected workflow's redacted detail envelope.
 
+For workflows that require business input, **Stage Trigger Input** accepts one
+local JSON object within the shared 1 MiB input bound. The file remains only in
+browser memory. Its values are never rendered by the console; only the
+value-free service preflight and compact trigger receipt are shown. **Check
+Staged Input** sends the exact id, exact version, and input object to the fixed
+`/api/v1/workflow-input-preflights` proxy. It must report ready before **Start
+Staged Input** is enabled. That start requires a separate confirmation and
+sends the same exact version, staged input, and one browser-generated
+idempotency key to `/api/v1/workflow-input-triggers`; the proxy again fixes the
+source to `live-ui` and keeps the ingress token server-side. Input becomes
+durable run context when accepted: never put credentials, tokens, or sensitive
+business data in the JSON file. A manual retry after an uncertain outcome
+reuses the same in-memory key and unchanged staged input; the UI never retries
+automatically.
+
 The review card also offers **Compare Versions** after the inventory contains
 at least two versions of the selected workflow. It calls only the fixed
 same-origin `GET /api/v1/workflow-diffs/{workflow_id}/{from_version}/{to_version}`

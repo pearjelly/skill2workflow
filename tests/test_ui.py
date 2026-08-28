@@ -1781,6 +1781,219 @@ class UiTests(TestCase):
             upstream.server_close()
             upstream_thread.join(timeout=2)
 
+    def test_live_proxy_preflights_staged_input_without_browser_token(self):
+        observed = {}
+        report = {
+            "schema_version": "skill2workflow-workflow-preflight-0.1.0",
+            "workflow": {"id": "workflow_demo", "version": "0.3.0", "status": "published"},
+            "ready": True,
+            "input": {
+                "provided": True, "status": "valid", "provided_property_count": 1,
+                "declared_property_count": 1, "required_property_count": 1,
+                "missing_required_count": 0, "unknown_property_count": 0,
+                "error_code": None, "error_path": None,
+            },
+            "summary": {
+                "node_count": 2, "connector_node_count": 0, "side_effecting_node_count": 0,
+                "mapping_count": 0, "blocked_node_count": 0, "issue_count": 0,
+            },
+            "nodes": [
+                {"id": "start", "type": "start", "connector": None, "input_mapping": {"status": "not_applicable", "mapping_count": 0, "mapped_count": 0, "missing_required_count": 0, "missing_optional_count": 0}},
+                {"id": "end", "type": "end", "connector": None, "input_mapping": {"status": "not_applicable", "mapping_count": 0, "mapped_count": 0, "missing_required_count": 0, "missing_optional_count": 0}},
+            ],
+            "issues": [],
+            "safety": {"side_effect_free": True, "connector_calls": False, "credentials_resolved": False, "raw_values_included": False},
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                observed["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                body = json.dumps(report, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text("ui-test-token-012345678901234567890123456789\n", encoding="utf-8")
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={"host": "127.0.0.1", "port": 0, "once": True, "service_url": f"http://127.0.0.1:{upstream.server_port}", "auth_token_file": token_file, "ready_callback": lambda server: ui_port.update({"value": server.server_port})},
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{ui_port['value']}/api/v1/workflow-input-preflights",
+                    data=b'{"workflow_id":"workflow_demo","version":"0.3.0","input":{"customer_id":"private"}}',
+                    headers={"Content-Type": "application/json"}, method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(json.loads(response.read().decode("utf-8")), report)
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(observed["path"], "/api/v1/workflow-preflights/workflow_demo/0.3.0")
+                self.assertEqual(observed["body"], {"input": {"customer_id": "private"}})
+                self.assertEqual(observed["authorization"], "Bearer ui-test-token-012345678901234567890123456789")
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)
+
+    def test_live_proxy_starts_staged_input_without_browser_token(self):
+        observed = {}
+        idempotency_key = "live-ui-0123456789abcdef0123456789abcdef0123"
+        receipt = {
+            "trigger_id": "trigger_staged_input",
+            "workflow_id": "workflow_demo",
+            "workflow_version": "0.3.0",
+            "run_id": "run_staged_input",
+            "run_status": "created",
+            "source": "live-ui",
+            "idempotency_key": idempotency_key,
+            "input_keys": ["customer_id"],
+        }
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                observed["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+                body = json.dumps(receipt, separators=(",", ":")).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text("ui-test-token-012345678901234567890123456789\n", encoding="utf-8")
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1", "port": 0, "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file,
+                        "ready_callback": lambda server: ui_port.update({"value": server.server_port}),
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{ui_port['value']}/api/v1/workflow-input-triggers",
+                    data=json.dumps(
+                        {
+                            "workflow_id": "workflow_demo",
+                            "version": "0.3.0",
+                            "idempotency_key": idempotency_key,
+                            "input": {"customer_id": "private"},
+                        },
+                        separators=(",", ":"),
+                    ).encode("utf-8"),
+                    headers={"Content-Type": "application/json"}, method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=2) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(json.loads(response.read().decode("utf-8")), receipt)
+                    self.assertEqual(response.headers["Cache-Control"], "no-store")
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(observed["path"], "/webhooks/workflow_demo/0.3.0")
+                self.assertEqual(
+                    observed["body"],
+                    {
+                        "source": "live-ui",
+                        "idempotency_key": idempotency_key,
+                        "input": {"customer_id": "private"},
+                    },
+                )
+                self.assertEqual(
+                    observed["authorization"],
+                    "Bearer ui-test-token-012345678901234567890123456789",
+                )
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)
+
+    def test_live_proxy_rejects_client_selected_staged_input_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            token_file = Path(directory) / "ingress.token"
+            token_file.write_text("ui-test-token-012345678901234567890123456789\n", encoding="utf-8")
+            os.chmod(token_file, 0o600)
+            ui_port = {}
+            ui_thread = threading.Thread(
+                target=serve_ui,
+                kwargs={
+                    "host": "127.0.0.1", "port": 0, "once": True,
+                    "service_url": "http://127.0.0.1:1", "auth_token_file": token_file,
+                    "ready_callback": lambda server: ui_port.update({"value": server.server_port}),
+                },
+                daemon=True,
+            )
+            ui_thread.start()
+            for _ in range(100):
+                if "value" in ui_port:
+                    break
+                ui_thread.join(0.01)
+            self.assertIn("value", ui_port)
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{ui_port['value']}/api/v1/workflow-input-triggers",
+                data=(
+                    b'{"workflow_id":"workflow_demo","version":"0.3.0",'
+                    b'"idempotency_key":"live-ui-test","input":{},"source":"browser"}'
+                ),
+                headers={"Content-Type": "application/json"}, method="POST",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as raised:
+                urllib.request.urlopen(request, timeout=2)
+            error = raised.exception
+            try:
+                self.assertEqual(error.code, 400)
+                self.assertEqual(
+                    json.loads(error.read().decode("utf-8")),
+                    {"error": "workflow input trigger body is malformed"},
+                )
+            finally:
+                error.close()
+            ui_thread.join(timeout=2)
+            self.assertFalse(ui_thread.is_alive())
+
     def test_live_proxy_rejects_nonempty_empty_trigger_body_before_upstream(self):
         with tempfile.TemporaryDirectory() as directory:
             token_file = Path(directory) / "ingress.token"

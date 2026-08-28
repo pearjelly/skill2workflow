@@ -885,7 +885,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-228 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-229 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -986,6 +986,13 @@ only through an explicit confirmation and a browser-generated idempotency key.
 The UI proxy fixes the source to `live-ui` and input to `{}`; uncertain manual
 retries reuse the same key, while aliases and arbitrary business inputs remain
 outside the browser boundary.
+
+Loop 229 adds the corresponding controlled path for real business inputs:
+operators stage one non-secret local JSON object, obtain a value-free service
+preflight, then explicitly start the exact published version with a generated
+idempotency key. The input is intentionally durable run context, never rendered
+by the UI, and a manual uncertain-outcome retry uses the unchanged staged input
+and same key.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
