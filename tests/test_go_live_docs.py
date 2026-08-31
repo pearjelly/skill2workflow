@@ -14,6 +14,7 @@ class GoLiveDocumentationTests(TestCase):
         self.assertIn("# Single-Instance Go-Live Checklist", guide)
         self.assertIn("skill2workflow service-init", guide)
         self.assertIn("skill2workflow service-doctor", guide)
+        self.assertIn("skill2workflow service-go-live-check", guide)
         self.assertIn("skill2workflow systemd-unit", guide)
         self.assertIn("skill2workflow service-probe", guide)
         self.assertIn("skill2workflow service-operational-readiness", guide)

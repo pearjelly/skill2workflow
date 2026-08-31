@@ -48,6 +48,7 @@ from .schedules import LocalScheduleRunner
 from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace, rotate_service_token
 from .service_doctor import diagnose_service
+from .go_live import assess_go_live
 from .service_client import (
     fetch_audit_consistency,
     fetch_audit_events,
@@ -499,6 +500,14 @@ def _main(argv=None) -> int:
         help="Check self-hosted service readiness without starting it",
     )
     service_doctor_cmd.add_argument("--config", type=Path, required=True)
+
+    service_go_live_cmd = subparsers.add_parser(
+        "service-go-live-check",
+        help="Compose local Doctor, service probe, and protected operational readiness",
+    )
+    service_go_live_cmd.add_argument("--config", type=Path, required=True)
+    service_go_live_cmd.add_argument("--service-url", required=True)
+    service_go_live_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
     service_init_cmd = subparsers.add_parser(
         "service-init",
@@ -1542,6 +1551,15 @@ def _main(argv=None) -> int:
 
     if args.command == "service-doctor":
         result = diagnose_service(args.config)
+        _print_json(result)
+        return 0 if result["status"] == "ready" else 1
+
+    if args.command == "service-go-live-check":
+        result = assess_go_live(
+            args.config,
+            args.service_url,
+            args.auth_token_file,
+        )
         _print_json(result)
         return 0 if result["status"] == "ready" else 1
 

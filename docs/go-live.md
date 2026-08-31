@@ -24,7 +24,8 @@ Workflow DSL document.
 
 ## 2. Check before starting
 
-Run the local, read-only Doctor against the generated configuration:
+To diagnose the prepared workspace before the service exists, run the local,
+read-only Doctor directly:
 
 ```bash
 skill2workflow service-doctor \
@@ -57,6 +58,24 @@ boundary. The project does not install or enable a supervisor for you.
 
 ## 4. Verify the running service
 
+After the service is started under your reviewed supervisor, use the composite
+read-only gate to run the checks in the safe order. It runs the local Doctor,
+then the unauthenticated fixed Probe, and only then reads the protected
+operational readiness report:
+
+```bash
+skill2workflow service-go-live-check \
+  --config /srv/skill2workflow/config/service.json \
+  --service-url http://127.0.0.1:8080 \
+  --auth-token-file /srv/skill2workflow/secrets/ingress.token
+```
+
+The command exits `0` only for `status: "ready"`. If the local Doctor is not
+ready, it does not access the service or token file. If the Probe is not ready,
+it does not access the protected operational-readiness route. Its output is a
+fixed, value-free summary; it contains no paths, credentials, workflow content,
+inputs, or raw errors.
+
 Use the unauthenticated fixed probe to distinguish ready, not-ready, and
 unavailable service state:
 
@@ -85,6 +104,9 @@ checks service readiness, state layout, workflow-artifact consistency, audit
 integrity, and offline-backup readiness without exporting workflow content,
 inputs, credentials, paths, or audit payloads. See
 [Remote operational readiness](remote-operational-readiness.md).
+
+For normal go-live verification, prefer the preceding `service-go-live-check`
+command so this protected read cannot run before the Doctor and Probe succeed.
 
 ## 6. Publish and operate deliberately
 

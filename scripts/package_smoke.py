@@ -72,6 +72,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-init",
     "service-token-rotate",
     "service-doctor",
+    "service-go-live-check",
     "systemd-unit",
     "service",
     "schedule-run-due",
