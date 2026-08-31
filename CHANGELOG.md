@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added an end-to-end local authoring-delivery smoke. It proves the standard
+  Skill-to-private-artifact-to-verified-Bundle-to-publication-to-human-gate
+  path and records local audit/snapshot evidence without a network call,
+  credential, or external connector.
+
 - Added a dedicated CI user-journey gate on Python 3.14. It exercises the
   local Pilot, scenario pack, explicit external connector fixture, and
   isolated installed-wheel quickstart without live providers or credentials.

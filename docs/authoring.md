@@ -111,6 +111,23 @@ the output file is not created. The result is still only a distribution
 artifact. Use `bundle-verify` to inspect it and `bundle-publish` separately
 when a deliberate immutable publication is appropriate.
 
+## Reproduce The Controlled Local Delivery Path
+
+To exercise the complete safe handoff from a standard Skill through controlled
+runtime completion, run:
+
+```bash
+python3 scripts/authoring_delivery_smoke.py \
+  --work-dir /tmp/skill2workflow-authoring-delivery
+```
+
+The drill creates a private authoring set, verifies and bundles it, publishes
+the resulting DSL to an isolated SQLite control plane, triggers one run, and
+approves its real human gate. It writes Bundle, verification, run, audit, and
+snapshot evidence under the work directory. It has no network listener,
+external connector, or credential; it is a local contract drill rather than a
+business-workflow or live-provider validation.
+
 ## Validate Before Download
 
 For a draft opened in the installed editor, select **Validate DSL**. The fixed

@@ -115,6 +115,7 @@ python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot-ci
 python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilot-pack-ci
 python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector-ci
 python3 scripts/quickstart_smoke.py --work-dir /tmp/skill2workflow-quickstart-ci
+python3 scripts/authoring_delivery_smoke.py --work-dir /tmp/skill2workflow-authoring-delivery-ci
 ```
 
 These commands exercise only local deterministic fixtures and an isolated

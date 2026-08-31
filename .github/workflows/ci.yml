@@ -83,6 +83,7 @@ jobs:
       - run: python scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilot-pack-ci
       - run: python scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector-ci
       - run: python scripts/quickstart_smoke.py --work-dir /tmp/skill2workflow-quickstart-ci
+      - run: python scripts/authoring_delivery_smoke.py --work-dir /tmp/skill2workflow-authoring-delivery-ci
 
   artifact-gates:
     name: release artifact gates

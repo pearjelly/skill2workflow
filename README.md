@@ -919,7 +919,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-244 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-245 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1098,6 +1098,11 @@ Loop 244 makes documented first-value paths release-relevant CI evidence: a
 separate Python 3.14 job runs the local Pilot, scenario pack, explicit external
 connector fixture, and isolated installed-wheel quickstart without live
 providers or credentials.
+
+Loop 245 adds the missing authoring-to-runtime proof to that job: a local
+Skill is exported, verified, bundled, published, triggered to a human gate,
+approved, and checked through audit and snapshot evidence without a network
+call, credential, or external connector.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

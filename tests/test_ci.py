@@ -76,6 +76,7 @@ class ContinuousIntegrationContractTests(TestCase):
         self.assertIn("pilot_scenario_pack_smoke.py", workflow)
         self.assertIn("external_connector_smoke.py", workflow)
         self.assertIn("quickstart_smoke.py", workflow)
+        self.assertIn("authoring_delivery_smoke.py", workflow)
 
     def test_ci_runs_release_artifact_gates(self):
         workflow = (
@@ -138,6 +139,7 @@ class ContinuousIntegrationContractTests(TestCase):
             "pilot_scenario_pack_smoke.py",
             "external_connector_smoke.py",
             "quickstart_smoke.py",
+            "authoring_delivery_smoke.py",
         ):
             self.assertIn(script, contributing)
             self.assertIn(script, release)

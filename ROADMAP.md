@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-244
+- Completed delivery loops: 1-245
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 244 is complete with local user-journey CI gates
+- Active loop: None; Loop 245 is complete with authoring-to-runtime delivery evidence
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation and repair evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-244 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-245 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6639,9 +6639,40 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ci -v
 ```
 
+### Loop 245: Authoring-To-Runtime Delivery Evidence
+
+**Status:** Complete.
+
+**Prior basis:** Loop 244 gated existing local Pilot and quickstart journeys,
+but the newly hardened authoring set and Bundle handoff still lacked one
+end-to-end proof that it reached an immutable publication and real human gate.
+
+**Outcome:** `authoring_delivery_smoke.py` builds one local Skill, creates and
+verifies its private authoring set, creates and verifies a Bundle from the same
+bytes, publishes the DSL into isolated SQLite state, triggers one run, and
+approves the waiting human gate. It writes only local Bundle, verification,
+run, audit, and snapshot evidence and is part of `user-journey-gates`.
+
+**Evidence:** The smoke test verifies private authoring-to-Bundle continuity,
+initial `waiting` state, approved `completed` state, audit events, snapshot
+presence, and absence of the private Skill instruction from its compact result
+and audit. The standalone script passes in a clean temporary directory; CI and
+contributor/release documentation use the same command.
+
+**Safety boundary:** This is a deterministic local, no-network, no-credential,
+no-external-connector contract drill. It does not validate a real business
+process, live provider, customer data, TLS ingress, hosted deployment, or
+automatic approval behavior.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_authoring_delivery_smoke -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 244 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 245 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6852,6 +6883,7 @@ This rolling queue is ordered. Loop 244 is complete and there is no active deliv
 | Loop 242: Pre-Write Authoring Secret Hygiene | Complete | Prevent obvious credentials from being written into local authoring artifacts before the later Bundle boundary | Shared conservative scanner before export and during verification, no-write/no-reflection proof, CLI/docs, and full gates |
 | Loop 243: Portable Source-Path Privacy | Complete | Prevent caller filesystem paths from entering portable authoring and Bundle artifacts while preserving review mapping | Fixed authoring source marker, cross-platform absolute-path Bundle refusal, digest-matched receive verification, docs, and full gates |
 | Loop 244: Local User-Journey CI Gates | Complete | Keep documented local first-value paths from silently regressing between releases | Dedicated Pilot, scenario-pack, explicit-connector, and installed-quickstart CI job, reproducible docs, and full gates |
+| Loop 245: Authoring-To-Runtime Delivery Evidence | Complete | Prove a hardened local Skill handoff reaches immutable execution controls rather than ending at a review artifact | Private authoring, verified Bundle, SQLite publication, human-gate approval, audit/snapshot smoke, CI/docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
