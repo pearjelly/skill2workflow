@@ -50,6 +50,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "authoring-verify",
     "authoring-repair",
     "authoring-bundle",
+    "authoring-publish",
     "bundle-create",
     "bundle-verify",
     "bundle-publish",
@@ -149,6 +150,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     authoring_artifact_dir = isolated_dir / "authoring-artifacts"
     authoring_repair_backup_dir = isolated_dir / "authoring-artifacts-before-repair"
     authoring_bundle_path = isolated_dir / "authoring-artifacts.s2w"
+    authoring_publish_state_dir = isolated_dir / "authoring-publish-control"
     venv.EnvBuilder(with_pip=True, clear=True).create(build_venv_dir)
     venv.EnvBuilder(with_pip=True, clear=True).create(venv_dir)
     wheel_dir.mkdir(parents=True, exist_ok=True)
@@ -481,6 +483,20 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    authoring_publish_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "authoring-publish",
+                str(authoring_artifact_dir),
+                "--state-dir",
+                str(authoring_publish_state_dir),
+                "--storage",
+                "sqlite",
+            ],
+            cwd=isolated_dir,
+        )
+    )
     authoring_bundle_result = json.loads(
         _run(
             [
@@ -541,6 +557,11 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or not authoring_repair_backup_dir.is_dir()
         or not isinstance(authoring_repaired_verification, dict)
         or authoring_repaired_verification.get("valid") is not True
+        or not isinstance(authoring_publish_result, dict)
+        or authoring_publish_result.get("status") != "published"
+        or not isinstance(authoring_publish_result.get("workflow_id"), str)
+        or not authoring_publish_result["workflow_id"]
+        or authoring_publish_state_dir.exists() is not True
         or not isinstance(authoring_bundle_result, dict)
         or authoring_bundle_result.get("status") != "created"
         or authoring_bundle_result.get("valid") is not True
@@ -751,6 +772,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "authoring_repair_preflight_status": True,
         "authoring_repair_status": True,
         "authoring_bundle_status": True,
+        "authoring_publish_status": True,
         "bundle_status": True,
         "bundle_publish_status": True,
         "bundle_diff_status": True,

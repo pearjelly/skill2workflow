@@ -36,6 +36,12 @@ passing its `workflow.json`. It first performs complete authoring-artifact
 verification against the same descriptor-bound bytes, then uses this Bundle
 writer. See [`authoring.md`](authoring.md).
 
+If the verified authoring set and the control plane are on the same trusted
+machine, `authoring-publish <authoring-directory> --state-dir <state-dir>`
+publishes the same verified bytes directly without creating a Bundle. It does
+not trigger or execute a workflow; use this Bundle path when the artifact must
+cross a review or distribution boundary.
+
 Verify a bundle before importing or reviewing it:
 
 ```bash

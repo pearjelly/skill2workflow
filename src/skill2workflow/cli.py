@@ -172,6 +172,18 @@ def _main(argv=None) -> int:
         help="Atomically replace an existing regular output bundle",
     )
 
+    authoring_publish_cmd = subparsers.add_parser(
+        "authoring-publish",
+        help="Verify a private local authoring set, then publish it to a local control plane",
+    )
+    authoring_publish_cmd.add_argument("output_dir", type=Path)
+    authoring_publish_cmd.add_argument(
+        "--state-dir", type=Path, default=Path(".skill2workflow")
+    )
+    authoring_publish_cmd.add_argument(
+        "--storage", choices=["json", "sqlite"], default="json"
+    )
+
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
     validate_cmd.add_argument("workflow", type=Path)
     validate_cmd.add_argument("--format", choices=["text", "json"], default="text")
@@ -1140,6 +1152,14 @@ def _main(argv=None) -> int:
             )
         )
         return 0
+
+    if args.command == "authoring-publish":
+        return _control_action(
+            lambda: LocalControlPlane(
+                args.state_dir,
+                storage=args.storage,
+            ).publish_workflow(load_verified_authoring_workflow(args.output_dir))
+        )
 
     if args.command == "validate":
         workflow = _load_json(args.workflow)

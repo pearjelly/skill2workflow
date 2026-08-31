@@ -37,6 +37,7 @@ class WorkflowBundleDocumentationTests(TestCase):
             "bundle-diff",
             "bundle-preflight",
             "bundle-run",
+            "authoring-publish",
             "allow-side-effects",
             "context.bundle_run",
             "bundle_verified",

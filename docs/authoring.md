@@ -152,6 +152,30 @@ the output file is not created. The result is still only a distribution
 artifact. Use `bundle-verify` to inspect it and `bundle-publish` separately
 when a deliberate immutable publication is appropriate.
 
+## Publish A Verified Local Authoring Set
+
+When the authoring set stays on the same trusted machine as the local control
+plane, publish it directly without creating a transport Bundle:
+
+```bash
+skill2workflow authoring-publish /tmp/skill2workflow-authoring-set \
+  --state-dir /srv/skill2workflow/control \
+  --storage sqlite
+```
+
+`authoring-publish` reads only the same descriptor-bound Workflow DSL bytes
+that pass full authoring-artifact verification, then uses the normal immutable
+local publication path. A damaged or altered set is refused before the control
+plane is initialized. Repeating an identical publication follows the existing
+idempotent publication contract; a different document for the same workflow
+version is rejected.
+
+It only publishes. It does not trigger a run, resolve credentials, call a
+connector, promote an alias, or approve a human gate. Use the separate
+`trigger` or `run-published` command after reviewing the publication result.
+Use `authoring-bundle` instead when the set must cross a workstation or review
+handoff boundary.
+
 ## Reproduce The Controlled Local Delivery Path
 
 To exercise the complete safe handoff from a standard Skill through controlled

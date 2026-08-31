@@ -267,6 +267,78 @@ class CliTests(TestCase):
             self.assertEqual(exit_code, 1)
             self.assertFalse(bundle_path.exists())
 
+    def test_authoring_publish_verifies_and_publishes_without_running(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            state_dir = root / "state"
+            skill.write_text(
+                """---
+name: authoring-publish
+---
+
+## Checklist
+
+1. Ask an operator for approval
+2. Record completion
+""",
+                encoding="utf-8",
+            )
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["authoring-export", str(skill), "--output-dir", str(output_dir)]),
+                    0,
+                )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "authoring-publish",
+                        str(output_dir),
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        result = json.loads(stdout.getvalue())
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(result["status"], "published")
+        self.assertEqual(result["workflow_id"], "workflow_authoring_publish")
+        self.assertFalse("run_id" in result)
+
+    def test_authoring_publish_refuses_tampered_artifact_before_state_initialization(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            state_dir = root / "state"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["authoring-export", str(skill), "--output-dir", str(output_dir)]),
+                    0,
+                )
+            (output_dir / "workflow.json").write_text("{}", encoding="utf-8")
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    [
+                        "authoring-publish",
+                        str(output_dir),
+                        "--state-dir",
+                        str(state_dir),
+                        "--storage",
+                        "sqlite",
+                    ]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "authoring artifact verification failed\n")
+        self.assertFalse(state_dir.exists())
+
     def test_explicit_connector_fixture_runs_local_and_bundle_workflows(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

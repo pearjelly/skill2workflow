@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-252
+- Completed delivery loops: 1-253
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 252 is complete with custom controlled quickstart input
+- Active loop: None; Loop 253 is complete with verified authoring-set publication
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the custom quickstart and production-boundary CI evidence
+- Next decision: select the next Production Baseline loop after reviewing the verified authoring publication and production-boundary CI evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-252 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-253 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6873,9 +6873,29 @@ The installed-wheel quickstart drill runs both bundled and custom-Skill paths
 under source-import isolation, and full regression and package gates remain
 green.
 
+### Loop 253: Verified Authoring-Set Publication
+
+**Status:** Complete.
+
+**Prior basis:** A local author could verify an artifact set and either create
+a transport Bundle or manually reopen its Workflow DSL for publication. The
+same-machine path added avoidable handoff friction and made it easier to skip
+the verified-read primitive by mistake.
+
+**Outcome:** `authoring-publish` loads only the descriptor-bound Workflow DSL
+bytes that pass full authoring-artifact verification, then uses the existing
+immutable local publication path. A damaged set fails before state
+initialization. The command publishes only: it does not trigger a run, resolve
+credentials, call a connector, promote an alias, or approve a human gate.
+
+**Evidence:** CLI tests prove successful SQLite publication without a run and
+tampered-set refusal before state creation. The installed-wheel package smoke
+executes the new command under source-import isolation; docs distinguish this
+trusted same-machine path from portable Bundle handoff.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 252 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the custom quickstart and production-boundary CI evidence.
+This rolling queue is ordered. Loop 253 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the verified authoring publication and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -7094,6 +7114,7 @@ This rolling queue is ordered. Loop 252 is complete and there is no active deliv
 | Loop 250: Bounded Local Audit Evidence Export | Complete | Produce a controlled handoff artifact from verified SQLite audit evidence without raw payload disclosure | Fresh owner-only no-overwrite export, full-chain validity gate, redacted 1-100 page, cursor disclosure, and focused API/CLI/docs/package tests |
 | Loop 251: Offline Audit Evidence Verification | Complete | Let evidence recipients validate the bounded redacted contract without direct runtime-state access | Owner-only 1 MiB no-follow input, fixed envelope allowlist, page/integrity consistency checks, public schema, installed-wheel smoke, and no provenance claim |
 | Loop 252: Custom Controlled Quickstart Input | Complete | Let an installed user start with one local controlled SKILL.md instead of only the bundled example | Bounded no-symlink pre-read, valid real-human-gate requirement, private copy, source-path redaction, and installed-wheel evidence |
+| Loop 253: Verified Authoring-Set Publication | Complete | Let a reviewed same-machine authoring set reach immutable local publication without a transport Bundle | Same-read artifact verification, no-state-on-refusal, no-trigger publication, installed-wheel smoke, and handoff-boundary docs |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

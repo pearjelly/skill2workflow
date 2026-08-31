@@ -233,6 +233,16 @@ class PackageSmokeTests(TestCase):
                             "valid": True,
                         }
                     )
+                if "authoring-publish" in command:
+                    state_dir = Path(command[command.index("--state-dir") + 1])
+                    state_dir.mkdir(parents=True, exist_ok=True)
+                    return json.dumps(
+                        {
+                            "workflow_id": "workflow_demo",
+                            "version": "0.1.0",
+                            "status": "published",
+                        }
+                    )
                 if "compile" in command:
                     output_path = Path(command[command.index("--output") + 1])
                     output_path.write_text("{}", encoding="utf-8")
@@ -401,6 +411,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["authoring_repair_preflight_status"])
         self.assertTrue(result["authoring_repair_status"])
         self.assertTrue(result["authoring_bundle_status"])
+        self.assertTrue(result["authoring_publish_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])
         self.assertTrue(result["python_classifiers_valid"])

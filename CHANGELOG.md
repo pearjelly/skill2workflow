@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `authoring-publish` for a same-machine handoff from a fully verified
+  private authoring set to immutable local publication. It refuses altered
+  artifacts before state initialization and does not trigger execution,
+  resolve credentials, or call connectors.
+
 - Extended installed `quickstart` with an explicit local `--skill` input for a
   user-owned controlled workflow. It validates and requires a real human gate
   before creating a workspace, copies accepted bytes into its private example
