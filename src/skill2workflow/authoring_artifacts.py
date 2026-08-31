@@ -28,6 +28,9 @@ AUTHORING_ARTIFACT_RESULT_SCHEMA_VERSION = "skill2workflow-authoring-artifacts-r
 AUTHORING_ARTIFACT_VERIFICATION_SCHEMA_VERSION = (
     "skill2workflow-authoring-artifacts-verification-0.1.0"
 )
+AUTHORING_ARTIFACT_REPAIR_RESULT_SCHEMA_VERSION = (
+    "skill2workflow-authoring-artifacts-repair-result-0.1.0"
+)
 _ARTIFACT_FILENAMES = (
     "workflow.json",
     "workflow.litegraph.json",
@@ -121,6 +124,70 @@ def create_authoring_artifacts(skill: Path, output_dir: Path) -> Dict[str, objec
         "output_dir": str(destination),
         "files": list(_ARTIFACT_FILENAMES),
         "workflow_sha256": workflow_file["sha256"],
+    }
+
+
+def repair_authoring_artifacts(
+    skill: Path,
+    output_dir: Path,
+    backup_dir: Path,
+) -> Dict[str, object]:
+    """Replace one local authoring set only after a verified fresh rebuild.
+
+    Repair is intentionally explicit and leaves the pre-repair directory at a
+    new, sibling backup location. The source Skill is compiled and the
+    replacement is fully verified before either existing artifact is renamed.
+    A malformed or secret-like source therefore cannot damage a prior set.
+    """
+
+    destination = Path(output_dir)
+    backup = Path(backup_dir)
+    _validate_repair_locations(destination, backup)
+    previous = verify_authoring_artifacts(destination)
+    before = destination.lstat()
+
+    staging_parent = Path(
+        tempfile.mkdtemp(prefix=f".{destination.name}.repair.", dir=destination.parent)
+    )
+    candidate = staging_parent / "replacement"
+    try:
+        rebuilt = create_authoring_artifacts(skill, candidate)
+        verification = verify_authoring_artifacts(candidate)
+        if not verification.get("valid"):
+            raise RuntimeError("rebuilt authoring artifacts are invalid")
+        current = destination.lstat()
+        if (
+            current.st_dev != before.st_dev
+            or current.st_ino != before.st_ino
+            or stat.S_ISLNK(current.st_mode)
+            or not stat.S_ISDIR(current.st_mode)
+        ):
+            raise ValueError("authoring artifact output directory changed during repair")
+        if backup.exists() or backup.is_symlink():
+            raise ValueError("authoring artifact backup directory must not already exist")
+
+        os.rename(destination, backup)
+        try:
+            os.rename(candidate, destination)
+        except OSError as error:
+            try:
+                os.rename(backup, destination)
+            except OSError as rollback_error:
+                raise RuntimeError("authoring artifact repair rollback failed") from rollback_error
+            raise RuntimeError("authoring artifact repair replacement failed") from error
+    finally:
+        shutil.rmtree(staging_parent, ignore_errors=True)
+
+    return {
+        "schema_version": AUTHORING_ARTIFACT_REPAIR_RESULT_SCHEMA_VERSION,
+        "status": "repaired",
+        "valid": True,
+        "previous_valid": previous.get("valid") is True,
+        "workflow_id": rebuilt["workflow_id"],
+        "workflow_version": rebuilt["workflow_version"],
+        "output_dir": str(destination),
+        "backup_dir": str(backup),
+        "workflow_sha256": rebuilt["workflow_sha256"],
     }
 
 
@@ -241,6 +308,22 @@ def _new_verification_report() -> Dict[str, object]:
 def _invalid(report: Dict[str, object], code: str) -> Dict[str, object]:
     report["errors"] = [{"code": code}]
     return report
+
+
+def _validate_repair_locations(destination: Path, backup: Path) -> None:
+    if destination.parent != backup.parent:
+        raise ValueError("authoring artifact backup directory must be a sibling")
+    parent = destination.parent
+    if not parent.exists() or parent.is_symlink() or not parent.is_dir():
+        raise ValueError("authoring artifact output parent must be a regular directory")
+    try:
+        metadata = destination.lstat()
+    except FileNotFoundError as error:
+        raise ValueError("authoring artifact output directory must already exist") from error
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+        raise ValueError("authoring artifact output directory must be a regular directory")
+    if backup.exists() or backup.is_symlink():
+        raise ValueError("authoring artifact backup directory must not already exist")
 
 
 def _read_artifact_members(directory: Path) -> Dict[str, bytes]:

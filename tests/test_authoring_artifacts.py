@@ -7,6 +7,7 @@ from unittest import TestCase
 from skill2workflow.authoring_artifacts import (
     create_authoring_artifacts,
     load_verified_authoring_workflow,
+    repair_authoring_artifacts,
     verify_authoring_artifacts,
 )
 from skill2workflow.visualizer import workflow_to_litegraph
@@ -221,6 +222,68 @@ class AuthoringArtifactTests(TestCase):
 
             with self.assertRaisesRegex(ValueError, "verification failed"):
                 load_verified_authoring_workflow(output_dir)
+
+    def test_repair_replaces_tampered_artifacts_only_after_creating_a_sibling_backup(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            backup_dir = root / "authoring-before-repair"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            create_authoring_artifacts(skill, output_dir)
+            (output_dir / "workflow.json").write_text("{}", encoding="utf-8")
+
+            result = repair_authoring_artifacts(skill, output_dir, backup_dir)
+            repaired = verify_authoring_artifacts(output_dir)
+            preserved = verify_authoring_artifacts(backup_dir)
+            backup_mode = backup_dir.stat().st_mode & 0o777
+            output_mode = output_dir.stat().st_mode & 0o777
+
+        self.assertEqual(
+            result["schema_version"],
+            "skill2workflow-authoring-artifacts-repair-result-0.1.0",
+        )
+        self.assertEqual(result["status"], "repaired")
+        self.assertTrue(result["valid"])
+        self.assertFalse(result["previous_valid"])
+        self.assertTrue(repaired["valid"])
+        self.assertFalse(preserved["valid"])
+        self.assertEqual(backup_mode, 0o700)
+        self.assertEqual(output_mode, 0o700)
+
+    def test_repair_leaves_existing_artifacts_unchanged_when_source_is_refused(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            backup_dir = root / "authoring-before-repair"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            create_authoring_artifacts(skill, output_dir)
+            original = (output_dir / "workflow.json").read_bytes()
+            skill.write_text(
+                "## Checklist\n\n1. Send Authorization: Bearer abcdefghijklmnop\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "secret-like"):
+                repair_authoring_artifacts(skill, output_dir, backup_dir)
+
+            self.assertEqual((output_dir / "workflow.json").read_bytes(), original)
+            self.assertFalse(backup_dir.exists())
+
+    def test_repair_requires_a_new_sibling_backup_directory(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            foreign_backup = root / "other" / "backup"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            create_authoring_artifacts(skill, output_dir)
+
+            with self.assertRaisesRegex(ValueError, "sibling"):
+                repair_authoring_artifacts(skill, output_dir, foreign_backup)
+
+        self.assertFalse(foreign_backup.exists())
 
     @staticmethod
     def _refresh_manifest_file_digest(output_dir, filename):

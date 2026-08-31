@@ -12,6 +12,7 @@ from . import __version__
 from .authoring_artifacts import (
     create_authoring_artifacts,
     load_verified_authoring_workflow,
+    repair_authoring_artifacts,
     verify_authoring_artifacts,
 )
 from .backup import (
@@ -143,6 +144,14 @@ def _main(argv=None) -> int:
         help="Verify a private local workflow, review, and LiteGraph artifact set",
     )
     authoring_verify_cmd.add_argument("output_dir", type=Path)
+
+    authoring_repair_cmd = subparsers.add_parser(
+        "authoring-repair",
+        help="Rebuild a local authoring set from SKILL.md after making an explicit sibling backup",
+    )
+    authoring_repair_cmd.add_argument("skill", type=Path)
+    authoring_repair_cmd.add_argument("output_dir", type=Path)
+    authoring_repair_cmd.add_argument("--backup-dir", type=Path, required=True)
 
     authoring_bundle_cmd = subparsers.add_parser(
         "authoring-bundle",
@@ -1076,6 +1085,16 @@ def _main(argv=None) -> int:
         report = verify_authoring_artifacts(args.output_dir)
         _print_json(report)
         return 0 if report["valid"] else 1
+
+    if args.command == "authoring-repair":
+        _print_json(
+            repair_authoring_artifacts(
+                args.skill,
+                args.output_dir,
+                args.backup_dir,
+            )
+        )
+        return 0
 
     if args.command == "authoring-bundle":
         _print_json(

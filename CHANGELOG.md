@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `authoring-repair` for a damaged local authoring set. It builds and
+  verifies a replacement from the original Skill before a reversible sibling
+  backup/replacement swap, preserving the prior directory for review.
+
 - Added an end-to-end local authoring-delivery smoke. It proves the standard
   Skill-to-private-artifact-to-verified-Bundle-to-publication-to-human-gate
   path and records local audit/snapshot evidence without a network call,

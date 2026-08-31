@@ -188,6 +188,28 @@ class PackageSmokeTests(TestCase):
                             "errors": [],
                         }
                     )
+                if "authoring-repair" in command:
+                    output_dir = Path(command[3])
+                    backup_dir = Path(command[command.index("--backup-dir") + 1])
+                    output_dir.rename(backup_dir)
+                    output_dir.mkdir()
+                    for filename in (
+                        "workflow.json",
+                        "workflow.litegraph.json",
+                        "compile-review.json",
+                        "manifest.json",
+                    ):
+                        (output_dir / filename).write_text("{}", encoding="utf-8")
+                    return json.dumps(
+                        {
+                            "schema_version": (
+                                "skill2workflow-authoring-artifacts-repair-result-0.1.0"
+                            ),
+                            "status": "repaired",
+                            "valid": True,
+                            "previous_valid": False,
+                        }
+                    )
                 if "authoring-bundle" in command:
                     output_path = Path(command[command.index("--output") + 1])
                     output_path.write_bytes(b"bundle")
@@ -341,6 +363,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["bundle_summary_status"])
         self.assertTrue(result["compile_review_status"])
         self.assertTrue(result["authoring_artifact_status"])
+        self.assertTrue(result["authoring_repair_status"])
         self.assertTrue(result["authoring_bundle_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])

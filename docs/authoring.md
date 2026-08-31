@@ -96,6 +96,30 @@ Verification also rejects a Workflow DSL containing an obvious secret-like
 value, including a historical set whose digests were rewritten after a manual
 edit.
 
+## Repair A Local Authoring Set
+
+If verification reports a damaged local set and the original `SKILL.md` is
+available, rebuild it with an explicit sibling backup:
+
+```bash
+skill2workflow authoring-repair path/to/SKILL.md \
+  /tmp/skill2workflow-authoring-set \
+  --backup-dir /tmp/skill2workflow-authoring-set-before-repair
+```
+
+The destination must already be a regular directory and the backup must be a
+new directory in the same parent. The command first compiles and completely
+verifies a fresh private replacement. Only then does it rename the old set to
+the requested backup and place the verified replacement at the original path.
+If compilation or replacement preparation fails, the existing set is left
+unchanged; if the final replacement rename fails, it attempts to restore the
+old set. The compact result reports only whether the prior set was valid and
+the new workflow identity/digest, never Skill contents or verification values.
+
+Repair is not an in-place edit, a merge, a provenance signature, or a way to
+recover a lost source Skill. Review the preserved backup before deleting it;
+publish and execute remain separate explicit actions.
+
 To turn an unchanged, verified authoring set into the existing portable
 Workflow Bundle without manually reopening `workflow.json`, use:
 

@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-246
+- Completed delivery loops: 1-247
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 246 is complete with authoring-delivery rejection evidence
+- Active loop: None; Loop 247 is complete with verified authoring repair evidence
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation and repair evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-246 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-247 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6700,9 +6700,41 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_authoring_delivery_smoke -v
 ```
 
+### Loop 247: Verified Authoring Repair
+
+**Status:** Complete.
+
+**Prior basis:** Loops 239-246 make local authoring artifacts private,
+verifiable, portable, and connected to controlled execution. An author whose
+local set failed verification still had to manually select and recreate a new
+directory, which makes recovery harder to review and can discard evidence of
+the damaged set.
+
+**Outcome:** `authoring-repair SKILL.md OUTPUT_DIR --backup-dir BACKUP_DIR`
+requires an existing regular output directory and a new sibling backup. It
+builds and verifies a complete private replacement first, then moves the prior
+set to the explicit backup and installs the replacement. A source refusal
+leaves the prior set in place; a replacement failure attempts rollback.
+
+**Evidence:** Unit, CLI, and isolated-wheel package smoke tests prove repair
+of a tampered set, preservation of the invalid predecessor, owner-only
+replacement permissions, source-refusal non-mutation, sibling-backup refusal,
+and verified output before the existing authoring-to-Bundle handoff.
+
+**Safety boundary:** Repair does not merge or repair artifact values in place,
+recover a missing Skill, authenticate provenance, publish, execute, resolve
+credentials, or access a service. The caller chooses the backup path and must
+review it before deletion.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_authoring_artifacts -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 246 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 247 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6915,6 +6947,7 @@ This rolling queue is ordered. Loop 246 is complete and there is no active deliv
 | Loop 244: Local User-Journey CI Gates | Complete | Keep documented local first-value paths from silently regressing between releases | Dedicated Pilot, scenario-pack, explicit-connector, and installed-quickstart CI job, reproducible docs, and full gates |
 | Loop 245: Authoring-To-Runtime Delivery Evidence | Complete | Prove a hardened local Skill handoff reaches immutable execution controls rather than ending at a review artifact | Private authoring, verified Bundle, SQLite publication, human-gate approval, audit/snapshot smoke, CI/docs, and full gates |
 | Loop 246: Authoring Delivery Rejection Evidence | Complete | Prove an explicit human rejection cannot silently traverse the approved execution path | Independent rejected run, failed terminal state, separate audit proof, CI/docs, and full gates |
+| Loop 247: Verified Authoring Repair | Complete | Make a failed local authoring verification recoverable without unreviewed overwrite or lost predecessor evidence | Verified staged rebuild, explicit sibling backup, rollback attempt, CLI/package proof, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -48,6 +48,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "validate",
     "authoring-export",
     "authoring-verify",
+    "authoring-repair",
     "authoring-bundle",
     "bundle-create",
     "bundle-verify",
@@ -144,6 +145,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     isolated_skill = isolated_dir / "approval-flow.SKILL.md"
     compiled_skill_workflow = isolated_dir / "compiled-approval-flow.workflow.json"
     authoring_artifact_dir = isolated_dir / "authoring-artifacts"
+    authoring_repair_backup_dir = isolated_dir / "authoring-artifacts-before-repair"
     authoring_bundle_path = isolated_dir / "authoring-artifacts.s2w"
     venv.EnvBuilder(with_pip=True, clear=True).create(build_venv_dir)
     venv.EnvBuilder(with_pip=True, clear=True).create(venv_dir)
@@ -442,6 +444,26 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    (authoring_artifact_dir / "workflow.json").write_text("{}", encoding="utf-8")
+    authoring_repair_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "authoring-repair",
+                str(isolated_skill),
+                str(authoring_artifact_dir),
+                "--backup-dir",
+                str(authoring_repair_backup_dir),
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    authoring_repaired_verification = json.loads(
+        _run(
+            [str(console_script), "authoring-verify", str(authoring_artifact_dir)],
+            cwd=isolated_dir,
+        )
+    )
     authoring_bundle_result = json.loads(
         _run(
             [
@@ -486,6 +508,15 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or authoring_artifact_verification.get("valid") is not True
         or authoring_artifact_verification.get("files") != 4
         or authoring_artifact_verification.get("errors") != []
+        or not isinstance(authoring_repair_result, dict)
+        or authoring_repair_result.get("schema_version")
+        != "skill2workflow-authoring-artifacts-repair-result-0.1.0"
+        or authoring_repair_result.get("status") != "repaired"
+        or authoring_repair_result.get("valid") is not True
+        or authoring_repair_result.get("previous_valid") is not False
+        or not authoring_repair_backup_dir.is_dir()
+        or not isinstance(authoring_repaired_verification, dict)
+        or authoring_repaired_verification.get("valid") is not True
         or not isinstance(authoring_bundle_result, dict)
         or authoring_bundle_result.get("status") != "created"
         or authoring_bundle_result.get("valid") is not True
@@ -657,6 +688,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "validate_status": True,
         "compile_review_status": True,
         "authoring_artifact_status": True,
+        "authoring_repair_status": True,
         "authoring_bundle_status": True,
         "bundle_status": True,
         "bundle_publish_status": True,
