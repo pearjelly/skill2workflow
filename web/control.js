@@ -1233,6 +1233,10 @@
         body: JSON.stringify({ workflow: candidate.workflow }),
       });
       if (!response.ok) {
+        if (response.status === 409) {
+          candidate.targetReview = null;
+          throw new Error("workflow publication target changed");
+        }
         throw new Error("workflow publication unavailable");
       }
       const result = await response.json();
@@ -1244,7 +1248,11 @@
       await loadLiveWorkflows();
     } catch (error) {
       state.liveWorkflowReleaseError = true;
-      setStatus("Publication unavailable", "is-invalid");
+      if (error && error.message === "workflow publication target changed") {
+        setStatus("Publish target changed; review it again before another publication", "is-invalid");
+      } else {
+        setStatus("Publication unavailable", "is-invalid");
+      }
     } finally {
       state.liveWorkflowReleaseLoading = false;
       updateWorkflowReleaseControls();

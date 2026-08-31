@@ -127,6 +127,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("skill2workflow-local-workflow-validation-0.1.0", text)
         self.assertIn('b"Validate DSL"', text)
         self.assertIn("validateWorkflowReleaseTargetReview", text)
+        self.assertIn('b"response.status === 409"', text)
+        self.assertIn('b"candidate.targetReview = null"', text)
 
     def test_release_docs_define_isolated_wheel_qualification(self):
         root = Path(__file__).resolve().parents[1]
@@ -176,13 +178,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("compile --output … --review", guide)
         self.assertIn("exact source-free schema", guide)
         self.assertIn("value-free validation result", guide)
-        self.assertIn("- Completed delivery loops: 1-256", roadmap)
+        self.assertIn("- Completed delivery loops: 1-257", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 256 is complete with live publication-target review",
+            "- Active loop: None; Loop 257 is complete with publication conflict recovery",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-256 are complete", readme)
+        self.assertIn("Delivery Loops 1-257 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

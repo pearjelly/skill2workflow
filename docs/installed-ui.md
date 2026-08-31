@@ -190,6 +190,12 @@ version. The review is read-only and is explicitly a point-in-time suggestion,
 not a lock, reservation, or authorization: another publisher can still change
 the result before publication.
 
+If that race occurs, the immutable publication route returns `409`. The
+console retains the staged browser-only document, discards its now-stale target
+review, disables the publish confirmation, and asks the operator to run
+**Review Publish Target** again. It never automatically retries a publication
+or treats a previous `new` result as a reservation.
+
 Only a successfully checked candidate with a `new` or `idempotent` target
 review enables **Publish Staged Workflow**. It sends the same fixed envelope to
 `/api/v1/workflow-releases`; the UI process reads the ingress token server-side

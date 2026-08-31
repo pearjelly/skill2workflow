@@ -16,6 +16,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Made a live-console publication `409` actionable. A stale target review is
+  discarded while the browser-only staged document is retained; the operator
+  must explicitly re-review before another publish attempt, with no automatic
+  retry.
+
 - Included `web/control.js` in the wheel's allowlisted static data. Installed
   `control.html` references this script; release qualification now fetches and
   checks it so a missing interactive control plane cannot pass.
