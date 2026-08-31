@@ -258,6 +258,7 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Connector retry policy semantics for `max_attempts` and bounded fixed `backoff_ms`, including control-plane audit and local visual evidence documented in `docs/runtime-policy.md` and `docs/connectors.md`
 - Optional `tool_call.on_fallback` transition semantics, edge validation, LiteGraph slot projection, and fixed `node_fallback` evidence documented in `docs/workflow-dsl-contract.md`
 - SQLite audit integrity result contract `skill2workflow-audit-integrity-0.1.0` and the payload-free `audit-verify` CLI; this does not claim signatures or JSON/JSONL chain guarantees
+- Local `audit-evidence` export contract `skill2workflow-audit-evidence-0.1.0`: a fresh owner-only output contains one 1-100 item redacted SQLite audit page only after full-chain verification is valid, with truncation/cursor disclosure and no overwrite, remote transfer, signature, or chain-repair claim; see [`audit-evidence.md`](audit-evidence.md)
 - Local `audit --limit` accepts a bounded 1-1000 tail after storage-level filters and preserves chronological output; omitting it retains the complete-list compatibility path
 - Offline `control-snapshot --max-items` accepts a bounded 1-1000 window for JSON and SQLite state, preserves aggregate totals, and leaves live snapshots at their fixed 100-item bound
 - Local `runs --limit` and `control-runs --limit` accept a bounded 1-1000 newest-summary window for JSON and SQLite state; omitting the flag retains the complete-list compatibility path

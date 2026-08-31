@@ -84,6 +84,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "state-upgrade",
     "state-retention-apply",
     "audit-verify",
+    "audit-evidence",
     "cancel-run",
     "service-resume",
     "service-cancel",
@@ -569,6 +570,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    bundle_control_state_dir = isolated_dir / "bundle-control"
     bundle_publish_result = json.loads(
         _run(
             [
@@ -576,7 +578,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
                 "bundle-publish",
                 str(bundle_path),
                 "--state-dir",
-                str(isolated_dir / "bundle-control"),
+                str(bundle_control_state_dir),
                 "--storage",
                 "sqlite",
             ],
@@ -604,6 +606,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    bundle_run_state_dir = isolated_dir / "bundle-run-control"
     bundle_run_result = json.loads(
         _run(
             [
@@ -611,7 +614,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
                 "bundle-run",
                 str(bundle_path),
                 "--state-dir",
-                str(isolated_dir / "bundle-run-control"),
+                str(bundle_run_state_dir),
                 "--storage",
                 "sqlite",
             ],
@@ -629,6 +632,22 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
                 str(isolated_dir / "bundle-summary-control"),
                 "--storage",
                 "sqlite",
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    audit_evidence_path = isolated_dir / "audit-evidence" / "window.json"
+    audit_evidence_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "audit-evidence",
+                "--state-dir",
+                str(bundle_control_state_dir),
+                "--output",
+                str(audit_evidence_path),
+                "--max-items",
+                "10",
             ],
             cwd=isolated_dir,
         )
@@ -651,8 +670,14 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             bundle_summary_result.get("bundle_run", {}).get("bundle_sha256")
         )
         or not bundle_path.is_file()
+        or audit_evidence_result.get("output") != str(audit_evidence_path)
+        or not isinstance(audit_evidence_result.get("event_count"), int)
+        or audit_evidence_result.get("event_count", 0) <= 0
+        or not isinstance(audit_evidence_result.get("truncated"), bool)
+        or not _is_sha256(audit_evidence_result.get("head_digest"))
+        or not audit_evidence_path.is_file()
     ):
-        raise RuntimeError("installed bundle commands did not preserve their contract")
+        raise RuntimeError("installed bundle or audit-evidence commands did not preserve their contract")
     _run(
         [
             str(python_bin),
@@ -719,6 +744,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "bundle_preflight_status": True,
         "bundle_run_status": True,
         "bundle_summary_status": True,
+        "audit_evidence_status": True,
     }
 
 

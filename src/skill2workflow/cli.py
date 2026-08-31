@@ -16,6 +16,7 @@ from .authoring_artifacts import (
     repair_authoring_artifacts,
     verify_authoring_artifacts,
 )
+from .audit_evidence import export_audit_evidence
 from .backup import (
     build_backup_retention_plan,
     create_state_backup,
@@ -1041,6 +1042,18 @@ def _main(argv=None) -> int:
     audit_verify_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     audit_verify_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
+    audit_evidence_cmd = subparsers.add_parser(
+        "audit-evidence",
+        help="Export one bounded redacted audit page after SQLite chain verification",
+    )
+    audit_evidence_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
+    audit_evidence_cmd.add_argument("--output", type=Path, required=True)
+    audit_evidence_cmd.add_argument("--max-items", type=int, default=100)
+    audit_evidence_cmd.add_argument("--workflow-id", default="")
+    audit_evidence_cmd.add_argument("--workflow-version", default="")
+    audit_evidence_cmd.add_argument("--run-id", default="")
+    audit_evidence_cmd.add_argument("--event-type", default="")
+
     connectors_cmd = subparsers.add_parser("connectors", help="List connector manifests")
     connectors_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     connectors_cmd.add_argument(
@@ -1988,6 +2001,19 @@ def _main(argv=None) -> int:
         result = LocalControlPlane(args.state_dir, storage=args.storage).verify_audit_integrity()
         _print_json(result)
         return 0 if result.get("status") == "valid" else 1
+
+    if args.command == "audit-evidence":
+        result = export_audit_evidence(
+            args.state_dir,
+            args.output,
+            max_items=args.max_items,
+            workflow_id=args.workflow_id,
+            workflow_version=args.workflow_version,
+            run_id=args.run_id,
+            event_type=args.event_type,
+        )
+        _print_json(result)
+        return 0
 
     if args.command == "connectors":
         runtime = _connector_runtime(args)

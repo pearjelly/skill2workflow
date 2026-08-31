@@ -795,6 +795,19 @@ Verify the SQLite audit chain without printing event payloads:
 PYTHONPATH=src python3 -m skill2workflow.cli audit-verify --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite
 ```
 
+Create a fresh, owner-only, bounded redacted evidence page only after the
+complete SQLite audit chain verifies:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli audit-evidence \
+  --state-dir /var/lib/skill2workflow \
+  --output /var/lib/skill2workflow-evidence/audit-window.json \
+  --max-items 100
+```
+
+This is one value-free audit window, not a complete export or backup; read
+[`docs/audit-evidence.md`](docs/audit-evidence.md) before handing it off.
+
 List connector manifests:
 
 ```bash
@@ -919,7 +932,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-249 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-250 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1123,6 +1136,11 @@ Loop 249 adds `authoring-repair --dry-run`, which fully rebuilds and verifies
 a temporary candidate but leaves the selected authoring and backup paths
 unchanged. Operators can therefore review a value-free readiness result before
 the explicit repair swap.
+
+Loop 250 adds [`audit-evidence`](docs/audit-evidence.md), a deliberately
+bounded local handoff artifact. It verifies the full SQLite audit chain first,
+then atomically creates one fresh owner-only redacted page with integrity and
+cursor disclosure. It is not a backup, complete-history export, or signature.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
@@ -1868,6 +1886,7 @@ See:
 - `docs/support-bundle.md`
 - `docs/remote-audit-consistency.md`
 - `docs/remote-audit-events.md`
+- `docs/audit-evidence.md`
 - `docs/remote-schedule-inventory.md`
 - `docs/remote-schedule-actions.md`
 - `docs/remote-schedule-create.md`
