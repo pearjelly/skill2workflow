@@ -185,6 +185,42 @@ class CliTests(TestCase):
         self.assertEqual(verification_exit, 0)
         self.assertTrue(json.loads(verification_stdout.getvalue())["valid"])
 
+    def test_authoring_repair_dry_run_does_not_create_the_requested_backup(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            backup_dir = root / "authoring-before-repair"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["authoring-export", str(skill), "--output-dir", str(output_dir)]),
+                    0,
+                )
+            before = (output_dir / "workflow.json").read_bytes()
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(
+                    [
+                        "authoring-repair",
+                        str(skill),
+                        str(output_dir),
+                        "--backup-dir",
+                        str(backup_dir),
+                        "--dry-run",
+                    ]
+                )
+            result = json.loads(stdout.getvalue())
+            after = (output_dir / "workflow.json").read_bytes()
+            backup_exists = backup_dir.exists()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(result["status"], "ready")
+        self.assertTrue(result["valid"])
+        self.assertTrue(result["previous_valid"])
+        self.assertEqual(after, before)
+        self.assertFalse(backup_exists)
+
     def test_authoring_bundle_creates_a_portable_bundle_only_after_artifact_verification(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

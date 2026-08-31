@@ -444,6 +444,21 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    authoring_repair_preflight_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "authoring-repair",
+                str(isolated_skill),
+                str(authoring_artifact_dir),
+                "--backup-dir",
+                str(authoring_repair_backup_dir),
+                "--dry-run",
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    authoring_repair_preflight_backup_exists = authoring_repair_backup_dir.exists()
     (authoring_artifact_dir / "workflow.json").write_text("{}", encoding="utf-8")
     authoring_repair_result = json.loads(
         _run(
@@ -508,6 +523,13 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or authoring_artifact_verification.get("valid") is not True
         or authoring_artifact_verification.get("files") != 4
         or authoring_artifact_verification.get("errors") != []
+        or not isinstance(authoring_repair_preflight_result, dict)
+        or authoring_repair_preflight_result.get("schema_version")
+        != "skill2workflow-authoring-artifacts-repair-preflight-0.1.0"
+        or authoring_repair_preflight_result.get("status") != "ready"
+        or authoring_repair_preflight_result.get("valid") is not True
+        or authoring_repair_preflight_result.get("previous_valid") is not True
+        or authoring_repair_preflight_backup_exists
         or not isinstance(authoring_repair_result, dict)
         or authoring_repair_result.get("schema_version")
         != "skill2workflow-authoring-artifacts-repair-result-0.1.0"
@@ -688,6 +710,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "validate_status": True,
         "compile_review_status": True,
         "authoring_artifact_status": True,
+        "authoring_repair_preflight_status": True,
         "authoring_repair_status": True,
         "authoring_bundle_status": True,
         "bundle_status": True,

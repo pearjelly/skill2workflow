@@ -12,6 +12,7 @@ from . import __version__
 from .authoring_artifacts import (
     create_authoring_artifacts,
     load_verified_authoring_workflow,
+    preflight_authoring_repair,
     repair_authoring_artifacts,
     verify_authoring_artifacts,
 )
@@ -152,6 +153,11 @@ def _main(argv=None) -> int:
     authoring_repair_cmd.add_argument("skill", type=Path)
     authoring_repair_cmd.add_argument("output_dir", type=Path)
     authoring_repair_cmd.add_argument("--backup-dir", type=Path, required=True)
+    authoring_repair_cmd.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Compile and verify a replacement without changing either directory",
+    )
 
     authoring_bundle_cmd = subparsers.add_parser(
         "authoring-bundle",
@@ -1087,8 +1093,13 @@ def _main(argv=None) -> int:
         return 0 if report["valid"] else 1
 
     if args.command == "authoring-repair":
+        operation = (
+            preflight_authoring_repair
+            if args.dry_run
+            else repair_authoring_artifacts
+        )
         _print_json(
-            repair_authoring_artifacts(
+            operation(
                 args.skill,
                 args.output_dir,
                 args.backup_dir,

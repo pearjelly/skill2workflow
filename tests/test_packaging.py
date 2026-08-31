@@ -168,13 +168,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("compile --output … --review", guide)
         self.assertIn("exact source-free schema", guide)
         self.assertIn("value-free validation result", guide)
-        self.assertIn("- Completed delivery loops: 1-248", roadmap)
+        self.assertIn("- Completed delivery loops: 1-249", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 248 is complete with authoring recovery delivery evidence",
+            "- Active loop: None; Loop 249 is complete with authoring repair preflight evidence",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-248 are complete", readme)
+        self.assertIn("Delivery Loops 1-249 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

@@ -31,6 +31,9 @@ AUTHORING_ARTIFACT_VERIFICATION_SCHEMA_VERSION = (
 AUTHORING_ARTIFACT_REPAIR_RESULT_SCHEMA_VERSION = (
     "skill2workflow-authoring-artifacts-repair-result-0.1.0"
 )
+AUTHORING_ARTIFACT_REPAIR_PREFLIGHT_SCHEMA_VERSION = (
+    "skill2workflow-authoring-artifacts-repair-preflight-0.1.0"
+)
 _ARTIFACT_FILENAMES = (
     "workflow.json",
     "workflow.litegraph.json",
@@ -146,25 +149,9 @@ def repair_authoring_artifacts(
     previous = verify_authoring_artifacts(destination)
     before = destination.lstat()
 
-    staging_parent = Path(
-        tempfile.mkdtemp(prefix=f".{destination.name}.repair.", dir=destination.parent)
-    )
-    candidate = staging_parent / "replacement"
+    staging_parent, candidate, rebuilt = _stage_verified_repair_candidate(skill, destination)
     try:
-        rebuilt = create_authoring_artifacts(skill, candidate)
-        verification = verify_authoring_artifacts(candidate)
-        if not verification.get("valid"):
-            raise RuntimeError("rebuilt authoring artifacts are invalid")
-        current = destination.lstat()
-        if (
-            current.st_dev != before.st_dev
-            or current.st_ino != before.st_ino
-            or stat.S_ISLNK(current.st_mode)
-            or not stat.S_ISDIR(current.st_mode)
-        ):
-            raise ValueError("authoring artifact output directory changed during repair")
-        if backup.exists() or backup.is_symlink():
-            raise ValueError("authoring artifact backup directory must not already exist")
+        _assert_repair_target_unchanged(destination, backup, before)
 
         os.rename(destination, backup)
         try:
@@ -181,6 +168,42 @@ def repair_authoring_artifacts(
     return {
         "schema_version": AUTHORING_ARTIFACT_REPAIR_RESULT_SCHEMA_VERSION,
         "status": "repaired",
+        "valid": True,
+        "previous_valid": previous.get("valid") is True,
+        "workflow_id": rebuilt["workflow_id"],
+        "workflow_version": rebuilt["workflow_version"],
+        "output_dir": str(destination),
+        "backup_dir": str(backup),
+        "workflow_sha256": rebuilt["workflow_sha256"],
+    }
+
+
+def preflight_authoring_repair(
+    skill: Path,
+    output_dir: Path,
+    backup_dir: Path,
+) -> Dict[str, object]:
+    """Fully prepare one repair candidate without changing its target or backup.
+
+    A temporary private candidate is compiled and verified using the same path
+    as real repair, then removed. The target directory and requested backup
+    remain untouched so an operator can review this result before replacement.
+    """
+
+    destination = Path(output_dir)
+    backup = Path(backup_dir)
+    _validate_repair_locations(destination, backup)
+    previous = verify_authoring_artifacts(destination)
+    before = destination.lstat()
+    staging_parent, _, rebuilt = _stage_verified_repair_candidate(skill, destination)
+    try:
+        _assert_repair_target_unchanged(destination, backup, before)
+    finally:
+        shutil.rmtree(staging_parent, ignore_errors=True)
+
+    return {
+        "schema_version": AUTHORING_ARTIFACT_REPAIR_PREFLIGHT_SCHEMA_VERSION,
+        "status": "ready",
         "valid": True,
         "previous_valid": previous.get("valid") is True,
         "workflow_id": rebuilt["workflow_id"],
@@ -322,6 +345,42 @@ def _validate_repair_locations(destination: Path, backup: Path) -> None:
         raise ValueError("authoring artifact output directory must already exist") from error
     if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
         raise ValueError("authoring artifact output directory must be a regular directory")
+    if backup.exists() or backup.is_symlink():
+        raise ValueError("authoring artifact backup directory must not already exist")
+
+
+def _stage_verified_repair_candidate(
+    skill: Path,
+    destination: Path,
+):
+    staging_parent = Path(
+        tempfile.mkdtemp(prefix=f".{destination.name}.repair.", dir=destination.parent)
+    )
+    candidate = staging_parent / "replacement"
+    try:
+        rebuilt = create_authoring_artifacts(skill, candidate)
+        verification = verify_authoring_artifacts(candidate)
+        if not verification.get("valid"):
+            raise RuntimeError("rebuilt authoring artifacts are invalid")
+        return staging_parent, candidate, rebuilt
+    except Exception:
+        shutil.rmtree(staging_parent, ignore_errors=True)
+        raise
+
+
+def _assert_repair_target_unchanged(
+    destination: Path,
+    backup: Path,
+    before: os.stat_result,
+) -> None:
+    current = destination.lstat()
+    if (
+        current.st_dev != before.st_dev
+        or current.st_ino != before.st_ino
+        or stat.S_ISLNK(current.st_mode)
+        or not stat.S_ISDIR(current.st_mode)
+    ):
+        raise ValueError("authoring artifact output directory changed during repair")
     if backup.exists() or backup.is_symlink():
         raise ValueError("authoring artifact backup directory must not already exist")
 

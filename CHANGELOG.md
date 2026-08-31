@@ -12,6 +12,10 @@ release; Roadmap loop completion alone does not publish a new version.
   verifies a replacement from the original Skill before a reversible sibling
   backup/replacement swap, preserving the prior directory for review.
 
+- Added `authoring-repair --dry-run`, a no-target-write repair preflight that
+  fully rebuilds and verifies a temporary candidate before an operator elects
+  to perform the explicit backup/replacement swap.
+
 - Extended the local authoring-delivery smoke to prove verification detection
   and repair before Bundle publication and both controlled human-gate outcomes.
 

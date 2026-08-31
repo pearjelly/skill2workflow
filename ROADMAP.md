@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-248
+- Completed delivery loops: 1-249
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 248 is complete with authoring recovery delivery evidence
+- Active loop: None; Loop 249 is complete with authoring repair preflight evidence
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation and repair evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-248 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-249 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6764,9 +6764,38 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_authoring_delivery_smoke -v
 ```
 
+### Loop 249: Authoring Repair Preflight
+
+**Status:** Complete.
+
+**Prior basis:** Loop 247's repair command creates and verifies a replacement
+before moving the existing set, but the operator had no direct way to inspect
+whether a replacement was ready without initiating the directory swap.
+
+**Outcome:** `authoring-repair --dry-run` shares the real repair candidate
+build and verification path, then removes its private temporary candidate. It
+checks the source, target directory, and requested sibling backup while
+leaving both user-selected paths unchanged.
+
+**Evidence:** API, CLI, and isolated-wheel package smoke tests require a
+`ready` value-free result, a verified candidate, unchanged target bytes, no
+backup creation, and the normal explicit repair path afterward. Existing
+artifact verification, Bundle, and delivery smoke contracts remain unchanged.
+
+**Safety boundary:** This is an operator preflight, not a repair, publication,
+execution, source backup, provenance signature, or a validation of external
+provider behavior. It writes only a removed temporary candidate outside the
+selected artifact and backup paths.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_authoring_artifacts tests.test_cli -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 248 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 249 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6981,6 +7010,7 @@ This rolling queue is ordered. Loop 248 is complete and there is no active deliv
 | Loop 246: Authoring Delivery Rejection Evidence | Complete | Prove an explicit human rejection cannot silently traverse the approved execution path | Independent rejected run, failed terminal state, separate audit proof, CI/docs, and full gates |
 | Loop 247: Verified Authoring Repair | Complete | Make a failed local authoring verification recoverable without unreviewed overwrite or lost predecessor evidence | Verified staged rebuild, explicit sibling backup, rollback attempt, CLI/package proof, and full gates |
 | Loop 248: Authoring Recovery Delivery Evidence | Complete | Prove repaired authoring bytes, not just a fresh export, can reach controlled runtime decisions | Damage detection, explicit repair, verified Bundle, approval/rejection audits, CI/docs, and full gates |
+| Loop 249: Authoring Repair Preflight | Complete | Let operators prove repair readiness without changing the selected artifact or backup paths | Shared verified candidate, no-write target/backup proof, CLI/package checks, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

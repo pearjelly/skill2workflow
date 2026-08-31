@@ -7,6 +7,7 @@ from unittest import TestCase
 from skill2workflow.authoring_artifacts import (
     create_authoring_artifacts,
     load_verified_authoring_workflow,
+    preflight_authoring_repair,
     repair_authoring_artifacts,
     verify_authoring_artifacts,
 )
@@ -284,6 +285,37 @@ class AuthoringArtifactTests(TestCase):
                 repair_authoring_artifacts(skill, output_dir, foreign_backup)
 
         self.assertFalse(foreign_backup.exists())
+
+    def test_repair_preflight_rebuilds_without_changing_destination_or_backup(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            backup_dir = root / "authoring-before-repair"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            create_authoring_artifacts(skill, output_dir)
+            before = {
+                name: (output_dir / name).read_bytes()
+                for name in ("workflow.json", "workflow.litegraph.json", "compile-review.json", "manifest.json")
+            }
+
+            result = preflight_authoring_repair(skill, output_dir, backup_dir)
+
+            after = {
+                name: (output_dir / name).read_bytes()
+                for name in before
+            }
+            backup_exists = backup_dir.exists()
+
+        self.assertEqual(
+            result["schema_version"],
+            "skill2workflow-authoring-artifacts-repair-preflight-0.1.0",
+        )
+        self.assertEqual(result["status"], "ready")
+        self.assertTrue(result["valid"])
+        self.assertTrue(result["previous_valid"])
+        self.assertEqual(after, before)
+        self.assertFalse(backup_exists)
 
     @staticmethod
     def _refresh_manifest_file_digest(output_dir, filename):

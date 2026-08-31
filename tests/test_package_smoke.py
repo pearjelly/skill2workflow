@@ -191,6 +191,17 @@ class PackageSmokeTests(TestCase):
                 if "authoring-repair" in command:
                     output_dir = Path(command[3])
                     backup_dir = Path(command[command.index("--backup-dir") + 1])
+                    if "--dry-run" in command:
+                        return json.dumps(
+                            {
+                                "schema_version": (
+                                    "skill2workflow-authoring-artifacts-repair-preflight-0.1.0"
+                                ),
+                                "status": "ready",
+                                "valid": True,
+                                "previous_valid": True,
+                            }
+                        )
                     output_dir.rename(backup_dir)
                     output_dir.mkdir()
                     for filename in (
@@ -363,6 +374,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["bundle_summary_status"])
         self.assertTrue(result["compile_review_status"])
         self.assertTrue(result["authoring_artifact_status"])
+        self.assertTrue(result["authoring_repair_preflight_status"])
         self.assertTrue(result["authoring_repair_status"])
         self.assertTrue(result["authoring_bundle_status"])
         self.assertTrue(result["wheel_metadata_valid"])

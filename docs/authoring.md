@@ -107,6 +107,22 @@ skill2workflow authoring-repair path/to/SKILL.md \
   --backup-dir /tmp/skill2workflow-authoring-set-before-repair
 ```
 
+Before replacing anything, run the identical rebuild and verification path in
+preflight mode:
+
+```bash
+skill2workflow authoring-repair path/to/SKILL.md \
+  /tmp/skill2workflow-authoring-set \
+  --backup-dir /tmp/skill2workflow-authoring-set-before-repair \
+  --dry-run
+```
+
+`--dry-run` creates and removes only a private temporary candidate. It leaves
+the selected authoring directory and requested backup path unchanged, while
+checking the source can produce a fully verified replacement. Its `ready`
+result includes only fixed status, prior validity, workflow identity, and
+digest; use it to review repair readiness before running the mutating command.
+
 The destination must already be a regular directory and the backup must be a
 new directory in the same parent. The command first compiles and completely
 verifies a fresh private replacement. Only then does it rename the old set to
