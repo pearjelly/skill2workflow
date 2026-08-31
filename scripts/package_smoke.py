@@ -1064,6 +1064,8 @@ def _qualify_installed_ui(console_script: Path, isolated_dir: Path) -> bool:
         or b"validateWorkflowReleaseTargetReview" not in control_script
         or b"response.status === 409" not in control_script
         or b"candidate.targetReview = null" not in control_script
+        or b"state.liveWorkflowPromotionConflict = true" not in control_script
+        or b"state.liveWorkflowDeprecationConflict = true" not in control_script
     ):
         raise RuntimeError("installed UI did not serve the interactive control script")
 

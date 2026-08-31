@@ -268,14 +268,20 @@ workflow id/version, the fixed `production` alias, and the observed current
 alias target to `POST /api/v1/workflow-promotions`. The service applies its
 existing compare-and-swap boundary, so stale inventory fails closed. This
 action accepts no workflow payload, trigger input, credential, or arbitrary
-alias.
+alias. If that compare-and-swap returns `409`, the console disables another
+promotion based on this inventory and requires **Load Live Workflows** before
+the operator can review a new target and try again. It never auto-retries or
+assumes the production alias changed.
 
 The review card also offers **Deprecate version** for a published version with
 no active alias. The operator must confirm in the browser; the UI sends the
 observed checksum and complete alias set to
 `POST /api/v1/workflow-deprecations`. The service checks both values in the
 same registry transaction, so stale inventory fails closed. The immutable
-artifact remains available for audit and rollback review.
+artifact remains available for audit and rollback review. If this operation
+returns `409`, the console likewise disables deprecation from the stale
+inventory and requires **Load Live Workflows** before another explicit
+confirmation; it does not auto-retry or infer a new version status.
 
 This live mode adds only the existing human-gate resume, cooperative
 cancellation, fixed immutable Workflow publication, fixed production-alias

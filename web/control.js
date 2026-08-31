@@ -112,8 +112,10 @@
     liveWorkflowReleaseError: false,
     liveWorkflowPromotionLoading: false,
     liveWorkflowPromotionError: false,
+    liveWorkflowPromotionConflict: false,
     liveWorkflowDeprecationLoading: false,
     liveWorkflowDeprecationError: false,
+    liveWorkflowDeprecationConflict: false,
     lastLiveLoadedAt: "",
     liveRefreshError: false,
   };
@@ -634,6 +636,10 @@
         throw new Error("workflow inventory unavailable");
       }
       state.liveWorkflowInventory = inventory;
+      state.liveWorkflowPromotionError = false;
+      state.liveWorkflowPromotionConflict = false;
+      state.liveWorkflowDeprecationError = false;
+      state.liveWorkflowDeprecationConflict = false;
       renderTables();
       setWorkflowPageStatus(
         "Loaded " + inventory.window.returned + " of " + inventory.window.total +
@@ -1408,6 +1414,7 @@
     }
     state.liveWorkflowPromotionLoading = true;
     state.liveWorkflowPromotionError = false;
+    state.liveWorkflowPromotionConflict = false;
     updateWorkflowPromotionControls();
     setWorkflowPromotionStatus("Recording the compare-and-swap promotion…", "");
     try {
@@ -1423,6 +1430,10 @@
         }),
       });
       if (!response.ok) {
+        if (response.status === 409) {
+          state.liveWorkflowPromotionConflict = true;
+          throw new Error("workflow promotion target changed");
+        }
         throw new Error("workflow promotion unavailable");
       }
       const result = await response.json();
@@ -1445,7 +1456,9 @@
     } catch (error) {
       state.liveWorkflowPromotionError = true;
       setWorkflowPromotionStatus(
-        "Promotion unavailable or stale; the production alias was not assumed to change.",
+        error && error.message === "workflow promotion target changed"
+          ? "Promotion target changed; Reload Live Workflows before another promotion."
+          : "Promotion unavailable; the production alias was not assumed to change.",
         "is-invalid",
       );
     } finally {
@@ -1468,6 +1481,7 @@
     }
     state.liveWorkflowDeprecationLoading = true;
     state.liveWorkflowDeprecationError = false;
+    state.liveWorkflowDeprecationConflict = false;
     updateWorkflowDeprecationControls();
     setWorkflowDeprecationStatus("Recording the checksum-and-alias compare-and-swap…", "");
     try {
@@ -1483,6 +1497,10 @@
         }),
       });
       if (!response.ok) {
+        if (response.status === 409) {
+          state.liveWorkflowDeprecationConflict = true;
+          throw new Error("workflow deprecation target changed");
+        }
         throw new Error("workflow deprecation unavailable");
       }
       const result = await response.json();
@@ -1505,7 +1523,9 @@
     } catch (error) {
       state.liveWorkflowDeprecationError = true;
       setWorkflowDeprecationStatus(
-        "Deprecation unavailable or stale; the version was not assumed to change.",
+        error && error.message === "workflow deprecation target changed"
+          ? "Deprecation target changed; Reload Live Workflows before another deprecation."
+          : "Deprecation unavailable; the version was not assumed to change.",
         "is-invalid",
       );
     } finally {
@@ -2769,8 +2789,10 @@
     state.liveWorkflowTriggeredRun = null;
     state.liveWorkflowPromotionLoading = false;
     state.liveWorkflowPromotionError = false;
+    state.liveWorkflowPromotionConflict = false;
     state.liveWorkflowDeprecationLoading = false;
     state.liveWorkflowDeprecationError = false;
+    state.liveWorkflowDeprecationConflict = false;
     state.liveRunRows = null;
     state.liveRunPageCursor = "";
     state.liveRunPageHasMore = Boolean(
@@ -2901,8 +2923,10 @@
     state.liveWorkflowExplanationError = false;
     state.liveWorkflowPromotionLoading = false;
     state.liveWorkflowPromotionError = false;
+    state.liveWorkflowPromotionConflict = false;
     state.liveWorkflowDeprecationLoading = false;
     state.liveWorkflowDeprecationError = false;
+    state.liveWorkflowDeprecationConflict = false;
     state.liveWorkflowDiff = null;
     state.liveWorkflowDiffKey = "";
     state.liveWorkflowDiffLoading = false;
@@ -3374,8 +3398,10 @@
         state.liveWorkflowTriggeredRun = null;
         state.liveWorkflowPromotionLoading = false;
         state.liveWorkflowPromotionError = false;
+        state.liveWorkflowPromotionConflict = false;
         state.liveWorkflowDeprecationLoading = false;
         state.liveWorkflowDeprecationError = false;
+        state.liveWorkflowDeprecationConflict = false;
         state.liveScheduleDispatchPage = null;
         state.liveScheduleDispatchRows = null;
         state.liveScheduleDispatchScheduleId = "";
@@ -3660,8 +3686,10 @@
     const promotion = liveWorkflowPromotionTarget(workflow);
     if (state.liveWorkflowPromotionLoading) {
       setWorkflowPromotionStatus("Recording the compare-and-swap promotion…", "");
+    } else if (state.liveWorkflowPromotionConflict) {
+      setWorkflowPromotionStatus("Promotion target changed; Reload Live Workflows before another promotion.", "is-invalid");
     } else if (state.liveWorkflowPromotionError) {
-      setWorkflowPromotionStatus("Promotion unavailable or stale; the production alias was not assumed to change.", "is-invalid");
+      setWorkflowPromotionStatus("Promotion unavailable; the production alias was not assumed to change.", "is-invalid");
     } else if (!state.liveWorkflowInventory) {
       setWorkflowPromotionStatus("Load Live Workflows before changing the production alias.", "");
     } else if (workflow.status !== "published") {
@@ -3674,8 +3702,10 @@
     const deprecation = liveWorkflowDeprecationTarget(workflow);
     if (state.liveWorkflowDeprecationLoading) {
       setWorkflowDeprecationStatus("Recording the checksum-and-alias compare-and-swap…", "");
+    } else if (state.liveWorkflowDeprecationConflict) {
+      setWorkflowDeprecationStatus("Deprecation target changed; Reload Live Workflows before another deprecation.", "is-invalid");
     } else if (state.liveWorkflowDeprecationError) {
-      setWorkflowDeprecationStatus("Deprecation unavailable or stale; the version was not assumed to change.", "is-invalid");
+      setWorkflowDeprecationStatus("Deprecation unavailable; the version was not assumed to change.", "is-invalid");
     } else if (!state.liveWorkflowInventory) {
       setWorkflowDeprecationStatus("Load Live Workflows before changing version status.", "");
     } else if (workflow.status !== "published") {
@@ -4194,7 +4224,7 @@
   function updateWorkflowPromotionControls() {
     const workflow = selectedLiveWorkflow();
     const target = liveWorkflowPromotionTarget(workflow);
-    els.promoteWorkflow.disabled = !target || state.liveWorkflowPromotionLoading;
+    els.promoteWorkflow.disabled = !target || state.liveWorkflowPromotionLoading || state.liveWorkflowPromotionConflict;
     els.promoteWorkflow.textContent = state.liveWorkflowPromotionLoading
       ? "Promoting…"
       : "Promote to production";
@@ -4203,7 +4233,7 @@
   function updateWorkflowDeprecationControls() {
     const workflow = selectedLiveWorkflow();
     const target = liveWorkflowDeprecationTarget(workflow);
-    els.deprecateWorkflow.disabled = !target || state.liveWorkflowDeprecationLoading;
+    els.deprecateWorkflow.disabled = !target || state.liveWorkflowDeprecationLoading || state.liveWorkflowDeprecationConflict;
     els.deprecateWorkflow.textContent = state.liveWorkflowDeprecationLoading
       ? "Deprecating…"
       : "Deprecate version";

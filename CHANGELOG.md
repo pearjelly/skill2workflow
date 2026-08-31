@@ -16,6 +16,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Made live-console promotion and deprecation conflicts actionable. A `409`
+  now disables the stale action and requires an explicit workflow-inventory
+  reload before another confirmation; the UI never retries or assumes a
+  mutation succeeded.
+
 - Made a live-console publication `409` actionable. A stale target review is
   discarded while the browser-only staged document is retained; the operator
   must explicitly re-review before another publish attempt, with no automatic

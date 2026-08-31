@@ -945,7 +945,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-257 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-258 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1189,6 +1189,11 @@ Loop 257 makes the advisory boundary recoverable: a `409` publication conflict
 retains the browser-only staged workflow but invalidates its stale target
 review, requiring an explicit re-review before another confirmation. The UI
 never auto-retries a publication.
+
+Loop 258 applies the same recovery rule to production-alias promotion and
+version deprecation: a compare-and-swap `409` disables the stale action until
+the operator explicitly reloads the protected workflow inventory. The UI never
+retries or assumes that either mutation succeeded.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
