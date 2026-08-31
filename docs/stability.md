@@ -21,6 +21,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   exact artifact directory. It checks members, owner-only permissions, digest
   consistency, DSL validity, review consistency, and graph derivation; a hash
   match is not an authenticity signature
+- `authoring-bundle` loads only the descriptor-bound Workflow DSL bytes that
+  have passed `authoring-verify`, then creates the existing deterministic,
+  secret-checked distribution Bundle. It never publishes or executes a
+  workflow; an invalid authoring set cannot create an output Bundle
 - Example workflow fixture validity under `examples/workflows/`
 - Published workflow artifact immutability
 - Authenticated release preflight uses the fixed

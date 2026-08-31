@@ -9,7 +9,11 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .authoring_artifacts import create_authoring_artifacts, verify_authoring_artifacts
+from .authoring_artifacts import (
+    create_authoring_artifacts,
+    load_verified_authoring_workflow,
+    verify_authoring_artifacts,
+)
 from .backup import (
     build_backup_retention_plan,
     create_state_backup,
@@ -139,6 +143,18 @@ def _main(argv=None) -> int:
         help="Verify a private local workflow, review, and LiteGraph artifact set",
     )
     authoring_verify_cmd.add_argument("output_dir", type=Path)
+
+    authoring_bundle_cmd = subparsers.add_parser(
+        "authoring-bundle",
+        help="Verify a private local authoring set, then create a portable Workflow Bundle",
+    )
+    authoring_bundle_cmd.add_argument("output_dir", type=Path)
+    authoring_bundle_cmd.add_argument("-o", "--output", type=Path, required=True)
+    authoring_bundle_cmd.add_argument(
+        "--force",
+        action="store_true",
+        help="Atomically replace an existing regular output bundle",
+    )
 
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
     validate_cmd.add_argument("workflow", type=Path)
@@ -1060,6 +1076,16 @@ def _main(argv=None) -> int:
         report = verify_authoring_artifacts(args.output_dir)
         _print_json(report)
         return 0 if report["valid"] else 1
+
+    if args.command == "authoring-bundle":
+        _print_json(
+            create_workflow_bundle(
+                load_verified_authoring_workflow(args.output_dir),
+                args.output,
+                overwrite=args.force,
+            )
+        )
+        return 0
 
     if args.command == "validate":
         workflow = _load_json(args.workflow)

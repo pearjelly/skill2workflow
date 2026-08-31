@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `authoring-bundle` as the verified handoff from a local authoring set
+  to the existing deterministic, secret-checked Workflow Bundle. It reads only
+  the bytes that pass complete authoring verification and never publishes or
+  executes the workflow.
+
 - Added `authoring-verify` for read-only local authoring-artifact integrity
   checks. It returns fixed value-free errors while checking private permissions,
   member digests, DSL validity, source-free review consistency, and LiteGraph

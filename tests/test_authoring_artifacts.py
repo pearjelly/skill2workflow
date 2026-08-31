@@ -6,6 +6,7 @@ from unittest import TestCase
 
 from skill2workflow.authoring_artifacts import (
     create_authoring_artifacts,
+    load_verified_authoring_workflow,
     verify_authoring_artifacts,
 )
 
@@ -145,6 +146,33 @@ class AuthoringArtifactTests(TestCase):
 
         self.assertFalse(report["valid"])
         self.assertEqual(report["errors"], [{"code": "artifact_permissions_invalid"}])
+
+    def test_verified_load_returns_only_the_same_workflow_after_all_checks(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            skill.write_text(
+                "---\nname: verified-load\n---\n\n## Checklist\n\n1. Review draft\n",
+                encoding="utf-8",
+            )
+            create_authoring_artifacts(skill, output_dir)
+
+            workflow = load_verified_authoring_workflow(output_dir)
+
+        self.assertEqual(workflow["workflow"]["id"], "workflow_verified_load")
+
+    def test_verified_load_refuses_tampered_artifacts_with_a_fixed_error(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            create_authoring_artifacts(skill, output_dir)
+            (output_dir / "workflow.json").write_text("{}", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "verification failed"):
+                load_verified_authoring_workflow(output_dir)
 
     @staticmethod
     def _refresh_manifest_file_digest(output_dir, filename):

@@ -121,36 +121,12 @@ def verify_authoring_artifacts(output_dir: Path) -> Dict[str, object]:
     or untrusted modification, but are not an authenticity signature.
     """
 
-    report = _new_verification_report()
     try:
-        members = _read_artifact_members(Path(output_dir))
+        workflow, members = _load_verified_authoring_artifacts(output_dir)
     except _ArtifactVerificationError as error:
-        return _invalid(report, error.code)
-    except (OSError, ValueError, UnicodeDecodeError, json.JSONDecodeError):
-        return _invalid(report, "artifact_unreadable")
+        return _invalid(_new_verification_report(), error.code)
 
-    try:
-        workflow = _parse_json_object(members["workflow.json"])
-        graph = _parse_json_object(members["workflow.litegraph.json"])
-        review = _parse_json_object(members["compile-review.json"])
-        manifest = _parse_json_object(members["manifest.json"])
-    except (ValueError, UnicodeDecodeError, json.JSONDecodeError, RecursionError):
-        return _invalid(report, "artifact_json_invalid")
-
-    manifest_error = _validate_manifest(manifest, members, workflow, review)
-    if manifest_error:
-        return _invalid(report, manifest_error)
-    try:
-        workflow_errors = validate_workflow_structured(workflow)
-    except (TypeError, KeyError, AttributeError, RecursionError):
-        return _invalid(report, "artifact_workflow_invalid")
-    if workflow_errors:
-        return _invalid(report, "artifact_workflow_invalid")
-    if graph != workflow_to_litegraph(workflow):
-        return _invalid(report, "artifact_graph_mismatch")
-    if not _review_matches_workflow(review, workflow):
-        return _invalid(report, "artifact_review_mismatch")
-
+    report = _new_verification_report()
     report["valid"] = True
     report["files"] = len(_ARTIFACT_FILENAMES)
     report["workflow"] = {
@@ -159,6 +135,55 @@ def verify_authoring_artifacts(output_dir: Path) -> Dict[str, object]:
         "sha256": hashlib.sha256(members["workflow.json"]).hexdigest(),
     }
     return report
+
+
+def load_verified_authoring_workflow(output_dir: Path) -> Dict[str, object]:
+    """Load one Workflow DSL only after the complete authoring-set check.
+
+    The returned document is read from the same descriptor-bound bytes that
+    passed member, digest, review, and derived-graph validation. This avoids a
+    verify-then-reopen gap for callers that need to create a portable bundle.
+    """
+
+    try:
+        workflow, _ = _load_verified_authoring_artifacts(output_dir)
+    except _ArtifactVerificationError as error:
+        raise ValueError("authoring artifact verification failed") from error
+    return workflow
+
+
+def _load_verified_authoring_artifacts(
+    output_dir: Path,
+):
+    try:
+        members = _read_artifact_members(Path(output_dir))
+    except _ArtifactVerificationError:
+        raise
+    except (OSError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise _ArtifactVerificationError("artifact_unreadable") from error
+
+    try:
+        workflow = _parse_json_object(members["workflow.json"])
+        graph = _parse_json_object(members["workflow.litegraph.json"])
+        review = _parse_json_object(members["compile-review.json"])
+        manifest = _parse_json_object(members["manifest.json"])
+    except (ValueError, UnicodeDecodeError, json.JSONDecodeError, RecursionError) as error:
+        raise _ArtifactVerificationError("artifact_json_invalid") from error
+
+    manifest_error = _validate_manifest(manifest, members, workflow, review)
+    if manifest_error:
+        raise _ArtifactVerificationError(manifest_error)
+    try:
+        workflow_errors = validate_workflow_structured(workflow)
+    except (TypeError, KeyError, AttributeError, RecursionError) as error:
+        raise _ArtifactVerificationError("artifact_workflow_invalid") from error
+    if workflow_errors:
+        raise _ArtifactVerificationError("artifact_workflow_invalid")
+    if graph != workflow_to_litegraph(workflow):
+        raise _ArtifactVerificationError("artifact_graph_mismatch")
+    if not _review_matches_workflow(review, workflow):
+        raise _ArtifactVerificationError("artifact_review_mismatch")
+    return workflow, members
 
 
 def _json_bytes(value: object) -> bytes:

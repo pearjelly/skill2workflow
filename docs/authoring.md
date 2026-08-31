@@ -82,6 +82,21 @@ status when verification fails. Hashes detect accidental or untrusted local
 modification; they are not an authenticity signature. Protect the directory
 and use an authenticated sharing channel when provenance matters.
 
+To turn an unchanged, verified authoring set into the existing portable
+Workflow Bundle without manually reopening `workflow.json`, use:
+
+```bash
+skill2workflow authoring-bundle /tmp/skill2workflow-authoring-set \
+  --output /tmp/skill2workflow-authoring-set.s2w
+```
+
+This command reads the same descriptor-bound bytes that pass full
+`authoring-verify`, then invokes the normal deterministic, secret-checked
+Bundle writer. A modified or invalid authoring set cannot produce a Bundle;
+the output file is not created. The result is still only a distribution
+artifact. Use `bundle-verify` to inspect it and `bundle-publish` separately
+when a deliberate immutable publication is appropriate.
+
 ## Validate Before Download
 
 For a draft opened in the installed editor, select **Validate DSL**. The fixed

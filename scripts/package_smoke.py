@@ -48,6 +48,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "validate",
     "authoring-export",
     "authoring-verify",
+    "authoring-bundle",
     "bundle-create",
     "bundle-verify",
     "bundle-publish",
@@ -143,6 +144,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     isolated_skill = isolated_dir / "approval-flow.SKILL.md"
     compiled_skill_workflow = isolated_dir / "compiled-approval-flow.workflow.json"
     authoring_artifact_dir = isolated_dir / "authoring-artifacts"
+    authoring_bundle_path = isolated_dir / "authoring-artifacts.s2w"
     venv.EnvBuilder(with_pip=True, clear=True).create(build_venv_dir)
     venv.EnvBuilder(with_pip=True, clear=True).create(venv_dir)
     wheel_dir.mkdir(parents=True, exist_ok=True)
@@ -440,6 +442,24 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    authoring_bundle_result = json.loads(
+        _run(
+            [
+                str(console_script),
+                "authoring-bundle",
+                str(authoring_artifact_dir),
+                "--output",
+                str(authoring_bundle_path),
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    authoring_bundle_verification = json.loads(
+        _run(
+            [str(console_script), "bundle-verify", str(authoring_bundle_path)],
+            cwd=isolated_dir,
+        )
+    )
     if (
         not isinstance(authoring_artifacts, dict)
         or authoring_artifacts.get("schema_version")
@@ -466,6 +486,13 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or authoring_artifact_verification.get("valid") is not True
         or authoring_artifact_verification.get("files") != 4
         or authoring_artifact_verification.get("errors") != []
+        or not isinstance(authoring_bundle_result, dict)
+        or authoring_bundle_result.get("status") != "created"
+        or authoring_bundle_result.get("valid") is not True
+        or not authoring_bundle_path.is_file()
+        or not isinstance(authoring_bundle_verification, dict)
+        or authoring_bundle_verification.get("valid") is not True
+        or authoring_bundle_verification.get("errors") != []
     ):
         raise RuntimeError(
             "installed skill2workflow authoring export did not preserve its contract"
@@ -630,6 +657,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "validate_status": True,
         "compile_review_status": True,
         "authoring_artifact_status": True,
+        "authoring_bundle_status": True,
         "bundle_status": True,
         "bundle_publish_status": True,
         "bundle_diff_status": True,

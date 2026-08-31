@@ -62,6 +62,8 @@ local authoring operation: it does not publish, execute, or resolve a
 credential.
 The installed `authoring-verify` command must then accept the exported set
 with its exact value-free verification result.
+The installed `authoring-bundle` command must create and the normal
+`bundle-verify` command must accept the resulting portable Bundle.
 
 The installed command set also includes `ui`. The qualification starts it with
 the source checkout unavailable, fetches `/web/index.html`, and checks that the

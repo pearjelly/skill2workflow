@@ -128,6 +128,51 @@ class CliTests(TestCase):
         self.assertFalse(report["valid"])
         self.assertEqual(report["errors"], [{"code": "artifact_file_digest_mismatch"}])
 
+    def test_authoring_bundle_creates_a_portable_bundle_only_after_artifact_verification(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            bundle_path = root / "authoring.s2w"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["authoring-export", str(skill), "--output-dir", str(output_dir)]),
+                    0,
+                )
+            output = StringIO()
+            with redirect_stdout(output):
+                bundle_exit = main(
+                    ["authoring-bundle", str(output_dir), "--output", str(bundle_path)]
+                )
+            verified = StringIO()
+            with redirect_stdout(verified):
+                verify_exit = main(["bundle-verify", str(bundle_path)])
+
+        self.assertEqual(bundle_exit, 0)
+        self.assertTrue(json.loads(output.getvalue())["valid"])
+        self.assertEqual(verify_exit, 0)
+        self.assertTrue(json.loads(verified.getvalue())["valid"])
+
+    def test_authoring_bundle_refuses_a_tampered_artifact_before_creating_output(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            bundle_path = root / "authoring.s2w"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                main(["authoring-export", str(skill), "--output-dir", str(output_dir)])
+            (output_dir / "workflow.json").write_text("{}", encoding="utf-8")
+
+            with redirect_stderr(StringIO()):
+                exit_code = main(
+                    ["authoring-bundle", str(output_dir), "--output", str(bundle_path)]
+                )
+
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(bundle_path.exists())
+
     def test_explicit_connector_fixture_runs_local_and_bundle_workflows(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

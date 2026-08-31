@@ -26,6 +26,12 @@ Creation validates the workflow and runs the repository's secret-hygiene
 scanner. Existing output is not overwritten unless `--force` is supplied;
 replacement is assembled in a temporary sibling and committed atomically.
 
+For a workflow that came directly from `authoring-export`, prefer
+`authoring-bundle <authoring-directory> --output <bundle>` instead of manually
+passing its `workflow.json`. It first performs complete authoring-artifact
+verification against the same descriptor-bound bytes, then uses this Bundle
+writer. See [`authoring.md`](authoring.md).
+
 Verify a bundle before importing or reviewing it:
 
 ```bash

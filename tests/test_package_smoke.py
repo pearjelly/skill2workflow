@@ -188,6 +188,18 @@ class PackageSmokeTests(TestCase):
                             "errors": [],
                         }
                     )
+                if "authoring-bundle" in command:
+                    output_path = Path(command[command.index("--output") + 1])
+                    output_path.write_bytes(b"bundle")
+                    return json.dumps(
+                        {
+                            "schema_version": (
+                                "skill2workflow-workflow-bundle-verification-0.1.0"
+                            ),
+                            "status": "created",
+                            "valid": True,
+                        }
+                    )
                 if "compile" in command:
                     output_path = Path(command[command.index("--output") + 1])
                     output_path.write_text("{}", encoding="utf-8")
@@ -329,6 +341,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["bundle_summary_status"])
         self.assertTrue(result["compile_review_status"])
         self.assertTrue(result["authoring_artifact_status"])
+        self.assertTrue(result["authoring_bundle_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])
         self.assertTrue(result["python_classifiers_valid"])
