@@ -177,6 +177,17 @@ class PackageSmokeTests(TestCase):
                             ],
                         }
                     )
+                if "authoring-verify" in command:
+                    return json.dumps(
+                        {
+                            "schema_version": (
+                                "skill2workflow-authoring-artifacts-verification-0.1.0"
+                            ),
+                            "valid": True,
+                            "files": 4,
+                            "errors": [],
+                        }
+                    )
                 if "compile" in command:
                     output_path = Path(command[command.index("--output") + 1])
                     output_path.write_text("{}", encoding="utf-8")

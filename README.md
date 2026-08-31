@@ -919,7 +919,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-239 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-240 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1075,6 +1075,11 @@ Loop 239 provides a durable local authoring handoff in one command:
 Workflow DSL, its LiteGraph inspection view, a source-free compile review, and
 a checksum manifest. It neither copies the selected Skill source nor publishes,
 runs, or resolves credentials.
+
+Loop 240 makes that local handoff independently verifiable: `authoring-verify`
+checks the fixed private artifact set, digests, DSL validity, source-free
+review, and derived graph using value-free results. Its checksums provide
+integrity detection, not an authenticity signature.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

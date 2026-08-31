@@ -106,6 +106,28 @@ class CliTests(TestCase):
             "manifest.json",
         ])
 
+    def test_authoring_verify_reports_invalid_tampered_artifacts_with_a_failure_exit(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["authoring-export", str(skill), "--output-dir", str(output_dir)]),
+                    0,
+                )
+            workflow_path = output_dir / "workflow.json"
+            workflow_path.write_text("{}", encoding="utf-8")
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                exit_code = main(["authoring-verify", str(output_dir)])
+            report = json.loads(stdout.getvalue())
+
+        self.assertEqual(exit_code, 1)
+        self.assertFalse(report["valid"])
+        self.assertEqual(report["errors"], [{"code": "artifact_file_digest_mismatch"}])
+
     def test_explicit_connector_fixture_runs_local_and_bundle_workflows(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

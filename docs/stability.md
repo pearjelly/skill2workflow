@@ -17,6 +17,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   containing the compiled Workflow DSL, derived LiteGraph view, source-free
   compile review, and checksum manifest; it never overwrites a destination,
   copies the Skill source, resolves credentials, publishes, or executes
+- `authoring-verify` is a read-only, value-free verification contract for that
+  exact artifact directory. It checks members, owner-only permissions, digest
+  consistency, DSL validity, review consistency, and graph derivation; a hash
+  match is not an authenticity signature
 - Example workflow fixture validity under `examples/workflows/`
 - Published workflow artifact immutability
 - Authenticated release preflight uses the fixed

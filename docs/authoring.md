@@ -68,6 +68,20 @@ set. The command does not publish or execute a workflow, resolve credentials,
 or access runtime/service state. Review `workflow.json` and validate it before
 using a separate publish or run command.
 
+Before accepting a set from another local workspace or using it in CI, verify
+the exact artifact names, owner-only permission boundary, file digests,
+Workflow DSL validity, source-free review consistency, and that the graph is
+still derived from that Workflow DSL:
+
+```bash
+skill2workflow authoring-verify /tmp/skill2workflow-authoring-set
+```
+
+The result is a value-free report with fixed error codes and a nonzero exit
+status when verification fails. Hashes detect accidental or untrusted local
+modification; they are not an authenticity signature. Protect the directory
+and use an authenticated sharing channel when provenance matters.
+
 ## Validate Before Download
 
 For a draft opened in the installed editor, select **Validate DSL**. The fixed

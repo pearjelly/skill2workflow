@@ -60,6 +60,8 @@ LiteGraph view, source-free review, and checksum manifest), validates the
 exported Workflow DSL, and confirms no `SKILL.md` is copied. This remains a
 local authoring operation: it does not publish, execute, or resolve a
 credential.
+The installed `authoring-verify` command must then accept the exported set
+with its exact value-free verification result.
 
 The installed command set also includes `ui`. The qualification starts it with
 the source checkout unavailable, fetches `/web/index.html`, and checks that the

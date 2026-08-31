@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-239
+- Completed delivery loops: 1-240
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 239 is complete with private authoring artifact export
+- Active loop: None; Loop 240 is complete with private authoring artifact verification
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation and repair evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-239 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-240 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6484,9 +6484,40 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_authoring_artifacts tests.test_cli -v
 ```
 
+### Loop 240: Private Local Authoring Artifact Verification
+
+**Status:** Complete.
+
+**Prior basis:** Loop 239 generated a private local artifact set with digests,
+but a reviewer or CI job had no standalone command to prove that the files,
+derived graph, and source-free review still matched its Workflow DSL.
+
+**Outcome:** `authoring-verify` reads exactly one owner-only four-file
+authoring directory through descriptor-bound no-follow reads. It checks the
+fixed member set and permissions, manifest digest consistency, DSL validity,
+source-free review invariants, and exact LiteGraph derivation. It emits only a
+fixed value-free report and exits nonzero for an invalid set.
+
+**Evidence:** Unit tests cover a valid export, a tampered Workflow DSL, a
+digest-updated but non-derived graph, and broadened permissions without
+reflecting test values. CLI coverage locks the nonzero invalid exit. The
+isolated wheel qualification generates and verifies the complete artifact set.
+
+**Safety boundary:** This is local read-only integrity verification, not an
+authenticity signature, provenance service, publication, execution, credential
+operation, or business validation. Artifact hashes detect modification but do
+not identify the author; use access controls and an authenticated sharing
+channel when provenance is required.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_authoring_artifacts tests.test_cli -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 239 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 240 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6692,6 +6723,7 @@ This rolling queue is ordered. Loop 239 is complete and there is no active deliv
 | Loop 237: Authoritative Local DSL Validation | Complete | Keep installed visual authoring from downloading a compiler-invalid edited DSL without a clear result | Fixed loopback validation, source-free bounded errors, installed editor save gate, docs, and full gates |
 | Loop 238: Source-Free Node Validation Locations | Complete | Make node-scoped installed-editor validation findings actionable without reflecting author content | Fixed optional node ordinal, strict browser response validation, redaction coverage, docs, and full gates |
 | Loop 239: Private Local Authoring Artifact Export | Complete | Give local authors one durable, reviewable Skill compilation handoff without copying source or invoking runtime effects | Fresh owner-only DSL, LiteGraph, source-free review, checksum manifest, isolated-wheel qualification, docs, and full gates |
+| Loop 240: Private Local Authoring Artifact Verification | Complete | Let authors and CI independently verify one exported local artifact set without reflecting its contents | Descriptor-bound private-member checks, fixed value-free report, digest/DSL/review/graph validation, isolated-wheel qualification, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

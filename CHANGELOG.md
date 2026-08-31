@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `authoring-verify` for read-only local authoring-artifact integrity
+  checks. It returns fixed value-free errors while checking private permissions,
+  member digests, DSL validity, source-free review consistency, and LiteGraph
+  derivation; hashes remain integrity checks, not authenticity signatures.
+
 - Added `authoring-export` for durable local Skill review. It creates a fresh
   owner-only directory with the authoritative Workflow DSL, derived LiteGraph
   view, source-free compile review, and checksum manifest; it neither copies

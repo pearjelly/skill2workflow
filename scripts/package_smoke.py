@@ -47,6 +47,7 @@ APACHE_2_0_LICENSE_SHA256 = (
 REQUIRED_CONSOLE_COMMANDS = (
     "validate",
     "authoring-export",
+    "authoring-verify",
     "bundle-create",
     "bundle-verify",
     "bundle-publish",
@@ -433,6 +434,12 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    authoring_artifact_verification = json.loads(
+        _run(
+            [str(console_script), "authoring-verify", str(authoring_artifact_dir)],
+            cwd=isolated_dir,
+        )
+    )
     if (
         not isinstance(authoring_artifacts, dict)
         or authoring_artifacts.get("schema_version")
@@ -453,6 +460,12 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or (authoring_artifact_dir / "SKILL.md").exists()
         or not isinstance(authoring_workflow_validation, dict)
         or not authoring_workflow_validation.get("valid")
+        or not isinstance(authoring_artifact_verification, dict)
+        or authoring_artifact_verification.get("schema_version")
+        != "skill2workflow-authoring-artifacts-verification-0.1.0"
+        or authoring_artifact_verification.get("valid") is not True
+        or authoring_artifact_verification.get("files") != 4
+        or authoring_artifact_verification.get("errors") != []
     ):
         raise RuntimeError(
             "installed skill2workflow authoring export did not preserve its contract"

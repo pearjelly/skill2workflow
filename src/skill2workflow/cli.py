@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .authoring_artifacts import create_authoring_artifacts
+from .authoring_artifacts import create_authoring_artifacts, verify_authoring_artifacts
 from .backup import (
     build_backup_retention_plan,
     create_state_backup,
@@ -133,6 +133,12 @@ def _main(argv=None) -> int:
     )
     authoring_export_cmd.add_argument("skill", type=Path)
     authoring_export_cmd.add_argument("--output-dir", type=Path, required=True)
+
+    authoring_verify_cmd = subparsers.add_parser(
+        "authoring-verify",
+        help="Verify a private local workflow, review, and LiteGraph artifact set",
+    )
+    authoring_verify_cmd.add_argument("output_dir", type=Path)
 
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
     validate_cmd.add_argument("workflow", type=Path)
@@ -1049,6 +1055,11 @@ def _main(argv=None) -> int:
     if args.command == "authoring-export":
         _print_json(create_authoring_artifacts(args.skill, args.output_dir))
         return 0
+
+    if args.command == "authoring-verify":
+        report = verify_authoring_artifacts(args.output_dir)
+        _print_json(report)
+        return 0 if report["valid"] else 1
 
     if args.command == "validate":
         workflow = _load_json(args.workflow)
