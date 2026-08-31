@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-243
+- Completed delivery loops: 1-244
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 243 is complete with portable source-path privacy
+- Active loop: None; Loop 244 is complete with local user-journey CI gates
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation and repair evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-243 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-244 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6610,9 +6610,38 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_authoring_artifacts tests.test_bundles -v
 ```
 
+### Loop 244: Local User-Journey CI Gates
+
+**Status:** Complete.
+
+**Prior basis:** Existing CI covered unit tests, package qualification, and
+operational safety drills, but the documented local Pilot and explicit
+connector paths were not run as one dedicated end-to-end user-journey gate.
+
+**Outcome:** The new Python 3.14 `user-journey-gates` job runs the local
+customer-support Pilot, three-scenario Pilot pack, explicit local external
+connector smoke, and isolated installed-wheel quickstart. Each command owns a
+fresh `/tmp` work directory and uses loopback receivers or fixtures only.
+
+**Evidence:** The four commands complete locally with completed Pilot runs,
+mapped local connector evidence, and every quickstart evidence check passing.
+CI contract tests lock the job name and all four commands; contributor and
+release documentation show the same reproducible paths.
+
+**Safety boundary:** These are deterministic local evaluation paths, not live
+provider validation, customer-data processing, credentials, hosted service
+operation, or a claim of external integration availability. The real Lark
+Pilot remains separately authorized and evidenced.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ci -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 243 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 244 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6822,6 +6851,7 @@ This rolling queue is ordered. Loop 243 is complete and there is no active deliv
 | Loop 241: Verified Authoring Bundle Handoff | Complete | Turn a fully verified local authoring set into the existing portable Bundle without manually bypassing its checks | Same-read verified DSL loader, deterministic secret-checked Bundle handoff, no-output-on-refusal coverage, isolated-wheel qualification, docs, and full gates |
 | Loop 242: Pre-Write Authoring Secret Hygiene | Complete | Prevent obvious credentials from being written into local authoring artifacts before the later Bundle boundary | Shared conservative scanner before export and during verification, no-write/no-reflection proof, CLI/docs, and full gates |
 | Loop 243: Portable Source-Path Privacy | Complete | Prevent caller filesystem paths from entering portable authoring and Bundle artifacts while preserving review mapping | Fixed authoring source marker, cross-platform absolute-path Bundle refusal, digest-matched receive verification, docs, and full gates |
+| Loop 244: Local User-Journey CI Gates | Complete | Keep documented local first-value paths from silently regressing between releases | Dedicated Pilot, scenario-pack, explicit-connector, and installed-quickstart CI job, reproducible docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

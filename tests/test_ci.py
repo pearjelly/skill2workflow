@@ -65,6 +65,18 @@ class ContinuousIntegrationContractTests(TestCase):
             workflow,
         )
 
+    def test_ci_runs_local_user_journey_gates(self):
+        workflow = (
+            Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("user-journey-gates:", workflow)
+        self.assertIn("name: local user journey gates", workflow)
+        self.assertIn("pilot_playbook_smoke.py", workflow)
+        self.assertIn("pilot_scenario_pack_smoke.py", workflow)
+        self.assertIn("external_connector_smoke.py", workflow)
+        self.assertIn("quickstart_smoke.py", workflow)
+
     def test_ci_runs_release_artifact_gates(self):
         workflow = (
             Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
@@ -122,6 +134,10 @@ class ContinuousIntegrationContractTests(TestCase):
             "recurring_scheduler_smoke.py",
             "service_doctor_smoke.py",
             "production_baseline_smoke.py",
+            "pilot_playbook_smoke.py",
+            "pilot_scenario_pack_smoke.py",
+            "external_connector_smoke.py",
+            "quickstart_smoke.py",
         ):
             self.assertIn(script, contributing)
             self.assertIn(script, release)

@@ -36,6 +36,12 @@ boundary. Contributors may use any supported Python locally;
 compatibility-sensitive changes should be reviewed against both matrix
 endpoints.
 
+A separate Python 3.14 CI job also runs the local end-user journeys: the
+customer-support Pilot, the three-scenario Pilot pack, explicit external
+connector loading, and the installed-wheel quickstart. These drills use local
+receivers and fixtures only; they do not call a live provider or require a
+credential.
+
 Optionally install the checkout in editable mode to use the `skill2workflow` console script:
 
 ```bash
@@ -101,6 +107,19 @@ python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-d
 
 Each command owns a fresh work directory; the gate never uses live providers,
 credentials, or a host service manager.
+
+To reproduce the local user-journey CI gate:
+
+```bash
+python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot-ci
+python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-pilot-pack-ci
+python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-external-connector-ci
+python3 scripts/quickstart_smoke.py --work-dir /tmp/skill2workflow-quickstart-ci
+```
+
+These commands exercise only local deterministic fixtures and an isolated
+installed wheel. They are evidence for the documented user journeys, not a
+claim of live-provider reliability or hosted service operation.
 
 Run a fresh-checkout CLI smoke:
 

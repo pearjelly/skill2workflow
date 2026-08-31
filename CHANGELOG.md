@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a dedicated CI user-journey gate on Python 3.14. It exercises the
+  local Pilot, scenario pack, explicit external connector fixture, and
+  isolated installed-wheel quickstart without live providers or credentials.
+
 - Hardened portable workflow provenance against local-path disclosure.
   `authoring-export` serializes the fixed `SKILL.md` source marker, while
   Bundle creation and verification reject absolute local node source paths.

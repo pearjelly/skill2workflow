@@ -59,6 +59,10 @@ python3 -m py_compile src/skill2workflow/*.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-release-package-smoke
 python3 scripts/reproducible_build.py --work-dir /tmp/skill2workflow-release-reproducible-build
 python3 scripts/service_soak_smoke.py --work-dir /tmp/skill2workflow-release-service-soak --cycles 3 --triggers-per-cycle 6
+python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-release-pilot
+python3 scripts/pilot_scenario_pack_smoke.py --work-dir /tmp/skill2workflow-release-pilot-pack
+python3 scripts/external_connector_smoke.py --work-dir /tmp/skill2workflow-release-external-connector
+python3 scripts/quickstart_smoke.py --work-dir /tmp/skill2workflow-release-quickstart
 python3 scripts/production_baseline_smoke.py --work-dir /tmp/skill2workflow-release-production-baseline
 git diff --check
 ```
@@ -89,6 +93,11 @@ It also runs the three-cycle service soak and cutover drill, which verifies
 repeated authenticated triggers, idempotency replay/conflict handling, graceful
 shutdown, and SQLite/audit continuity. See
 [`service-soak.md`](service-soak.md) for its bounded evidence contract.
+
+The separate CI `user-journey-gates` job runs the local Pilot, scenario pack,
+explicit connector fixture, and installed quickstart journeys on Python 3.14.
+They use only loopback receivers, local fixtures, and isolated wheel installs;
+they do not validate a live SaaS provider or hosted deployment.
 
 ```bash
 python3 scripts/backup_restore_smoke.py --work-dir /tmp/skill2workflow-release-backup-ci
