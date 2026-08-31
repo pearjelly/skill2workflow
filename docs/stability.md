@@ -157,9 +157,11 @@ These surfaces should remain compatible during the `0.1.x` line:
   the exact source-free review shape. This is package availability evidence,
   not a claim that compiler inference validates business policy.
 - The installed editor's fixed local Workflow DSL validation route returns a
-  bounded result with only stable validation codes. **Validate DSL** and
-  installed **Save DSL** use it before download; it neither reflects submitted
-  values nor accesses service state, credentials, publication, or execution.
+  bounded result with stable validation codes and, only for node-scoped
+  findings, a zero-based node ordinal. **Validate DSL** and installed **Save
+  DSL** use it before download; it neither reflects submitted values, node
+  names, paths, or messages nor accesses service state, credentials,
+  publication, or execution.
 - The installed live UI can start only a preflight-ready empty trigger for an
   exact published version through the fixed `/api/v1/workflow-empty-triggers`
   proxy. The proxy fixes `source` to `live-ui` and input to `{}`, requires an

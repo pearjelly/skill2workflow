@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-237
+- Completed delivery loops: 1-238
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 237 is complete with authoritative local DSL validation
+- Active loop: None; Loop 238 is complete with source-free node validation locations
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation evidence
+- Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation and repair evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-237 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-238 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6421,9 +6421,40 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui -v
 ```
 
+### Loop 238: Source-Free Node Validation Locations
+
+**Status:** Complete.
+
+**Prior basis:** Loop 237 made installed editor validation authoritative and
+source-free, but authors could receive a node-specific issue code without a
+safe way to identify which graph node it applied to.
+
+**Outcome:** Each bounded local validation finding can now include only a
+zero-based `node_index` when the compiler's existing path begins with
+`nodes/<index>`. The server never returns a node id, field path, message, or
+submitted value. The editor validates that strict optional field and renders a
+human-facing one-based node ordinal beside the stable code.
+
+**Evidence:** A real loopback UI test submits a deliberately invalid workflow
+containing a private marker and requires the node-transition finding with
+`node_index: 0`, while asserting that the raw response has no marker and each
+finding has only the documented source-free fields. Existing valid-route, UI,
+installed-wheel, and package qualification tests preserve the valid contract.
+
+**Safety boundary:** Node ordinals are structural positions, not node names or
+document paths. This does not disclose user content, make the UI authoritative,
+repair a workflow, provide business validation, resolve credentials, publish,
+execute, or access service/runtime state.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 237 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 238 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6627,6 +6658,7 @@ This rolling queue is ordered. Loop 237 is complete and there is no active deliv
 | Loop 235: Headless Local SKILL.md Compile Review | Complete | Give CLI and CI users the same source-free inference review without breaking ordinary compile output | Explicit review mode, default-output compatibility, CLI/docs/tests, and full gates |
 | Loop 236: Installed SKILL.md Compile-Review Qualification | Complete | Prove the distributed wheel retains safe headless Skill compilation and review | Isolated installed CLI compile/review, fixed-summary verification, written DSL validation, docs, and full gates |
 | Loop 237: Authoritative Local DSL Validation | Complete | Keep installed visual authoring from downloading a compiler-invalid edited DSL without a clear result | Fixed loopback validation, source-free bounded errors, installed editor save gate, docs, and full gates |
+| Loop 238: Source-Free Node Validation Locations | Complete | Make node-scoped installed-editor validation findings actionable without reflecting author content | Fixed optional node ordinal, strict browser response validation, redaction coverage, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

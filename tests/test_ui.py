@@ -357,7 +357,13 @@ class UiTests(TestCase):
         self.assertTrue(result["errors"])
         self.assertFalse(result["truncated"])
         self.assertNotIn(secret_marker.encode("utf-8"), raw)
-        self.assertTrue(all(set(error) == {"code"} for error in result["errors"]))
+        self.assertTrue(
+            all(set(error) in ({"code"}, {"code", "node_index"}) for error in result["errors"])
+        )
+        self.assertIn(
+            {"code": "node_transition_target_missing", "node_index": 0},
+            result["errors"],
+        )
 
     def test_ui_server_rejects_malformed_skill_compile_before_parsing(self):
         observed = {}

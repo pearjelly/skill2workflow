@@ -8,6 +8,7 @@
   const MAX_SKILL_COMPILE_REVIEW_COUNT = 10000;
   const MAX_WORKFLOW_VALIDATION_ERROR_COUNT = 100000;
   const MAX_WORKFLOW_VALIDATION_ERRORS = 100;
+  const MAX_WORKFLOW_VALIDATION_NODE_INDEX = 100000;
   const SKILL_COMPILE_REVIEW_NOTICES = {
     checklist_not_found: "No checklist steps were found. This draft uses the compiler's generic review step.",
     human_gate_not_inferred: "No human approval node was inferred. Add an explicit review before real-world effects.",
@@ -994,10 +995,16 @@
       throw new Error("local Workflow DSL validation returned an invalid response");
     }
     payload.errors.forEach(function (error) {
+      const errorKeys = plainObject(error) ? Object.keys(error) : [];
       if (!plainObject(error)
-        || Object.keys(error).length !== 1
+        || !errorKeys.includes("code")
+        || errorKeys.length > 2
         || typeof error.code !== "string"
-        || !/^[a-z0-9_]{1,64}$/.test(error.code)) {
+        || !/^[a-z0-9_]{1,64}$/.test(error.code)
+        || (Object.prototype.hasOwnProperty.call(error, "node_index")
+          && (!Number.isSafeInteger(error.node_index)
+            || error.node_index < 0
+            || error.node_index > MAX_WORKFLOW_VALIDATION_NODE_INDEX))) {
         throw new Error("local Workflow DSL validation returned an invalid response");
       }
     });
@@ -1011,7 +1018,10 @@
       return;
     }
     const errors = validation.errors.map(function (error) {
-      return "Workflow DSL: " + error.code.replace(/_/g, " ") + ".";
+      const location = Object.prototype.hasOwnProperty.call(error, "node_index")
+        ? " node " + (error.node_index + 1)
+        : "";
+      return "Workflow DSL" + location + ": " + error.code.replace(/_/g, " ") + ".";
     });
     if (validation.truncated) {
       errors.push("Workflow DSL: additional validation errors were omitted from this bounded response.");

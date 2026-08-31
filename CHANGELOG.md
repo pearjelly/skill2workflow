@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Improved installed-editor DSL validation findings with a safe node ordinal
+  when the compiler error applies to a node. The response still excludes node
+  names, paths, messages, and submitted values.
+
 - Added authoritative local Workflow DSL validation to the installed editor.
   **Validate DSL** and installed **Save DSL** use the compiler validator before
   download and receive only bounded, source-free error codes.

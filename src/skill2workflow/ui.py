@@ -141,15 +141,31 @@ _LOCAL_WORKFLOW_VALIDATION_MAX_ERRORS = 100
 _LOCAL_WORKFLOW_VALIDATION_CODE_PATTERN = re.compile(r"^[a-z0-9_]{1,64}$")
 
 
-def _local_workflow_validation_code(error: object) -> str:
-    """Return one fixed, value-free compiler validation code."""
+def _local_workflow_validation_error(error: object) -> dict:
+    """Return one fixed, value-free compiler validation finding."""
 
     if not isinstance(error, dict):
-        return "workflow_invalid"
+        return {"code": "workflow_invalid"}
     code = error.get("code")
-    if isinstance(code, str) and _LOCAL_WORKFLOW_VALIDATION_CODE_PATTERN.fullmatch(code):
-        return code
-    return "workflow_invalid"
+    finding = {
+        "code": (
+            code
+            if isinstance(code, str)
+            and _LOCAL_WORKFLOW_VALIDATION_CODE_PATTERN.fullmatch(code)
+            else "workflow_invalid"
+        )
+    }
+    path = error.get("path")
+    if (
+        isinstance(path, list)
+        and len(path) >= 2
+        and path[0] == "nodes"
+        and isinstance(path[1], int)
+        and not isinstance(path[1], bool)
+        and 0 <= path[1] <= 100_000
+    ):
+        finding["node_index"] = path[1]
+    return finding
 
 
 def find_ui_root() -> Path:
@@ -1074,7 +1090,7 @@ def serve_ui(
             try:
                 errors = validate_workflow_structured(payload["workflow"])
                 safe_errors = [
-                    {"code": _local_workflow_validation_code(error)}
+                    _local_workflow_validation_error(error)
                     for error in errors[:_LOCAL_WORKFLOW_VALIDATION_MAX_ERRORS]
                 ]
                 response_body = json.dumps(

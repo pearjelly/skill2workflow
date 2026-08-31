@@ -50,8 +50,10 @@ Without `-o`, `compile --review` intentionally prints an explicit
 For a draft opened in the installed editor, select **Validate DSL**. The fixed
 loopback route validates the assembled Workflow DSL with the same compiler
 validator as the CLI. Its bounded response reports only stable issue codes, so
-author-entered content and local paths cannot be reflected into the result.
-**Save DSL** repeats the same check before downloading the artifact.
+author-entered content and local paths cannot be reflected into the result. An
+issue that applies to a node can additionally report only its zero-based node
+ordinal; the editor renders that ordinal without accepting a server-provided
+node name. **Save DSL** repeats the same check before downloading the artifact.
 
 This is a structural contract check, not business approval, credential
 validation, publication, execution, or a guarantee that a workflow's effects
