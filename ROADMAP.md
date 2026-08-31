@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-234
+- Completed delivery loops: 1-235
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 234 is complete with source-free compile review
+- Active loop: None; Loop 235 is complete with headless compile review
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the compile-review authoring evidence
+- Next decision: select the next Production Baseline loop after reviewing the headless authoring evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-234 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-235 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6325,9 +6325,40 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_compiler tests.test_ui -v
 ```
 
+### Loop 235: Headless Local SKILL.md Compile Review
+
+**Status:** Complete.
+
+**Prior basis:** Loop 234 made source-free compiler inference visible in the
+installed editor, but local scripts and CI using the primary CLI could not
+consume the same review without reimplementing compiler interpretation.
+
+**Outcome:** The `compile` command now accepts explicit `--review`. With `-o`,
+it writes the normal Workflow DSL file and emits only the fixed review summary
+to standard output. Without `-o`, it emits an explicit `{workflow, review}`
+wrapper. Omitting `--review` preserves the existing DSL-only standard output.
+
+**Evidence:** CLI tests lock both modes, default output compatibility, the
+written Workflow DSL equality, exact review counts, and absence of Skill text
+from the review. A real example compile with `-o --review` validates the
+written artifact. Public authoring/input-boundary docs record the shell-safe
+automation sequence and the finite source-free contract.
+
+**Safety boundary:** The option only reports compiler inference. It does not
+read runtime state, resolve credentials, create durable state, publish,
+execute, change the compiled Workflow DSL, or establish business-policy
+correctness. The wrapper mode is explicit so existing scripts consuming plain
+DSL output remain compatible.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_cli tests.test_compiler -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 234 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 235 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6528,6 +6559,7 @@ This rolling queue is ordered. Loop 234 is complete and there is no active deliv
 | Loop 232: Offline Editor Asset Boundary | Complete | Make the installed visual authoring surface usable without CDN access or runtime internet egress | Pinned local LiteGraph assets, MIT notice, SHA-256 integrity test, offline docs, and full gates |
 | Loop 233: Strict Local SKILL.md Source Decoding | Complete | Keep a selected local Skill's bytes from being silently replacement-decoded before compilation | Fatal UTF-8 byte decoder, explicit browser failure, UI/docs/tests, and full gates |
 | Loop 234: Source-Free Local SKILL.md Compile Review | Complete | Make conservative compiler inference visible before an author changes or publishes a draft | Fixed structural summary, finite notice codes, strict browser validation, UI/docs/tests, and full gates |
+| Loop 235: Headless Local SKILL.md Compile Review | Complete | Give CLI and CI users the same source-free inference review without breaking ordinary compile output | Explicit review mode, default-output compatibility, CLI/docs/tests, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

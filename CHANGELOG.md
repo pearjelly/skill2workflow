@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `compile --review` for headless authoring and CI. It emits the same
+  fixed source-free compile-review contract as the editor while preserving the
+  default DSL-only `compile` output.
+
 - Added a source-free **SKILL Compile Review** to the local editor flow. It
   reports compiler-inferred structural counts and fixed missing-control notices
   without echoing Skill content or changing, publishing, or executing the

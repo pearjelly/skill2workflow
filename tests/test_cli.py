@@ -25,6 +25,60 @@ class CliTests(TestCase):
         self.assertEqual(raised.exception.code, 0)
         self.assertEqual(stdout.getvalue(), "skill2workflow 0.1.0\n")
 
+    def test_compile_review_is_source_free_and_keeps_default_output_compatible(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output = root / "workflow.json"
+            skill.write_text(
+                "---\nname: cli-review\n---\n\n## Checklist\n\n1. Ask for approval\n2. Verify completion\n",
+                encoding="utf-8",
+            )
+
+            plain_stdout = StringIO()
+            with redirect_stdout(plain_stdout):
+                self.assertEqual(main(["compile", str(skill)]), 0)
+            plain = json.loads(plain_stdout.getvalue())
+
+            review_stdout = StringIO()
+            with redirect_stdout(review_stdout):
+                self.assertEqual(
+                    main(["compile", str(skill), "--output", str(output), "--review"]),
+                    0,
+                )
+            review = json.loads(review_stdout.getvalue())
+            written_workflow = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(plain["workflow"]["id"], "workflow_cli_review")
+        self.assertNotIn("review", plain)
+        self.assertEqual(written_workflow, plain)
+        self.assertEqual(
+            review,
+            {
+                "schema_version": "skill2workflow-skill-compile-review-0.1.0",
+                "ordered_step_count": 2,
+                "executable_node_count": 2,
+                "human_gate_count": 1,
+                "verification_node_count": 1,
+                "hard_gate_count": 0,
+                "notices": [],
+            },
+        )
+        self.assertNotIn("Ask for approval", json.dumps(review))
+
+    def test_compile_review_wraps_draft_only_when_no_output_file_is_requested(self):
+        with TemporaryDirectory() as temporary:
+            skill = Path(temporary) / "SKILL.md"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(main(["compile", str(skill), "--review"]), 0)
+            compiled = json.loads(stdout.getvalue())
+
+        self.assertEqual(set(compiled), {"workflow", "review"})
+        self.assertEqual(compiled["workflow"]["workflow"]["id"], "workflow_skill_workflow")
+        self.assertEqual(compiled["review"]["ordered_step_count"], 1)
+
     def test_explicit_connector_fixture_runs_local_and_bundle_workflows(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

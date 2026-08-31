@@ -34,3 +34,17 @@ PYTHONPATH=src python3 -m unittest tests.test_parser -v
 This is a local authoring-input boundary only. It does not add remote upload,
 arbitrary document conversion, multi-tenant isolation, or a guarantee that
 parser heuristics understand every possible Markdown dialect.
+
+## Optional Compile Review
+
+`compile --review` also emits the fixed
+`skill2workflow-skill-compile-review-0.1.0` summary. With `-o`, standard output
+is only the review so a local script can store the normal Workflow DSL artifact
+and inspect source-free counts/notices separately. Without `-o`, the explicit
+JSON wrapper contains both the normal draft and the review; plain `compile`
+retains its DSL-only compatibility output.
+
+The review contains only inferred structural counts and the finite notices
+`checklist_not_found`, `human_gate_not_inferred`, and
+`verification_not_inferred`. It does not include Skill text, local paths,
+credentials, validation of business intent, or authorization to publish/run.

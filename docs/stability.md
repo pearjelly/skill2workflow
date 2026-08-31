@@ -148,6 +148,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   inferred structural counts and a finite notice vocabulary. The editor
   validates that response before showing it; review guidance never mutates the
   draft, supplies business validation, or grants execution authority.
+- The local `compile --review` CLI exposes the same fixed review contract. Its
+  default DSL-only output remains compatible; only the explicit review mode
+  changes standard output, and it neither writes state nor publishes/executes
+  a workflow.
 - The installed live UI can start only a preflight-ready empty trigger for an
   exact published version through the fixed `/api/v1/workflow-empty-triggers`
   proxy. The proxy fixes `source` to `live-ui` and input to `{}`, requires an

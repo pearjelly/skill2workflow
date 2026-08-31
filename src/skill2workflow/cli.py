@@ -23,7 +23,7 @@ from .bundles import (
     load_verified_workflow_bundle_with_report,
     verify_workflow_bundle,
 )
-from .compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
+from .compiler import compile_ir_to_workflow, summarize_skill_compile, validate_workflow, validate_workflow_structured
 from .connectors import ConnectorRuntime
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
@@ -120,6 +120,11 @@ def _main(argv=None) -> int:
     compile_cmd = subparsers.add_parser("compile", help="Compile SKILL.md into Workflow DSL")
     compile_cmd.add_argument("skill", type=Path)
     compile_cmd.add_argument("-o", "--output", type=Path)
+    compile_cmd.add_argument(
+        "--review",
+        action="store_true",
+        help="Emit a source-free compiler-inference review (with -o, print only the review)",
+    )
 
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
     validate_cmd.add_argument("workflow", type=Path)
@@ -1022,10 +1027,14 @@ def _main(argv=None) -> int:
         return 0
 
     if args.command == "compile":
-        workflow = compile_ir_to_workflow(parse_skill_file(args.skill))
+        ir = parse_skill_file(args.skill)
+        workflow = compile_ir_to_workflow(ir)
+        review = summarize_skill_compile(ir, workflow)
         if args.output:
             args.output.write_text(json.dumps(workflow, ensure_ascii=False, indent=2), encoding="utf-8")
-        else:
+        if args.review:
+            _print_json(review if args.output else {"workflow": workflow, "review": review})
+        elif not args.output:
             _print_json(workflow)
         return 0
 

@@ -33,6 +33,18 @@ proof of business safety or an execution policy. Review and edit the Workflow
 DSL before publication; the summary neither changes the draft nor authorizes a
 side effect.
 
+The same review is available to local automation. To write the ordinary DSL
+artifact while emitting only the source-free review on standard output:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli compile path/to/SKILL.md \
+  -o /tmp/workflow.json --review > /tmp/skill-compile-review.json
+```
+
+Without `-o`, `compile --review` intentionally prints an explicit
+`{"workflow": ..., "review": ...}` wrapper. Plain `compile` without
+`--review` keeps its existing DSL-only output for compatibility.
+
 This local compile route is intentionally unavailable from a generic static
 server such as `python3 -m http.server`; use `skill2workflow ui` for the
 interactive compiler path. Do not place credentials, tokens, customer data, or

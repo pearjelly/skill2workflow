@@ -447,6 +447,16 @@ Compile a workflow:
 PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/approval-flow/SKILL.md -o /tmp/skill2workflow-workflow.json
 ```
 
+Emit the matching source-free compiler review for local CI or author review:
+
+```bash
+PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/approval-flow/SKILL.md -o /tmp/skill2workflow-workflow.json --review
+```
+
+With `-o`, standard output is the review JSON and the ordinary DSL file remains
+unchanged. Plain `compile` retains its DSL-only output; without `-o`, the
+explicit `--review` form prints both documents in a wrapper.
+
 Validate it:
 
 ```bash
@@ -897,7 +907,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-234 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-235 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1029,6 +1039,10 @@ files instead of replacement-decoding them into a different document.
 Loop 234 makes compiler inference reviewable: the local compile result carries
 a fixed source-free structural summary, and the editor highlights missing
 checklist, human-gate, or verification inference without changing the draft.
+
+Loop 235 extends that same review to headless authoring: `compile --review`
+lets local scripts and CI inspect fixed counts/notices while preserving normal
+DSL-only compile output by default.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 
