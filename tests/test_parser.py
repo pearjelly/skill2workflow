@@ -5,10 +5,28 @@ from textwrap import dedent
 from unittest import TestCase
 from unittest.mock import patch
 
-from skill2workflow.parser import MAX_SKILL_FILE_BYTES, parse_skill_file
+from skill2workflow.parser import MAX_SKILL_FILE_BYTES, parse_skill_file, parse_skill_text
 
 
 class ParserTests(TestCase):
+    def test_parse_bounded_skill_text_uses_an_explicit_non_path_source(self):
+        ir = parse_skill_text(
+            "---\nname: local-preview\n---\n\n## Checklist\n\n1. Review draft\n",
+            source_path="SKILL.md",
+        )
+
+        self.assertEqual(ir["metadata"]["name"], "local-preview")
+        self.assertEqual(ir["source_path"], "SKILL.md")
+        self.assertEqual(ir["ordered_steps"], ["Review draft"])
+
+    def test_parse_skill_text_rejects_non_string_and_oversized_values(self):
+        with self.assertRaisesRegex(ValueError, "text must be a string"):
+            parse_skill_text(None)  # type: ignore[arg-type]
+        with self.assertRaisesRegex(ValueError, "must be valid UTF-8"):
+            parse_skill_text("\ud800")
+        with self.assertRaisesRegex(ValueError, f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes"):
+            parse_skill_text("x" * (MAX_SKILL_FILE_BYTES + 1))
+
     def test_parse_rejects_oversized_skill_before_opening(self):
         with TemporaryDirectory() as tmp:
             path = Path(tmp) / "SKILL.md"

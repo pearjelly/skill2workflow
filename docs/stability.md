@@ -132,6 +132,11 @@ These surfaces should remain compatible during the `0.1.x` line:
   confirm its fixed server-side-token publication through the same 1 MiB
   contract. It refreshes redacted inventory after success and does not promote
   aliases or execute the staged document, documented in [`installed-ui.md`](installed-ui.md)
+- The installed visual editor can compile one bounded local `SKILL.md` in
+  memory through its fixed loopback route and return one validated draft
+  Workflow DSL document. It neither writes files nor accesses service state,
+  credentials, publication, or execution, and it fixes the generated source
+  reference to `SKILL.md`.
 - The installed live UI can start only a preflight-ready empty trigger for an
   exact published version through the fixed `/api/v1/workflow-empty-triggers`
   proxy. The proxy fixes `source` to `live-ui` and input to `{}`, requires an

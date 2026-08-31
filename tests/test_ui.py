@@ -163,6 +163,85 @@ class UiTests(TestCase):
         thread.join(timeout=2)
         self.assertFalse(thread.is_alive())
         self.assertIn(b"Workflow DSL Visual Editor", body)
+        self.assertIn(b"Choose SKILL.md", body)
+        self.assertIn(b"Compile SKILL", body)
+        app = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn("/api/v1/skill-compiles", app)
+        self.assertIn("compileStagedSkill", app)
+
+    def test_ui_server_compiles_one_bounded_skill_without_service_credentials(self):
+        observed = {}
+
+        def ready(server):
+            observed["port"] = server.server_port
+
+        thread = threading.Thread(
+            target=serve_ui,
+            kwargs={"host": "127.0.0.1", "port": 0, "once": True, "ready_callback": ready},
+            daemon=True,
+        )
+        thread.start()
+        for _ in range(100):
+            if "port" in observed:
+                break
+            thread.join(0.01)
+        self.assertIn("port", observed)
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{observed['port']}/api/v1/skill-compiles",
+            data=json.dumps(
+                {
+                    "skill_markdown": "---\nname: local-preview\n---\n\n## Checklist\n\n1. Review draft\n",
+                },
+                separators=(",", ":"),
+            ).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:
+            workflow = json.loads(response.read().decode("utf-8"))
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers["Cache-Control"], "no-store")
+        thread.join(timeout=2)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(workflow["workflow"]["id"], "workflow_local_preview")
+        self.assertEqual(workflow["nodes"][1]["metadata"]["source"]["file"], "SKILL.md")
+
+    def test_ui_server_rejects_malformed_skill_compile_before_parsing(self):
+        observed = {}
+
+        def ready(server):
+            observed["port"] = server.server_port
+
+        thread = threading.Thread(
+            target=serve_ui,
+            kwargs={"host": "127.0.0.1", "port": 0, "once": True, "ready_callback": ready},
+            daemon=True,
+        )
+        thread.start()
+        for _ in range(100):
+            if "port" in observed:
+                break
+            thread.join(0.01)
+        self.assertIn("port", observed)
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{observed['port']}/api/v1/skill-compiles",
+            data=b'{"skill_markdown":"draft","source_path":"outside"}',
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            urllib.request.urlopen(request, timeout=2)
+        error = raised.exception
+        try:
+            self.assertEqual(error.code, 400)
+            self.assertEqual(
+                json.loads(error.read().decode("utf-8")),
+                {"error": "skill compile body is malformed"},
+            )
+        finally:
+            error.close()
+        thread.join(timeout=2)
+        self.assertFalse(thread.is_alive())
 
     def test_cli_ui_command_forwards_loopback_server_options(self):
         captured = {}

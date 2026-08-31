@@ -11,8 +11,11 @@ from pathlib import Path
 from typing import Callable, Optional
 from urllib.parse import parse_qs, unquote, urlsplit
 
+from .artifact_io import MAX_WORKFLOW_ARTIFACT_BYTES
+from .compiler import compile_ir_to_workflow, validate_workflow_structured
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
+from .parser import MAX_SKILL_FILE_BYTES, parse_skill_text
 from .service import read_service_bearer_token
 from .service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
@@ -127,6 +130,9 @@ _LIVE_SCHEDULE_DISPATCH_REVIEW_MAX_REQUEST_BYTES = min(
     MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_REQUEST_BYTES,
 )
 _LIVE_SCHEDULE_DISPATCH_REVIEW_MAX_RESPONSE_BYTES = MAX_RECURRING_SCHEDULE_DISPATCH_REVIEW_RESPONSE_BYTES
+_SKILL_COMPILE_PATH = "/api/v1/skill-compiles"
+_SKILL_COMPILE_MAX_REQUEST_BYTES = MAX_SKILL_FILE_BYTES + 1024
+_SKILL_COMPILE_MAX_RESPONSE_BYTES = MAX_WORKFLOW_ARTIFACT_BYTES
 
 
 def find_ui_root() -> Path:
@@ -319,6 +325,12 @@ def serve_ui(
 
         def do_POST(self):
             parsed = urlsplit(self.path)
+            if parsed.path == _SKILL_COMPILE_PATH:
+                if parsed.query:
+                    self._write_json(404, {"error": "skill compile path is not available"})
+                    return
+                self._serve_local_skill_compile()
+                return
             if parsed.path == _WORKFLOW_INPUT_PREFLIGHT_PATH:
                 if parsed.query:
                     self._write_json(404, {"error": "workflow input preflight path is not available"})
@@ -951,6 +963,55 @@ def serve_ui(
                 return
             except Exception:
                 self._write_json(503, {"error": "workflow input preflight unavailable"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
+
+        def _serve_local_skill_compile(self):
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(400, {"error": "skill compile body is malformed"})
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(400, {"error": "skill compile body is malformed"})
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(400, {"error": "skill compile body is malformed"})
+                return
+            if content_length > _SKILL_COMPILE_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "skill compile body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(400, {"error": "skill compile body is malformed"})
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != {"skill_markdown"}
+                or not isinstance(payload.get("skill_markdown"), str)
+            ):
+                self._write_json(400, {"error": "skill compile body is malformed"})
+                return
+            try:
+                workflow = compile_ir_to_workflow(
+                    parse_skill_text(payload["skill_markdown"], source_path="SKILL.md")
+                )
+                if validate_workflow_structured(workflow):
+                    raise ValueError("compiled workflow is invalid")
+                response_body = json.dumps(
+                    workflow, ensure_ascii=False, separators=(",", ":")
+                ).encode("utf-8")
+                if len(response_body) > _SKILL_COMPILE_MAX_RESPONSE_BYTES:
+                    raise ValueError("compiled workflow is too large")
+            except (TypeError, ValueError, UnicodeEncodeError):
+                self._write_json(400, {"error": "skill compile rejected"})
                 return
             self._write_json(200, response_body, content_type="application/json")
 

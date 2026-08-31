@@ -16,10 +16,14 @@ http://127.0.0.1:4173/web/control.html
 ```
 
 The server is loopback-only by default and serves static editor assets and
-non-sensitive example JSON. It does not read runtime state or the service state directory,
-resolve credentials, expose an ingress token, or mutate workflows. The
-control-plane page still accepts an exported snapshot file; by default it is
-not a live authenticated service console.
+non-sensitive example JSON. It does not read runtime state or the service state
+directory, resolve credentials, expose an ingress token, or mutate workflows.
+The editor's **Compile SKILL** action is the one local authoring exception: it
+accepts one bounded 2 MiB `SKILL.md` in memory and returns a draft Workflow DSL
+document without writing, publishing, executing, or contacting the service.
+Its generated source reference is the fixed `SKILL.md`, not a browser file
+path. The control-plane page still accepts an exported snapshot file; by
+default it is not a live authenticated service console.
 
 For an explicit live view of one running service, configure both the
 service origin and its owner-only ingress token file:

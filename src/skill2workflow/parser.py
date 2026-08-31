@@ -17,6 +17,22 @@ def parse_skill_file(path: Path) -> SkillIR:
     """Parse a SKILL.md file into the project Skill IR."""
     source_path = Path(path)
     text = _read_skill_file(source_path)
+    return parse_skill_text(text, source_path=str(source_path))
+
+
+def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
+    """Parse bounded in-memory SKILL.md text without reading a filesystem path."""
+
+    if not isinstance(text, str):
+        raise ValueError("SKILL.md text must be a string")
+    if not isinstance(source_path, str) or not source_path:
+        raise ValueError("SKILL.md source path must be a non-empty string")
+    try:
+        encoded = text.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise ValueError("SKILL.md text must be valid UTF-8") from error
+    if len(encoded) > MAX_SKILL_FILE_BYTES:
+        raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
     metadata, body, body_start_line = _parse_frontmatter(text)
     checklist_details = _extract_checklist_details(body, body_start_line)
     checklist = [_format_step_detail(step) for step in checklist_details]
@@ -44,7 +60,7 @@ def parse_skill_file(path: Path) -> SkillIR:
         ),
         "verification_rules": _find_lines(body, ("verify", "test", "check", "validation")),
         "sections": sections,
-        "source_path": str(source_path),
+        "source_path": source_path,
     }
 
 

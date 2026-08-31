@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-230
+- Completed delivery loops: 1-231
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 230 is complete with live trigger-to-run handoff
+- Active loop: None; Loop 231 is complete with local SKILL.md editor compilation
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the live trigger-to-run handoff evidence
+- Next decision: select the next Production Baseline loop after reviewing the local authoring evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-230 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-231 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6193,9 +6193,42 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_control_ui -v
 ```
 
+### Loop 231: Local SKILL.md Editor Compilation
+
+**Status:** Complete.
+
+**Prior basis:** The editor could inspect existing Workflow DSL files and the
+CLI could compile a `SKILL.md`, but a user working in the installed visual
+authoring surface had to leave the editor and manage an intermediate file.
+
+**Outcome:** The loopback `skill2workflow ui` process now accepts one bounded
+in-memory `SKILL.md` document through a fixed local compile route, parses and
+compiles it with the normal compiler, and returns one validated draft Workflow
+DSL document to the editor. The browser then uses the normal graph and
+allowlisted write-back path. No source file is written: generated node metadata
+uses the fixed `SKILL.md` reference rather than a browser file path.
+
+**Evidence:** Parser tests cover bounded in-memory text and preserve normal
+file parsing. UI HTTP tests cover successful local compilation, a fixed source
+reference, `no-store`, and rejection of extra client-selected fields. The
+editor contract and authoring/install documentation lock the two-step upload
+and compile interaction and distinguish it from generic static hosting.
+
+**Safety boundary:** This is a loopback-only authoring aid. It accepts exactly
+one 2 MiB Markdown string, does not persist input or output, read service
+state, resolve credentials, receive an ingress token, publish, execute, or
+proxy arbitrary compiler/runtime paths. It is not a secret-safe upload surface;
+credentials and customer data remain forbidden in Skill files.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_parser tests.test_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 230 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 231 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6392,6 +6425,7 @@ This rolling queue is ordered. Loop 230 is complete and there is no active deliv
 | Loop 228: Confirmation-Protected Live Empty Trigger | Complete | Let operators start one preflighted no-input published version from the live console without browser credentials or uncontrolled retries | Fixed source/empty-input proxy, confirmation, strict compact receipt, manual same-key retry, UI tests, docs, and full gates |
 | Loop 229: Staged-Input Live Workflow Trigger | Complete | Let operators preflight and start a published exact version with one explicit non-secret JSON input from the live console | Fixed staged-input proxies, value-free preflight, confirmation, server-side token, same-key retry, UI/docs/tests, and full gates |
 | Loop 230: Live Trigger-To-Run Handoff | Complete | Let operators move from one accepted exact-version trigger receipt into the bounded redacted run review without manually searching the run table | Receipt-bound local handoff, existing fixed run-detail route, UI/docs/tests, and full gates |
+| Loop 231: Local SKILL.md Editor Compilation | Complete | Let authors compile one standard local SKILL.md directly into the installed visual editor without creating an intermediate file | Fixed loopback compile route, bounded in-memory parser/compiler handoff, no-write/source-path redaction, UI/docs/tests, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

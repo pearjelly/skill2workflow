@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added local `SKILL.md` compilation to the installed LiteGraph editor. One
+  bounded Skill document can be compiled into an in-memory draft DSL through a
+  fixed loopback route, with no file write, service-token access, publication,
+  or execution.
+
 - Added **Review Started Run** to the live workflow review. An accepted,
   validated trigger receipt can now open the existing bounded redacted run
   detail directly, without re-triggering work, accepting a user-supplied run

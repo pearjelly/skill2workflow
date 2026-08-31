@@ -1,5 +1,7 @@
 (function () {
   const GRAPH_VERSION = "skill2workflow-litegraph-0.1.0";
+  const SKILL_COMPILE_URL = "/api/v1/skill-compiles";
+  const MAX_SKILL_INPUT_BYTES = 2 * 1024 * 1024;
   const NODE_TYPES = ["start", "step", "human_gate", "tool_call", "verification", "instruction", "failure", "end"];
   const TYPE_THEME = {
     start: { color: "#1769aa", background: "#eaf4fc" },
@@ -38,6 +40,8 @@
   let currentWorkflow = {};
   let currentWorkflowDsl = null;
   let validationErrors = [];
+  let stagedSkillMarkdown = null;
+  let skillCompileLoading = false;
 
   const els = {};
 
@@ -85,6 +89,8 @@
     els.exampleSelect = document.getElementById("example-select");
     els.loadSample = document.getElementById("load-sample");
     els.fileInput = document.getElementById("file-input");
+    els.skillInput = document.getElementById("skill-input");
+    els.compileSkill = document.getElementById("compile-skill");
     els.fitView = document.getElementById("fit-view");
     els.validateGraph = document.getElementById("validate-graph");
     els.saveWorkflow = document.getElementById("save-workflow");
@@ -122,6 +128,8 @@
     els.saveWorkflow.addEventListener("click", saveWorkflow);
     els.saveGraph.addEventListener("click", saveGraph);
     els.fileInput.addEventListener("change", loadSelectedFile);
+    els.skillInput.addEventListener("change", stageSelectedSkill);
+    els.compileSkill.addEventListener("click", compileStagedSkill);
     els.nodeTitle.addEventListener("input", updateSelectedNode);
     els.nodeDescription.addEventListener("input", updateSelectedNode);
     els.nodeAction.addEventListener("input", updateSelectedNode);
@@ -236,6 +244,63 @@
     } finally {
       event.target.value = "";
     }
+  }
+
+  async function stageSelectedSkill(event) {
+    const file = event.target.files && event.target.files[0];
+    stagedSkillMarkdown = null;
+    updateSkillCompileControls();
+    if (!file) return;
+    try {
+      if (typeof file.size !== "number" || file.size < 1 || file.size > MAX_SKILL_INPUT_BYTES) {
+        throw new Error("SKILL.md is outside the 2 MiB limit");
+      }
+      const markdown = await file.text();
+      if (!markdown || new TextEncoder().encode(markdown).length > MAX_SKILL_INPUT_BYTES) {
+        throw new Error("SKILL.md is outside the 2 MiB limit");
+      }
+      stagedSkillMarkdown = markdown;
+      setStatus("SKILL staged", "valid");
+    } catch (error) {
+      renderValidation(["Could not stage SKILL.md: " + error.message], new Set());
+      setStatus("SKILL rejected", "invalid");
+    } finally {
+      event.target.value = "";
+      updateSkillCompileControls();
+    }
+  }
+
+  async function compileStagedSkill() {
+    if (!stagedSkillMarkdown || skillCompileLoading) return;
+    skillCompileLoading = true;
+    updateSkillCompileControls();
+    setStatus("Compiling SKILL", "idle");
+    try {
+      const response = await fetch(SKILL_COMPILE_URL, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skill_markdown: stagedSkillMarkdown }),
+      });
+      if (!response.ok) {
+        throw new Error(response.status === 404
+          ? "Use skill2workflow ui instead of a static HTTP server to compile SKILL.md"
+          : "local SKILL compilation is unavailable");
+      }
+      const workflow = await response.json();
+      loadDocument(workflow, "Compiled SKILL.md");
+    } catch (error) {
+      renderValidation(["Could not compile SKILL.md: " + error.message], new Set());
+      setStatus("SKILL compile failed", "invalid");
+    } finally {
+      skillCompileLoading = false;
+      updateSkillCompileControls();
+    }
+  }
+
+  function updateSkillCompileControls() {
+    els.compileSkill.disabled = !stagedSkillMarkdown || skillCompileLoading;
+    els.compileSkill.textContent = skillCompileLoading ? "Compiling SKILL…" : "Compile SKILL";
   }
 
   function loadDocument(documentJson, label) {

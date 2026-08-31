@@ -4,6 +4,25 @@ This guide describes the current authoring surface for `skill2workflow`.
 
 Workflow DSL remains the execution truth source. The LiteGraph editor is an inspection and editing surface that must round-trip back through Workflow DSL validation before a workflow is published or run.
 
+## Compile A Local SKILL.md
+
+When the editor is served by the installed `skill2workflow ui` command, choose
+one local `SKILL.md` and select **Compile SKILL**. The loopback UI process parses
+and compiles that one in-memory document into a draft Workflow DSL document,
+then loads the result into the normal editor for review and allowlisted edits.
+
+The request is bounded to 2 MiB, has no filesystem output, does not access the
+runtime state directory or a service token, and never executes, publishes, or
+persists the result. The generated source reference is the fixed `SKILL.md`,
+not the browser's local file path. The editor renders the returned Workflow DSL
+only after its normal local validation. Use the CLI `compile` command when you
+need a durable JSON artifact in a specified filesystem location.
+
+This local compile route is intentionally unavailable from a generic static
+server such as `python3 -m http.server`; use `skill2workflow ui` for the
+interactive compiler path. Do not place credentials, tokens, customer data, or
+other secrets in a Skill document.
+
 ## Example Gallery
 
 The web editor can load example Workflow DSL files from:
