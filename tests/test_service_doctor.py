@@ -16,6 +16,25 @@ from skill2workflow.service_doctor import diagnose_service
 
 
 class ServiceDoctorTests(TestCase):
+    def test_running_service_mode_skips_only_the_bind_check(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            initialized = initialize_service_workspace(root, port=0)
+
+            result = diagnose_service(
+                Path(initialized["config_file"]), check_bind=False
+            )
+
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["checks"][-1], {
+            "id": "bind",
+            "status": "skipped",
+            "code": "running_service",
+        })
+        self.assertTrue(
+            all(check["status"] == "passed" for check in result["checks"][:-1])
+        )
+
     def test_ready_workspace_has_fixed_secret_free_checks_without_mutation(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / "runtime"

@@ -1,15 +1,49 @@
 import json
+import threading
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
 from skill2workflow.cli import main
 from skill2workflow.go_live import assess_go_live
+from skill2workflow.service import RuntimeService, load_service_config
+from skill2workflow.service_bootstrap import initialize_service_workspace
 
 
 class GoLiveTests(TestCase):
+    def test_running_service_gate_uses_bind_skip_and_real_protected_checks(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            initialized = initialize_service_workspace(root, port=0)
+            config_path = Path(initialized["config_file"])
+            service = RuntimeService(load_service_config(config_path))
+            ready = threading.Event()
+            thread = threading.Thread(
+                target=service.serve,
+                kwargs={"ready_callback": lambda _service: ready.set()},
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            try:
+                result = assess_go_live(
+                    config_path,
+                    "http://127.0.0.1:{}".format(service.server_address[1]),
+                    Path(initialized["token_file"]),
+                )
+            finally:
+                service.begin_shutdown()
+                thread.join(timeout=2)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(result["status"], "ready")
+        self.assertEqual(result["local_doctor"]["skipped_check_ids"], ["bind"])
+        self.assertEqual(result["service_probe"]["status"], "ready")
+        self.assertEqual(result["operational_readiness"]["status"], "ready")
+
     def test_local_doctor_failure_skips_network_and_token_use(self):
         doctor = {
             "status": "not_ready",
@@ -18,15 +52,17 @@ class GoLiveTests(TestCase):
                 {"id": "auth", "status": "skipped", "code": "blocked_by_config"},
             ],
         }
-        with patch("skill2workflow.go_live.diagnose_service", return_value=doctor), patch(
+        with patch("skill2workflow.go_live.diagnose_service", return_value=doctor) as diagnose, patch(
             "skill2workflow.go_live.fetch_service_probe"
         ) as probe, patch("skill2workflow.go_live.fetch_operational_readiness") as operational:
             result = assess_go_live(Path("service.json"), "https://service.example", Path("token"))
 
         self.assertEqual(result["status"], "not_ready")
-        self.assertEqual(result["local_doctor"]["failed_check_ids"], ["config", "auth"])
+        self.assertEqual(result["local_doctor"]["failed_check_ids"], ["config"])
+        self.assertEqual(result["local_doctor"]["skipped_check_ids"], ["auth"])
         self.assertEqual(result["service_probe"]["status"], "not_checked")
         self.assertEqual(result["operational_readiness"]["status"], "not_checked")
+        diagnose.assert_called_once_with(Path("service.json"), check_bind=False)
         probe.assert_not_called()
         operational.assert_not_called()
 

@@ -17,10 +17,9 @@ working on.
 ## Operate one self-hosted instance
 
 - [Service](service.md) — authenticated loopback service and route boundary
-- [Go-live checklist](go-live.md) — one reviewed single-instance deployment sequence
 - [Service bootstrap](service-bootstrap.md) — secure first-use workspace
 - [Service Doctor](service-doctor.md) — read-only readiness diagnosis
-- [Go-live checklist](go-live.md) — safe ordered Doctor, Probe, and operational-readiness gate
+- [Go-live checklist](go-live.md) — one reviewed single-instance deployment sequence and safe ordered deployment gate
 - [Systemd supervision](systemd-service.md) — manually reviewed Linux unit
 - [Recurring scheduling](recurring-scheduling.md) — durable dispatch semantics
 - [Human approval](human-approval.md) — remote approve/reject handoff

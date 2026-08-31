@@ -24,7 +24,11 @@ SERVICE_DOCTOR_RESULT_SCHEMA_VERSION = (
 _CHECK_IDS = ("config", "auth", "credentials", "state", "bind")
 
 
-def diagnose_service(config_path: Path) -> Dict[str, object]:
+def diagnose_service(
+    config_path: Path,
+    *,
+    check_bind: bool = True,
+) -> Dict[str, object]:
     """Return a fixed, secret-free startup report without mutating the workspace."""
 
     try:
@@ -39,8 +43,11 @@ def diagnose_service(config_path: Path) -> Dict[str, object]:
     checks.append(_auth_check(config))
     checks.append(_credential_check(config))
     checks.append(_state_check(config))
-    checks.append(_bind_check(config))
-    return _result(checks)
+    if check_bind:
+        checks.append(_bind_check(config))
+    else:
+        checks.append(_check("bind", "skipped", "running_service"))
+    return _result(checks, allow_running_bind_skip=not check_bind)
 
 
 def _auth_check(config: ServiceConfig) -> Dict[str, str]:
@@ -108,8 +115,21 @@ def _check(check_id: str, status: str, code: str) -> Dict[str, str]:
     return {"id": check_id, "status": status, "code": code}
 
 
-def _result(checks: List[Dict[str, str]]) -> Dict[str, object]:
-    ready = all(check["status"] == "passed" for check in checks)
+def _result(
+    checks: List[Dict[str, str]],
+    *,
+    allow_running_bind_skip: bool = False,
+) -> Dict[str, object]:
+    ready = all(
+        check["status"] == "passed"
+        or (
+            allow_running_bind_skip
+            and check["id"] == "bind"
+            and check["status"] == "skipped"
+            and check["code"] == "running_service"
+        )
+        for check in checks
+    )
     return {
         "schema_version": SERVICE_DOCTOR_RESULT_SCHEMA_VERSION,
         "status": "ready" if ready else "not_ready",

@@ -74,7 +74,11 @@ The command exits `0` only for `status: "ready"`. If the local Doctor is not
 ready, it does not access the service or token file. If the Probe is not ready,
 it does not access the protected operational-readiness route. Its output is a
 fixed, value-free summary; it contains no paths, credentials, workflow content,
-inputs, or raw errors.
+inputs, or raw errors. Because this command runs after the service starts, its
+local Doctor report marks only the port-bind check as `skipped` with
+`running_service`; the Probe is the authoritative running-service check. The
+configuration, authentication, credential-directory, and state checks still
+must pass.
 
 Use the unauthenticated fixed probe to distinguish ready, not-ready, and
 unavailable service state:

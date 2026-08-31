@@ -20,6 +20,7 @@ class GoLiveDocumentationTests(TestCase):
         self.assertIn("skill2workflow service-operational-readiness", guide)
         self.assertIn("does not prove provider availability", guide)
         self.assertIn("never retries a write automatically", guide)
+        self.assertIn("running_service", guide)
         self.assertIn("claim multi-tenant RBAC", guide)
         self.assertIn("[Go-live checklist](go-live.md)", index)
         self.assertIn("[go-live checklist](docs/go-live.md)", readme)

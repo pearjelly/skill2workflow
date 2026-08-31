@@ -23,14 +23,19 @@ def assess_go_live(
     Doctor checks and the unauthenticated probe have already reported ready.
     """
 
-    doctor = diagnose_service(config_path)
+    doctor = diagnose_service(config_path, check_bind=False)
     local = {
         "status": doctor["status"],
         "check_count": len(doctor["checks"]),
         "failed_check_ids": [
             check["id"]
             for check in doctor["checks"]
-            if check["status"] != "passed"
+            if check["status"] == "failed"
+        ],
+        "skipped_check_ids": [
+            check["id"]
+            for check in doctor["checks"]
+            if check["status"] == "skipped"
         ],
     }
     if doctor["status"] != "ready":
