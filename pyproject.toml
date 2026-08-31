@@ -53,6 +53,7 @@ where = ["src"]
   "web/app.js",
   "web/control.css",
   "web/control.html",
+  "web/control.js",
   "web/index.html",
   "web/styles.css",
 ]

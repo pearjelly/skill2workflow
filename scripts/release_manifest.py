@@ -35,6 +35,7 @@ PACKAGED_UI_DATA_FILES = frozenset(
         "data/share/skill2workflow/web/app.js",
         "data/share/skill2workflow/web/control.css",
         "data/share/skill2workflow/web/control.html",
+        "data/share/skill2workflow/web/control.js",
         "data/share/skill2workflow/web/index.html",
         "data/share/skill2workflow/web/styles.css",
         "data/share/skill2workflow/web/vendor/litegraph-0.7.18/LICENSE",

@@ -181,14 +181,23 @@ the full DSL validation plus a value-free empty-trigger analysis without
 persisting an artifact, resolving credentials, or invoking a connector. A
 workflow can still be structurally valid while its empty trigger needs input.
 
-Only a successfully checked candidate enables **Publish Staged Workflow**. It
-sends the same fixed envelope to `/api/v1/workflow-releases`; the UI process
-reads the ingress token server-side and forwards it to the existing publication
-route. A successful compact redacted result refreshes the live inventory,
-clears the staged document, and never promotes an alias or executes the
-workflow. The service remains the Workflow DSL validation and immutable
-publication authority. Do not include credentials, access tokens, or business
-payloads in the document.
+After that check, **Review Publish Target** sends the same fixed envelope to
+`/api/v1/workflow-release-target-reviews`. It reports only whether the exact
+immutable target is `new`, an `idempotent` byte-for-byte match, or a
+`conflict`, plus recognition digests and the existing value-free checks. A
+known conflict keeps publication disabled so the operator can stage a different
+version. The review is read-only and is explicitly a point-in-time suggestion,
+not a lock, reservation, or authorization: another publisher can still change
+the result before publication.
+
+Only a successfully checked candidate with a `new` or `idempotent` target
+review enables **Publish Staged Workflow**. It sends the same fixed envelope to
+`/api/v1/workflow-releases`; the UI process reads the ingress token server-side
+and forwards it to the existing publication route. The service still performs
+the authoritative atomic immutable conflict check. A successful compact
+redacted result refreshes the live inventory, clears the staged document, and
+never promotes an alias or executes the workflow. Do not include credentials,
+access tokens, or business payloads in the document.
 
 Selecting a live version enables **Review Workflow Plan** through the fixed
 same-origin `/api/v1/workflow-explanations/{workflow_id}/{version}` route. The

@@ -32,6 +32,7 @@ class PackagingMetadataTests(TestCase):
         self.assertIn('"Development Status :: 4 - Beta"', text)
         self.assertIn('"web/vendor/litegraph-0.7.18/litegraph.min.js"', text)
         self.assertIn('"web/vendor/litegraph-0.7.18/litegraph.css"', text)
+        self.assertIn('"web/control.js"', text)
         for version in ("3.9", "3.10", "3.11", "3.12", "3.13", "3.14"):
             self.assertIn(
                 f'"Programming Language :: Python :: {version}"', text
@@ -121,9 +122,11 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("authoring-service-release-preflight", text)
         self.assertIn("authoring-service-release-target-review", text)
         self.assertIn("authoring-service-publish", text)
+        self.assertIn("control.js", text)
         self.assertIn("workflow-validations", text)
         self.assertIn("skill2workflow-local-workflow-validation-0.1.0", text)
         self.assertIn('b"Validate DSL"', text)
+        self.assertIn("validateWorkflowReleaseTargetReview", text)
 
     def test_release_docs_define_isolated_wheel_qualification(self):
         root = Path(__file__).resolve().parents[1]
@@ -173,13 +176,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("compile --output … --review", guide)
         self.assertIn("exact source-free schema", guide)
         self.assertIn("value-free validation result", guide)
-        self.assertIn("- Completed delivery loops: 1-255", roadmap)
+        self.assertIn("- Completed delivery loops: 1-256", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 255 is complete with value-free publication-target review",
+            "- Active loop: None; Loop 256 is complete with live publication-target review",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-255 are complete", readme)
+        self.assertIn("Delivery Loops 1-256 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

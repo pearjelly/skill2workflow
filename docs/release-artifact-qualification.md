@@ -67,7 +67,8 @@ The installed `authoring-bundle` command must create and the normal
 
 The installed command set also includes `ui`. The qualification starts it with
 the source checkout unavailable, fetches `/web/index.html`, and checks that the
-static editor and example assets were carried into the wheel's data area.
+static editor, interactive control script, and example assets were carried into
+the wheel's data area.
 It then starts a second once-only installed UI process and submits the copied
 public Workflow DSL to its fixed local validation route, requiring the exact
 valid, value-free validation result and `no-store` response.

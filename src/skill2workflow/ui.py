@@ -56,6 +56,7 @@ from .service_client import (
     fetch_workflow_preflight,
     post_workflow_release,
     post_workflow_release_preflight,
+    post_workflow_release_target_review,
     post_workflow_promotion,
     post_workflow_deprecation,
     post_workflow_trigger,
@@ -88,6 +89,9 @@ _WORKFLOW_RELEASE_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_RELEASE_RESPONSE_BYTE
 _WORKFLOW_RELEASE_PREFLIGHT_PATH = "/api/v1/workflow-release-preflights"
 _WORKFLOW_RELEASE_PREFLIGHT_MAX_REQUEST_BYTES = MAX_REMOTE_WORKFLOW_RELEASE_PREFLIGHT_REQUEST_BYTES
 _WORKFLOW_RELEASE_PREFLIGHT_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_RELEASE_PREFLIGHT_RESPONSE_BYTES
+_WORKFLOW_RELEASE_TARGET_REVIEW_PATH = "/api/v1/workflow-release-target-reviews"
+_WORKFLOW_RELEASE_TARGET_REVIEW_MAX_REQUEST_BYTES = MAX_REMOTE_WORKFLOW_RELEASE_PREFLIGHT_REQUEST_BYTES
+_WORKFLOW_RELEASE_TARGET_REVIEW_MAX_RESPONSE_BYTES = MAX_REMOTE_WORKFLOW_RELEASE_PREFLIGHT_RESPONSE_BYTES
 _WORKFLOW_EMPTY_TRIGGER_PATH = "/api/v1/workflow-empty-triggers"
 _WORKFLOW_EMPTY_TRIGGER_MAX_REQUEST_BYTES = 512
 _WORKFLOW_EMPTY_TRIGGER_MAX_RESPONSE_BYTES = MAX_SERVICE_ACTION_RESPONSE_BYTES
@@ -187,6 +191,7 @@ def find_ui_root() -> Path:
             web_root.is_dir()
             and (web_root / "index.html").is_file()
             and (web_root / "control.html").is_file()
+            and (web_root / "control.js").is_file()
             and (examples_root / "control-plane-snapshot.json").is_file()
             and (examples_root / "workflows").is_dir()
         ):
@@ -399,6 +404,15 @@ def serve_ui(
                     )
                     return
                 self._serve_live_workflow_release_preflight()
+                return
+            if parsed.path == _WORKFLOW_RELEASE_TARGET_REVIEW_PATH:
+                if parsed.query:
+                    self._write_json(
+                        404,
+                        {"error": "workflow release target review path is not available"},
+                    )
+                    return
+                self._serve_live_workflow_release_target_review()
                 return
             if parsed.path == _WORKFLOW_RELEASE_PATH:
                 if parsed.query:
@@ -1341,6 +1355,70 @@ def serve_ui(
                 return
             except Exception:
                 self._write_json(503, {"error": "workflow release preflight unavailable"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
+
+        def _serve_live_workflow_release_target_review(self):
+            configured_service_url = getattr(self.server, "live_service_url", None)
+            token_file = getattr(self.server, "live_auth_token_file", None)
+            if configured_service_url is None or token_file is None:
+                self._write_json(404, {"error": "workflow release target review is not configured"})
+                return
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(400, {"error": "workflow release target review body is malformed"})
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(400, {"error": "workflow release target review body is malformed"})
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(400, {"error": "workflow release target review body is malformed"})
+                return
+            if content_length > _WORKFLOW_RELEASE_TARGET_REVIEW_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "workflow release target review body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(400, {"error": "workflow release target review body is malformed"})
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                payload = None
+            if (
+                not isinstance(payload, dict)
+                or set(payload) != {"workflow"}
+                or not isinstance(payload.get("workflow"), dict)
+            ):
+                self._write_json(400, {"error": "workflow release target review body is malformed"})
+                return
+            try:
+                response = post_workflow_release_target_review(
+                    configured_service_url,
+                    token_file,
+                    payload["workflow"],
+                )
+                response_body = json.dumps(
+                    response,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(response_body) > _WORKFLOW_RELEASE_TARGET_REVIEW_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow release target review unavailable")
+            except ServiceActionError as error:
+                if error.status_code == 400:
+                    self._write_json(400, {"error": "workflow release target review rejected"})
+                elif error.status_code == 413:
+                    self._write_json(413, {"error": "workflow release target review body is too large"})
+                else:
+                    self._write_json(503, {"error": "workflow release target review unavailable"})
+                return
+            except Exception:
+                self._write_json(503, {"error": "workflow release target review unavailable"})
                 return
             self._write_json(200, response_body, content_type="application/json")
 

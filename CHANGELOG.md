@@ -8,6 +8,18 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Extended the protected live control UI with `Review Publish Target`. After a
+  staged DSL passes release preflight, it shows a value-free `new`,
+  `idempotent`, or `conflict` target result before enabling publication. The
+  browser never receives the ingress token; the review is advisory and the
+  existing immutable publication transaction remains authoritative.
+
+### Fixed
+
+- Included `web/control.js` in the wheel's allowlisted static data. Installed
+  `control.html` references this script; release qualification now fetches and
+  checks it so a missing interactive control plane cannot pass.
+
 - Added `service-workflow-release-target-review` and
   `authoring-service-release-target-review` for authenticated, value-free,
   point-in-time review of an immutable publication target. They classify a

@@ -1026,6 +1026,47 @@ def _qualify_installed_ui(console_script: Path, isolated_dir: Path) -> bool:
 
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
+        control_port = probe.getsockname()[1]
+    process = subprocess.Popen(
+        [str(console_script), "ui", "--port", str(control_port), "--once"],
+        cwd=str(isolated_dir),
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    control_script = b""
+    error = None
+    deadline = time.monotonic() + 5
+    try:
+        while time.monotonic() < deadline:
+            try:
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{control_port}/web/control.js", timeout=1
+                ) as response:
+                    control_script = response.read()
+                break
+            except (OSError, urllib.error.URLError) as caught:
+                error = caught
+                time.sleep(0.05)
+        if not control_script:
+            raise RuntimeError(f"installed UI did not serve control.js: {error}")
+        process.wait(timeout=5)
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+    if process.returncode != 0:
+        raise RuntimeError("installed UI control script server did not exit cleanly")
+    if (
+        b"LIVE_WORKFLOW_RELEASE_URL" not in control_script
+        or b"LIVE_WORKFLOW_RELEASE_TARGET_REVIEW_URL" not in control_script
+        or b"validateWorkflowReleaseTargetReview" not in control_script
+    ):
+        raise RuntimeError("installed UI did not serve the interactive control script")
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
         validation_port = probe.getsockname()[1]
     process = subprocess.Popen(
         [str(console_script), "ui", "--port", str(validation_port), "--once"],
