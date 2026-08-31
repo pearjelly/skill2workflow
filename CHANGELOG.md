@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Extended installed `quickstart` with an explicit local `--skill` input for a
+  user-owned controlled workflow. It validates and requires a real human gate
+  before creating a workspace, copies accepted bytes into its private example
+  directory, and keeps the caller's source path out of emitted Workflow DSL
+  and command output.
+
 - Added `audit-evidence` for a fresh, owner-only, bounded redacted local
   SQLite audit-page handoff. It verifies the full audit chain before an atomic
   no-overwrite write and records integrity plus page truncation without raw

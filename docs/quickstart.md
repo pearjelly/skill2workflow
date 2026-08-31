@@ -2,9 +2,8 @@
 
 Loop 52 gives an installed `skill2workflow` wheel a complete first-value path
 without requiring the source checkout or an external connector. One command
-creates a secure service workspace, writes a standard example `SKILL.md`,
-compiles Workflow DSL, publishes it into SQLite, starts a run, and stops at a
-real human gate.
+creates a secure service workspace, compiles Workflow DSL, publishes it into
+SQLite, starts a run, and stops at a real human gate.
 
 ## Create The Workspace
 
@@ -40,6 +39,31 @@ Unlike the source-checkout contributor demo, quickstart has no reset or force
 mode. It never deletes or replaces an existing path. If compilation,
 validation, publication, or the initial run fails, it removes only the new
 workspace it created.
+
+## Use Your Own Skill
+
+To start with a local Skill instead of the bundled example, pass one explicit
+path:
+
+```bash
+skill2workflow quickstart \
+  --root /srv/skill2workflow/customer-review \
+  --skill /srv/customer-workflows/review/SKILL.md \
+  --host 127.0.0.1 \
+  --port 8080
+```
+
+Before it creates the workspace, quickstart reads that one local regular file
+through the standard bounded, no-symlink Skill boundary and compiles it in
+memory. The resulting workflow must be valid and contain a `human_gate`; a
+Skill without one is refused and no workspace is created. The accepted bytes
+are copied to the new private `example/SKILL.md` and the generated DSL uses
+the fixed `SKILL.md` source marker. The supplied source path is not retained
+in the generated Workflow DSL or printed in the JSON result.
+
+Quickstart does not add a human gate to an uncontrolled Skill. Author the
+approval instruction explicitly, review the generated waiting run, and approve
+or reject it through the normal operator command.
 
 ## Inspect And Approve
 
@@ -77,10 +101,10 @@ skill2workflow service \
   --config /srv/skill2workflow/quickstart/config/service.json
 ```
 
-An authenticated webhook trigger starts another durable run of
-`workflow_controlled_quickstart@0.1.0`, which again waits for a human decision.
-Follow [`service-bootstrap.md`](service-bootstrap.md) for safe local token use
-and [`security-boundary.md`](security-boundary.md) before exposing traffic.
+An authenticated webhook trigger starts another durable run of the generated
+workflow version, which again waits for a human decision. Follow
+[`service-bootstrap.md`](service-bootstrap.md) for safe local token use and
+[`security-boundary.md`](security-boundary.md) before exposing traffic.
 
 ## Boundary
 
@@ -101,6 +125,7 @@ python3 scripts/quickstart_smoke.py \
 ```
 
 The drill builds and installs the wheel, disables source imports, invokes the
-installed quickstart, verifies the first waiting run, resumes it to completion,
-starts the generated service unchanged, submits an authenticated webhook, and
-proves the second run waits at the same human gate before graceful shutdown.
+installed bundled and custom-Skill quickstarts, verifies their waiting runs,
+resumes the bundled run to completion, starts the generated service unchanged,
+submits an authenticated webhook, and proves the second run waits at the same
+human gate before graceful shutdown.

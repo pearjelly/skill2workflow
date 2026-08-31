@@ -61,6 +61,41 @@ def run_quickstart_smoke(
         isolated,
         environment,
     )
+    custom_skill = isolated / "customer-controlled-review.SKILL.md"
+    custom_skill_text = """---
+name: installed-customer-review
+description: A controlled customer review path.
+---
+
+<HARD-GATE>
+Do not complete the review before an operator approves it.
+</HARD-GATE>
+
+## Checklist
+
+1. Prepare the customer review
+2. Ask the operator for approval
+3. Record completion
+"""
+    custom_skill.write_text(custom_skill_text, encoding="utf-8")
+    custom_workspace = isolated / "custom-quickstart"
+    custom_initialized, raw_custom_initialize = _run_json(
+        [
+            str(console),
+            "quickstart",
+            "--root",
+            str(custom_workspace),
+            "--port",
+            str(_available_port()),
+            "--skill",
+            str(custom_skill),
+        ],
+        isolated,
+        environment,
+    )
+    custom_workflow_path = custom_workspace / "example" / "workflow.json"
+    custom_workflow = json.loads(custom_workflow_path.read_text(encoding="utf-8"))
+    custom_workspace_skill = custom_workspace / "example" / "SKILL.md"
     state_dir = Path(str(initialized["state_dir"]))
     config_file = Path(str(initialized["config_file"]))
     ingress_file = Path(str(initialized["token_file"]))
@@ -186,6 +221,16 @@ def run_quickstart_smoke(
         "output_redacted": redacted,
         "skill_compiled_and_published": initialized.get("workflow_id")
         == "workflow_controlled_quickstart",
+        "custom_skill_initialized": custom_initialized.get("status")
+        == "ready_for_review"
+        and custom_initialized.get("run_status") == "waiting"
+        and custom_initialized.get("workflow_id")
+        == "workflow_installed_customer_review",
+        "custom_skill_source_private": (
+            str(custom_skill) not in raw_custom_initialize
+            and str(custom_skill) not in json.dumps(custom_workflow)
+            and custom_workspace_skill.read_text(encoding="utf-8") == custom_skill_text
+        ),
         "initial_run_waiting": waiting.get("status") == "waiting",
         "initial_run_resumed": resumed.get("status") == "completed",
         "service_ready": ready,

@@ -525,6 +525,11 @@ def _main(argv=None) -> int:
     quickstart_cmd.add_argument("--root", type=Path, required=True)
     quickstart_cmd.add_argument("--host", default="127.0.0.1")
     quickstart_cmd.add_argument("--port", type=int, default=8080)
+    quickstart_cmd.add_argument(
+        "--skill",
+        type=Path,
+        help="Optional local SKILL.md to compile into the new controlled workspace",
+    )
 
     backup_cmd = subparsers.add_parser(
         "backup",
@@ -1511,6 +1516,7 @@ def _main(argv=None) -> int:
                 args.root,
                 host=args.host,
                 port=args.port,
+                skill_path=args.skill,
             )
         )
 

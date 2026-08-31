@@ -10,7 +10,7 @@ from typing import Callable, Dict, Optional
 
 from .compiler import compile_ir_to_workflow, validate_workflow
 from .control_plane import LocalControlPlane
-from .parser import parse_skill_file
+from .parser import parse_skill_text, read_skill_text
 from .service_bootstrap import initialize_service_workspace
 
 
@@ -48,8 +48,20 @@ def initialize_quickstart_workspace(
     host: str = "127.0.0.1",
     port: int = 8080,
     token_factory: Optional[Callable[[], str]] = None,
+    skill_path: Optional[Path] = None,
 ) -> Dict[str, object]:
-    """Create a secure service workspace and one waiting example workflow."""
+    """Create a secure service workspace and one waiting controlled workflow."""
+
+    skill_text = QUICKSTART_SKILL
+    if skill_path is not None:
+        skill_text = read_skill_text(Path(skill_path))
+    workflow = compile_ir_to_workflow(
+        parse_skill_text(skill_text, source_path="SKILL.md")
+    )
+    if validate_workflow(workflow) or not _has_human_gate(workflow):
+        raise ValueError(
+            "quickstart SKILL must compile to a valid workflow with a human gate"
+        )
 
     bootstrap = initialize_service_workspace(
         root,
@@ -62,14 +74,9 @@ def initialize_quickstart_workspace(
         example_dir = workspace / "example"
         example_dir.mkdir(mode=0o700)
         os.chmod(example_dir, 0o700)
-        skill_path = example_dir / "SKILL.md"
+        workspace_skill_path = example_dir / "SKILL.md"
         workflow_path = example_dir / "workflow.json"
-        _write_private_file(skill_path, QUICKSTART_SKILL)
-
-        workflow = compile_ir_to_workflow(parse_skill_file(skill_path))
-        errors = validate_workflow(workflow)
-        if errors:
-            raise ValueError("; ".join(errors))
+        _write_private_file(workspace_skill_path, skill_text)
         _write_private_file(
             workflow_path,
             json.dumps(workflow, ensure_ascii=False, indent=2) + "\n",
@@ -79,7 +86,7 @@ def initialize_quickstart_workspace(
             raise ValueError("quickstart workflow metadata must be an object")
         workflow_id = str(metadata.get("id", ""))
         workflow_version = str(metadata.get("version", ""))
-        if workflow_id != "workflow_controlled_quickstart":
+        if not workflow_id or not workflow_version:
             raise ValueError("quickstart workflow identity is invalid")
 
         control = LocalControlPlane(
@@ -104,7 +111,7 @@ def initialize_quickstart_workspace(
         "state_dir": state_dir,
         "token_file": str(bootstrap["token_file"]),
         "credential_directory": str(bootstrap["credential_directory"]),
-        "skill_file": str(skill_path),
+        "skill_file": str(workspace_skill_path),
         "workflow_file": str(workflow_path),
         "workflow_id": workflow_id,
         "workflow_version": workflow_version,
@@ -157,3 +164,11 @@ def _write_private_file(path: Path, value: str) -> None:
         if descriptor >= 0:
             os.close(descriptor)
     os.chmod(path, 0o600)
+
+
+def _has_human_gate(workflow: Dict[str, object]) -> bool:
+    nodes = workflow.get("nodes")
+    return isinstance(nodes, list) and any(
+        isinstance(node, dict) and node.get("type") == "human_gate"
+        for node in nodes
+    )

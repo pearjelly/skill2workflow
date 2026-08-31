@@ -44,11 +44,14 @@ source .venv/bin/activate
 python -m pip install .
 skill2workflow quickstart \
   --root /tmp/skill2workflow-quickstart \
+  --skill /absolute/path/to/SKILL.md \
   --port 8080
 ```
 
 The command generates an owner-only ingress secret without printing it, uses
-SQLite state, and returns the waiting `run_id`. Follow the
+SQLite state, and returns the waiting `run_id`. Omit `--skill` to use the
+bundled example; a supplied local Skill must compile to a valid workflow with
+an explicit human gate. Follow the
 [installed quickstart guide](docs/quickstart.md) to inspect and approve that
 run, start the authenticated service, and submit a second trigger. Its JSON
 result also contains safe `operator_commands` argv arrays for those next
@@ -244,19 +247,23 @@ explicit connector boundaries. It currently supports:
 ### Installed wheel quickstart
 
 After installing the wheel, create a secure service workspace containing a
-compiled, published example workflow that is already waiting at a human gate:
+compiled, published workflow that is already waiting at a human gate. Omit
+`--skill` for the bundled example, or pass a controlled local `SKILL.md`:
 
 ```bash
 skill2workflow quickstart \
   --root /tmp/skill2workflow-quickstart \
+  --skill /absolute/path/to/SKILL.md \
   --port 8080
 ```
 
 The command never overwrites an existing root or prints its generated ingress
-secret. Use the returned `run_id` with `control-run` and `resume-published` to
-inspect and approve the first controlled run. See [the installed quickstart
-guide](docs/quickstart.md) for the complete service and authenticated-trigger
-journey.
+secret. A supplied Skill is compiled before workspace creation and is rejected
+unless it contains a real human gate; its original path is not written into the
+generated DSL. Use the returned `run_id` with `control-run` and
+`resume-published` to inspect and approve the first controlled run. See [the
+installed quickstart guide](docs/quickstart.md) for the complete service and
+authenticated-trigger journey.
 
 ### Source-checkout contributor demo
 
@@ -934,7 +941,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-251 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-252 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1148,6 +1155,11 @@ Loop 251 adds offline `audit-evidence-verify`: a recipient can validate the
 private file's fixed redaction and paging envelope without runtime-state access.
 It is deliberately a structure check, not a provenance signature or a fresh
 source-database verification.
+
+Loop 252 makes the installed first-use path useful for a real team Skill: an
+explicit local `quickstart --skill` input is bounded and compiled before any
+workspace is created, requires a real human gate, is copied privately, and
+never carries its original filesystem path into generated Workflow DSL.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

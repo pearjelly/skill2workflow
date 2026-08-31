@@ -16,8 +16,14 @@ MAX_SKILL_FILE_BYTES = 2 * 1024 * 1024
 def parse_skill_file(path: Path) -> SkillIR:
     """Parse a SKILL.md file into the project Skill IR."""
     source_path = Path(path)
-    text = _read_skill_file(source_path)
+    text = read_skill_text(source_path)
     return parse_skill_text(text, source_path=str(source_path))
+
+
+def read_skill_text(path: Path) -> str:
+    """Read one bounded local SKILL.md through the safe file boundary."""
+
+    return _read_skill_file(Path(path))
 
 
 def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
