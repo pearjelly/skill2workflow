@@ -45,6 +45,20 @@ Without `-o`, `compile --review` intentionally prints an explicit
 `{"workflow": ..., "review": ...}` wrapper. Plain `compile` without
 `--review` keeps its existing DSL-only output for compatibility.
 
+## Validate Before Download
+
+For a draft opened in the installed editor, select **Validate DSL**. The fixed
+loopback route validates the assembled Workflow DSL with the same compiler
+validator as the CLI. Its bounded response reports only stable issue codes, so
+author-entered content and local paths cannot be reflected into the result.
+**Save DSL** repeats the same check before downloading the artifact.
+
+This is a structural contract check, not business approval, credential
+validation, publication, execution, or a guarantee that a workflow's effects
+are appropriate. A generic static server can still provide local graph checks,
+but it cannot provide this compiler-backed result; use `skill2workflow ui` or
+`skill2workflow validate path/to/workflow.json --format json` before release.
+
 This local compile route is intentionally unavailable from a generic static
 server such as `python3 -m http.server`; use `skill2workflow ui` for the
 interactive compiler path. Do not place credentials, tokens, customer data, or

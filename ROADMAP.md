@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-236
+- Completed delivery loops: 1-237
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 236 is complete with installed compile-review qualification
+- Active loop: None; Loop 237 is complete with authoritative local DSL validation
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the installed authoring and release-artifact evidence
+- Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-236 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-237 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6387,9 +6387,43 @@ PYTHONPATH=src python3 -m unittest tests.test_package_smoke tests.test_packaging
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 ```
 
+### Loop 237: Authoritative Local DSL Validation
+
+**Status:** Complete.
+
+**Prior basis:** The installed visual editor could compile a local Skill and
+perform useful graph checks, but its client-side save path did not prove that
+all compiler validation rules accepted the edited DSL before the user downloaded
+it.
+
+**Outcome:** The installed loopback UI now exposes one fixed local
+`workflow-validations` route. **Validate DSL** and installed **Save DSL** send
+the assembled document through `validate_workflow_structured` before download.
+The bounded response exposes only stable issue codes, a count, and truncation;
+it never reflects messages, paths, or workflow values.
+
+**Evidence:** UI tests run the real once-only loopback server for a valid
+workflow and an invalid workflow containing a private marker; they lock the
+fixed schema, no-store response, bounded source-free errors, and absence of the
+submitted marker. Static-editor checks lock the action, route, and response
+validator. Public authoring, installed-UI, stability, README, and changelog
+documentation record the fallback and no-side-effect boundary.
+
+**Safety boundary:** This is a local, bounded structural validation aid. It
+does not perform business approval, resolve credentials, access runtime or
+service state, publish, execute, persist drafts, or prove external effects are
+appropriate. Static hosting retains local graph checks but clearly reports that
+full compiler validation requires the installed UI or CLI.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 236 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 237 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6592,6 +6626,7 @@ This rolling queue is ordered. Loop 236 is complete and there is no active deliv
 | Loop 234: Source-Free Local SKILL.md Compile Review | Complete | Make conservative compiler inference visible before an author changes or publishes a draft | Fixed structural summary, finite notice codes, strict browser validation, UI/docs/tests, and full gates |
 | Loop 235: Headless Local SKILL.md Compile Review | Complete | Give CLI and CI users the same source-free inference review without breaking ordinary compile output | Explicit review mode, default-output compatibility, CLI/docs/tests, and full gates |
 | Loop 236: Installed SKILL.md Compile-Review Qualification | Complete | Prove the distributed wheel retains safe headless Skill compilation and review | Isolated installed CLI compile/review, fixed-summary verification, written DSL validation, docs, and full gates |
+| Loop 237: Authoritative Local DSL Validation | Complete | Keep installed visual authoring from downloading a compiler-invalid edited DSL without a clear result | Fixed loopback validation, source-free bounded errors, installed editor save gate, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

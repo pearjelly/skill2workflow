@@ -36,6 +36,15 @@ Review** with inferred node counts and fixed missing-control notices. It is an
 authoring prompt only: it does not inspect business intent, change the draft,
 validate a real-world action, publish, or execute anything.
 
+For a loaded or compiled draft, **Validate DSL** sends one bounded document to
+the installed UI's fixed local validation route. The route runs the same
+compiler validation used by the CLI, returns a fixed result with only issue
+codes (never error messages, paths, or submitted values), and makes no state,
+credential, service, publication, or execution access. **Save DSL** performs
+that check before download. A generic static server has only the editor's
+local structural checks, so it reports that full compiler validation is
+unavailable; use `skill2workflow ui` or the CLI before publishing.
+
 For an explicit live view of one running service, configure both the
 service origin and its owner-only ingress token file:
 

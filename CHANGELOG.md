@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added authoritative local Workflow DSL validation to the installed editor.
+  **Validate DSL** and installed **Save DSL** use the compiler validator before
+  download and receive only bounded, source-free error codes.
+
 - Extended isolated wheel qualification to compile a copied local `SKILL.md`
   with the installed `compile --review` command, validate the written Workflow
   DSL, and enforce the fixed source-free review contract.

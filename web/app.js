@@ -2,8 +2,12 @@
   const GRAPH_VERSION = "skill2workflow-litegraph-0.1.0";
   const SKILL_COMPILE_URL = "/api/v1/skill-compiles";
   const SKILL_COMPILE_REVIEW_SCHEMA_VERSION = "skill2workflow-skill-compile-review-0.1.0";
+  const WORKFLOW_VALIDATION_URL = "/api/v1/workflow-validations";
+  const WORKFLOW_VALIDATION_SCHEMA_VERSION = "skill2workflow-local-workflow-validation-0.1.0";
   const MAX_SKILL_INPUT_BYTES = 2 * 1024 * 1024;
   const MAX_SKILL_COMPILE_REVIEW_COUNT = 10000;
+  const MAX_WORKFLOW_VALIDATION_ERROR_COUNT = 100000;
+  const MAX_WORKFLOW_VALIDATION_ERRORS = 100;
   const SKILL_COMPILE_REVIEW_NOTICES = {
     checklist_not_found: "No checklist steps were found. This draft uses the compiler's generic review step.",
     human_gate_not_inferred: "No human approval node was inferred. Add an explicit review before real-world effects.",
@@ -133,7 +137,7 @@
     window.addEventListener("resize", resizeCanvas);
     els.loadSample.addEventListener("click", loadSample);
     els.fitView.addEventListener("click", fitGraph);
-    els.validateGraph.addEventListener("click", validateGraph);
+    els.validateGraph.addEventListener("click", validateCurrentWorkflow);
     els.saveWorkflow.addEventListener("click", saveWorkflow);
     els.saveGraph.addEventListener("click", saveGraph);
     els.fileInput.addEventListener("change", loadSelectedFile);
@@ -888,33 +892,132 @@
     downloadJson(graphJson, (currentWorkflow.name || "workflow") + ".litegraph.json");
   }
 
-  function saveWorkflow() {
-    const graphErrors = validateGraph();
-    if (graphErrors.length) {
+  async function saveWorkflow() {
+    const workflow = workflowFromEditor();
+    if (!workflow) return;
+
+    const validation = await requestWorkflowValidation(workflow);
+    if (validation === false) return;
+    if (!validation) {
+      downloadJson(workflow, (currentWorkflow.name || "workflow") + ".workflow.json");
+      renderValidation([
+        "DSL saved after local checks only. Start skill2workflow ui or run the CLI validate command before publishing.",
+      ]);
+      setStatus("DSL saved (local checks)", "idle");
       return;
     }
+    downloadJson(workflow, (currentWorkflow.name || "workflow") + ".workflow.json");
+    setStatus("DSL saved", "valid");
+  }
+
+  async function validateCurrentWorkflow() {
+    const workflow = workflowFromEditor();
+    if (!workflow) return;
+    const validation = await requestWorkflowValidation(workflow);
+    if (validation === false) return;
+    if (!validation) {
+      renderValidation([
+        "Full compiler validation is unavailable. Start skill2workflow ui or run the CLI validate command.",
+      ]);
+      setStatus("Local checks only", "idle");
+      return;
+    }
+    renderWorkflowValidation(validation);
+  }
+
+  function workflowFromEditor() {
+    const graphErrors = validateGraph();
+    if (graphErrors.length) return null;
     if (!currentWorkflowDsl) {
       renderValidation(["Load Workflow DSL or a LiteGraph JSON with embedded source workflow before saving DSL."]);
       setStatus("No source DSL", "invalid");
-      return;
+      return null;
     }
-
     let workflow;
     try {
       workflow = workflowDslFromGraph();
     } catch (error) {
       renderValidation([error.message]);
       setStatus("Invalid DSL", "invalid");
-      return;
+      return null;
     }
     const workflowErrors = validateWorkflowDsl(workflow);
     if (workflowErrors.length) {
       renderValidation(workflowErrors);
       setStatus("Invalid DSL", "invalid");
+      return null;
+    }
+    return workflow;
+  }
+
+  async function requestWorkflowValidation(workflow) {
+    try {
+      const response = await fetch(WORKFLOW_VALIDATION_URL, {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workflow: workflow }),
+      });
+      if (response.status === 404) return null;
+      if (!response.ok) {
+        throw new Error("local Workflow DSL validation is unavailable");
+      }
+      const validation = parseWorkflowValidationResponse(await response.json());
+      if (!validation.valid) {
+        renderWorkflowValidation(validation);
+        return false;
+      }
+      return validation;
+    } catch (error) {
+      renderValidation(["Could not validate Workflow DSL: " + error.message]);
+      setStatus("DSL validation failed", "invalid");
+      return false;
+    }
+  }
+
+  function parseWorkflowValidationResponse(payload) {
+    if (!plainObject(payload)
+      || Object.keys(payload).length !== 5
+      || payload.schema_version !== WORKFLOW_VALIDATION_SCHEMA_VERSION
+      || typeof payload.valid !== "boolean"
+      || !Number.isSafeInteger(payload.error_count)
+      || payload.error_count < 0
+      || payload.error_count > MAX_WORKFLOW_VALIDATION_ERROR_COUNT
+      || !Array.isArray(payload.errors)
+      || payload.errors.length > MAX_WORKFLOW_VALIDATION_ERRORS
+      || typeof payload.truncated !== "boolean") {
+      throw new Error("local Workflow DSL validation returned an invalid response");
+    }
+    if (payload.valid !== (payload.error_count === 0)
+      || payload.errors.length > payload.error_count
+      || payload.truncated !== (payload.error_count > payload.errors.length)) {
+      throw new Error("local Workflow DSL validation returned an invalid response");
+    }
+    payload.errors.forEach(function (error) {
+      if (!plainObject(error)
+        || Object.keys(error).length !== 1
+        || typeof error.code !== "string"
+        || !/^[a-z0-9_]{1,64}$/.test(error.code)) {
+        throw new Error("local Workflow DSL validation returned an invalid response");
+      }
+    });
+    return payload;
+  }
+
+  function renderWorkflowValidation(validation) {
+    if (validation.valid) {
+      renderValidation([]);
+      setStatus("Workflow valid", "valid");
       return;
     }
-    downloadJson(workflow, (currentWorkflow.name || "workflow") + ".workflow.json");
-    setStatus("DSL saved", "valid");
+    const errors = validation.errors.map(function (error) {
+      return "Workflow DSL: " + error.code.replace(/_/g, " ") + ".";
+    });
+    if (validation.truncated) {
+      errors.push("Workflow DSL: additional validation errors were omitted from this bounded response.");
+    }
+    renderValidation(errors);
+    setStatus("Invalid DSL", "invalid");
   }
 
   function workflowDslFromGraph() {

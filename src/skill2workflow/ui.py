@@ -133,6 +133,23 @@ _LIVE_SCHEDULE_DISPATCH_REVIEW_MAX_RESPONSE_BYTES = MAX_RECURRING_SCHEDULE_DISPA
 _SKILL_COMPILE_PATH = "/api/v1/skill-compiles"
 _SKILL_COMPILE_MAX_REQUEST_BYTES = MAX_SKILL_FILE_BYTES + 1024
 _SKILL_COMPILE_MAX_RESPONSE_BYTES = MAX_WORKFLOW_ARTIFACT_BYTES
+_LOCAL_WORKFLOW_VALIDATION_PATH = "/api/v1/workflow-validations"
+_LOCAL_WORKFLOW_VALIDATION_SCHEMA_VERSION = "skill2workflow-local-workflow-validation-0.1.0"
+_LOCAL_WORKFLOW_VALIDATION_MAX_REQUEST_BYTES = MAX_WORKFLOW_ARTIFACT_BYTES + 1024
+_LOCAL_WORKFLOW_VALIDATION_MAX_RESPONSE_BYTES = 32 * 1024
+_LOCAL_WORKFLOW_VALIDATION_MAX_ERRORS = 100
+_LOCAL_WORKFLOW_VALIDATION_CODE_PATTERN = re.compile(r"^[a-z0-9_]{1,64}$")
+
+
+def _local_workflow_validation_code(error: object) -> str:
+    """Return one fixed, value-free compiler validation code."""
+
+    if not isinstance(error, dict):
+        return "workflow_invalid"
+    code = error.get("code")
+    if isinstance(code, str) and _LOCAL_WORKFLOW_VALIDATION_CODE_PATTERN.fullmatch(code):
+        return code
+    return "workflow_invalid"
 
 
 def find_ui_root() -> Path:
@@ -330,6 +347,12 @@ def serve_ui(
                     self._write_json(404, {"error": "skill compile path is not available"})
                     return
                 self._serve_local_skill_compile()
+                return
+            if parsed.path == _LOCAL_WORKFLOW_VALIDATION_PATH:
+                if parsed.query:
+                    self._write_json(404, {"error": "workflow validation path is not available"})
+                    return
+                self._serve_local_workflow_validation()
                 return
             if parsed.path == _WORKFLOW_INPUT_PREFLIGHT_PATH:
                 if parsed.query:
@@ -1016,6 +1039,59 @@ def serve_ui(
                     raise ValueError("compiled workflow is too large")
             except (TypeError, ValueError, UnicodeEncodeError):
                 self._write_json(400, {"error": "skill compile rejected"})
+                return
+            self._write_json(200, response_body, content_type="application/json")
+
+        def _serve_local_workflow_validation(self):
+            if self.headers.get("Transfer-Encoding"):
+                self._write_json(400, {"error": "workflow validation body is malformed"})
+                return
+            content_lengths = self.headers.get_all("Content-Length", [])
+            if len(content_lengths) != 1:
+                self._write_json(400, {"error": "workflow validation body is malformed"})
+                return
+            try:
+                content_length = int(content_lengths[0])
+            except (TypeError, ValueError):
+                content_length = -1
+            if content_length < 0:
+                self._write_json(400, {"error": "workflow validation body is malformed"})
+                return
+            if content_length > _LOCAL_WORKFLOW_VALIDATION_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "workflow validation body is too large"})
+                return
+            body = self.rfile.read(content_length)
+            if len(body) != content_length:
+                self._write_json(400, {"error": "workflow validation body is malformed"})
+                return
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
+                payload = None
+            if not isinstance(payload, dict) or set(payload) != {"workflow"}:
+                self._write_json(400, {"error": "workflow validation body is malformed"})
+                return
+            try:
+                errors = validate_workflow_structured(payload["workflow"])
+                safe_errors = [
+                    {"code": _local_workflow_validation_code(error)}
+                    for error in errors[:_LOCAL_WORKFLOW_VALIDATION_MAX_ERRORS]
+                ]
+                response_body = json.dumps(
+                    {
+                        "schema_version": _LOCAL_WORKFLOW_VALIDATION_SCHEMA_VERSION,
+                        "valid": not errors,
+                        "error_count": len(errors),
+                        "errors": safe_errors,
+                        "truncated": len(errors) > len(safe_errors),
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                if len(response_body) > _LOCAL_WORKFLOW_VALIDATION_MAX_RESPONSE_BYTES:
+                    raise ValueError("workflow validation result is too large")
+            except (TypeError, ValueError, OverflowError, RecursionError):
+                self._write_json(400, {"error": "workflow validation rejected"})
                 return
             self._write_json(200, response_body, content_type="application/json")
 

@@ -200,11 +200,16 @@ class UiTests(TestCase):
         self.assertIn(b"Choose SKILL.md", body)
         self.assertIn(b"Compile SKILL", body)
         self.assertIn(b"SKILL Compile Review", body)
+        self.assertIn(b"Validate DSL", body)
         app = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("/api/v1/skill-compiles", app)
+        self.assertIn("/api/v1/workflow-validations", app)
         self.assertIn("compileStagedSkill", app)
         self.assertIn("parseSkillCompileResponse", app)
+        self.assertIn("validateCurrentWorkflow", app)
+        self.assertIn("parseWorkflowValidationResponse", app)
         self.assertIn("skill2workflow-skill-compile-review-0.1.0", app)
+        self.assertIn("skill2workflow-local-workflow-validation-0.1.0", app)
 
     def test_ui_server_compiles_one_bounded_skill_without_service_credentials(self):
         observed = {}
@@ -256,6 +261,103 @@ class UiTests(TestCase):
             },
         )
         self.assertNotIn("Review draft", json.dumps(compiled["review"]))
+
+    def test_ui_server_validates_one_workflow_with_a_source_free_result(self):
+        observed = {}
+
+        def ready(server):
+            observed["port"] = server.server_port
+
+        workflow = json.loads(
+            (ROOT / "examples" / "workflows" / "approval-flow.workflow.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        thread = threading.Thread(
+            target=serve_ui,
+            kwargs={"host": "127.0.0.1", "port": 0, "once": True, "ready_callback": ready},
+            daemon=True,
+        )
+        thread.start()
+        for _ in range(100):
+            if "port" in observed:
+                break
+            thread.join(0.01)
+        self.assertIn("port", observed)
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{observed['port']}/api/v1/workflow-validations",
+            data=json.dumps({"workflow": workflow}, separators=(",", ":")).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers["Cache-Control"], "no-store")
+        thread.join(timeout=2)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(
+            result,
+            {
+                "schema_version": "skill2workflow-local-workflow-validation-0.1.0",
+                "valid": True,
+                "error_count": 0,
+                "errors": [],
+                "truncated": False,
+            },
+        )
+
+    def test_ui_server_validation_does_not_echo_workflow_values(self):
+        observed = {}
+
+        def ready(server):
+            observed["port"] = server.server_port
+
+        secret_marker = "private authoring text must not be echoed"
+        workflow = {
+            "schema_version": "0.1.0",
+            "workflow": {
+                "id": "workflow_private",
+                "name": secret_marker,
+                "version": "0.1.0",
+                "status": "draft",
+            },
+            "entry": "start",
+            "nodes": [
+                {"id": "start", "type": "start", "title": secret_marker, "on_success": "missing"},
+                {"id": "end", "type": "end"},
+            ],
+            "edges": [],
+        }
+        thread = threading.Thread(
+            target=serve_ui,
+            kwargs={"host": "127.0.0.1", "port": 0, "once": True, "ready_callback": ready},
+            daemon=True,
+        )
+        thread.start()
+        for _ in range(100):
+            if "port" in observed:
+                break
+            thread.join(0.01)
+        self.assertIn("port", observed)
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{observed['port']}/api/v1/workflow-validations",
+            data=json.dumps({"workflow": workflow}, separators=(",", ":")).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=2) as response:
+            raw = response.read()
+            result = json.loads(raw.decode("utf-8"))
+            self.assertEqual(response.status, 200)
+        thread.join(timeout=2)
+        self.assertFalse(thread.is_alive())
+        self.assertFalse(result["valid"])
+        self.assertGreater(result["error_count"], 0)
+        self.assertTrue(result["errors"])
+        self.assertFalse(result["truncated"])
+        self.assertNotIn(secret_marker.encode("utf-8"), raw)
+        self.assertTrue(all(set(error) == {"code"} for error in result["errors"]))
 
     def test_ui_server_rejects_malformed_skill_compile_before_parsing(self):
         observed = {}

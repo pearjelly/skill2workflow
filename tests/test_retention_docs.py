@@ -54,10 +54,10 @@ class RetentionDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-236 are complete", readme)
+        self.assertIn("Delivery Loops 1-237 are complete", readme)
         self.assertIn("Loop 47", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("- Completed delivery loops: 1-236", roadmap)
+        self.assertIn("- Completed delivery loops: 1-237", roadmap)
         self.assertIn("Loop 47: Data Retention And Disposal", roadmap)
         self.assertIn("Current maturity remains Self-hosted Beta", roadmap)
 

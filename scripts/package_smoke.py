@@ -767,7 +767,7 @@ def _qualify_systemd_unit(
 
 
 def _qualify_installed_ui(console_script: Path, isolated_dir: Path) -> bool:
-    """Prove an installed wheel serves its packaged UI and example assets."""
+    """Prove an installed wheel serves and locally validates through its UI."""
 
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))
@@ -808,6 +808,67 @@ def _qualify_installed_ui(console_script: Path, isolated_dir: Path) -> bool:
         raise RuntimeError("installed UI server did not exit cleanly")
     if b"skill2workflow" not in body or b"Workflow DSL Visual Editor" not in body:
         raise RuntimeError("installed UI served an unexpected index document")
+    if b"Validate DSL" not in body:
+        raise RuntimeError("installed UI did not serve the Workflow DSL validation action")
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        validation_port = probe.getsockname()[1]
+    process = subprocess.Popen(
+        [str(console_script), "ui", "--port", str(validation_port), "--once"],
+        cwd=str(isolated_dir),
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    validation = None
+    error = None
+    request_body = json.dumps(
+        {
+            "workflow": json.loads(
+                (isolated_dir / "approval-flow.workflow.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    deadline = time.monotonic() + 5
+    try:
+        while time.monotonic() < deadline:
+            try:
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{validation_port}/api/v1/workflow-validations",
+                    data=request_body,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=1) as response:
+                    if response.headers.get("Cache-Control") != "no-store":
+                        raise RuntimeError("installed UI validation response was cacheable")
+                    validation = json.loads(response.read().decode("utf-8"))
+                break
+            except (OSError, urllib.error.URLError) as caught:
+                error = caught
+                time.sleep(0.05)
+        if validation is None:
+            raise RuntimeError(f"installed UI did not validate Workflow DSL: {error}")
+        process.wait(timeout=5)
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+    if process.returncode != 0:
+        raise RuntimeError("installed UI validation server did not exit cleanly")
+    if validation != {
+        "schema_version": "skill2workflow-local-workflow-validation-0.1.0",
+        "valid": True,
+        "error_count": 0,
+        "errors": [],
+        "truncated": False,
+    }:
+        raise RuntimeError("installed UI did not preserve the Workflow DSL validation contract")
     return True
 
 
