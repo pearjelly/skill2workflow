@@ -145,11 +145,13 @@ python3 scripts/authoring_delivery_smoke.py \
   --work-dir /tmp/skill2workflow-authoring-delivery
 ```
 
-The drill creates a private authoring set, verifies and bundles it, publishes
-the resulting DSL to an isolated SQLite control plane, then proves both human
-gate outcomes: one run is explicitly approved to completion and an independent
+The drill creates a private authoring set, deliberately damages it to prove
+verification detection, repairs it from the original Skill with an explicit
+backup, and then verifies and bundles the recovered set. It publishes the
+resulting DSL to an isolated SQLite control plane and proves both human gate
+outcomes: one run is explicitly approved to completion and an independent
 second run is explicitly rejected to a safe `failed` terminal state. It writes
-Bundle, verification, run, audit, and snapshot evidence under the work
+Bundle, verification, repair, run, audit, and snapshot evidence under the work
 directory. It has no network listener, external connector, or credential; it
 is a local contract drill rather than a business-workflow or live-provider
 validation.

@@ -12,6 +12,9 @@ release; Roadmap loop completion alone does not publish a new version.
   verifies a replacement from the original Skill before a reversible sibling
   backup/replacement swap, preserving the prior directory for review.
 
+- Extended the local authoring-delivery smoke to prove verification detection
+  and repair before Bundle publication and both controlled human-gate outcomes.
+
 - Added an end-to-end local authoring-delivery smoke. It proves the standard
   Skill-to-private-artifact-to-verified-Bundle-to-publication-to-human-gate
   path and records local audit/snapshot evidence without a network call,

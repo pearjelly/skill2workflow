@@ -12,6 +12,7 @@ from typing import Dict, Optional, Sequence
 from .authoring_artifacts import (
     create_authoring_artifacts,
     load_verified_authoring_workflow,
+    repair_authoring_artifacts,
     verify_authoring_artifacts,
 )
 from .bundles import create_workflow_bundle, verify_workflow_bundle
@@ -45,6 +46,7 @@ def run_authoring_delivery_smoke(
 
     source = root / "SKILL.md"
     authoring_dir = root / "authoring"
+    authoring_backup_dir = root / "authoring-before-repair"
     bundle = root / "authoring-delivery.s2w"
     artifacts_dir = root / "artifacts"
     state_dir = root / "state"
@@ -54,6 +56,13 @@ def run_authoring_delivery_smoke(
     source.chmod(0o600)
 
     export = create_authoring_artifacts(source, authoring_dir)
+    (authoring_dir / "workflow.json").write_text("{}", encoding="utf-8")
+    damaged_authoring_verification = verify_authoring_artifacts(authoring_dir)
+    authoring_repair = repair_authoring_artifacts(
+        source,
+        authoring_dir,
+        authoring_backup_dir,
+    )
     authoring_verification = verify_authoring_artifacts(authoring_dir)
     workflow = load_verified_authoring_workflow(authoring_dir)
     bundle_result = create_workflow_bundle(workflow, bundle)
@@ -91,6 +100,11 @@ def run_authoring_delivery_smoke(
     snapshot = build_control_snapshot(state_dir, storage="sqlite")
 
     _write_private_json(artifacts_dir / "authoring-verification.json", authoring_verification)
+    _write_private_json(
+        artifacts_dir / "damaged-authoring-verification.json",
+        damaged_authoring_verification,
+    )
+    _write_private_json(artifacts_dir / "authoring-repair.json", authoring_repair)
     _write_private_json(artifacts_dir / "bundle-verification.json", bundle_verification)
     _write_private_json(artifacts_dir / "run.json", completed)
     _write_private_json(artifacts_dir / "audit.json", audit_events)
@@ -100,6 +114,9 @@ def run_authoring_delivery_smoke(
 
     checks = {
         "authoring_exported": export.get("valid") is True,
+        "damaged_authoring_detected": damaged_authoring_verification.get("valid") is False,
+        "authoring_repaired": authoring_repair.get("valid") is True
+        and authoring_repair.get("previous_valid") is False,
         "authoring_verified": authoring_verification.get("valid") is True,
         "bundle_created": bundle_result.get("valid") is True and bundle.is_file(),
         "bundle_verified": bundle_verification.get("valid") is True,
@@ -119,6 +136,8 @@ def run_authoring_delivery_smoke(
         "schema_version": AUTHORING_DELIVERY_EVIDENCE_SCHEMA_VERSION,
         "status": "passed" if all(checks.values()) else "failed",
         "checks": checks,
+        "damaged_authoring_valid": damaged_authoring_verification.get("valid") is True,
+        "repaired_authoring_valid": authoring_verification.get("valid") is True,
         "initial_run_status": str(waiting.get("status") or ""),
         "final_run_status": str(completed.get("status") or ""),
         "rejected_initial_run_status": str(rejected_waiting.get("status") or ""),
@@ -126,6 +145,10 @@ def run_authoring_delivery_smoke(
         "artifacts": {
             "bundle": str(bundle),
             "authoring_verification": str(artifacts_dir / "authoring-verification.json"),
+            "damaged_authoring_verification": str(
+                artifacts_dir / "damaged-authoring-verification.json"
+            ),
+            "authoring_repair": str(artifacts_dir / "authoring-repair.json"),
             "bundle_verification": str(artifacts_dir / "bundle-verification.json"),
             "run": str(artifacts_dir / "run.json"),
             "audit": str(artifacts_dir / "audit.json"),
