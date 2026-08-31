@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Bundled pinned LiteGraph 0.7.18 editor assets in the wheel and static
+  preview, including the upstream MIT notice and SHA-256 verification. The
+  visual editor no longer requires CDN access or runtime internet egress.
+
 - Added local `SKILL.md` compilation to the installed LiteGraph editor. One
   bounded Skill document can be compiled into an in-memory draft DSL through a
   fixed loopback route, with no file write, service-token access, publication,

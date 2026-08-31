@@ -18,6 +18,11 @@ http://127.0.0.1:4173/web/control.html
 The server is loopback-only by default and serves static editor assets and
 non-sensitive example JSON. It does not read runtime state or the service state
 directory, resolve credentials, expose an ingress token, or mutate workflows.
+The LiteGraph JavaScript and stylesheet are bundled at a pinned local path in
+the wheel, so the editor works without CDN access or general internet egress.
+Their upstream version, MIT notice, and SHA-256 digests are recorded beside the
+assets at `web/vendor/litegraph-0.7.18/`; no browser dependency is fetched at
+runtime.
 The editor's **Compile SKILL** action is the one local authoring exception: it
 accepts one bounded 2 MiB `SKILL.md` in memory and returns a draft Workflow DSL
 document without writing, publishing, executing, or contacting the service.

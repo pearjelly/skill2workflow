@@ -137,6 +137,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   Workflow DSL document. It neither writes files nor accesses service state,
   credentials, publication, or execution, and it fixes the generated source
   reference to `SKILL.md`.
+- The installed visual editor loads its pinned LiteGraph JavaScript and
+  stylesheet from committed local MIT-licensed assets with test-locked
+  SHA-256 digests. It makes no runtime CDN request or browser-time package
+  installation.
 - The installed live UI can start only a preflight-ready empty trigger for an
   exact published version through the fixed `/api/v1/workflow-empty-triggers`
   proxy. The proxy fixes `source` to `live-ui` and input to `{}`, requires an

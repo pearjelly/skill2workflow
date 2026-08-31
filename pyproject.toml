@@ -56,6 +56,12 @@ where = ["src"]
   "web/index.html",
   "web/styles.css",
 ]
+"share/skill2workflow/web/vendor/litegraph-0.7.18" = [
+  "web/vendor/litegraph-0.7.18/LICENSE",
+  "web/vendor/litegraph-0.7.18/README.md",
+  "web/vendor/litegraph-0.7.18/litegraph.css",
+  "web/vendor/litegraph-0.7.18/litegraph.min.js",
+]
 "share/skill2workflow/examples" = [
   "examples/control-plane-snapshot.json",
 ]

@@ -4,6 +4,11 @@ This guide describes the current authoring surface for `skill2workflow`.
 
 Workflow DSL remains the execution truth source. The LiteGraph editor is an inspection and editing surface that must round-trip back through Workflow DSL validation before a workflow is published or run.
 
+The installed editor bundles its pinned LiteGraph JavaScript and stylesheet.
+Opening it through `skill2workflow ui` therefore needs no CDN access, internet
+egress, or browser-time dependency install. The version, MIT license, and
+asset SHA-256 records live in `web/vendor/litegraph-0.7.18/` for review.
+
 ## Compile A Local SKILL.md
 
 When the editor is served by the installed `skill2workflow ui` command, choose

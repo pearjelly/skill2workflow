@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-231
+- Completed delivery loops: 1-232
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 231 is complete with local SKILL.md editor compilation
+- Active loop: None; Loop 232 is complete with offline editor assets
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the local authoring evidence
+- Next decision: select the next Production Baseline loop after reviewing the offline editor evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-231 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-232 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6226,9 +6226,42 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_parser tests.test_ui -v
 ```
 
+### Loop 232: Offline Editor Asset Boundary
+
+**Status:** Complete.
+
+**Prior basis:** The installed editor and new local `SKILL.md` authoring path
+were useful only where the browser could fetch the LiteGraph JavaScript and
+stylesheet from a third-party CDN at runtime. That prevented dependable use in
+air-gapped, restricted-egress, and offline self-hosted environments.
+
+**Outcome:** The pinned LiteGraph 0.7.18 JavaScript and stylesheet now ship as
+committed local assets. The editor loads only those relative paths; a vendor
+record carries the upstream MIT license and exact SHA-256 digests. The installed
+wheel and source static preview therefore require no runtime CDN or package
+manager access.
+
+**Evidence:** UI tests lock every local asset digest, the local relative paths,
+the absence of the former CDN origin, and the vendor version record. The
+installed UI and authoring guides document the offline behavior and review
+process. The normal test suite, connector smoke, and secret-hygiene checks
+remain green.
+
+**Safety boundary:** Bundling a reviewed browser dependency does not make the
+editor a hosted frontend or modify workflow/runtime authority. The vendor
+directory is a fixed pinned asset set, not an automatic updater, package
+installer, or general static asset proxy; changes require an explicit review of
+the version, license, and hashes.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 231 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 232 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6426,6 +6459,7 @@ This rolling queue is ordered. Loop 231 is complete and there is no active deliv
 | Loop 229: Staged-Input Live Workflow Trigger | Complete | Let operators preflight and start a published exact version with one explicit non-secret JSON input from the live console | Fixed staged-input proxies, value-free preflight, confirmation, server-side token, same-key retry, UI/docs/tests, and full gates |
 | Loop 230: Live Trigger-To-Run Handoff | Complete | Let operators move from one accepted exact-version trigger receipt into the bounded redacted run review without manually searching the run table | Receipt-bound local handoff, existing fixed run-detail route, UI/docs/tests, and full gates |
 | Loop 231: Local SKILL.md Editor Compilation | Complete | Let authors compile one standard local SKILL.md directly into the installed visual editor without creating an intermediate file | Fixed loopback compile route, bounded in-memory parser/compiler handoff, no-write/source-path redaction, UI/docs/tests, and full gates |
+| Loop 232: Offline Editor Asset Boundary | Complete | Make the installed visual authoring surface usable without CDN access or runtime internet egress | Pinned local LiteGraph assets, MIT notice, SHA-256 integrity test, offline docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

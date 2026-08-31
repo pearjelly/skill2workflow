@@ -30,6 +30,8 @@ class PackagingMetadataTests(TestCase):
         self.assertIn('requires = ["setuptools>=77.0.1"]', text)
         self.assertIn('skill2workflow = "skill2workflow.cli:main"', text)
         self.assertIn('"Development Status :: 4 - Beta"', text)
+        self.assertIn('"web/vendor/litegraph-0.7.18/litegraph.min.js"', text)
+        self.assertIn('"web/vendor/litegraph-0.7.18/litegraph.css"', text)
         for version in ("3.9", "3.10", "3.11", "3.12", "3.13", "3.14"):
             self.assertIn(
                 f'"Programming Language :: Python :: {version}"', text
@@ -152,13 +154,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
         self.assertIn("--version", guide)
         self.assertIn("wheel metadata", guide)
-        self.assertIn("- Completed delivery loops: 1-231", roadmap)
+        self.assertIn("- Completed delivery loops: 1-232", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 231 is complete with local SKILL.md editor compilation",
+            "- Active loop: None; Loop 232 is complete with offline editor assets",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-231 are complete", readme)
+        self.assertIn("Delivery Loops 1-232 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

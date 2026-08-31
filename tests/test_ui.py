@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import threading
@@ -26,6 +27,28 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_editor_bundles_pinned_litegraph_assets_without_a_cdn(self):
+        vendor = ROOT / "web" / "vendor" / "litegraph-0.7.18"
+        expected_digests = {
+            "litegraph.min.js": "6a6bd1480057107b8dc12b40730b88afb01729ebcbf0555cd67f5a229f381589",
+            "litegraph.css": "565cee8d54e7dfd16295f0ec7b19f910a739c0f42d5263198e3416a38a6006b3",
+            "LICENSE": "8bc224b3d4a8e3a7729f57bc7f4eb35f3946d6b476edbf9e725c551dd7f6d72b",
+        }
+        for filename, expected_digest in expected_digests.items():
+            with self.subTest(filename=filename):
+                self.assertEqual(
+                    hashlib.sha256((vendor / filename).read_bytes()).hexdigest(),
+                    expected_digest,
+                )
+
+        page = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+        self.assertIn('./vendor/litegraph-0.7.18/litegraph.css', page)
+        self.assertIn('./vendor/litegraph-0.7.18/litegraph.min.js', page)
+        self.assertNotIn("cdn.jsdelivr.net", page)
+        record = (vendor / "README.md").read_text(encoding="utf-8")
+        self.assertIn("litegraph.js` 0.7.18", record)
+        self.assertIn(expected_digests["litegraph.min.js"], record)
+
     def test_live_workflow_explanation_path_parser_accepts_only_two_safe_components(self):
         self.assertEqual(
             _parse_live_workflow_explanation_path(
