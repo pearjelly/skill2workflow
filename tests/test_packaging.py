@@ -132,6 +132,7 @@ class PackagingMetadataTests(TestCase):
         self.assertIn('b"state.liveWorkflowPromotionConflict = true"', text)
         self.assertIn('b"state.liveWorkflowDeprecationConflict = true"', text)
         self.assertIn('b"state.liveScheduleDispatchReviewConflict = true"', text)
+        self.assertIn('b"state.liveRunActionConflict = true"', text)
 
     def test_release_docs_define_isolated_wheel_qualification(self):
         root = Path(__file__).resolve().parents[1]
@@ -181,13 +182,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("compile --output … --review", guide)
         self.assertIn("exact source-free schema", guide)
         self.assertIn("value-free validation result", guide)
-        self.assertIn("- Completed delivery loops: 1-259", roadmap)
+        self.assertIn("- Completed delivery loops: 1-260", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 259 is complete with live dispatch-review conflict recovery",
+            "- Active loop: None; Loop 260 is complete with live run-action conflict recovery",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-259 are complete", readme)
+        self.assertIn("Delivery Loops 1-260 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

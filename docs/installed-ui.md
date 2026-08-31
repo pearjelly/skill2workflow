@@ -92,7 +92,11 @@ explicit browser confirmation and sends only the fixed boolean decision to the
 same-origin `/api/v1/runs/{run_id}/resume` route. The UI process forwards it
 with the protected token file, validates the fixed response, and refreshes the
 live snapshot; it never stores the token in browser state or proxies arbitrary
-paths. Static, example, and file snapshots never expose these controls.
+paths. If the service returns `409`, the console disables both human decision
+and cancellation actions from the stale run snapshot until it receives a new
+**Load Live** snapshot. It never retries or infers which action, if any,
+changed the run. Static, example, and file snapshots never expose these
+controls.
 
 Selecting any live run also loads the fixed, redacted
 `skill2workflow-run-detail-0.1.0` projection from
@@ -108,6 +112,8 @@ only `{}` to the fixed same-origin `/api/v1/runs/{run_id}/cancel` route. The
 existing cooperative semantics remain visible in the UI: an in-flight
 connector attempt may finish, and the action never claims rollback or forceful
 termination. Terminal runs and all non-live snapshots keep the control hidden.
+The same stale-run `409` rule applies: obtain a new **Load Live** snapshot
+before another run action; the UI never retries a cancellation.
 
 The live Runs view starts with the control snapshot's newest bounded window.
 When its `runs` window is truncated, **Load Older Runs** becomes available. Each

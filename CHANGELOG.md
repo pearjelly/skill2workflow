@@ -16,6 +16,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Made live human-decision and cancellation conflicts actionable. A `409` now
+  disables actions from the stale run snapshot until a new live snapshot is
+  loaded; the UI never retries or infers a run outcome.
+
 - Made live-console dispatch-review conflicts actionable. A `409` now disables
   review controls based on stale dispatch evidence until the operator explicitly
   reloads it; the UI never retries or infers a review outcome.

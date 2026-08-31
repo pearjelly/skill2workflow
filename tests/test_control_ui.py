@@ -183,6 +183,8 @@ class ControlUiContractTests(TestCase):
         self.assertIn("Reload Live Workflows before another deprecation", javascript)
         self.assertIn("state.liveScheduleDispatchReviewConflict = true", javascript)
         self.assertIn("Load Dispatch Evidence before another review", javascript)
+        self.assertIn("state.liveRunActionConflict = true", javascript)
+        self.assertIn("Load Live before another run action", javascript)
         self.assertIn(".file-action.is-disabled", css)
         self.assertIn('id="workflow-diff-target"', html)
         self.assertIn('id="load-workflow-diff"', html)

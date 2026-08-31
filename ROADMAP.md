@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-259
+- Completed delivery loops: 1-260
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 259 is complete with live dispatch-review conflict recovery
+- Active loop: None; Loop 260 is complete with live run-action conflict recovery
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing live dispatch-review conflict recovery and production-boundary CI evidence
+- Next decision: select the next Production Baseline loop after reviewing live run-action conflict recovery and production-boundary CI evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-259 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-260 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7028,9 +7028,28 @@ server-side Bearer authentication, exact bounded request forwarding, and no
 browser token. Static UI and installed-wheel tests lock conflict state,
 disabled controls, explicit reload messaging, and shipped script inclusion.
 
+### Loop 260: Live Run-Action Conflict Recovery
+
+**Status:** Complete.
+
+**Prior basis:** The live console already sent authenticated fixed human-gate
+decisions and cooperative cancellations, but a true `409` only appeared as a
+generic unavailable result. The same stale run snapshot could still offer both
+actions even though the service had rejected its observed state.
+
+**Outcome:** A decision or cancellation `409` now freezes both run actions
+from that snapshot until the console receives a new live snapshot. The refreshed
+state is the only basis for another explicit confirmation. The console neither
+retries nor infers which action, if any, changed the run.
+
+**Evidence:** Loopback UI-proxy tests prove fixed `409` mapping, exact action
+request forwarding, server-side Bearer authentication, and no browser token.
+Static UI and isolated-wheel qualification tests lock the shared conflict flag,
+disabled actions, explicit refresh message, and installed script inclusion.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 259 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing live dispatch-review conflict recovery and production-boundary CI evidence.
+This rolling queue is ordered. Loop 260 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing live run-action conflict recovery and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -7256,6 +7275,7 @@ This rolling queue is ordered. Loop 259 is complete and there is no active deliv
 | Loop 257: Publication Conflict Recovery | Complete | Make a true immutable publication race recoverable without auto-retry or stale-review reuse | Fixed 409 proxy, browser-only staged-candidate retention, stale-review invalidation, explicit re-review, and loopback UI evidence |
 | Loop 258: Live CAS Action Conflict Recovery | Complete | Make true promotion and deprecation races recoverable without stale-action reuse | Fixed 409 proxy, stale-action disablement, explicit inventory reload, no mutation retry, and loopback UI evidence |
 | Loop 259: Live Dispatch-Review Conflict Recovery | Complete | Make true scheduler-review races recoverable without stale-evidence reuse | Fixed 409 proxy, stale-review disablement, explicit evidence reload, no retry, and loopback UI evidence |
+| Loop 260: Live Run-Action Conflict Recovery | Complete | Make true human-decision and cancellation races recoverable without stale-run reuse | Fixed 409 proxy, shared stale-action disablement, explicit live refresh, no retry, and loopback UI evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

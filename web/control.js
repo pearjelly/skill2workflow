@@ -57,6 +57,7 @@
     liveLoading: false,
     humanGateLoading: false,
     runCancelLoading: false,
+    liveRunActionConflict: false,
     liveRunDetail: null,
     liveRunDetailId: "",
     liveRunDetailLoading: false,
@@ -2422,7 +2423,7 @@
 
   async function decideSelectedRun(approved) {
     const run = selectedWaitingRun();
-    if (!run || state.humanGateLoading) {
+    if (!run || state.humanGateLoading || state.liveRunActionConflict) {
       return;
     }
     const decision = approved ? "approve" : "reject";
@@ -2438,6 +2439,7 @@
       return;
     }
     state.humanGateLoading = true;
+    state.liveRunActionConflict = false;
     renderHumanGateActions();
     setStatus("Submitting", "");
     try {
@@ -2451,6 +2453,10 @@
         },
       );
       if (!response.ok) {
+        if (response.status === 409) {
+          state.liveRunActionConflict = true;
+          throw new Error("run action target changed");
+        }
         throw new Error(decision + " unavailable");
       }
       const payload = await response.json();
@@ -2466,7 +2472,12 @@
       setStatus(approved ? "Approved" : "Rejected", "is-valid");
       await loadLiveSnapshot({ background: true });
     } catch (error) {
-      setStatus("Unavailable", "is-invalid");
+      setStatus(
+        error && error.message === "run action target changed"
+          ? "Run changed"
+          : "Unavailable",
+        "is-invalid",
+      );
     } finally {
       state.humanGateLoading = false;
       renderHumanGateActions();
@@ -2475,7 +2486,7 @@
 
   async function cancelSelectedRun() {
     const run = selectedCancellableRun();
-    if (!run || state.runCancelLoading) {
+    if (!run || state.runCancelLoading || state.liveRunActionConflict) {
       return;
     }
     if (
@@ -2489,6 +2500,7 @@
       return;
     }
     state.runCancelLoading = true;
+    state.liveRunActionConflict = false;
     renderRunCancelActions();
     renderHumanGateActions();
     setStatus("Cancelling", "");
@@ -2503,6 +2515,10 @@
         },
       );
       if (!response.ok) {
+        if (response.status === 409) {
+          state.liveRunActionConflict = true;
+          throw new Error("run action target changed");
+        }
         throw new Error("cancellation unavailable");
       }
       const payload = await response.json();
@@ -2520,7 +2536,12 @@
       );
       await loadLiveSnapshot({ background: true });
     } catch (error) {
-      setStatus("Unavailable", "is-invalid");
+      setStatus(
+        error && error.message === "run action target changed"
+          ? "Run changed"
+          : "Unavailable",
+        "is-invalid",
+      );
     } finally {
       state.runCancelLoading = false;
       renderRunCancelActions();
@@ -2770,6 +2791,7 @@
     state.liveRunDetailId = "";
     state.liveRunDetailLoading = false;
     state.liveRunDetailError = false;
+    state.liveRunActionConflict = false;
     state.runCancelLoading = false;
     state.liveWorkflowExplanation = null;
     state.liveWorkflowExplanationKey = "";
@@ -2901,6 +2923,7 @@
     state.liveRunDetailId = "";
     state.liveRunDetailLoading = false;
     state.liveRunDetailError = false;
+    state.liveRunActionConflict = false;
     state.runCancelLoading = false;
     state.liveRunRows = null;
     state.liveRunPageCursor = "";
@@ -3792,11 +3815,13 @@
     const run = selectedWaitingRun();
     const visible = Boolean(run);
     els.humanGateActions.hidden = !visible;
-    els.approveRun.disabled = !visible || state.humanGateLoading || state.runCancelLoading;
-    els.rejectRun.disabled = !visible || state.humanGateLoading || state.runCancelLoading;
+    els.approveRun.disabled = !visible || state.humanGateLoading || state.runCancelLoading || state.liveRunActionConflict;
+    els.rejectRun.disabled = !visible || state.humanGateLoading || state.runCancelLoading || state.liveRunActionConflict;
     if (visible) {
       els.humanGateStatus.textContent = state.humanGateLoading
         ? "Submitting the decision…"
+        : state.liveRunActionConflict
+        ? "Run state changed; Load Live before another run action."
         : "This run is waiting for an explicit human decision.";
     }
   }
@@ -3806,10 +3831,12 @@
     const visible = Boolean(run);
     els.runCancelActions.hidden = !visible;
     els.cancelRun.disabled =
-      !visible || state.runCancelLoading || state.humanGateLoading;
+      !visible || state.runCancelLoading || state.humanGateLoading || state.liveRunActionConflict;
     if (visible) {
       els.runCancelStatus.textContent = state.runCancelLoading
         ? "Recording cooperative cancellation…"
+        : state.liveRunActionConflict
+        ? "Run state changed; Load Live before another run action."
         : "Cancellation is cooperative; an in-flight connector attempt may finish.";
     }
   }
