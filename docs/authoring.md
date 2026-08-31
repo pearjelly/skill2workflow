@@ -122,11 +122,13 @@ python3 scripts/authoring_delivery_smoke.py \
 ```
 
 The drill creates a private authoring set, verifies and bundles it, publishes
-the resulting DSL to an isolated SQLite control plane, triggers one run, and
-approves its real human gate. It writes Bundle, verification, run, audit, and
-snapshot evidence under the work directory. It has no network listener,
-external connector, or credential; it is a local contract drill rather than a
-business-workflow or live-provider validation.
+the resulting DSL to an isolated SQLite control plane, then proves both human
+gate outcomes: one run is explicitly approved to completion and an independent
+second run is explicitly rejected to a safe `failed` terminal state. It writes
+Bundle, verification, run, audit, and snapshot evidence under the work
+directory. It has no network listener, external connector, or credential; it
+is a local contract drill rather than a business-workflow or live-provider
+validation.
 
 ## Validate Before Download
 

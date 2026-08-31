@@ -13,6 +13,10 @@ release; Roadmap loop completion alone does not publish a new version.
   path and records local audit/snapshot evidence without a network call,
   credential, or external connector.
 
+- Extended the authoring-delivery smoke with an independent explicit-rejection
+  run. The local evidence now proves both approved completion and a rejected
+  human gate reaching `failed` with separate terminal audit evidence.
+
 - Added a dedicated CI user-journey gate on Python 3.14. It exercises the
   local Pilot, scenario pack, explicit external connector fixture, and
   isolated installed-wheel quickstart without live providers or credentials.
