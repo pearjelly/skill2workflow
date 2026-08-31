@@ -119,3 +119,11 @@ PYTHONWARNINGS=ignore::ResourceWarning PYTHONPATH=src python3 -m unittest \
   tests.test_cli.CliTests.test_service_workflow_publish_command_loads_workflow \
   -v
 ```
+## Verified Authoring-Set Handoff
+
+For a local authoring directory created by `authoring-export`, prefer
+`authoring-service-release-preflight <authoring-dir>` and
+`authoring-service-publish <authoring-dir>` over reopening its `workflow.json`.
+They load only the descriptor-bound bytes that pass complete authoring
+verification before using the existing authenticated service routes. Preflight
+and publication remain separate explicit actions; neither starts a run.

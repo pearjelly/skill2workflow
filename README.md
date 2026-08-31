@@ -181,6 +181,8 @@ explicit connector boundaries. It currently supports:
 - Publish immutable workflow versions into a local control plane
 - Publish a fully verified private authoring set directly to a local control
   plane without creating a transport Bundle or triggering execution
+- Preflight and publish a fully verified private authoring set through an
+  authenticated self-hosted service without reopening its raw Workflow DSL
 - Inspect published workflow registry/artifact consistency with a bounded,
   value-free `workflow-artifacts` report
 - Promote a published version behind a stable control-plane alias such as `production`
@@ -943,7 +945,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-253 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-254 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1166,6 +1168,10 @@ never carries its original filesystem path into generated Workflow DSL.
 Loop 253 closes the same-machine authoring handoff: `authoring-publish` reads
 only the bytes that pass full private-artifact verification and publishes an
 immutable version without creating a Bundle or starting a run.
+
+Loop 254 extends that verified handoff to a remote self-hosted service with
+separate authoring-set release preflight and explicit publication commands;
+both refuse altered artifacts before token reads or network calls.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

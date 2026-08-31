@@ -22,6 +22,8 @@ class RemoteWorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("Loop 86", guide)
         self.assertIn("service-workflow-publish", guide)
         self.assertIn("service-workflow-release-preflight", guide)
+        self.assertIn("authoring-service-publish", guide)
+        self.assertIn("authoring-service-release-preflight", guide)
         self.assertIn("workflow-release-preflights", guide)
         self.assertIn("POST /api/v1/workflow-releases", guide)
         self.assertIn('"workflow": <Workflow DSL object>', guide)

@@ -51,6 +51,8 @@ REQUIRED_CONSOLE_COMMANDS = (
     "authoring-repair",
     "authoring-bundle",
     "authoring-publish",
+    "authoring-service-release-preflight",
+    "authoring-service-publish",
     "bundle-create",
     "bundle-verify",
     "bundle-publish",

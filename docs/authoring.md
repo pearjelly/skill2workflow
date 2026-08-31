@@ -176,6 +176,32 @@ connector, promote an alias, or approve a human gate. Use the separate
 Use `authoring-bundle` instead when the set must cross a workstation or review
 handoff boundary.
 
+## Preflight And Publish To A Self-Hosted Service
+
+When the verified authoring set is local but the self-hosted control plane runs
+behind its authenticated service boundary, preserve the same verified-read
+contract for both remote steps:
+
+```bash
+skill2workflow authoring-service-release-preflight \
+  /tmp/skill2workflow-authoring-set \
+  --service-url https://workflow.example.internal \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
+skill2workflow authoring-service-publish \
+  /tmp/skill2workflow-authoring-set \
+  --service-url https://workflow.example.internal \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+```
+
+The first command performs only the existing remote release preflight; it does
+not write an artifact or call a connector. The second is a separate explicit
+immutable publication action. Both refuse a damaged local set before they read
+the token or make a network request. Remote publication still does not trigger
+work, resolve credentials, promote an alias, or decide a human gate. A
+preflight response is a point-in-time review result, not an authorization or a
+lock on later publication; inspect the explicit publication receipt.
+
 ## Reproduce The Controlled Local Delivery Path
 
 To exercise the complete safe handoff from a standard Skill through controlled

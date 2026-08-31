@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `authoring-service-release-preflight` and `authoring-service-publish`
+  for verified private authoring sets targeting an authenticated self-hosted
+  service. Both reject damaged local artifacts before token reads or network
+  calls; preflight and immutable publication remain separate, and neither
+  starts a run.
+
 - Added `authoring-publish` for a same-machine handoff from a fully verified
   private authoring set to immutable local publication. It refuses altered
   artifacts before state initialization and does not trigger execution,

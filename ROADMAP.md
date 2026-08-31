@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-253
+- Completed delivery loops: 1-254
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 253 is complete with verified authoring-set publication
+- Active loop: None; Loop 254 is complete with verified remote authoring publication
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the verified authoring publication and production-boundary CI evidence
+- Next decision: select the next Production Baseline loop after reviewing the verified remote authoring publication and production-boundary CI evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-253 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-254 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6893,9 +6893,31 @@ tampered-set refusal before state creation. The installed-wheel package smoke
 executes the new command under source-import isolation; docs distinguish this
 trusted same-machine path from portable Bundle handoff.
 
+### Loop 254: Verified Remote Authoring Publication
+
+**Status:** Complete.
+
+**Prior basis:** The local `authoring-publish` command kept verified bytes on
+the same machine, while remote release commands accepted a separately reopened
+Workflow DSL file. A team using a remote self-hosted control plane could lose
+the authoring verification boundary at its final handoff.
+
+**Outcome:** `authoring-service-release-preflight` and
+`authoring-service-publish` each load only the descriptor-bound bytes that
+pass complete local authoring verification before calling the existing
+authenticated remote route. They refuse altered local artifacts before token
+reads or network calls. Preflight and immutable publication are separate; no
+command triggers work, resolves credentials, promotes an alias, or decides a
+human gate.
+
+**Evidence:** CLI tests cover the exact verified Workflow DSL supplied to each
+remote client and prove tampering suppresses the publish call. Installed-wheel
+command qualification and the existing authenticated service/client route
+tests cover the packaged interface and remote transport contract.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 253 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the verified authoring publication and production-boundary CI evidence.
+This rolling queue is ordered. Loop 254 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the verified remote authoring publication and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -7115,6 +7137,7 @@ This rolling queue is ordered. Loop 253 is complete and there is no active deliv
 | Loop 251: Offline Audit Evidence Verification | Complete | Let evidence recipients validate the bounded redacted contract without direct runtime-state access | Owner-only 1 MiB no-follow input, fixed envelope allowlist, page/integrity consistency checks, public schema, installed-wheel smoke, and no provenance claim |
 | Loop 252: Custom Controlled Quickstart Input | Complete | Let an installed user start with one local controlled SKILL.md instead of only the bundled example | Bounded no-symlink pre-read, valid real-human-gate requirement, private copy, source-path redaction, and installed-wheel evidence |
 | Loop 253: Verified Authoring-Set Publication | Complete | Let a reviewed same-machine authoring set reach immutable local publication without a transport Bundle | Same-read artifact verification, no-state-on-refusal, no-trigger publication, installed-wheel smoke, and handoff-boundary docs |
+| Loop 254: Verified Remote Authoring Publication | Complete | Let a reviewed local authoring set cross the authenticated self-hosted service boundary without reopening raw DSL | Same-read verification, remote preflight/publication separation, no-token/no-network refusal, installed command qualification, and route-contract coverage |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
