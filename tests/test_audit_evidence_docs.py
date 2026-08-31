@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest import TestCase
 
@@ -15,6 +16,11 @@ class AuditEvidenceDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(encoding="utf-8")
+        schema = json.loads(
+            (ROOT / "schemas" / "audit-evidence-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
         for phrase in (
             "audit-evidence",
             "SQLite",
@@ -25,9 +31,25 @@ class AuditEvidenceDocumentationTests(TestCase):
             "symbolic link",
             "raw provider errors",
             "does not repair",
+            "audit-evidence-verify",
+            "not an authenticity signature",
+            "1 MiB",
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, guide)
         self.assertIn("docs/audit-evidence.md", readme)
         self.assertIn("audit-evidence", stability)
         self.assertIn('"audit-evidence"', package_smoke)
+        self.assertIn('"audit-evidence-verify"', package_smoke)
+        self.assertEqual(
+            schema["$id"],
+            "https://skill2workflow.dev/schemas/audit-evidence-0.1.0.schema.json",
+        )
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            "skill2workflow-audit-evidence-0.1.0",
+        )
+        self.assertEqual(
+            schema["$defs"]["auditPage"]["properties"]["events"]["maxItems"],
+            100,
+        )

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/audit-evidence-0.1.0.schema.json",
+  "title": "skill2workflow bounded local audit evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "integrity", "audit_page"],
+  "properties": {
+    "schema_version": {"const": "skill2workflow-audit-evidence-0.1.0"},
+    "integrity": {"$ref": "#/$defs/integrity"},
+    "audit_page": {"$ref": "#/$defs/auditPage"}
+  },
+  "$defs": {
+    "safeString": {"type": "string", "maxLength": 128},
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "status", "algorithm", "event_count", "head_digest"],
+      "properties": {
+        "schema_version": {"const": "skill2workflow-audit-integrity-0.1.0"},
+        "status": {"const": "valid"},
+        "algorithm": {"const": "sha256-chain-v1"},
+        "event_count": {"type": "integer", "minimum": 0},
+        "head_digest": {"type": "string", "pattern": "^(|[a-f0-9]{64})$"}
+      }
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflow_id", "workflow_version", "run_id", "event_type"],
+      "properties": {
+        "workflow_id": {"$ref": "#/$defs/safeString"},
+        "workflow_version": {"$ref": "#/$defs/safeString"},
+        "run_id": {"$ref": "#/$defs/safeString"},
+        "event_type": {"type": "string", "maxLength": 64}
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "type", "run_id", "workflow_id", "workflow_version", "timestamp", "node_id", "connector_id", "connector_kind", "connector_status", "attempt", "max_attempts", "next_attempt", "backoff_ms", "approved", "has_error"],
+      "properties": {
+        "sequence": {"type": "integer", "minimum": 1},
+        "type": {"type": "string", "minLength": 1, "maxLength": 64},
+        "run_id": {"$ref": "#/$defs/safeString"},
+        "workflow_id": {"$ref": "#/$defs/safeString"},
+        "workflow_version": {"$ref": "#/$defs/safeString"},
+        "timestamp": {"type": "string", "maxLength": 256},
+        "node_id": {"$ref": "#/$defs/safeString"},
+        "connector_id": {"$ref": "#/$defs/safeString"},
+        "connector_kind": {"$ref": "#/$defs/safeString"},
+        "connector_status": {"$ref": "#/$defs/safeString"},
+        "attempt": {"type": "integer", "minimum": 0},
+        "max_attempts": {"type": "integer", "minimum": 0},
+        "next_attempt": {"type": "integer", "minimum": 0},
+        "backoff_ms": {"type": "integer", "minimum": 0},
+        "approved": {"type": "boolean"},
+        "has_error": {"type": "boolean"}
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_items", "total", "returned", "truncated", "next_cursor"],
+      "properties": {
+        "max_items": {"type": "integer", "minimum": 1, "maximum": 100},
+        "total": {"type": "integer", "minimum": 0},
+        "returned": {"type": "integer", "minimum": 0},
+        "truncated": {"type": "boolean"},
+        "next_cursor": {"type": "string", "maxLength": 128, "pattern": "^[A-Za-z0-9_-]*$"}
+      }
+    },
+    "auditPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "filters", "events", "window"],
+      "properties": {
+        "schema_version": {"const": "skill2workflow-audit-event-list-0.1.0"},
+        "filters": {"$ref": "#/$defs/filters"},
+        "events": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/event"}},
+        "window": {"$ref": "#/$defs/window"}
+      }
+    }
+  }
+}

@@ -807,6 +807,8 @@ PYTHONPATH=src python3 -m skill2workflow.cli audit-evidence \
 
 This is one value-free audit window, not a complete export or backup; read
 [`docs/audit-evidence.md`](docs/audit-evidence.md) before handing it off.
+Recipients can run `audit-evidence-verify` on the owner-only file to validate
+its fixed redacted structure; this is not a signature or provenance check.
 
 List connector manifests:
 
@@ -932,7 +934,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-250 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-251 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1141,6 +1143,11 @@ Loop 250 adds [`audit-evidence`](docs/audit-evidence.md), a deliberately
 bounded local handoff artifact. It verifies the full SQLite audit chain first,
 then atomically creates one fresh owner-only redacted page with integrity and
 cursor disclosure. It is not a backup, complete-history export, or signature.
+
+Loop 251 adds offline `audit-evidence-verify`: a recipient can validate the
+private file's fixed redaction and paging envelope without runtime-state access.
+It is deliberately a structure check, not a provenance signature or a fresh
+source-database verification.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

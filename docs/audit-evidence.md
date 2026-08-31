@@ -43,6 +43,28 @@ complete audit history.
 The process stdout is intentionally smaller still: output path, event count,
 truncation flag, and chain head digest. It never prints audit event values.
 
+## Independent offline verification
+
+The recipient can validate a received private file without access to the
+runtime state directory:
+
+```bash
+skill2workflow audit-evidence-verify \
+  /var/lib/skill2workflow-evidence/audit-window.json
+```
+
+The verifier accepts only an owner-only, regular non-symlink JSON file below
+1 MiB. It checks the fixed allowlist, value-free valid-chain declaration,
+bounded event fields, exact filter correspondence, ascending page sequence,
+and cursor/truncation consistency. Its compact output contains only `valid`,
+event count, truncation, and head digest. The public shape is published as
+[`schemas/audit-evidence-0.1.0.schema.json`](../schemas/audit-evidence-0.1.0.schema.json).
+
+This is a structural/redaction check, not an authenticity signature, proof of
+the exporting host, proof that the page was a complete history, or a fresh
+verification of the source SQLite database. Keep the expected digest or use an
+operator-approved authenticated channel when provenance matters.
+
 ## Sensitive-data and filesystem boundary
 
 The page has the same allowlisted projection as the remote audit-event tail:

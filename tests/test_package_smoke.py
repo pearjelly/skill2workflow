@@ -295,6 +295,16 @@ class PackageSmokeTests(TestCase):
                             "safety": {"side_effect_free": True},
                         }
                     )
+                if "audit-evidence-verify" in command:
+                    return json.dumps(
+                        {
+                            "schema_version": "skill2workflow-audit-evidence-verification-0.1.0",
+                            "valid": True,
+                            "event_count": 3,
+                            "truncated": False,
+                            "head_digest": "a" * 64,
+                        }
+                    )
                 if "audit-evidence" in command:
                     output_path = Path(command[command.index("--output") + 1])
                     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -385,6 +395,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["bundle_run_status"])
         self.assertTrue(result["bundle_summary_status"])
         self.assertTrue(result["audit_evidence_status"])
+        self.assertTrue(result["audit_evidence_verification_status"])
         self.assertTrue(result["compile_review_status"])
         self.assertTrue(result["authoring_artifact_status"])
         self.assertTrue(result["authoring_repair_preflight_status"])

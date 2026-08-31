@@ -85,6 +85,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "state-retention-apply",
     "audit-verify",
     "audit-evidence",
+    "audit-evidence-verify",
     "cancel-run",
     "service-resume",
     "service-cancel",
@@ -652,6 +653,12 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             cwd=isolated_dir,
         )
     )
+    audit_evidence_verification = json.loads(
+        _run(
+            [str(console_script), "audit-evidence-verify", str(audit_evidence_path)],
+            cwd=isolated_dir,
+        )
+    )
     if (
         bundle_create_result.get("valid") is not True
         or bundle_create_result.get("status") != "created"
@@ -676,6 +683,12 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or not isinstance(audit_evidence_result.get("truncated"), bool)
         or not _is_sha256(audit_evidence_result.get("head_digest"))
         or not audit_evidence_path.is_file()
+        or audit_evidence_verification.get("schema_version")
+        != "skill2workflow-audit-evidence-verification-0.1.0"
+        or audit_evidence_verification.get("valid") is not True
+        or audit_evidence_verification.get("event_count") != audit_evidence_result.get("event_count")
+        or audit_evidence_verification.get("truncated") != audit_evidence_result.get("truncated")
+        or audit_evidence_verification.get("head_digest") != audit_evidence_result.get("head_digest")
     ):
         raise RuntimeError("installed bundle or audit-evidence commands did not preserve their contract")
     _run(
@@ -745,6 +758,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "bundle_run_status": True,
         "bundle_summary_status": True,
         "audit_evidence_status": True,
+        "audit_evidence_verification_status": True,
     }
 
 

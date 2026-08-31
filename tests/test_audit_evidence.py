@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.audit_evidence import export_audit_evidence
+from skill2workflow.audit_evidence import (
+    MAX_AUDIT_EVIDENCE_BYTES,
+    export_audit_evidence,
+    validate_audit_evidence,
+    verify_audit_evidence_file,
+)
 from skill2workflow.control_plane import LocalControlPlane
 
 
@@ -56,6 +62,63 @@ class AuditEvidenceExportTests(TestCase):
         self.assertNotIn("private provider diagnostic", serialized)
         self.assertNotIn("private connector value", serialized)
         self.assertEqual(permissions, 0o600)
+
+        verification = validate_audit_evidence(exported)
+        self.assertEqual(
+            verification,
+            {
+                "schema_version": "skill2workflow-audit-evidence-verification-0.1.0",
+                "valid": True,
+                "event_count": 2,
+                "truncated": True,
+                "head_digest": result["head_digest"],
+            },
+        )
+
+    def test_rejects_unallowlisted_or_inconsistent_evidence_without_reflection(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / "state"
+            output = root / "audit.json"
+            self._seed(state_dir)
+            export_audit_evidence(state_dir, output, max_items=1)
+            evidence = json.loads(output.read_text(encoding="utf-8"))
+
+        evidence["audit_page"]["events"][0]["private_raw_error"] = "do-not-reflect"
+        with self.assertRaisesRegex(ValueError, "audit evidence is invalid") as error:
+            validate_audit_evidence(evidence)
+        self.assertNotIn("do-not-reflect", str(error.exception))
+
+        evidence["audit_page"]["events"][0].pop("private_raw_error")
+        evidence["audit_page"]["window"]["returned"] = 0
+        with self.assertRaisesRegex(ValueError, "audit evidence is invalid"):
+            validate_audit_evidence(evidence)
+
+    def test_verification_rejects_unsafe_or_oversize_input_before_parsing(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state_dir = root / "state"
+            output = root / "audit.json"
+            self._seed(state_dir)
+            export_audit_evidence(state_dir, output)
+
+            output.chmod(0o644)
+            with self.assertRaisesRegex(ValueError, "owner-only"):
+                verify_audit_evidence_file(output)
+            output.chmod(0o600)
+
+            outside = root / "outside.json"
+            outside.write_text("{}", encoding="utf-8")
+            output.unlink()
+            output.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "symbolic link"):
+                verify_audit_evidence_file(output)
+
+            output.unlink()
+            output.write_bytes(b"x" * (MAX_AUDIT_EVIDENCE_BYTES + 1))
+            output.chmod(0o600)
+            with self.assertRaisesRegex(ValueError, "byte limit"):
+                verify_audit_evidence_file(output)
 
     def test_rejects_json_storage_and_leaves_no_output(self):
         with TemporaryDirectory() as temporary:
@@ -110,8 +173,9 @@ class AuditEvidenceExportTests(TestCase):
             self._seed(state_dir)
             database = state_dir / "control.sqlite3"
             import sqlite3
-            with sqlite3.connect(database) as connection:
-                connection.execute("UPDATE audit_events SET digest = 'tampered' WHERE sequence = 1")
+            with closing(sqlite3.connect(database)) as connection:
+                with connection:
+                    connection.execute("UPDATE audit_events SET digest = 'tampered' WHERE sequence = 1")
 
             with self.assertRaisesRegex(ValueError, "integrity"):
                 export_audit_evidence(state_dir, output)

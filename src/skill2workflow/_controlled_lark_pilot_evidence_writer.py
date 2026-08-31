@@ -125,7 +125,13 @@ def _open_relative_directory(root_fd: int, components: tuple, create: bool) -> i
         raise
 
 
-def _read_json_at(parent_fd: int, name: str, *, owner_only: bool = False):
+def _read_json_at(
+    parent_fd: int,
+    name: str,
+    *,
+    owner_only: bool = False,
+    max_bytes: int = 0,
+):
     file_descriptor = None
     try:
         try:
@@ -145,6 +151,19 @@ def _read_json_at(parent_fd: int, name: str, *, owner_only: bool = False):
             raise ValueError("anchored JSON file must be a regular file")
         if owner_only and os.name == "posix" and item.st_mode & 0o077:
             raise ValueError("private authorization JSON must use owner-only permissions")
+        if max_bytes:
+            if item.st_size > max_bytes:
+                raise ValueError("anchored JSON file exceeds its byte limit")
+            handle = os.fdopen(file_descriptor, "rb")
+            file_descriptor = None
+            with handle:
+                raw = handle.read(max_bytes + 1)
+            if len(raw) > max_bytes:
+                raise ValueError("anchored JSON file exceeds its byte limit")
+            try:
+                return json.loads(raw.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise ValueError("anchored JSON file is invalid") from error
         handle = os.fdopen(file_descriptor, "r", encoding="utf-8")
         file_descriptor = None
         with handle:
@@ -153,7 +172,12 @@ def _read_json_at(parent_fd: int, name: str, *, owner_only: bool = False):
         _close_descriptors(file_descriptor)
 
 
-def read_json_anchored(path: Path, *, owner_only: bool = False):
+def read_json_anchored(
+    path: Path,
+    *,
+    owner_only: bool = False,
+    max_bytes: int = 0,
+):
     _require_dir_fd_support()
     absolute = _canonicalize_root_alias(
         Path(os.path.abspath(os.fspath(path)))
@@ -172,6 +196,7 @@ def read_json_anchored(path: Path, *, owner_only: bool = False):
             parent_fd,
             absolute.name,
             owner_only=owner_only,
+            max_bytes=max_bytes,
         )
     finally:
         _close_descriptors(parent_fd, root_fd)

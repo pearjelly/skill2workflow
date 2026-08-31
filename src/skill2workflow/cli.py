@@ -16,7 +16,7 @@ from .authoring_artifacts import (
     repair_authoring_artifacts,
     verify_authoring_artifacts,
 )
-from .audit_evidence import export_audit_evidence
+from .audit_evidence import export_audit_evidence, verify_audit_evidence_file
 from .backup import (
     build_backup_retention_plan,
     create_state_backup,
@@ -1054,6 +1054,12 @@ def _main(argv=None) -> int:
     audit_evidence_cmd.add_argument("--run-id", default="")
     audit_evidence_cmd.add_argument("--event-type", default="")
 
+    audit_evidence_verify_cmd = subparsers.add_parser(
+        "audit-evidence-verify",
+        help="Validate one private bounded audit-evidence envelope without printing events",
+    )
+    audit_evidence_verify_cmd.add_argument("path", type=Path)
+
     connectors_cmd = subparsers.add_parser("connectors", help="List connector manifests")
     connectors_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
     connectors_cmd.add_argument(
@@ -2013,6 +2019,10 @@ def _main(argv=None) -> int:
             event_type=args.event_type,
         )
         _print_json(result)
+        return 0
+
+    if args.command == "audit-evidence-verify":
+        _print_json(verify_audit_evidence_file(args.path))
         return 0
 
     if args.command == "connectors":

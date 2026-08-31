@@ -13,6 +13,10 @@ release; Roadmap loop completion alone does not publish a new version.
   no-overwrite write and records integrity plus page truncation without raw
   audit payload values.
 
+- Added `audit-evidence-verify` and a public schema so recipients can validate
+  an owner-only evidence envelope's fixed redaction and paging contract without
+  reading runtime state; it explicitly does not claim signature or provenance.
+
 - Added `authoring-repair` for a damaged local authoring set. It builds and
   verifies a replacement from the original Skill before a reversible sibling
   backup/replacement swap, preserving the prior directory for review.
