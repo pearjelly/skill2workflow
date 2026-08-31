@@ -80,6 +80,7 @@
     liveScheduleDispatchError: false,
     liveScheduleDispatchReviewLoading: false,
     liveScheduleDispatchReviewError: false,
+    liveScheduleDispatchReviewConflict: false,
     liveReadiness: null,
     liveReadinessLoading: false,
     liveWorkflowInventory: null,
@@ -549,6 +550,10 @@
       );
       state.liveScheduleDispatchCursor = page.window.next_cursor || "";
       state.liveScheduleDispatchHasMore = Boolean(page.window.has_more && page.window.next_cursor);
+      if (reset) {
+        state.liveScheduleDispatchReviewError = false;
+        state.liveScheduleDispatchReviewConflict = false;
+      }
       renderDetail();
       setScheduleDispatchStatus(
         "Loaded " + state.liveScheduleDispatchRows.length + " retained dispatch records" +
@@ -2820,6 +2825,7 @@
     state.liveScheduleDispatchError = false;
     state.liveScheduleDispatchReviewLoading = false;
     state.liveScheduleDispatchReviewError = false;
+    state.liveScheduleDispatchReviewConflict = false;
     if (label !== "Live Service Snapshot") {
       state.liveSchedules = null;
       state.liveSchedulesLoading = false;
@@ -3411,6 +3417,7 @@
         state.liveScheduleDispatchError = false;
         state.liveScheduleDispatchReviewLoading = false;
         state.liveScheduleDispatchReviewError = false;
+        state.liveScheduleDispatchReviewConflict = false;
         renderTables();
         renderDetail();
         if (kind === "run" && isLiveSnapshot()) {
@@ -3529,6 +3536,7 @@
     }
     state.liveScheduleDispatchReviewLoading = true;
     state.liveScheduleDispatchReviewError = false;
+    state.liveScheduleDispatchReviewConflict = false;
     updateLiveScheduleDispatchReviewControls();
     setScheduleDispatchReviewStatus("Recording the compare-and-swap review…", "");
     try {
@@ -3542,6 +3550,10 @@
         },
       );
       if (!response.ok) {
+        if (response.status === 409) {
+          state.liveScheduleDispatchReviewConflict = true;
+          throw new Error("dispatch review target changed");
+        }
         throw new Error("dispatch review unavailable");
       }
       const review = await response.json();
@@ -3557,7 +3569,9 @@
     } catch (error) {
       state.liveScheduleDispatchReviewError = true;
       setScheduleDispatchReviewStatus(
-        "Review unavailable or stale; dispatch state was not replayed.",
+        error && error.message === "dispatch review target changed"
+          ? "Dispatch review changed; Load Dispatch Evidence before another review."
+          : "Review unavailable; dispatch state was not replayed.",
         "is-invalid",
       );
     } finally {
@@ -4084,13 +4098,16 @@
     const enabled = hasTarget && [
       "effect_confirmed", "effect_not_observed", "no_conclusion",
     ].indexOf(els.scheduleDispatchReviewOutcome.value) !== -1;
-    els.scheduleDispatchReviewTarget.disabled = !schedule || !state.liveScheduleDispatchRows || state.liveScheduleDispatchReviewLoading;
-    els.scheduleDispatchReviewOutcome.disabled = !enabled || state.liveScheduleDispatchReviewLoading;
-    els.reviewScheduleDispatch.disabled = !enabled || state.liveScheduleDispatchReviewLoading;
+    const conflict = state.liveScheduleDispatchReviewConflict;
+    els.scheduleDispatchReviewTarget.disabled = !schedule || !state.liveScheduleDispatchRows || state.liveScheduleDispatchReviewLoading || conflict;
+    els.scheduleDispatchReviewOutcome.disabled = !enabled || state.liveScheduleDispatchReviewLoading || conflict;
+    els.reviewScheduleDispatch.disabled = !enabled || state.liveScheduleDispatchReviewLoading || conflict;
     els.reviewScheduleDispatch.textContent = state.liveScheduleDispatchReviewLoading
       ? "Recording…"
       : "Record Review";
-    if (!schedule || !hasTarget) {
+    if (conflict) {
+      setScheduleDispatchReviewStatus("Dispatch review changed; Load Dispatch Evidence before another review.", "is-invalid");
+    } else if (!schedule || !hasTarget) {
       setScheduleDispatchReviewStatus("Only uncertain dispatches can receive an explicit conclusion.", "");
     } else if (!state.liveScheduleDispatchReviewLoading && !state.liveScheduleDispatchReviewError) {
       setScheduleDispatchReviewStatus("The review uses the server-provided completion timestamp and a compare-and-swap check.", "");

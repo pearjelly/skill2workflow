@@ -16,6 +16,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Made live-console dispatch-review conflicts actionable. A `409` now disables
+  review controls based on stale dispatch evidence until the operator explicitly
+  reloads it; the UI never retries or infers a review outcome.
+
 - Made live-console promotion and deprecation conflicts actionable. A `409`
   now disables the stale action and requires an explicit workflow-inventory
   reload before another confirmation; the UI never retries or assumes a

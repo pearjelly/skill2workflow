@@ -153,6 +153,9 @@ before calling the fixed authenticated
 `/api/v1/recurring-schedule-dispatch-reviews/{dispatch_id}` route. The service
 performs its existing compare-and-swap check and preserves the `uncertain`
 dispatch status. A review never replays, claims, or mutates dispatch execution.
+If the compare-and-swap returns `409`, the console disables review controls
+based on the stale dispatch evidence and requires **Load Dispatch Evidence**
+before another confirmation. It never auto-retries or infers a review result.
 
 The live console also exposes **Load Live Readiness**. It calls only the fixed
 same-origin `/api/v1/operational-readiness` route and validates the

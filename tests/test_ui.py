@@ -1461,6 +1461,99 @@ class UiTests(TestCase):
             upstream.server_close()
             upstream_thread.join(timeout=2)
 
+    def test_live_proxy_reports_schedule_dispatch_review_conflict_without_browser_token(self):
+        observed = {}
+
+        class UpstreamHandler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["authorization"] = self.headers.get("Authorization", "")
+                observed["path"] = self.path
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"]))
+                )
+                body = b'{"error":"upstream conflict"}'
+                self.send_response(409)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *_args):
+                return
+
+        upstream = HTTPServer(("127.0.0.1", 0), UpstreamHandler)
+        upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+        upstream_thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                token_file = Path(directory) / "ingress.token"
+                token_file.write_text(
+                    "ui-test-token-012345678901234567890123456789\n",
+                    encoding="utf-8",
+                )
+                os.chmod(token_file, 0o600)
+                ui_port = {}
+
+                def ready(server):
+                    ui_port["value"] = server.server_port
+
+                ui_thread = threading.Thread(
+                    target=serve_ui,
+                    kwargs={
+                        "host": "127.0.0.1",
+                        "port": 0,
+                        "once": True,
+                        "service_url": f"http://127.0.0.1:{upstream.server_port}",
+                        "auth_token_file": token_file,
+                        "ready_callback": ready,
+                    },
+                    daemon=True,
+                )
+                ui_thread.start()
+                for _ in range(100):
+                    if "value" in ui_port:
+                        break
+                    ui_thread.join(0.01)
+                self.assertIn("value", ui_port)
+                request_body = {
+                    "expected_completed_at": "2026-08-20T01:00:05Z",
+                    "outcome": "effect_confirmed",
+                }
+                request = urllib.request.Request(
+                    "http://127.0.0.1:{}/api/v1/recurring-schedule-dispatch-reviews/dispatch_demo".format(
+                        ui_port["value"]
+                    ),
+                    data=json.dumps(request_body, separators=(",", ":")).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with self.assertRaises(urllib.error.HTTPError) as raised:
+                    urllib.request.urlopen(request, timeout=2)
+                error = raised.exception
+                try:
+                    self.assertEqual(error.code, 409)
+                    self.assertEqual(
+                        json.loads(error.read().decode("utf-8")),
+                        {"error": "dispatch review conflict"},
+                    )
+                finally:
+                    error.close()
+                ui_thread.join(timeout=2)
+                self.assertFalse(ui_thread.is_alive())
+                self.assertEqual(
+                    observed["path"],
+                    "/api/v1/recurring-schedule-dispatches/dispatch_demo/review",
+                )
+                self.assertEqual(observed["body"], request_body)
+                self.assertEqual(
+                    observed["authorization"],
+                    "Bearer ui-test-token-012345678901234567890123456789",
+                )
+        finally:
+            upstream.shutdown()
+            upstream.server_close()
+            upstream_thread.join(timeout=2)
+
     def test_live_proxy_exposes_operational_readiness_without_browser_token(self):
         observed = {}
         report = {

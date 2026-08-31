@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-258
+- Completed delivery loops: 1-259
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 258 is complete with live CAS action conflict recovery
+- Active loop: None; Loop 259 is complete with live dispatch-review conflict recovery
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing live CAS action conflict recovery and production-boundary CI evidence
+- Next decision: select the next Production Baseline loop after reviewing live dispatch-review conflict recovery and production-boundary CI evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-258 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-259 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7009,9 +7009,28 @@ Static UI tests lock conflict flags, disabled stale-action controls, and
 explicit reload messages; full regression and isolated-wheel qualification
 cover the shipped client.
 
+### Loop 259: Live Dispatch-Review Conflict Recovery
+
+**Status:** Complete.
+
+**Prior basis:** The live console already records an explicit conclusion for a
+bounded uncertain scheduler dispatch using the server's completion timestamp as
+a compare-and-swap precondition. A true `409`, however, left its stale dispatch
+evidence selectable behind a generic error.
+
+**Outcome:** A dispatch-review `409` now disables all review controls backed
+by the stale evidence. Only a successful explicit **Load Dispatch Evidence**
+reload clears that conflict state and permits another confirmation. The console
+does not retry or infer a recorded review, and it never replays the dispatch.
+
+**Evidence:** A loopback UI-proxy test proves fixed `409` propagation,
+server-side Bearer authentication, exact bounded request forwarding, and no
+browser token. Static UI and installed-wheel tests lock conflict state,
+disabled controls, explicit reload messaging, and shipped script inclusion.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 258 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing live CAS action conflict recovery and production-boundary CI evidence.
+This rolling queue is ordered. Loop 259 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing live dispatch-review conflict recovery and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -7236,6 +7255,7 @@ This rolling queue is ordered. Loop 258 is complete and there is no active deliv
 | Loop 256: Live Publication-Target Review | Complete | Make the same conflict-aware target review usable from the protected live console before publication confirmation | Server-side token proxy, strict browser contract, conflict-aware disabled publication, advisory race disclosure, and loopback UI evidence |
 | Loop 257: Publication Conflict Recovery | Complete | Make a true immutable publication race recoverable without auto-retry or stale-review reuse | Fixed 409 proxy, browser-only staged-candidate retention, stale-review invalidation, explicit re-review, and loopback UI evidence |
 | Loop 258: Live CAS Action Conflict Recovery | Complete | Make true promotion and deprecation races recoverable without stale-action reuse | Fixed 409 proxy, stale-action disablement, explicit inventory reload, no mutation retry, and loopback UI evidence |
+| Loop 259: Live Dispatch-Review Conflict Recovery | Complete | Make true scheduler-review races recoverable without stale-evidence reuse | Fixed 409 proxy, stale-review disablement, explicit evidence reload, no retry, and loopback UI evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
