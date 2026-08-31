@@ -73,6 +73,27 @@ The Doctor does not acquire the scheduler lease and therefore cannot prove that
 this process will become the active instance. After startup, use `GET /readyz`
 as the authoritative live readiness signal.
 
+## Running-Service Go-Live Check
+
+`service-doctor` is a pre-start diagnostic: its `bind` check deliberately
+verifies that the configured loopback address is available. Do not treat a
+busy address from this command as a failure of an already-running service.
+For post-start deployment verification, use the ordered read-only gate instead:
+
+```bash
+skill2workflow service-go-live-check \
+  --config /srv/skill2workflow/config/service.json \
+  --service-url http://127.0.0.1:8080 \
+  --auth-token-file /srv/skill2workflow/secrets/ingress.token
+```
+
+The gate reuses the same local safety checks while reporting only `bind` as
+`skipped` with `running_service`; configuration, ingress authentication,
+credential-directory, and state checks must still pass. It then checks the
+fixed Probe before reading the protected operational-readiness endpoint. See
+the [single-instance go-live checklist](go-live.md) for the complete operator
+sequence.
+
 ## Evidence
 
 Run the real CLI drill:

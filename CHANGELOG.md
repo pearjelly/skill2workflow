@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `service-go-live-check`, a read-only single-instance deployment gate.
+  It orders the running-service Doctor, fixed unauthenticated Probe, and
+  protected operational-readiness report, short-circuiting before network or
+  token access when earlier prerequisites are not ready.
+
 - Extended the protected live control UI with `Review Publish Target`. After a
   staged DSL passes release preflight, it shows a value-free `new`,
   `idempotent`, or `conflict` target result before enabling publication. The

@@ -10,6 +10,7 @@ class GoLiveDocumentationTests(TestCase):
         guide = (ROOT / "docs" / "go-live.md").read_text(encoding="utf-8")
         index = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
         self.assertIn("# Single-Instance Go-Live Checklist", guide)
         self.assertIn("skill2workflow service-init", guide)
@@ -24,3 +25,4 @@ class GoLiveDocumentationTests(TestCase):
         self.assertIn("claim multi-tenant RBAC", guide)
         self.assertIn("[Go-live checklist](go-live.md)", index)
         self.assertIn("[go-live checklist](docs/go-live.md)", readme)
+        self.assertIn("Added `service-go-live-check`", changelog)

@@ -16,6 +16,10 @@ class ServiceDoctorDocumentationTests(TestCase):
         self.assertIn("exit code `0`", guide)
         self.assertIn("exit code `1`", guide)
         self.assertIn("scripts/service_doctor_smoke.py", guide)
+        self.assertIn("## Running-Service Go-Live Check", guide)
+        self.assertIn("skill2workflow service-go-live-check", guide)
+        self.assertIn("running_service", guide)
+        self.assertIn("[single-instance go-live checklist](go-live.md)", guide)
 
     def test_readme_and_roadmap_publish_completed_loop_53(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
