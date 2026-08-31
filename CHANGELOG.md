@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Extended isolated wheel qualification to compile a copied local `SKILL.md`
+  with the installed `compile --review` command, validate the written Workflow
+  DSL, and enforce the fixed source-free review contract.
+
 - Added `compile --review` for headless authoring and CI. It emits the same
   fixed source-free compile-review contract as the editor while preserving the
   default DSL-only `compile` output.

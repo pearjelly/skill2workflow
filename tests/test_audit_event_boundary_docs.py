@@ -26,8 +26,8 @@ class AuditEventBoundaryDocsTests(TestCase):
     def test_roadmap_and_readme_promote_loop_175(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Completed delivery loops: 1-235", roadmap)
+        self.assertIn("Completed delivery loops: 1-236", roadmap)
         self.assertIn(
-            "Loop 235 is complete with headless compile review", roadmap
+            "Loop 236 is complete with installed compile-review qualification", roadmap
         )
-        self.assertIn("Delivery Loops 1-235 are complete", readme)
+        self.assertIn("Delivery Loops 1-236 are complete", readme)

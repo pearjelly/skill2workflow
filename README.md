@@ -386,6 +386,10 @@ python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
 
 This builds a wheel, installs it into a separate virtual environment, and runs
 the installed CLI outside the repository with source-import paths disabled.
+It also copies a local `SKILL.md` into that isolated directory, runs installed
+`compile --review`, checks the fixed source-free review contract, and validates
+the resulting Workflow DSL file. This proves the headless authoring path is
+present in the artifact rather than only in a source checkout.
 It also writes value-free `release-artifact-manifest.json` and
 `release-artifact-sbom.json` companions containing archive/member hashes and an
 SPDX 2.3 package inventory. It is the release-artifact check; the editable
@@ -907,7 +911,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-235 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-236 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1043,6 +1047,10 @@ checklist, human-gate, or verification inference without changing the draft.
 Loop 235 extends that same review to headless authoring: `compile --review`
 lets local scripts and CI inspect fixed counts/notices while preserving normal
 DSL-only compile output by default.
+
+Loop 236 qualifies that CLI path in the distributed wheel: the isolated package
+smoke copies a local `SKILL.md`, runs installed `compile --review`, enforces the
+finite source-free review shape, and validates the written DSL artifact.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

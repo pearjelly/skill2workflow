@@ -47,6 +47,13 @@ The installed command set also includes the protected `service-resume`,
 owner-only `service-support-bundle` operator
 clients.
 
+The qualification also copies the public approval-flow `SKILL.md` fixture into
+`isolated/` and invokes the installed `compile --output … --review` command.
+It requires the output file to validate as Workflow DSL and requires the review
+to have the exact source-free schema, bounded non-negative counters, and only
+the documented finite notice codes. It does not retain or print Skill source,
+resolve credentials, publish, or execute a workflow.
+
 The installed command set also includes `ui`. The qualification starts it with
 the source checkout unavailable, fetches `/web/index.html`, and checks that the
 static editor and example assets were carried into the wheel's data area.

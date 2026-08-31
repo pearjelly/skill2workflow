@@ -24,6 +24,9 @@ class PackageSmokeTests(TestCase):
             fixture = repo / "examples" / "workflows" / "approval-flow.workflow.json"
             fixture.parent.mkdir(parents=True)
             fixture.write_text("{}", encoding="utf-8")
+            skill_fixture = repo / "examples" / "skills" / "approval-flow" / "SKILL.md"
+            skill_fixture.parent.mkdir(parents=True)
+            skill_fixture.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
             commands = []
 
             class FakeEnvBuilder:
@@ -151,6 +154,23 @@ class PackageSmokeTests(TestCase):
                     return json.dumps(
                         {"status": "written", "unit_name": output_path.name}
                     )
+                if "compile" in command:
+                    output_path = Path(command[command.index("--output") + 1])
+                    output_path.write_text("{}", encoding="utf-8")
+                    return json.dumps(
+                        {
+                            "schema_version": "skill2workflow-skill-compile-review-0.1.0",
+                            "ordered_step_count": 1,
+                            "executable_node_count": 1,
+                            "human_gate_count": 0,
+                            "verification_node_count": 0,
+                            "hard_gate_count": 0,
+                            "notices": [
+                                "human_gate_not_inferred",
+                                "verification_not_inferred",
+                            ],
+                        }
+                    )
                 if "validate" in command:
                     return '{"valid": true}\n'
                 if "bundle-create" in command:
@@ -273,6 +293,7 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(result["bundle_preflight_status"])
         self.assertTrue(result["bundle_run_status"])
         self.assertTrue(result["bundle_summary_status"])
+        self.assertTrue(result["compile_review_status"])
         self.assertTrue(result["wheel_metadata_valid"])
         self.assertTrue(result["project_urls_valid"])
         self.assertTrue(result["python_classifiers_valid"])

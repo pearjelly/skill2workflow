@@ -138,6 +138,8 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     wheel_dir = work_dir / "wheelhouse"
     isolated_dir = work_dir / "isolated"
     isolated_fixture = isolated_dir / "approval-flow.workflow.json"
+    isolated_skill = isolated_dir / "approval-flow.SKILL.md"
+    compiled_skill_workflow = isolated_dir / "compiled-approval-flow.workflow.json"
     venv.EnvBuilder(with_pip=True, clear=True).create(build_venv_dir)
     venv.EnvBuilder(with_pip=True, clear=True).create(venv_dir)
     wheel_dir.mkdir(parents=True, exist_ok=True)
@@ -145,6 +147,10 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     shutil.copy2(
         repo_root / "examples" / "workflows" / "approval-flow.workflow.json",
         isolated_fixture,
+    )
+    shutil.copy2(
+        repo_root / "examples" / "skills" / "approval-flow" / "SKILL.md",
+        isolated_skill,
     )
 
     build_python = _venv_executable(build_venv_dir, "python")
@@ -330,6 +336,77 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     validate_result = json.loads(validate_output)
     if not validate_result.get("valid"):
         raise RuntimeError(f"installed skill2workflow validate returned invalid result: {validate_output}")
+    compile_review = json.loads(
+        _run(
+            [
+                str(console_script),
+                "compile",
+                str(isolated_skill),
+                "--output",
+                str(compiled_skill_workflow),
+                "--review",
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    compiled_skill_validation = json.loads(
+        _run(
+            [
+                str(console_script),
+                "validate",
+                str(compiled_skill_workflow),
+                "--format",
+                "json",
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    if not isinstance(compile_review, dict) or not isinstance(
+        compiled_skill_validation, dict
+    ):
+        raise RuntimeError("installed skill2workflow compile review did not return objects")
+    if (
+        compile_review.get("schema_version")
+        != "skill2workflow-skill-compile-review-0.1.0"
+        or set(compile_review)
+        != {
+            "schema_version",
+            "ordered_step_count",
+            "executable_node_count",
+            "human_gate_count",
+            "verification_node_count",
+            "hard_gate_count",
+            "notices",
+        }
+        or not all(
+            isinstance(compile_review.get(field), int)
+            and not isinstance(compile_review.get(field), bool)
+            and 0 <= compile_review[field] <= 10000
+            for field in (
+                "ordered_step_count",
+                "executable_node_count",
+                "human_gate_count",
+                "verification_node_count",
+                "hard_gate_count",
+            )
+        )
+        or not isinstance(compile_review.get("notices"), list)
+        or len(compile_review["notices"]) > 3
+        or not all(isinstance(notice, str) for notice in compile_review["notices"])
+        or any(
+            notice
+            not in {
+                "checklist_not_found",
+                "human_gate_not_inferred",
+                "verification_not_inferred",
+            }
+            for notice in compile_review["notices"]
+        )
+        or len(set(compile_review["notices"])) != len(compile_review["notices"])
+        or not compiled_skill_workflow.is_file()
+        or not compiled_skill_validation.get("valid")
+    ):
+        raise RuntimeError("installed skill2workflow compile review did not preserve its contract")
     bundle_path = isolated_dir / "approval-flow.s2w"
     bundle_create_result = json.loads(
         _run(
@@ -488,6 +565,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "version_matches_metadata": True,
         "required_command_help_contains_usage": True,
         "validate_status": True,
+        "compile_review_status": True,
         "bundle_status": True,
         "bundle_publish_status": True,
         "bundle_diff_status": True,

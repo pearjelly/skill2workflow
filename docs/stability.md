@@ -152,6 +152,10 @@ These surfaces should remain compatible during the `0.1.x` line:
   default DSL-only output remains compatible; only the explicit review mode
   changes standard output, and it neither writes state nor publishes/executes
   a workflow.
+- Release-artifact qualification runs that explicit mode from an installed
+  wheel against a copied public fixture, validates the written DSL, and checks
+  the exact source-free review shape. This is package availability evidence,
+  not a claim that compiler inference validates business policy.
 - The installed live UI can start only a preflight-ready empty trigger for an
   exact published version through the fixed `/api/v1/workflow-empty-triggers`
   proxy. The proxy fixes `source` to `live-ui` and input to `{}`, requires an

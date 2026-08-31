@@ -108,6 +108,9 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("release_manifest", text)
         self.assertIn('"release_sbom_status": True', text)
         self.assertIn("release_sbom", text)
+        self.assertIn('"compile_review_status": True', text)
+        self.assertIn('"--review"', text)
+        self.assertIn("compiled_skill_workflow", text)
 
     def test_release_docs_define_isolated_wheel_qualification(self):
         root = Path(__file__).resolve().parents[1]
@@ -154,13 +157,15 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("Python 3.9 through 3.14", " ".join(guide.split()))
         self.assertIn("--version", guide)
         self.assertIn("wheel metadata", guide)
-        self.assertIn("- Completed delivery loops: 1-235", roadmap)
+        self.assertIn("compile --output … --review", guide)
+        self.assertIn("exact source-free schema", guide)
+        self.assertIn("- Completed delivery loops: 1-236", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 235 is complete with headless compile review",
+            "- Active loop: None; Loop 236 is complete with installed compile-review qualification",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-235 are complete", readme)
+        self.assertIn("Delivery Loops 1-236 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

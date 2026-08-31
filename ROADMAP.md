@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-235
+- Completed delivery loops: 1-236
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 235 is complete with headless compile review
+- Active loop: None; Loop 236 is complete with installed compile-review qualification
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the headless authoring evidence
+- Next decision: select the next Production Baseline loop after reviewing the installed authoring and release-artifact evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-235 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-236 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6356,9 +6356,40 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_cli tests.test_compiler -v
 ```
 
+### Loop 236: Installed SKILL.md Compile-Review Qualification
+
+**Status:** Complete.
+
+**Prior basis:** Loop 235 made the source-free review available to local CLI
+and CI callers, but its evidence did not prove the command and review contract
+survived distribution in the wheel that an open-source user installs.
+
+**Outcome:** The isolated package smoke now copies the public approval-flow
+`SKILL.md` fixture into its source-free work directory, calls installed
+`compile --output … --review`, requires the written Workflow DSL to validate,
+and verifies the exact finite review schema, counters, and notice vocabulary.
+
+**Evidence:** Package-smoke tests lock the copied fixture, installed command,
+written output, and returned status. A real wheel build/install smoke runs the
+same sequence with `PYTHONPATH` removed and user-site packages disabled.
+Release qualification, stability, README, and changelog documentation record
+the artifact boundary.
+
+**Safety boundary:** This is a public fixture-only, no-side-effect release
+check. It does not retain or print Skill source, resolve credentials, access
+runtime state, publish, execute, or claim that compiler inference supplies
+business validation.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_package_smoke tests.test_packaging -v
+python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 235 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 236 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6560,6 +6591,7 @@ This rolling queue is ordered. Loop 235 is complete and there is no active deliv
 | Loop 233: Strict Local SKILL.md Source Decoding | Complete | Keep a selected local Skill's bytes from being silently replacement-decoded before compilation | Fatal UTF-8 byte decoder, explicit browser failure, UI/docs/tests, and full gates |
 | Loop 234: Source-Free Local SKILL.md Compile Review | Complete | Make conservative compiler inference visible before an author changes or publishes a draft | Fixed structural summary, finite notice codes, strict browser validation, UI/docs/tests, and full gates |
 | Loop 235: Headless Local SKILL.md Compile Review | Complete | Give CLI and CI users the same source-free inference review without breaking ordinary compile output | Explicit review mode, default-output compatibility, CLI/docs/tests, and full gates |
+| Loop 236: Installed SKILL.md Compile-Review Qualification | Complete | Prove the distributed wheel retains safe headless Skill compilation and review | Isolated installed CLI compile/review, fixed-summary verification, written DSL validation, docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
