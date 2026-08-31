@@ -81,6 +81,43 @@ this route as a required staged-file check before exposing its separate publish
 confirmation, and the CLI prints the same value-free report without publishing
 the document.
 
+## Publication-target review
+
+Before an operator asks the service to publish, it can also inspect the exact
+immutable target at the instant of the read:
+
+```bash
+skill2workflow service-workflow-release-target-review \
+  /path/to/workflow.workflow.json \
+  --service-url https://service.example \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+```
+
+```text
+POST /api/v1/workflow-release-target-reviews
+Authorization: Bearer <single-team-token>
+```
+
+The exact request envelope and 1 MiB bound are the same as release preflight.
+The fixed `skill2workflow-workflow-release-target-review-0.1.0` response
+contains only the workflow id/version, SHA-256 recognition digests, the existing
+target state, and the existing value-free preflight projection. It never returns
+the candidate DSL or published DSL, credentials, paths, or business values.
+
+`target.state` is one of:
+
+- `new`: no matching `workflow_id@version` was present at the read;
+- `idempotent`: the matching immutable record has the exact candidate digest;
+- `conflict`: a matching record exists with a different digest.
+
+`publication_ready` is true for `new` and `idempotent`; an
+`empty_trigger_ready: false` candidate can still be published when its trigger
+contract requires input. The review is read-only and writes neither a registry
+record nor an audit event. It is an advisory point-in-time result, not a lock,
+reservation, authorization, or compare-and-swap precondition: another publisher
+can win the target after the response. The subsequent immutable publish route
+remains the authoritative atomic conflict decision.
+
 ## Fixed response
 
 Successful publication returns exactly:
@@ -113,9 +150,12 @@ an artifact elsewhere.
 PYTHONWARNINGS=ignore::ResourceWarning PYTHONPATH=src python3 -m unittest \
   tests.test_service.RuntimeServiceTests.test_remote_workflow_publication_is_authenticated_immutable_and_redacted \
   tests.test_service.RuntimeServiceTests.test_remote_workflow_release_preflight_validates_unpublished_document_without_writing \
+  tests.test_service.RuntimeServiceTests.test_remote_workflow_release_target_review_is_authenticated_read_only_and_race_advisory \
   tests.test_service_client.ServiceClientTests.test_service_workflow_publish_uses_fixed_contract \
   tests.test_service_client.ServiceClientTests.test_service_workflow_release_preflight_uses_fixed_value_free_contract \
+  tests.test_service_client.ServiceClientTests.test_service_workflow_release_target_review_uses_fixed_value_free_contract \
   tests.test_cli.CliTests.test_service_workflow_release_preflight_command_loads_unpublished_workflow \
+  tests.test_cli.CliTests.test_service_workflow_release_target_review_command_loads_candidate \
   tests.test_cli.CliTests.test_service_workflow_publish_command_loads_workflow \
   -v
 ```
@@ -123,7 +163,9 @@ PYTHONWARNINGS=ignore::ResourceWarning PYTHONPATH=src python3 -m unittest \
 
 For a local authoring directory created by `authoring-export`, prefer
 `authoring-service-release-preflight <authoring-dir>` and
+`authoring-service-release-target-review <authoring-dir>` and
 `authoring-service-publish <authoring-dir>` over reopening its `workflow.json`.
 They load only the descriptor-bound bytes that pass complete authoring
-verification before using the existing authenticated service routes. Preflight
-and publication remain separate explicit actions; neither starts a run.
+verification before using the existing authenticated service routes. Preflight,
+target review, and publication remain separate explicit actions; neither starts
+a run.

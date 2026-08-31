@@ -119,6 +119,7 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("authoring-bundle", text)
         self.assertIn("authoring-publish", text)
         self.assertIn("authoring-service-release-preflight", text)
+        self.assertIn("authoring-service-release-target-review", text)
         self.assertIn("authoring-service-publish", text)
         self.assertIn("workflow-validations", text)
         self.assertIn("skill2workflow-local-workflow-validation-0.1.0", text)
@@ -172,13 +173,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("compile --output … --review", guide)
         self.assertIn("exact source-free schema", guide)
         self.assertIn("value-free validation result", guide)
-        self.assertIn("- Completed delivery loops: 1-254", roadmap)
+        self.assertIn("- Completed delivery loops: 1-255", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 254 is complete with verified remote authoring publication",
+            "- Active loop: None; Loop 255 is complete with value-free publication-target review",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-254 are complete", readme)
+        self.assertIn("Delivery Loops 1-255 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)

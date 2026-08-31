@@ -9,6 +9,8 @@ second execution authority.
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 from typing import Dict, List, Optional, Sequence
 
@@ -19,6 +21,9 @@ from .input_schema import InputSchemaValidationError, validate_trigger_input
 WORKFLOW_PREFLIGHT_SCHEMA_VERSION = "skill2workflow-workflow-preflight-0.1.0"
 WORKFLOW_RELEASE_PREFLIGHT_SCHEMA_VERSION = (
     "skill2workflow-workflow-release-preflight-0.1.0"
+)
+WORKFLOW_RELEASE_TARGET_REVIEW_SCHEMA_VERSION = (
+    "skill2workflow-workflow-release-target-review-0.1.0"
 )
 MAX_WORKFLOW_PREFLIGHT_BYTES = 64 * 1024
 MAX_WORKFLOW_PREFLIGHT_NODES = 1000
@@ -171,6 +176,89 @@ def build_workflow_release_preflight(workflow: Dict[str, object]) -> Dict[str, o
     }
     _check_size(result)
     return result
+
+
+def build_workflow_release_target_review(
+    workflow: Dict[str, object],
+    published_record: Optional[Dict[str, object]] = None,
+) -> Dict[str, object]:
+    """Review one candidate against an optional immutable target record.
+
+    The result is a point-in-time, value-free publication hint. It cannot lock
+    the target or authorize a later write; immutable publication remains the
+    authoritative conflict check.
+    """
+
+    release_preflight = build_workflow_release_preflight(workflow)
+    metadata = release_preflight["workflow"]
+    candidate = copy.deepcopy(workflow)
+    candidate_metadata = candidate.get("workflow")
+    if not isinstance(candidate_metadata, dict):
+        raise ValueError("workflow.workflow must be an object")
+    candidate_metadata["status"] = "published"
+    candidate_checksum = _workflow_checksum(candidate)
+
+    target_state = "new"
+    published_checksum = None
+    if published_record is not None:
+        published_checksum = _validate_target_record(
+            published_record,
+            workflow_id=str(metadata["id"]),
+            version=str(metadata["version"]),
+        )
+        target_state = (
+            "idempotent" if published_checksum == candidate_checksum else "conflict"
+        )
+
+    result: Dict[str, object] = {
+        "schema_version": WORKFLOW_RELEASE_TARGET_REVIEW_SCHEMA_VERSION,
+        "workflow": {
+            "id": metadata["id"],
+            "version": metadata["version"],
+        },
+        "candidate_checksum": candidate_checksum,
+        "target": {
+            "state": target_state,
+            "published_checksum": published_checksum,
+        },
+        "publication_ready": target_state in {"new", "idempotent"},
+        "empty_trigger_ready": release_preflight["empty_trigger_ready"],
+        "summary": release_preflight["summary"],
+        "issues": release_preflight["issues"],
+        "safety": release_preflight["safety"],
+    }
+    _check_size(result)
+    return result
+
+
+def _validate_target_record(
+    record: Dict[str, object],
+    *,
+    workflow_id: str,
+    version: str,
+) -> str:
+    if not isinstance(record, dict):
+        raise ValueError("publication target record is invalid")
+    checksum = record.get("checksum")
+    if (
+        record.get("workflow_id") != workflow_id
+        or record.get("version") != version
+        or not isinstance(checksum, str)
+        or len(checksum) != 64
+        or any(char not in "0123456789abcdef" for char in checksum)
+    ):
+        raise ValueError("publication target record is invalid")
+    return checksum
+
+
+def _workflow_checksum(workflow: Dict[str, object]) -> str:
+    encoded = json.dumps(
+        workflow,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def render_workflow_preflight_text(preflight: Dict[str, object]) -> str:

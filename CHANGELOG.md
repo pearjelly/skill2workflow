@@ -8,6 +8,13 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `service-workflow-release-target-review` and
+  `authoring-service-release-target-review` for authenticated, value-free,
+  point-in-time review of an immutable publication target. They classify a
+  candidate as `new`, safely `idempotent`, or `conflict` without reserving a
+  version or writing registry/audit state; immutable publication remains the
+  authoritative atomic decision.
+
 - Added `authoring-service-release-preflight` and `authoring-service-publish`
   for verified private authoring sets targeting an authenticated self-hosted
   service. Both reject damaged local artifacts before token reads or network

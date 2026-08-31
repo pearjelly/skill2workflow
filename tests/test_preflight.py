@@ -9,7 +9,9 @@ from pathlib import Path
 from skill2workflow.cli import main
 from skill2workflow.preflight import (
     WORKFLOW_PREFLIGHT_SCHEMA_VERSION,
+    WORKFLOW_RELEASE_TARGET_REVIEW_SCHEMA_VERSION,
     build_workflow_preflight,
+    build_workflow_release_target_review,
 )
 
 
@@ -83,3 +85,67 @@ class WorkflowPreflightTests(unittest.TestCase):
                 ])
         self.assertEqual(status, 0)
         self.assertNotIn("secret", output.getvalue())
+
+    def test_release_target_review_distinguishes_new_idempotent_and_conflicting_versions(self):
+        workflow = copy.deepcopy(self.workflow)
+        workflow["workflow"]["id"] = "workflow_target_review"
+        workflow["workflow"]["name"] = "private candidate name"
+        new = build_workflow_release_target_review(workflow)
+        same = build_workflow_release_target_review(
+            workflow,
+            {
+                "workflow_id": "workflow_target_review",
+                "version": "0.1.0",
+                "checksum": new["candidate_checksum"],
+            },
+        )
+        conflict = build_workflow_release_target_review(
+            workflow,
+            {
+                "workflow_id": "workflow_target_review",
+                "version": "0.1.0",
+                "checksum": "a" * 64,
+            },
+        )
+
+        self.assertEqual(
+            new["schema_version"], WORKFLOW_RELEASE_TARGET_REVIEW_SCHEMA_VERSION
+        )
+        self.assertEqual(new["target"]["state"], "new")
+        self.assertTrue(new["publication_ready"])
+        self.assertEqual(same["target"]["state"], "idempotent")
+        self.assertTrue(same["publication_ready"])
+        self.assertEqual(conflict["target"]["state"], "conflict")
+        self.assertFalse(conflict["publication_ready"])
+        self.assertNotIn("private candidate name", json.dumps(conflict))
+
+    def test_release_target_review_schema_locks_the_value_free_contract(self):
+        schema = json.loads(
+            Path("schemas/workflow-release-target-review-0.1.0.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+
+        self.assertTrue(schema["additionalProperties"] is False)
+        self.assertEqual(
+            schema["properties"]["schema_version"]["const"],
+            WORKFLOW_RELEASE_TARGET_REVIEW_SCHEMA_VERSION,
+        )
+        self.assertEqual(
+            schema["required"],
+            [
+                "schema_version",
+                "workflow",
+                "candidate_checksum",
+                "target",
+                "publication_ready",
+                "empty_trigger_ready",
+                "summary",
+                "issues",
+                "safety",
+            ],
+        )
+        self.assertEqual(
+            schema["properties"]["target"]["properties"]["state"]["enum"],
+            ["new", "idempotent", "conflict"],
+        )

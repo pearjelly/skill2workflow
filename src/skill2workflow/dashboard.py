@@ -875,6 +875,7 @@ def build_support_bundle_from_control(
     http_requests.pop("audit_integrity", None)
     http_requests.pop("runtime_info", None)
     http_requests.pop("workflow_release", None)
+    http_requests.pop("workflow_release_target_review", None)
     http_requests.pop("workflow_promotion", None)
     http_requests.pop("workflow_deprecation", None)
     http_requests.pop("workflow_inventory", None)

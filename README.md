@@ -945,7 +945,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-254 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-255 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1172,6 +1172,12 @@ immutable version without creating a Bundle or starting a run.
 Loop 254 extends that verified handoff to a remote self-hosted service with
 separate authoring-set release preflight and explicit publication commands;
 both refuse altered artifacts before token reads or network calls.
+
+Loop 255 adds a protected, value-free target review before remote publication:
+it tells an operator whether the exact immutable version is new, safely
+idempotent, or conflicting at the instant of the read, without reserving the
+version or writing state. The immutable publication transaction remains the
+authoritative race-safe decision.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

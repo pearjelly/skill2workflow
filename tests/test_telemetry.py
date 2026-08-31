@@ -134,6 +134,7 @@ class RuntimeTelemetryTests(TestCase):
             telemetry.observe_http("audit_integrity", 200)
             telemetry.observe_http("runtime_info", 200)
             telemetry.observe_http("workflow_release", 200)
+            telemetry.observe_http("workflow_release_target_review", 200)
             telemetry.observe_http("workflow_promotion", 200)
             telemetry.observe_http("workflow_deprecation", 200)
             telemetry.observe_http("workflow_inventory", 200)
@@ -175,6 +176,7 @@ class RuntimeTelemetryTests(TestCase):
             'skill2workflow_http_requests_total{route="audit_integrity",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="runtime_info",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_release",status_class="2xx"} 1',
+            'skill2workflow_http_requests_total{route="workflow_release_target_review",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_promotion",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_deprecation",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="workflow_inventory",status_class="2xx"} 1',
@@ -243,7 +245,7 @@ class RuntimeTelemetryTests(TestCase):
                 "audit_consistency",
                 "support_bundle", "run_list", "run_page", "run_detail", "workflow_trigger", "run_cancel",
                 "audit_event_list",
-                "workflow_release", "workflow_promotion", "workflow_deprecation", "workflow_inventory", "workflow_diff", "workflow_explanation", "workflow_preflight", "run_resume", "unknown",
+                "workflow_release", "workflow_release_target_review", "workflow_promotion", "workflow_deprecation", "workflow_inventory", "workflow_diff", "workflow_explanation", "workflow_preflight", "run_resume", "unknown",
             },
         )
         serialized = json.dumps(aggregate, ensure_ascii=False)

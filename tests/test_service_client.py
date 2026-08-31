@@ -62,6 +62,7 @@ from skill2workflow.service_client import (
     post_workflow_trigger,
     post_workflow_release,
     post_workflow_release_preflight,
+    post_workflow_release_target_review,
     post_workflow_promotion,
     post_workflow_deprecation,
     fetch_workflow_diff,
@@ -1131,6 +1132,66 @@ class ServiceClientTests(TestCase):
 
         self.assertEqual(report, payload)
         self.assertEqual(observed["path"], "/api/v1/workflow-release-preflights")
+        self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
+        self.assertEqual(observed["body"], {"workflow": workflow})
+        self.assertFalse(thread.is_alive())
+
+    def test_service_workflow_release_target_review_uses_fixed_value_free_contract(self):
+        observed = {}
+        payload = {
+            "schema_version": "skill2workflow-workflow-release-target-review-0.1.0",
+            "workflow": {"id": "workflow_remote_release", "version": "1.2.3"},
+            "candidate_checksum": "a" * 64,
+            "target": {"state": "new", "published_checksum": None},
+            "publication_ready": True,
+            "empty_trigger_ready": True,
+            "summary": {
+                "node_count": 2,
+                "connector_node_count": 0,
+                "side_effecting_node_count": 0,
+                "mapping_count": 0,
+                "blocked_node_count": 0,
+                "issue_count": 0,
+            },
+            "issues": [],
+            "safety": {
+                "side_effect_free": True,
+                "connector_calls": False,
+                "credentials_resolved": False,
+                "raw_values_included": False,
+            },
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                observed["path"] = self.path
+                observed["authorization"] = self.headers.get("Authorization")
+                observed["body"] = json.loads(
+                    self.rfile.read(int(self.headers["Content-Length"])).decode("utf-8")
+                )
+                _send_json(self, 200, payload)
+
+            def log_message(self, *_args):
+                return
+
+        workflow = _workflow_document()
+        with TemporaryDirectory() as tmp:
+            token_file = Path(tmp) / "token"
+            token_file.write_text(AUTH_TOKEN, encoding="utf-8")
+            token_file.chmod(0o600)
+            server = HTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            report = post_workflow_release_target_review(
+                f"http://127.0.0.1:{server.server_port}",
+                token_file,
+                workflow,
+            )
+            thread.join(timeout=2)
+            server.server_close()
+
+        self.assertEqual(report, payload)
+        self.assertEqual(observed["path"], "/api/v1/workflow-release-target-reviews")
         self.assertEqual(observed["authorization"], f"Bearer {AUTH_TOKEN}")
         self.assertEqual(observed["body"], {"workflow": workflow})
         self.assertFalse(thread.is_alive())

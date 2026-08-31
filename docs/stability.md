@@ -38,6 +38,12 @@ These surfaces should remain compatible during the `0.1.x` line:
   never stores a Workflow artifact, resolves a credential, or invokes a
   connector before immutable publication; the stable CLI entry point is
   `service-workflow-release-preflight`.
+- Authenticated release target review uses the fixed
+  `skill2workflow-workflow-release-target-review-0.1.0` value-free response to
+  classify the current target as `new`, `idempotent`, or `conflict` without a
+  registry/audit write, credential resolution, or connector call. It is a
+  point-in-time advisory response, never a lock or publication authorization;
+  the stable CLI entry point is `service-workflow-release-target-review`.
 - Published artifact checksum verification before read, promotion, trigger, or execution, documented in [`published-artifact-integrity.md`](published-artifact-integrity.md)
 - Published Workflow artifact publication and reads use a fixed 2 MiB UTF-8
   envelope with regular-file/no-follow descriptor identity and growth-race

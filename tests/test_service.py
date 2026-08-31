@@ -1,3 +1,4 @@
+import copy
 import json
 import http.client
 import socket
@@ -38,6 +39,7 @@ from skill2workflow.schedules import RecurringScheduleDispatcher, RecurringSched
 from skill2workflow.service_client import (
     ServiceActionError,
     post_workflow_release_preflight,
+    post_workflow_release_target_review,
     post_workflow_release,
     post_workflow_promotion,
     post_workflow_deprecation,
@@ -3931,6 +3933,80 @@ class RuntimeServiceTests(TestCase):
         self.assertNotIn("private", json.dumps(report, ensure_ascii=False))
         self.assertEqual(records, [])
         self.assertEqual(audit_after, audit_count)
+        self.assertFalse(thread.is_alive())
+
+    def test_remote_workflow_release_target_review_is_authenticated_read_only_and_race_advisory(self):
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            state_dir = root / "state"
+            config = _service_config(root, state_dir=state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
+            candidate = _workflow()
+            candidate["workflow"]["id"] = "workflow_target_review"
+            candidate["nodes"][0]["title"] = "private staged title"
+            ready = threading.Event()
+            holder = {}
+            thread = threading.Thread(
+                target=serve_runtime_service,
+                kwargs={
+                    "config": config,
+                    "ready_callback": lambda service: (
+                        holder.update({"service": service}), ready.set()
+                    ),
+                },
+                daemon=True,
+            )
+            thread.start()
+            self.assertTrue(ready.wait(timeout=2))
+            host, port = holder["service"].server_address
+            base_url = f"http://{host}:{port}"
+            url = f"{base_url}/api/v1/workflow-release-target-reviews"
+            try:
+                denied_status, denied = _post_json(url, {"workflow": candidate})
+                malformed_status, malformed = _post_json(
+                    url, {"workflow": []}, token=AUTH_TOKEN
+                )
+                new = post_workflow_release_target_review(
+                    base_url, config.auth_token_file, candidate
+                )
+                audit_before_publish = len(control.list_audit_events())
+                control.publish_workflow(candidate)
+                audit_after_publish = len(control.list_audit_events())
+                idempotent = post_workflow_release_target_review(
+                    base_url, config.auth_token_file, candidate
+                )
+                conflict_candidate = copy.deepcopy(candidate)
+                conflict_candidate["nodes"][0]["title"] = "different private title"
+                conflict = post_workflow_release_target_review(
+                    base_url, config.auth_token_file, conflict_candidate
+                )
+                audit_after_reviews = len(control.list_audit_events())
+            finally:
+                holder["service"].begin_shutdown()
+                thread.join(timeout=3)
+            records = LocalControlPlane(state_dir, storage="sqlite").list_workflows()
+
+        self.assertEqual(denied_status, 401)
+        self.assertEqual(denied, {"error": "authentication required"})
+        self.assertEqual(malformed_status, 400)
+        self.assertEqual(malformed, {"error": "workflow release target review rejected"})
+        self.assertEqual(new["target"], {"state": "new", "published_checksum": None})
+        self.assertTrue(new["publication_ready"])
+        self.assertEqual(idempotent["target"]["state"], "idempotent")
+        self.assertTrue(idempotent["publication_ready"])
+        self.assertEqual(
+            idempotent["candidate_checksum"], idempotent["target"]["published_checksum"]
+        )
+        self.assertEqual(conflict["target"]["state"], "conflict")
+        self.assertFalse(conflict["publication_ready"])
+        self.assertNotEqual(
+            conflict["candidate_checksum"], conflict["target"]["published_checksum"]
+        )
+        self.assertTrue(new["empty_trigger_ready"])
+        self.assertNotIn("private", json.dumps([new, idempotent, conflict], ensure_ascii=False))
+        self.assertEqual(audit_after_publish, audit_before_publish + 1)
+        self.assertEqual(audit_after_reviews, audit_after_publish)
+        self.assertEqual(len(records), 1)
         self.assertFalse(thread.is_alive())
 
     def test_remote_workflow_deprecation_is_authenticated_idempotent_and_redacted(self):

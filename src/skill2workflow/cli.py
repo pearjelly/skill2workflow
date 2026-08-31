@@ -84,6 +84,7 @@ from .service_client import (
     post_run_resume,
     post_workflow_release,
     post_workflow_release_preflight,
+    post_workflow_release_target_review,
     post_workflow_promotion,
     post_workflow_deprecation,
     post_workflow_trigger,
@@ -866,6 +867,16 @@ def _main(argv=None) -> int:
     service_release_preflight_cmd.add_argument("--service-url", required=True)
     service_release_preflight_cmd.add_argument("--auth-token-file", type=Path, required=True)
 
+    service_release_target_review_cmd = subparsers.add_parser(
+        "service-workflow-release-target-review",
+        help="Review a Workflow DSL publication target through the authenticated service",
+    )
+    service_release_target_review_cmd.add_argument("workflow", type=Path)
+    service_release_target_review_cmd.add_argument("--service-url", required=True)
+    service_release_target_review_cmd.add_argument(
+        "--auth-token-file", type=Path, required=True
+    )
+
     authoring_service_release_preflight_cmd = subparsers.add_parser(
         "authoring-service-release-preflight",
         help="Verify a private authoring set, then preflight it through the authenticated service",
@@ -873,6 +884,16 @@ def _main(argv=None) -> int:
     authoring_service_release_preflight_cmd.add_argument("output_dir", type=Path)
     authoring_service_release_preflight_cmd.add_argument("--service-url", required=True)
     authoring_service_release_preflight_cmd.add_argument(
+        "--auth-token-file", type=Path, required=True
+    )
+
+    authoring_service_release_target_review_cmd = subparsers.add_parser(
+        "authoring-service-release-target-review",
+        help="Verify an authoring set, then review its publication target through the authenticated service",
+    )
+    authoring_service_release_target_review_cmd.add_argument("output_dir", type=Path)
+    authoring_service_release_target_review_cmd.add_argument("--service-url", required=True)
+    authoring_service_release_target_review_cmd.add_argument(
         "--auth-token-file", type=Path, required=True
     )
 
@@ -1872,9 +1893,27 @@ def _main(argv=None) -> int:
             )
         )
 
+    if args.command == "service-workflow-release-target-review":
+        return _service_action(
+            lambda: post_workflow_release_target_review(
+                args.service_url,
+                args.auth_token_file,
+                _load_json(args.workflow),
+            )
+        )
+
     if args.command == "authoring-service-release-preflight":
         return _service_action(
             lambda: post_workflow_release_preflight(
+                args.service_url,
+                args.auth_token_file,
+                load_verified_authoring_workflow(args.output_dir),
+            )
+        )
+
+    if args.command == "authoring-service-release-target-review":
+        return _service_action(
+            lambda: post_workflow_release_target_review(
                 args.service_url,
                 args.auth_token_file,
                 load_verified_authoring_workflow(args.output_dir),

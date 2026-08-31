@@ -48,6 +48,7 @@ _ROUTES = (
     "run_detail",
     "workflow_trigger",
     "workflow_release",
+    "workflow_release_target_review",
     "workflow_promotion",
     "workflow_deprecation",
     "workflow_inventory",

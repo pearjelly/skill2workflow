@@ -1454,6 +1454,56 @@ name: authoring-publish
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         preflight.assert_called_once_with("https://service.example", token_file, workflow)
 
+    def test_service_workflow_release_target_review_command_loads_candidate(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        workflow = _approval_workflow()
+        expected = {
+            "schema_version": "skill2workflow-workflow-release-target-review-0.1.0",
+            "workflow": {"id": "workflow_demo", "version": "0.1.0"},
+            "candidate_checksum": "a" * 64,
+            "target": {"state": "new", "published_checksum": None},
+            "publication_ready": True,
+            "empty_trigger_ready": False,
+            "summary": {
+                "node_count": 3,
+                "connector_node_count": 0,
+                "side_effecting_node_count": 0,
+                "mapping_count": 0,
+                "blocked_node_count": 0,
+                "issue_count": 1,
+            },
+            "issues": [],
+            "safety": {
+                "side_effect_free": True,
+                "connector_calls": False,
+                "credentials_resolved": False,
+                "raw_values_included": False,
+            },
+        }
+        with TemporaryDirectory() as tmp:
+            workflow_file = Path(tmp) / "workflow.json"
+            workflow_file.write_text(json.dumps(workflow), encoding="utf-8")
+            with patch(
+                "skill2workflow.cli.post_workflow_release_target_review",
+                return_value=expected,
+            ) as review:
+                with redirect_stdout(stdout):
+                    exit_code = main(
+                        [
+                            "service-workflow-release-target-review",
+                            str(workflow_file),
+                            "--service-url",
+                            "https://service.example",
+                            "--auth-token-file",
+                            str(token_file),
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        review.assert_called_once_with("https://service.example", token_file, workflow)
+
     def test_authoring_service_release_preflight_uses_verified_artifact_bytes(self):
         stdout = StringIO()
         token_file = Path("/private/ingress.token")
@@ -1517,6 +1567,70 @@ name: authoring-publish
         self.assertEqual(exit_code, 0)
         self.assertEqual(json.loads(stdout.getvalue()), expected)
         preflight.assert_called_once_with("https://service.example", token_file, workflow)
+
+    def test_authoring_service_release_target_review_uses_verified_artifact_bytes(self):
+        stdout = StringIO()
+        token_file = Path("/private/ingress.token")
+        expected = {
+            "schema_version": "skill2workflow-workflow-release-target-review-0.1.0",
+            "workflow": {"id": "workflow_authoring_target_review", "version": "0.1.0"},
+            "candidate_checksum": "a" * 64,
+            "target": {"state": "new", "published_checksum": None},
+            "publication_ready": True,
+            "empty_trigger_ready": True,
+            "summary": {
+                "node_count": 1,
+                "connector_node_count": 0,
+                "side_effecting_node_count": 0,
+                "mapping_count": 0,
+                "blocked_node_count": 0,
+                "issue_count": 0,
+            },
+            "issues": [],
+            "safety": {
+                "side_effect_free": True,
+                "connector_calls": False,
+                "credentials_resolved": False,
+                "raw_values_included": False,
+            },
+        }
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "SKILL.md"
+            authoring_dir = root / "authoring"
+            skill.write_text(
+                "---\nname: authoring-target-review\n---\n\n## Checklist\n\n"
+                "1. Review release\n",
+                encoding="utf-8",
+            )
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["authoring-export", str(skill), "--output-dir", str(authoring_dir)]),
+                    0,
+                )
+            workflow = json.loads(
+                (authoring_dir / "workflow.json").read_text(encoding="utf-8")
+            )
+            expected["workflow"]["id"] = workflow["workflow"]["id"]
+            with patch(
+                "skill2workflow.cli.post_workflow_release_target_review",
+                return_value=expected,
+            ) as review:
+                with redirect_stdout(stdout):
+                    exit_code = main(
+                        [
+                            "authoring-service-release-target-review",
+                            str(authoring_dir),
+                            "--service-url",
+                            "https://service.example",
+                            "--auth-token-file",
+                            str(token_file),
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(json.loads(stdout.getvalue()), expected)
+        review.assert_called_once_with("https://service.example", token_file, workflow)
 
     def test_authoring_service_publish_uses_verified_artifact_bytes(self):
         stdout = StringIO()
@@ -1595,6 +1709,37 @@ name: authoring-publish
         self.assertEqual(exit_code, 1)
         self.assertEqual(stderr.getvalue(), "authoring artifact verification failed\n")
         publish.assert_not_called()
+
+    def test_authoring_service_target_review_refuses_tampering_before_remote_call(self):
+        token_file = Path("/private/ingress.token")
+        with TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            skill = root / "SKILL.md"
+            authoring_dir = root / "authoring"
+            skill.write_text("## Checklist\n\n1. Review release\n", encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                self.assertEqual(
+                    main(["authoring-export", str(skill), "--output-dir", str(authoring_dir)]),
+                    0,
+                )
+            (authoring_dir / "workflow.json").write_text("{}", encoding="utf-8")
+            stderr = StringIO()
+            with patch("skill2workflow.cli.post_workflow_release_target_review") as review:
+                with redirect_stderr(stderr):
+                    exit_code = main(
+                        [
+                            "authoring-service-release-target-review",
+                            str(authoring_dir),
+                            "--service-url",
+                            "https://service.example",
+                            "--auth-token-file",
+                            str(token_file),
+                        ]
+                    )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(stderr.getvalue(), "authoring artifact verification failed\n")
+        review.assert_not_called()
 
     def test_service_workflow_promote_command_uses_cas_options(self):
         stdout = StringIO()

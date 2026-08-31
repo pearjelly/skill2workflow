@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-254
+- Completed delivery loops: 1-255
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 254 is complete with verified remote authoring publication
+- Active loop: None; Loop 255 is complete with value-free publication-target review
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the verified remote authoring publication and production-boundary CI evidence
+- Next decision: select the next Production Baseline loop after reviewing the publication-target review and production-boundary CI evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-254 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-255 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6915,9 +6915,32 @@ remote client and prove tampering suppresses the publish call. Installed-wheel
 command qualification and the existing authenticated service/client route
 tests cover the packaged interface and remote transport contract.
 
+### Loop 255: Value-Free Publication-Target Review
+
+**Status:** Complete.
+
+**Prior basis:** Remote release preflight validated a candidate document, and
+immutable publication safely accepted an identical retry or rejected a changed
+same-version document. Operators still had no protected way to distinguish a
+new target from an already idempotent or conflicting target before the write.
+
+**Outcome:** `service-workflow-release-target-review` and its verified-set
+counterpart `authoring-service-release-target-review` return a bounded,
+value-free point-in-time review. They classify the exact target as `new`,
+`idempotent`, or `conflict`, expose only candidate/existing SHA-256 recognition
+digests, and preserve the structural release-preflight projection. The route
+does not reserve a version, mutate registry/audit state, resolve credentials,
+call connectors, or trigger a run. Immutable publication remains the only
+authoritative atomic conflict decision.
+
+**Evidence:** Unit, authenticated service, client, CLI, telemetry, documentation,
+and installed-wheel command-contract tests prove three-state classification,
+redaction, no audit write, no registry write, malformed/auth refusal, and the
+explicit advisory/race boundary.
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 254 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the verified remote authoring publication and production-boundary CI evidence.
+This rolling queue is ordered. Loop 255 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the publication-target review and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -7138,6 +7161,7 @@ This rolling queue is ordered. Loop 254 is complete and there is no active deliv
 | Loop 252: Custom Controlled Quickstart Input | Complete | Let an installed user start with one local controlled SKILL.md instead of only the bundled example | Bounded no-symlink pre-read, valid real-human-gate requirement, private copy, source-path redaction, and installed-wheel evidence |
 | Loop 253: Verified Authoring-Set Publication | Complete | Let a reviewed same-machine authoring set reach immutable local publication without a transport Bundle | Same-read artifact verification, no-state-on-refusal, no-trigger publication, installed-wheel smoke, and handoff-boundary docs |
 | Loop 254: Verified Remote Authoring Publication | Complete | Let a reviewed local authoring set cross the authenticated self-hosted service boundary without reopening raw DSL | Same-read verification, remote preflight/publication separation, no-token/no-network refusal, installed command qualification, and route-contract coverage |
+| Loop 255: Value-Free Publication-Target Review | Complete | Let a remote operator distinguish a new, idempotent, or conflicting immutable publication target before the explicit write | Authenticated read-only three-state review, recognition digests only, no registry/audit mutation, advisory race boundary, and installed command qualification |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

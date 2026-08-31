@@ -72,8 +72,11 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("remote-workflow-release.md", guide)
         self.assertIn("service-workflow-publish", guide)
         self.assertIn("service-workflow-release-preflight", guide)
+        self.assertIn("service-workflow-release-target-review", guide)
         self.assertIn("authoring-service-publish", guide)
         self.assertIn("authoring-service-release-preflight", guide)
+        self.assertIn("authoring-service-release-target-review", guide)
+        self.assertIn("POST /api/v1/workflow-release-target-reviews", guide)
         self.assertIn("POST /api/v1/workflow-promotions", guide)
         self.assertIn("remote-workflow-promotion.md", guide)
         self.assertIn("service-workflow-promote", guide)
@@ -130,6 +133,6 @@ class ServiceDocumentationTests(TestCase):
     def test_readme_points_to_service_entry_point_and_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-254 are complete", readme)
+        self.assertIn("Delivery Loops 1-255 are complete", readme)
         self.assertIn("docs/service.md", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

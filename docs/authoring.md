@@ -188,6 +188,11 @@ skill2workflow authoring-service-release-preflight \
   --service-url https://workflow.example.internal \
   --auth-token-file /run/secrets/skill2workflow-ingress-token
 
+skill2workflow authoring-service-release-target-review \
+  /tmp/skill2workflow-authoring-set \
+  --service-url https://workflow.example.internal \
+  --auth-token-file /run/secrets/skill2workflow-ingress-token
+
 skill2workflow authoring-service-publish \
   /tmp/skill2workflow-authoring-set \
   --service-url https://workflow.example.internal \
@@ -195,12 +200,14 @@ skill2workflow authoring-service-publish \
 ```
 
 The first command performs only the existing remote release preflight; it does
-not write an artifact or call a connector. The second is a separate explicit
-immutable publication action. Both refuse a damaged local set before they read
-the token or make a network request. Remote publication still does not trigger
-work, resolve credentials, promote an alias, or decide a human gate. A
-preflight response is a point-in-time review result, not an authorization or a
-lock on later publication; inspect the explicit publication receipt.
+not write an artifact or call a connector. The second reviews whether the
+current `workflow_id@version` is `new`, safely `idempotent`, or already a
+`conflict`, using recognition digests only. The third is the separate explicit
+immutable publication action. All three refuse a damaged local set before they
+read the token or make a network request. Remote publication still does not
+trigger work, resolve credentials, promote an alias, or decide a human gate.
+Both review responses are point-in-time advice, not authorization, a lock, or
+a reservation on later publication; inspect the explicit publication receipt.
 
 ## Reproduce The Controlled Local Delivery Path
 
