@@ -68,6 +68,11 @@ set. The command does not publish or execute a workflow, resolve credentials,
 or access runtime/service state. Review `workflow.json` and validate it before
 using a separate publish or run command.
 
+Node source mapping retains the compiled Skill's line and section information,
+but the exported file reference is always the fixed `SKILL.md`. The local path
+passed to the command is never written into an authoring set or a Bundle
+created from it.
+
 Before creating the directory, the compiler-generated Workflow DSL passes the
 same conservative secret-hygiene scan used by portable Bundles. Obvious
 secret-like values cause a fixed refusal and leave no output directory. This is

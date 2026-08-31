@@ -16,7 +16,7 @@ import os
 import stat
 import tempfile
 import zipfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Dict, Optional, Tuple
 
 from .artifact_io import MAX_WORKFLOW_ARTIFACT_BYTES
@@ -324,6 +324,8 @@ def _inspect_bundle(raw: bytes, report: Dict[str, object]):
         workflow_errors = validate_workflow_structured(workflow)
         if workflow_errors:
             return _invalid(report, "invalid_workflow", "$.workflow")
+        if _workflow_has_absolute_local_source_path(workflow):
+            return _invalid(report, "local_source_path", "$.workflow")
         try:
             findings = scan_json_value(workflow, source="workflow.json")
         except RecursionError:
@@ -348,6 +350,8 @@ def _validate_bundle_workflow(workflow: object) -> None:
     if errors:
         first = errors[0]
         raise ValueError("workflow is invalid: {}".format(first.get("code", "invalid_workflow")))
+    if _workflow_has_absolute_local_source_path(workflow):
+        raise ValueError("workflow contains an absolute local source path")
     try:
         findings = scan_json_value(workflow, source="workflow.json")
     except RecursionError as error:
@@ -546,6 +550,33 @@ def _connector_ids(workflow: Dict[str, object]):
             and isinstance(node.get("connector"), dict)
             and str((node.get("connector") or {}).get("id") or "")
         }
+    )
+
+
+def _workflow_has_absolute_local_source_path(workflow: Dict[str, object]) -> bool:
+    nodes = workflow.get("nodes")
+    if not isinstance(nodes, list):
+        return False
+    for node in nodes:
+        if not isinstance(node, dict):
+            continue
+        metadata = node.get("metadata")
+        if not isinstance(metadata, dict):
+            continue
+        source = metadata.get("source")
+        if not isinstance(source, dict):
+            continue
+        reference = source.get("file")
+        if isinstance(reference, str) and _is_absolute_local_source_path(reference):
+            return True
+    return False
+
+
+def _is_absolute_local_source_path(reference: str) -> bool:
+    return (
+        Path(reference).is_absolute()
+        or PureWindowsPath(reference).is_absolute()
+        or reference.lower().startswith("file://")
     )
 
 

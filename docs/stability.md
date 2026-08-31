@@ -28,6 +28,9 @@ These surfaces should remain compatible during the `0.1.x` line:
   have passed `authoring-verify`, then creates the existing deterministic,
   secret-checked distribution Bundle. It never publishes or executes a
   workflow; an invalid authoring set cannot create an output Bundle
+- `authoring-export` preserves source line/section mapping while fixing its
+  serialized source-file reference to `SKILL.md`; portable Bundle creation and
+  verification reject absolute POSIX, Windows, and `file://` node source paths
 - Example workflow fixture validity under `examples/workflows/`
 - Published workflow artifact immutability
 - Authenticated release preflight uses the fixed

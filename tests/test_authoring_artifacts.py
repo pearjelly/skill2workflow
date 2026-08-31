@@ -42,11 +42,18 @@ class AuthoringArtifactTests(TestCase):
                     0o600,
                 )
             self.assertFalse((output_dir / "SKILL.md").exists())
+            source_files = {
+                node.get("metadata", {}).get("source", {}).get("file")
+                for node in workflow["nodes"]
+                if isinstance(node.get("metadata"), dict)
+                and isinstance(node["metadata"].get("source"), dict)
+            }
 
         self.assertEqual(result["schema_version"], "skill2workflow-authoring-artifacts-result-0.1.0")
         self.assertEqual(result["status"], "created")
         self.assertTrue(result["valid"])
         self.assertEqual(workflow["workflow"]["id"], "workflow_authoring_pack")
+        self.assertEqual(source_files, {"SKILL.md"})
         self.assertEqual(graph["extra"]["truth_source"], "workflow_dsl")
         self.assertEqual(review["schema_version"], "skill2workflow-skill-compile-review-0.1.0")
         self.assertEqual(manifest["schema_version"], "skill2workflow-authoring-artifacts-0.1.0")

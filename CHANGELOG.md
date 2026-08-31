@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Hardened portable workflow provenance against local-path disclosure.
+  `authoring-export` serializes the fixed `SKILL.md` source marker, while
+  Bundle creation and verification reject absolute local node source paths.
+
 - Hardened local authoring artifacts with the existing conservative
   secret-hygiene boundary. `authoring-export` now rejects obvious secret-like
   compiled values before writing any files, and `authoring-verify` rejects

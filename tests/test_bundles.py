@@ -79,6 +79,46 @@ class WorkflowBundleTests(TestCase):
             with self.assertRaisesRegex(ValueError, "already exists"):
                 create_workflow_bundle(clean, output)
 
+    def test_create_rejects_an_absolute_local_source_path_before_writing(self):
+        workflow = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        workflow["nodes"][1]["metadata"]["source"]["file"] = "/private/acme/SKILL.md"
+        with TemporaryDirectory() as temporary:
+            output = Path(temporary) / "workflow.s2w"
+
+            with self.assertRaisesRegex(ValueError, "local source path"):
+                create_workflow_bundle(workflow, output)
+
+            self.assertFalse(output.exists())
+
+    def test_verify_rejects_a_digest_matched_absolute_local_source_path(self):
+        workflow = json.loads(FIXTURE.read_text(encoding="utf-8"))
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            bundle = root / "workflow.s2w"
+            create_workflow_bundle(workflow, bundle)
+            changed = json.loads(json.dumps(workflow))
+            changed["nodes"][1]["metadata"]["source"]["file"] = r"C:\\Users\\private\\SKILL.md"
+            workflow_bytes = json.dumps(
+                changed, ensure_ascii=False, sort_keys=True, indent=2
+            ).encode("utf-8") + b"\n"
+            with zipfile.ZipFile(bundle, "r") as archive:
+                manifest = json.loads(archive.read("manifest.json"))
+            digest = hashlib.sha256(workflow_bytes).hexdigest()
+            manifest["workflow"]["bytes"] = len(workflow_bytes)
+            manifest["workflow"]["sha256"] = digest
+            manifest["files"] = [
+                {"path": "workflow.json", "bytes": len(workflow_bytes), "sha256": digest}
+            ]
+            with zipfile.ZipFile(bundle, "w") as archive:
+                archive.writestr("manifest.json", json.dumps(manifest).encode("utf-8"))
+                archive.writestr("workflow.json", workflow_bytes)
+
+            report = verify_workflow_bundle(bundle)
+
+        self.assertFalse(report["valid"])
+        self.assertEqual(report["errors"], [{"code": "local_source_path", "path": "$.workflow"}])
+        self.assertNotIn("Users", json.dumps(report))
+
     def test_verify_rejects_unexpected_members(self):
         with TemporaryDirectory() as temporary:
             bundle = Path(temporary) / "bad.s2w"

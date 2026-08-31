@@ -21,6 +21,11 @@ section, and source-line mapping behavior. The parser remains dependency-free
 and does not treat this source-file limit as a Workflow DSL or trigger-input
 limit.
 
+`parse_skill_file` remains a local inspection primitive and may retain its
+input path in its in-memory IR. The portable `authoring-export` path replaces
+that file reference with the fixed `SKILL.md` before compiling Workflow DSL, so
+an exported artifact or derived Bundle cannot disclose the caller's local path.
+
 ## Verification
 
 `tests/test_parser.py` covers pre-open size rejection, symlink rejection,

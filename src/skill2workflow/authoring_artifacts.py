@@ -48,6 +48,10 @@ def create_authoring_artifacts(skill: Path, output_dir: Path) -> Dict[str, objec
     """
 
     ir = parse_skill_file(Path(skill))
+    ir = dict(ir)
+    # The artifact can become a portable Bundle. Keep compiler source line
+    # mapping, but never carry the caller's local filesystem path into it.
+    ir["source_path"] = "SKILL.md"
     workflow = compile_ir_to_workflow(ir)
     errors = validate_workflow_structured(workflow)
     if errors:

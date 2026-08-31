@@ -25,6 +25,10 @@ PYTHONPATH=src python3 -m skill2workflow.cli bundle-create \
 Creation validates the workflow and runs the repository's secret-hygiene
 scanner. Existing output is not overwritten unless `--force` is supplied;
 replacement is assembled in a temporary sibling and committed atomically.
+Creation also rejects an absolute POSIX, Windows, or `file://` node source
+reference before writing, so a portable Bundle cannot carry a caller's local
+filesystem path. Bundle verification repeats that check with a fixed redacted
+error code. Relative logical source references and line mapping remain intact.
 
 For a workflow that came directly from `authoring-export`, prefer
 `authoring-bundle <authoring-directory> --output <bundle>` instead of manually
