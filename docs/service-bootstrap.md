@@ -108,6 +108,14 @@ Add connector credential files beneath `secrets/connectors/` using the Workflow
 DSL credential handle as the filename and mode `0600`. The runtime resolves them
 at execution time.
 
+For the approved Feishu China live task connector, initialize the non-secret
+descriptor with `--lark-app-id cli_example --lark-app-secret-handle
+lark_app_secret`, then create `secrets/connectors/lark_app_secret` as an
+owner-only file through your secret manager. The service derives the existing
+`lark_bot_access_token` handle in memory for each execution; do not create or
+rotate a static tenant-token file. The App Secret is never a command-line
+value, configuration value, or Workflow DSL field.
+
 ## Data And Security Boundary
 
 The generated listener remains loopback-only. Public or cross-host traffic still

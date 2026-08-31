@@ -127,6 +127,14 @@ policy, then atomically rename it onto the handle. An in-place update also
 remains visible to the next execution, but atomic replacement avoids partial
 reads. The provider never returns a partially inspected replacement.
 
+For the explicitly configured Feishu China tenant-token descriptor, the public
+`lark_bot_access_token` handle is derived at execution time from the non-secret
+App ID in service configuration and a reserved private App Secret file. The
+source App Secret handle is not available to connector bindings. Each request
+performs one direct bounded exchange in memory; no tenant token is cached,
+written to the credential directory, persisted in state, or included in backup
+artifacts. This narrow provider is not a generic OAuth or hosted-secret system.
+
 See [`security-boundary.md`](security-boundary.md) for handle validation, filesystem containment, ingress authentication, audit evidence, and the external TLS termination boundary. The older JSON credential file remains supported only for explicit local CLI evaluation paths. That file is bounded to 2 MiB and read through a regular-file, no-follow, device/inode-checked descriptor; see [`credential-file-boundary.md`](credential-file-boundary.md).
 
 Verified state backups intentionally exclude the service configuration, Bearer token file, mounted credential directory, and unrelated state-directory files. Restore those external providers separately and rotate values according to policy. The backup still contains workflow and run business data and therefore requires its own encryption and access controls; see [`backup-restore.md`](backup-restore.md).

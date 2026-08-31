@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable, Dict, Optional
 
 from .connectors import normalize_http_allowed_origins
+from .credentials import validate_lark_tenant_access_token_config
 from .service import SERVICE_SCHEMA_VERSION, read_service_bearer_token
 
 
@@ -30,6 +31,8 @@ def initialize_service_workspace(
     port: int = 8080,
     token_factory: Optional[Callable[[], str]] = None,
     http_allowed_origins: object = None,
+    lark_app_id: Optional[str] = None,
+    lark_app_secret_handle: Optional[str] = None,
 ) -> Dict[str, object]:
     """Create one complete, non-overwriting, owner-only service workspace."""
 
@@ -37,6 +40,17 @@ def initialize_service_workspace(
         http_allowed_origins,
         label="service bootstrap http_allowed_origins",
     )
+    if (lark_app_id is None) != (lark_app_secret_handle is None):
+        raise ValueError(
+            "service bootstrap lark_app_id and lark_app_secret_handle must be provided together"
+        )
+    lark_tenant_access_token = None
+    if lark_app_id is not None:
+        lark_tenant_access_token = validate_lark_tenant_access_token_config(
+            handle="lark_bot_access_token",
+            app_id=lark_app_id,
+            app_secret_handle=lark_app_secret_handle,
+        )
     requested_root = Path(root)
     if not requested_root.is_absolute():
         raise ValueError("service bootstrap root must be an absolute path")
@@ -81,6 +95,12 @@ def initialize_service_workspace(
         }
         if normalized_http_allowed_origins is not None:
             runtime["http_allowed_origins"] = list(normalized_http_allowed_origins)
+        credentials = {
+            "provider": "directory",
+            "directory": str(credential_dir),
+        }
+        if lark_tenant_access_token is not None:
+            credentials["lark_tenant_access_token"] = lark_tenant_access_token
         config = {
             "schema_version": SERVICE_SCHEMA_VERSION,
             "service": {"host": host, "port": port},
@@ -89,10 +109,7 @@ def initialize_service_workspace(
                 "provider": "bearer_token_file",
                 "token_file": str(token_file),
             },
-            "credentials": {
-                "provider": "directory",
-                "directory": str(credential_dir),
-            },
+            "credentials": credentials,
         }
         temporary_config = config_dir / f".service.json.tmp-{secrets.token_hex(8)}"
         _write_private_file(

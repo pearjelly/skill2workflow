@@ -7051,6 +7051,32 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 This rolling queue is ordered. Loop 260 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing live run-action conflict recovery and production-boundary CI evidence.
 
+### Loop 261: Self-Hosted Feishu Tenant Credentials
+
+**Status:** In progress.
+
+**Prior basis:** The controlled Pilot exchanges a Vault-injected App Secret in
+memory for one short-lived Feishu tenant token, while the durable service only
+accepts a static `lark_bot_access_token` file. A real long-running deployment
+therefore requires manual token replacement even when its App Secret is safely
+managed.
+
+**Planned outcome:** An explicit, China-only directory-credential descriptor
+will derive the existing public `lark_bot_access_token` handle from a
+non-secret App ID and a reserved owner-only App Secret source file at connector
+execution time. It will use a fixed direct bounded exchange, retain no token,
+and preserve existing static credentials unchanged.
+
+**Safety boundary:** This does not add generic OAuth, token caching, token
+persistence, hosted secret management, Lark international support, automatic
+connector discovery, or exactly-once provider effects. Doctor and all
+read-only service surfaces remain local and do not exchange credentials.
+
+**Planned evidence:** strict configuration and source-handle denial tests,
+fake-transport bounded/redacted exchange tests, service lifecycle and rotation
+drill, installed-wheel/package qualification, secret hygiene, and production
+baseline evidence. Design: `docs/superpowers/plans/2026-08-31-self-hosted-lark-tenant-credentials.md`.
+
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -7276,6 +7302,7 @@ This rolling queue is ordered. Loop 260 is complete and there is no active deliv
 | Loop 258: Live CAS Action Conflict Recovery | Complete | Make true promotion and deprecation races recoverable without stale-action reuse | Fixed 409 proxy, stale-action disablement, explicit inventory reload, no mutation retry, and loopback UI evidence |
 | Loop 259: Live Dispatch-Review Conflict Recovery | Complete | Make true scheduler-review races recoverable without stale-evidence reuse | Fixed 409 proxy, stale-review disablement, explicit evidence reload, no retry, and loopback UI evidence |
 | Loop 260: Live Run-Action Conflict Recovery | Complete | Make true human-decision and cancellation races recoverable without stale-run reuse | Fixed 409 proxy, shared stale-action disablement, explicit live refresh, no retry, and loopback UI evidence |
+| Loop 261: Self-Hosted Feishu Tenant Credentials | In progress | Derive the approved live Feishu token in memory from a protected App Secret instead of a manually rotated static token | Planned explicit China-only descriptor, reserved secret handle, direct bounded exchange, rotation, and redaction evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -32,7 +32,11 @@ from .backup import (
 )
 from .control_plane import LocalControlPlane
 from .connectors import ConnectorRuntime, normalize_http_allowed_origins
-from .credentials import DirectoryCredentialProvider
+from .credentials import (
+    DirectoryCredentialProvider,
+    LarkTenantAccessTokenCredentialProvider,
+    validate_lark_tenant_access_token_config,
+)
 from .explain import (
     MAX_WORKFLOW_EXPLANATION_BYTES,
     build_workflow_explanation,
@@ -179,6 +183,7 @@ class ServiceConfig:
     credential_dir: Path
     backup_parent_dir: Optional[Path] = None
     http_allowed_origins: Optional[Tuple[str, ...]] = None
+    lark_tenant_access_token: Optional[Dict[str, str]] = None
 
 
 def load_service_config(path: Path) -> ServiceConfig:
@@ -274,8 +279,10 @@ def parse_service_config(payload: object) -> ServiceConfig:
         raise ValueError("service config auth must contain only provider and token_file")
     if auth.get("provider") != "bearer_token_file":
         raise ValueError("service config auth.provider must be bearer_token_file")
-    if not isinstance(credentials, dict) or set(credentials) != {"provider", "directory"}:
-        raise ValueError("service config credentials must contain only provider and directory")
+    if not isinstance(credentials, dict) or not set(credentials).issubset(
+        {"provider", "directory", "lark_tenant_access_token"}
+    ) or set(credentials) < {"provider", "directory"}:
+        raise ValueError("service config credentials must contain provider and directory, with optional lark_tenant_access_token")
     if credentials.get("provider") != "directory":
         raise ValueError("service config credentials.provider must be directory")
 
@@ -285,6 +292,20 @@ def parse_service_config(payload: object) -> ServiceConfig:
     storage = runtime.get("storage")
     auth_token_file = _absolute_path(auth.get("token_file"), "service auth.token_file")
     credential_dir = _absolute_path(credentials.get("directory"), "service credentials.directory")
+    lark_tenant_access_token = credentials.get("lark_tenant_access_token")
+    if lark_tenant_access_token is not None:
+        if not isinstance(lark_tenant_access_token, dict) or set(lark_tenant_access_token) != {
+            "handle", "app_id", "app_secret_handle"
+        }:
+            raise ValueError("service credentials.lark_tenant_access_token is invalid")
+        try:
+            validate_lark_tenant_access_token_config(
+                handle=lark_tenant_access_token.get("handle"),
+                app_id=lark_tenant_access_token.get("app_id"),
+                app_secret_handle=lark_tenant_access_token.get("app_secret_handle"),
+            )
+        except (TypeError, ValueError):
+            raise ValueError("service credentials.lark_tenant_access_token is invalid") from None
     backup_parent_dir = (
         _absolute_path(runtime.get("backup_parent_dir"), "service runtime.backup_parent_dir")
         if "backup_parent_dir" in runtime
@@ -317,6 +338,7 @@ def parse_service_config(payload: object) -> ServiceConfig:
         storage=storage,
         auth_token_file=auth_token_file,
         credential_dir=credential_dir,
+        lark_tenant_access_token=lark_tenant_access_token,
         backup_parent_dir=backup_parent_dir,
         http_allowed_origins=http_allowed_origins,
     )
@@ -427,7 +449,13 @@ class RuntimeService:
         ensure_service_state_layout(config.state_dir)
         self.telemetry = RuntimeTelemetry(config.state_dir)
         self.authenticator = FileBearerTokenAuthenticator(config.auth_token_file)
-        self.credential_provider = DirectoryCredentialProvider(config.credential_dir)
+        directory_credentials = DirectoryCredentialProvider(config.credential_dir)
+        self.credential_provider = directory_credentials
+        if config.lark_tenant_access_token is not None:
+            self.credential_provider = LarkTenantAccessTokenCredentialProvider(
+                directory_credentials,
+                **config.lark_tenant_access_token,
+            )
         self.connector_runtime = ConnectorRuntime(
             http_allowed_origins=config.http_allowed_origins,
         )

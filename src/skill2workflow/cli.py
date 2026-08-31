@@ -517,6 +517,14 @@ def _main(argv=None) -> int:
     service_init_cmd.add_argument("--host", default="127.0.0.1")
     service_init_cmd.add_argument("--port", type=int, default=8080)
     service_init_cmd.add_argument(
+        "--lark-app-id",
+        help="Optional Feishu China App ID; requires --lark-app-secret-handle",
+    )
+    service_init_cmd.add_argument(
+        "--lark-app-secret-handle",
+        help="Private credential filename containing the Feishu App Secret; never accepts its value",
+    )
+    service_init_cmd.add_argument(
         "--http-allowed-origin",
         dest="http_allowed_origins",
         action="append",
@@ -1570,6 +1578,8 @@ def _main(argv=None) -> int:
                 host=args.host,
                 port=args.port,
                 http_allowed_origins=args.http_allowed_origins,
+                lark_app_id=args.lark_app_id,
+                lark_app_secret_handle=args.lark_app_secret_handle,
             )
         )
 

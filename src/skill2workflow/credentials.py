@@ -8,14 +8,27 @@ import re
 import stat
 from pathlib import Path
 from typing import Dict
+import urllib.request
 
 
 MAX_DIRECTORY_CREDENTIAL_BYTES = 64 * 1024
 MAX_CREDENTIAL_FILE_BYTES = 2 * 1024 * 1024
+LARK_TENANT_ACCESS_TOKEN_URL = (
+    "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal"
+)
+LARK_TENANT_ACCESS_TOKEN_TIMEOUT_SECONDS = 5.0
+_CREDENTIAL_HANDLE = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,127}\Z")
 
 
 class CredentialResolutionError(Exception):
     """Raised when a credential handle cannot be resolved."""
+
+
+def _require_credential_handle(value: object, label: str) -> str:
+    handle = str(value or "")
+    if not _CREDENTIAL_HANDLE.fullmatch(handle):
+        raise ValueError(f"{label} is invalid")
+    return handle
 
 
 class StaticCredentialProvider:
@@ -34,7 +47,7 @@ class StaticCredentialProvider:
 class DirectoryCredentialProvider:
     """Resolve credential handles from separately mounted files on every use."""
 
-    _HANDLE = re.compile(r"[A-Za-z][A-Za-z0-9_.-]{0,127}\Z")
+    _HANDLE = _CREDENTIAL_HANDLE
 
     def __init__(self, directory: Path):
         self.directory = Path(directory)
@@ -75,6 +88,130 @@ class DirectoryCredentialProvider:
                 f"credential handle not found: {handle_text}"
             )
         return value
+
+
+class LarkTenantAccessTokenCredentialProvider:
+    """Derive one approved Feishu token without retaining provider credentials.
+
+    The source provider remains responsible for secure private App Secret
+    reads.  This narrow wrapper reserves its source handle and exposes only
+    the configured public target handle to connector execution.
+    """
+
+    def __init__(
+        self,
+        source_provider,
+        *,
+        handle: str,
+        app_id: str,
+        app_secret_handle: str,
+        token_transport=None,
+    ):
+        self.source_provider = source_provider
+        configuration = validate_lark_tenant_access_token_config(
+            handle=handle,
+            app_id=app_id,
+            app_secret_handle=app_secret_handle,
+        )
+        self.handle = configuration["handle"]
+        self.app_id = configuration["app_id"]
+        self.app_secret_handle = configuration["app_secret_handle"]
+        self.token_transport = token_transport
+
+    def is_ready(self) -> bool:
+        checker = getattr(self.source_provider, "is_ready", None)
+        return bool(checker()) if callable(checker) else True
+
+    def resolve(self, handle: str) -> str:
+        requested_handle = str(handle or "")
+        if requested_handle == self.app_secret_handle:
+            raise CredentialResolutionError(
+                f"credential handle not found: {requested_handle}"
+            )
+        if requested_handle != self.handle:
+            return self.source_provider.resolve(requested_handle)
+        try:
+            app_secret = self.source_provider.resolve(self.app_secret_handle)
+            return _issue_lark_tenant_access_token(
+                self.app_id,
+                app_secret,
+                token_transport=self.token_transport,
+            )
+        except (CredentialResolutionError, OSError, UnicodeDecodeError, ValueError):
+            raise CredentialResolutionError(
+                f"credential handle not found: {requested_handle}"
+            ) from None
+
+
+def validate_lark_tenant_access_token_config(
+    *, handle: object, app_id: object, app_secret_handle: object
+) -> Dict[str, str]:
+    """Validate the non-secret static part of the narrow Feishu provider."""
+
+    target = _require_credential_handle(handle, "lark tenant token handle")
+    source = _require_credential_handle(
+        app_secret_handle,
+        "lark tenant token app_secret_handle",
+    )
+    if target == source:
+        raise ValueError("lark tenant token handle and app_secret_handle must differ")
+    if not isinstance(app_id, str) or not app_id or len(app_id.encode("utf-8")) > 256:
+        raise ValueError("lark tenant token app_id is invalid")
+    if "\r" in app_id or "\n" in app_id or "\x00" in app_id:
+        raise ValueError("lark tenant token app_id is invalid")
+    return {"handle": target, "app_id": app_id, "app_secret_handle": source}
+
+
+def _issue_lark_tenant_access_token(
+    app_id: str,
+    app_secret: str,
+    *,
+    token_transport=None,
+) -> str:
+    """Exchange private App credentials directly for one in-memory token."""
+
+    payload = json.dumps(
+        {"app_id": app_id, "app_secret": app_secret},
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        LARK_TENANT_ACCESS_TOKEN_URL,
+        data=payload,
+        headers={"Content-Type": "application/json; charset=utf-8"},
+        method="POST",
+    )
+    try:
+        if token_transport is None:
+            response = urllib.request.build_opener(
+                urllib.request.ProxyHandler({})
+            ).open(request, timeout=LARK_TENANT_ACCESS_TOKEN_TIMEOUT_SECONDS)
+        else:
+            response = token_transport(request, LARK_TENANT_ACCESS_TOKEN_TIMEOUT_SECONDS)
+        try:
+            raw = response.read(MAX_DIRECTORY_CREDENTIAL_BYTES + 1)
+        finally:
+            close = getattr(response, "close", None)
+            if callable(close):
+                close()
+    except Exception:
+        raise ValueError("lark tenant token exchange failed") from None
+    if not isinstance(raw, bytes) or len(raw) > MAX_DIRECTORY_CREDENTIAL_BYTES:
+        raise ValueError("lark tenant token exchange failed")
+    try:
+        decoded = json.loads(raw.decode("utf-8"))
+        token = decoded.get("tenant_access_token")
+    except (AttributeError, TypeError, UnicodeDecodeError, ValueError):
+        raise ValueError("lark tenant token exchange failed") from None
+    if (
+        not isinstance(decoded, dict)
+        or type(decoded.get("code")) is not int
+        or decoded.get("code") != 0
+        or not isinstance(token, str)
+        or not token
+    ):
+        raise ValueError("lark tenant token exchange failed")
+    return token
 
 
 def _read_directory_credential(directory: Path, handle: str) -> str:

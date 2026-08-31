@@ -101,6 +101,38 @@ class ServiceBootstrapTests(TestCase):
             ["https://example.com", "http://api.example.com"],
         )
 
+    def test_initialize_writes_non_secret_lark_tenant_credential_descriptor(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            result = initialize_service_workspace(
+                root,
+                token_factory=lambda: "t" * 48,
+                lark_app_id="cli_example",
+                lark_app_secret_handle="lark_app_secret",
+            )
+            raw_config = json.loads(
+                (root / "config" / "service.json").read_text(encoding="utf-8")
+            )
+            config = load_service_config(root / "config" / "service.json")
+
+        self.assertEqual(
+            raw_config["credentials"]["lark_tenant_access_token"],
+            {
+                "handle": "lark_bot_access_token",
+                "app_id": "cli_example",
+                "app_secret_handle": "lark_app_secret",
+            },
+        )
+        self.assertEqual(config.lark_tenant_access_token, raw_config["credentials"]["lark_tenant_access_token"])
+        self.assertNotIn("lark_app_secret", json.dumps(result))
+
+    def test_initialize_rejects_partial_lark_descriptor_before_creating_workspace(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            with self.assertRaisesRegex(ValueError, "provided together"):
+                initialize_service_workspace(root, lark_app_id="cli_example")
+            self.assertFalse(root.exists())
+
     def test_initialize_rejects_invalid_http_origin_before_creating_workspace(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / "runtime"
