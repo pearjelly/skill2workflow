@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Hardened local `SKILL.md` staging with strict browser-side UTF-8 byte
+  decoding. Malformed source files now stop before compilation instead of being
+  silently rewritten by replacement decoding.
+
 - Bundled pinned LiteGraph 0.7.18 editor assets in the wheel and static
   preview, including the upstream MIT notice and SHA-256 verification. The
   visual editor no longer requires CDN access or runtime internet egress.

@@ -897,7 +897,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-232 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-233 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
@@ -1021,6 +1021,10 @@ Loop 232 makes that authoring surface deployable in disconnected environments:
 the pinned LiteGraph JavaScript and stylesheet now ship as local MIT-licensed
 assets, with committed SHA-256 verification. The editor no longer depends on a
 runtime CDN fetch.
+
+Loop 233 preserves source fidelity before that local compile: the browser reads
+selected `SKILL.md` bytes through fatal UTF-8 decoding and rejects malformed
+files instead of replacement-decoding them into a different document.
 
 Loop 40 completed a paid assisted Pilot with five approved real task creations across five `Asia/Shanghai` calendar days, two opaque private cases, one human rejection, safety exercises, and fixed verification. The finalized [redacted evidence](docs/pilot-evidence/loop-40/) records the `continue` decision without exposing task content, provider identifiers, or credentials. Live behavior remains limited to the fixed `create_task` action.
 

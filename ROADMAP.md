@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-232
+- Completed delivery loops: 1-233
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 232 is complete with offline editor assets
+- Active loop: None; Loop 233 is complete with strict local Skill decoding
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the offline editor evidence
+- Next decision: select the next Production Baseline loop after reviewing the source-fidelity authoring evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-232 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-233 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6259,9 +6259,42 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui -v
 ```
 
+### Loop 233: Strict Local SKILL.md Source Decoding
+
+**Status:** Complete.
+
+**Prior basis:** The loopback compiler already rejected invalid text at its
+boundary, but the browser staged source with `File.text()`. Browser replacement
+decoding could change malformed UTF-8 bytes before the compiler ever saw them,
+leaving the author with a draft that did not exactly represent the selected
+file.
+
+**Outcome:** The editor now reads selected Skill bytes through a fatal UTF-8
+decoder before staging. A browser without that verification primitive or a file
+with malformed bytes receives a visible staging failure; no replacement-decoded
+text reaches the compiler. Valid text retains the existing 2 MiB bound,
+in-memory-only route, fixed source reference, and no-persistence behavior.
+
+**Evidence:** UI tests lock the fatal `TextDecoder` use, byte-buffer intake,
+and absence of `File.text()` in the SKILL staging path. Existing parser and UI
+HTTP tests continue to cover the service-side UTF-8 and bounded-body rejection
+paths. Documentation records the source-fidelity promise and excludes this
+authoring route from credential or runtime access.
+
+**Safety boundary:** This validates only document encoding and does not make a
+Skill document trustworthy or secret-safe. It does not upload files beyond the
+loopback compiler request, reveal source bytes in errors, read local paths,
+write an artifact, or authorize publication/execution.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_parser -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 232 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 233 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6460,6 +6493,7 @@ This rolling queue is ordered. Loop 232 is complete and there is no active deliv
 | Loop 230: Live Trigger-To-Run Handoff | Complete | Let operators move from one accepted exact-version trigger receipt into the bounded redacted run review without manually searching the run table | Receipt-bound local handoff, existing fixed run-detail route, UI/docs/tests, and full gates |
 | Loop 231: Local SKILL.md Editor Compilation | Complete | Let authors compile one standard local SKILL.md directly into the installed visual editor without creating an intermediate file | Fixed loopback compile route, bounded in-memory parser/compiler handoff, no-write/source-path redaction, UI/docs/tests, and full gates |
 | Loop 232: Offline Editor Asset Boundary | Complete | Make the installed visual authoring surface usable without CDN access or runtime internet egress | Pinned local LiteGraph assets, MIT notice, SHA-256 integrity test, offline docs, and full gates |
+| Loop 233: Strict Local SKILL.md Source Decoding | Complete | Keep a selected local Skill's bytes from being silently replacement-decoded before compilation | Fatal UTF-8 byte decoder, explicit browser failure, UI/docs/tests, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

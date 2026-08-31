@@ -49,6 +49,17 @@ class UiTests(TestCase):
         self.assertIn("litegraph.js` 0.7.18", record)
         self.assertIn(expected_digests["litegraph.min.js"], record)
 
+    def test_editor_stages_skill_files_with_strict_utf8_byte_decoding(self):
+        app = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+        start = app.index("async function stageSelectedSkill")
+        end = app.index("async function compileStagedSkill", start)
+        stage_source = app[start:end]
+
+        self.assertIn('new TextDecoder("utf-8", { fatal: true })', stage_source)
+        self.assertIn("await file.arrayBuffer()", stage_source)
+        self.assertNotIn("file.text()", stage_source)
+        self.assertIn("cannot verify UTF-8 SKILL.md input", stage_source)
+
     def test_live_workflow_explanation_path_parser_accepts_only_two_safe_components(self):
         self.assertEqual(
             _parse_live_workflow_explanation_path(

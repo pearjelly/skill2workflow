@@ -255,7 +255,12 @@
       if (typeof file.size !== "number" || file.size < 1 || file.size > MAX_SKILL_INPUT_BYTES) {
         throw new Error("SKILL.md is outside the 2 MiB limit");
       }
-      const markdown = await file.text();
+      if (typeof TextDecoder !== "function") {
+        throw new Error("this browser cannot verify UTF-8 SKILL.md input");
+      }
+      const markdown = new TextDecoder("utf-8", { fatal: true }).decode(
+        await file.arrayBuffer()
+      );
       if (!markdown || new TextEncoder().encode(markdown).length > MAX_SKILL_INPUT_BYTES) {
         throw new Error("SKILL.md is outside the 2 MiB limit");
       }
