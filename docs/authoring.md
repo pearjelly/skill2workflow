@@ -45,6 +45,29 @@ Without `-o`, `compile --review` intentionally prints an explicit
 `{"workflow": ..., "review": ...}` wrapper. Plain `compile` without
 `--review` keeps its existing DSL-only output for compatibility.
 
+## Export A Reviewable Local Authoring Set
+
+When an author needs durable review artifacts instead of an in-memory editor
+draft, create a fresh destination directory in one command:
+
+```bash
+skill2workflow authoring-export path/to/SKILL.md \
+  --output-dir /tmp/skill2workflow-authoring-set
+```
+
+The command refuses to replace an existing destination and creates the new
+directory with owner-only permissions. Its files are also owner-only:
+
+- `workflow.json` — the authoritative compiled Workflow DSL;
+- `workflow.litegraph.json` — the derived LiteGraph inspection view;
+- `compile-review.json` — the fixed source-free structural compile review;
+- `manifest.json` — workflow identity plus byte counts and SHA-256 values.
+
+The original `SKILL.md` is read for compilation but is never copied into this
+set. The command does not publish or execute a workflow, resolve credentials,
+or access runtime/service state. Review `workflow.json` and validate it before
+using a separate publish or run command.
+
 ## Validate Before Download
 
 For a draft opened in the installed editor, select **Validate DSL**. The fixed

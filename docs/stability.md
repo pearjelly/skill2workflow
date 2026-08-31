@@ -13,6 +13,10 @@ These surfaces should remain compatible during the `0.1.x` line:
 - `schemas/workflow.schema.json`
 - Structured validation error keys: `code`, `message`, `path`, `severity`
 - CLI command names documented in `README.md` and `HARNESS.md`
+- `authoring-export` creates only a fresh local owner-only artifact directory
+  containing the compiled Workflow DSL, derived LiteGraph view, source-free
+  compile review, and checksum manifest; it never overwrites a destination,
+  copies the Skill source, resolves credentials, publishes, or executes
 - Example workflow fixture validity under `examples/workflows/`
 - Published workflow artifact immutability
 - Authenticated release preflight uses the fixed

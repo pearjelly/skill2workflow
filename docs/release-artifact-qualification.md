@@ -54,6 +54,13 @@ to have the exact source-free schema, bounded non-negative counters, and only
 the documented finite notice codes. It does not retain or print Skill source,
 resolve credentials, publish, or execute a workflow.
 
+It also runs installed `authoring-export` into a fresh private local directory.
+Qualification requires the exact four-file artifact set (Workflow DSL,
+LiteGraph view, source-free review, and checksum manifest), validates the
+exported Workflow DSL, and confirms no `SKILL.md` is copied. This remains a
+local authoring operation: it does not publish, execute, or resolve a
+credential.
+
 The installed command set also includes `ui`. The qualification starts it with
 the source checkout unavailable, fetches `/web/index.html`, and checks that the
 static editor and example assets were carried into the wheel's data area.

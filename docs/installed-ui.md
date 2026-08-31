@@ -36,6 +36,11 @@ Review** with inferred node counts and fixed missing-control notices. It is an
 authoring prompt only: it does not inspect business intent, change the draft,
 validate a real-world action, publish, or execute anything.
 
+For durable local review artifacts, use `skill2workflow authoring-export
+path/to/SKILL.md --output-dir /private/path` instead. It creates a new
+owner-only DSL, graph, review, and manifest set without copying the source,
+contacting the service, publishing, or executing anything.
+
 For a loaded or compiled draft, **Validate DSL** sends one bounded document to
 the installed UI's fixed local validation route. The route runs the same
 compiler validation used by the CLI, returns a fixed result with only issue

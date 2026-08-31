@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .authoring_artifacts import create_authoring_artifacts
 from .backup import (
     build_backup_retention_plan,
     create_state_backup,
@@ -125,6 +126,13 @@ def _main(argv=None) -> int:
         action="store_true",
         help="Emit a source-free compiler-inference review (with -o, print only the review)",
     )
+
+    authoring_export_cmd = subparsers.add_parser(
+        "authoring-export",
+        help="Compile SKILL.md into a private workflow, review, and LiteGraph artifact set",
+    )
+    authoring_export_cmd.add_argument("skill", type=Path)
+    authoring_export_cmd.add_argument("--output-dir", type=Path, required=True)
 
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
     validate_cmd.add_argument("workflow", type=Path)
@@ -1036,6 +1044,10 @@ def _main(argv=None) -> int:
             _print_json(review if args.output else {"workflow": workflow, "review": review})
         elif not args.output:
             _print_json(workflow)
+        return 0
+
+    if args.command == "authoring-export":
+        _print_json(create_authoring_artifacts(args.skill, args.output_dir))
         return 0
 
     if args.command == "validate":

@@ -79,6 +79,33 @@ class CliTests(TestCase):
         self.assertEqual(compiled["workflow"]["workflow"]["id"], "workflow_skill_workflow")
         self.assertEqual(compiled["review"]["ordered_step_count"], 1)
 
+    def test_authoring_export_creates_workflow_review_and_graph(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            skill.write_text(
+                "---\nname: authoring-export\n---\n\n## Checklist\n\n1. Review draft\n",
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(
+                    main(["authoring-export", str(skill), "--output-dir", str(output_dir)]),
+                    0,
+                )
+            result = json.loads(stdout.getvalue())
+
+        self.assertEqual(result["status"], "created")
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["workflow_id"], "workflow_authoring_export")
+        self.assertEqual(result["files"], [
+            "workflow.json",
+            "workflow.litegraph.json",
+            "compile-review.json",
+            "manifest.json",
+        ])
+
     def test_explicit_connector_fixture_runs_local_and_bundle_workflows(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

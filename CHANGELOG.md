@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `authoring-export` for durable local Skill review. It creates a fresh
+  owner-only directory with the authoritative Workflow DSL, derived LiteGraph
+  view, source-free compile review, and checksum manifest; it neither copies
+  Skill source nor resolves credentials, publishes, or executes a workflow.
+
 - Improved installed-editor DSL validation findings with a safe node ordinal
   when the compiler error applies to a node. The response still excludes node
   names, paths, messages, and submitted values.

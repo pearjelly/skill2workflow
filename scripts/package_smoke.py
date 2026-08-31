@@ -46,6 +46,7 @@ APACHE_2_0_LICENSE_SHA256 = (
 )
 REQUIRED_CONSOLE_COMMANDS = (
     "validate",
+    "authoring-export",
     "bundle-create",
     "bundle-verify",
     "bundle-publish",
@@ -140,6 +141,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     isolated_fixture = isolated_dir / "approval-flow.workflow.json"
     isolated_skill = isolated_dir / "approval-flow.SKILL.md"
     compiled_skill_workflow = isolated_dir / "compiled-approval-flow.workflow.json"
+    authoring_artifact_dir = isolated_dir / "authoring-artifacts"
     venv.EnvBuilder(with_pip=True, clear=True).create(build_venv_dir)
     venv.EnvBuilder(with_pip=True, clear=True).create(venv_dir)
     wheel_dir.mkdir(parents=True, exist_ok=True)
@@ -407,6 +409,54 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         or not compiled_skill_validation.get("valid")
     ):
         raise RuntimeError("installed skill2workflow compile review did not preserve its contract")
+    authoring_artifacts = json.loads(
+        _run(
+            [
+                str(console_script),
+                "authoring-export",
+                str(isolated_skill),
+                "--output-dir",
+                str(authoring_artifact_dir),
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    authoring_workflow_validation = json.loads(
+        _run(
+            [
+                str(console_script),
+                "validate",
+                str(authoring_artifact_dir / "workflow.json"),
+                "--format",
+                "json",
+            ],
+            cwd=isolated_dir,
+        )
+    )
+    if (
+        not isinstance(authoring_artifacts, dict)
+        or authoring_artifacts.get("schema_version")
+        != "skill2workflow-authoring-artifacts-result-0.1.0"
+        or authoring_artifacts.get("status") != "created"
+        or authoring_artifacts.get("valid") is not True
+        or authoring_artifacts.get("files")
+        != [
+            "workflow.json",
+            "workflow.litegraph.json",
+            "compile-review.json",
+            "manifest.json",
+        ]
+        or not all(
+            (authoring_artifact_dir / name).is_file()
+            for name in authoring_artifacts["files"]
+        )
+        or (authoring_artifact_dir / "SKILL.md").exists()
+        or not isinstance(authoring_workflow_validation, dict)
+        or not authoring_workflow_validation.get("valid")
+    ):
+        raise RuntimeError(
+            "installed skill2workflow authoring export did not preserve its contract"
+        )
     bundle_path = isolated_dir / "approval-flow.s2w"
     bundle_create_result = json.loads(
         _run(
@@ -566,6 +616,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "required_command_help_contains_usage": True,
         "validate_status": True,
         "compile_review_status": True,
+        "authoring_artifact_status": True,
         "bundle_status": True,
         "bundle_publish_status": True,
         "bundle_diff_status": True,
