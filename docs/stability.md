@@ -17,6 +17,9 @@ These surfaces should remain compatible during the `0.1.x` line:
   containing the compiled Workflow DSL, derived LiteGraph view, source-free
   compile review, and checksum manifest; it never overwrites a destination,
   copies the Skill source, resolves credentials, publishes, or executes
+- `authoring-export` rejects a compiler-generated Workflow DSL with obvious
+  secret-like values before any authoring file is written; `authoring-verify`
+  rejects the same values from received or manually edited artifact sets
 - `authoring-verify` is a read-only, value-free verification contract for that
   exact artifact directory. It checks members, owner-only permissions, digest
   consistency, DSL validity, review consistency, and graph derivation; a hash

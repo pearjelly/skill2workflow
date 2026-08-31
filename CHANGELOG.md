@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Hardened local authoring artifacts with the existing conservative
+  secret-hygiene boundary. `authoring-export` now rejects obvious secret-like
+  compiled values before writing any files, and `authoring-verify` rejects
+  matching received or manually altered sets without echoing a value.
+
 - Added `authoring-bundle` as the verified handoff from a local authoring set
   to the existing deterministic, secret-checked Workflow Bundle. It reads only
   the bytes that pass complete authoring verification and never publishes or

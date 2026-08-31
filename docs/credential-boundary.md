@@ -54,6 +54,12 @@ never reports a suspected secret prefix.
 
 The scanner is intentionally conservative and dependency-free. It catches obvious secret-like keys and values in committed JSON fixtures; it is not a replacement for repository secret scanning or human review.
 
+The same scanner also runs before `authoring-export` writes a local authoring
+artifact directory, and again while `authoring-verify` reads one. It returns
+only fixed refusal information on this path; a rejected export leaves no
+artifact directory, while a rejected verification never echoes a matching
+value.
+
 ## Local Credential Provider
 
 The local runtime supports a minimal credential-provider boundary for connector execution. Workflow DSL may reference a credential handle, while the resolved value lives outside the workflow artifact.

@@ -106,6 +106,26 @@ class CliTests(TestCase):
             "manifest.json",
         ])
 
+    def test_authoring_export_refuses_secret_like_source_before_creating_output(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            skill.write_text(
+                "## Checklist\n\n1. Send Bearer abcdefghijklmnop\n",
+                encoding="utf-8",
+            )
+            stderr = StringIO()
+            with redirect_stderr(stderr):
+                exit_code = main(
+                    ["authoring-export", str(skill), "--output-dir", str(output_dir)]
+                )
+
+        self.assertEqual(exit_code, 1)
+        self.assertFalse(output_dir.exists())
+        self.assertIn("secret-like", stderr.getvalue())
+        self.assertNotIn("abcdefghijklmnop", stderr.getvalue())
+
     def test_authoring_verify_reports_invalid_tampered_artifacts_with_a_failure_exit(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

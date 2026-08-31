@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-241
+- Completed delivery loops: 1-242
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 241 is complete with verified authoring bundle handoff
+- Active loop: None; Loop 242 is complete with pre-write authoring secret hygiene
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing the installed authoring-validation and repair evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-241 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-242 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6547,9 +6547,42 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_authoring_artifacts tests.test_cli -v
 ```
 
+### Loop 242: Pre-Write Authoring Secret Hygiene
+
+**Status:** Complete.
+
+**Prior basis:** Loop 241 made authoring-to-Bundle handoff safe, but the
+existing secret-hygiene scan ran only during Bundle creation. A copied Skill
+with an obvious secret-like value could therefore leave a private authoring
+directory before the later refusal.
+
+**Outcome:** `authoring-export` now scans the generated Workflow DSL before it
+creates a staging directory or writes any artifact. `authoring-verify` repeats
+the scan after structural validation, so an older or manually altered set with
+rewritten digests cannot be accepted. Both paths use only fixed refusal text or
+codes and never echo a matched value.
+
+**Evidence:** Unit tests prove export refuses a compiled Bearer-like value with
+no output directory, and prove verification rejects a digest-refreshed,
+graph-refreshed artifact containing a secret-like value without reflection. CLI
+coverage locks the nonzero export refusal and lack of output. Existing Bundle,
+wheel, connector, and repository secret-hygiene qualification preserves the
+shared scanner contract.
+
+**Safety boundary:** This conservative heuristic catches only obvious patterns;
+it is not a credential manager, redaction system, provenance control, or a
+substitute for human review. It never reads a mounted credential, resolves a
+handle, publishes, executes, or sends a network request.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_authoring_artifacts tests.test_cli -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 241 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 242 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6757,6 +6790,7 @@ This rolling queue is ordered. Loop 241 is complete and there is no active deliv
 | Loop 239: Private Local Authoring Artifact Export | Complete | Give local authors one durable, reviewable Skill compilation handoff without copying source or invoking runtime effects | Fresh owner-only DSL, LiteGraph, source-free review, checksum manifest, isolated-wheel qualification, docs, and full gates |
 | Loop 240: Private Local Authoring Artifact Verification | Complete | Let authors and CI independently verify one exported local artifact set without reflecting its contents | Descriptor-bound private-member checks, fixed value-free report, digest/DSL/review/graph validation, isolated-wheel qualification, docs, and full gates |
 | Loop 241: Verified Authoring Bundle Handoff | Complete | Turn a fully verified local authoring set into the existing portable Bundle without manually bypassing its checks | Same-read verified DSL loader, deterministic secret-checked Bundle handoff, no-output-on-refusal coverage, isolated-wheel qualification, docs, and full gates |
+| Loop 242: Pre-Write Authoring Secret Hygiene | Complete | Prevent obvious credentials from being written into local authoring artifacts before the later Bundle boundary | Shared conservative scanner before export and during verification, no-write/no-reflection proof, CLI/docs, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

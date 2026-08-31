@@ -68,6 +68,12 @@ set. The command does not publish or execute a workflow, resolve credentials,
 or access runtime/service state. Review `workflow.json` and validate it before
 using a separate publish or run command.
 
+Before creating the directory, the compiler-generated Workflow DSL passes the
+same conservative secret-hygiene scan used by portable Bundles. Obvious
+secret-like values cause a fixed refusal and leave no output directory. This is
+not a replacement for secret management or human review; do not put tokens,
+customer data, or credentials in a Skill.
+
 Before accepting a set from another local workspace or using it in CI, verify
 the exact artifact names, owner-only permission boundary, file digests,
 Workflow DSL validity, source-free review consistency, and that the graph is
@@ -81,6 +87,9 @@ The result is a value-free report with fixed error codes and a nonzero exit
 status when verification fails. Hashes detect accidental or untrusted local
 modification; they are not an authenticity signature. Protect the directory
 and use an authenticated sharing channel when provenance matters.
+Verification also rejects a Workflow DSL containing an obvious secret-like
+value, including a historical set whose digests were rewritten after a manual
+edit.
 
 To turn an unchanged, verified authoring set into the existing portable
 Workflow Bundle without manually reopening `workflow.json`, use:

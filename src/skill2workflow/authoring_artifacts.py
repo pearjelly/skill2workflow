@@ -19,6 +19,7 @@ from .compiler import (
     validate_workflow_structured,
 )
 from .parser import parse_skill_file
+from .secret_hygiene import scan_json_value
 from .visualizer import workflow_to_litegraph
 
 
@@ -51,6 +52,12 @@ def create_authoring_artifacts(skill: Path, output_dir: Path) -> Dict[str, objec
     errors = validate_workflow_structured(workflow)
     if errors:
         raise ValueError("compiled workflow is invalid")
+    try:
+        secret_findings = scan_json_value(workflow, source="workflow.json")
+    except RecursionError as error:
+        raise ValueError("compiled workflow is invalid") from error
+    if secret_findings:
+        raise ValueError("compiled workflow contains secret-like values")
     review = summarize_skill_compile(ir, workflow)
     graph = workflow_to_litegraph(workflow)
 
@@ -179,6 +186,12 @@ def _load_verified_authoring_artifacts(
         raise _ArtifactVerificationError("artifact_workflow_invalid") from error
     if workflow_errors:
         raise _ArtifactVerificationError("artifact_workflow_invalid")
+    try:
+        secret_findings = scan_json_value(workflow, source="workflow.json")
+    except RecursionError as error:
+        raise _ArtifactVerificationError("artifact_workflow_invalid") from error
+    if secret_findings:
+        raise _ArtifactVerificationError("artifact_secret_like_value")
     if graph != workflow_to_litegraph(workflow):
         raise _ArtifactVerificationError("artifact_graph_mismatch")
     if not _review_matches_workflow(review, workflow):

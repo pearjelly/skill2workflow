@@ -9,6 +9,7 @@ from skill2workflow.authoring_artifacts import (
     load_verified_authoring_workflow,
     verify_authoring_artifacts,
 )
+from skill2workflow.visualizer import workflow_to_litegraph
 
 
 class AuthoringArtifactTests(TestCase):
@@ -71,6 +72,21 @@ class AuthoringArtifactTests(TestCase):
                 create_authoring_artifacts(skill, output_dir)
 
             self.assertEqual(sentinel.read_text(encoding="utf-8"), "keep")
+
+    def test_refuses_secret_like_compiled_workflow_before_creating_artifacts(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            skill.write_text(
+                "## Checklist\n\n1. Send Authorization: Bearer abcdefghijklmnop\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "secret-like"):
+                create_authoring_artifacts(skill, output_dir)
+
+            self.assertFalse(output_dir.exists())
 
     def test_verifies_export_without_reflecting_artifact_content(self):
         with TemporaryDirectory() as temporary:
@@ -147,6 +163,31 @@ class AuthoringArtifactTests(TestCase):
         self.assertFalse(report["valid"])
         self.assertEqual(report["errors"], [{"code": "artifact_permissions_invalid"}])
 
+    def test_verification_rejects_secret_like_workflow_even_with_refreshed_digests(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output_dir = root / "authoring"
+            skill.write_text("## Checklist\n\n1. Review draft\n", encoding="utf-8")
+            create_authoring_artifacts(skill, output_dir)
+            workflow_path = output_dir / "workflow.json"
+            workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+            workflow["nodes"][1]["description"] = "Bearer abcdefghijklmnop"
+            workflow_path.write_text(json.dumps(workflow), encoding="utf-8")
+            (output_dir / "workflow.litegraph.json").write_text(
+                json.dumps(workflow_to_litegraph(workflow)),
+                encoding="utf-8",
+            )
+            self._refresh_manifest_file_digest(output_dir, "workflow.json")
+            self._refresh_manifest_file_digest(output_dir, "workflow.litegraph.json")
+            self._refresh_manifest_workflow(output_dir, workflow_path.read_bytes())
+
+            report = verify_authoring_artifacts(output_dir)
+
+        self.assertFalse(report["valid"])
+        self.assertEqual(report["errors"], [{"code": "artifact_secret_like_value"}])
+        self.assertNotIn("abcdefghijklmnop", json.dumps(report))
+
     def test_verified_load_returns_only_the_same_workflow_after_all_checks(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -183,4 +224,12 @@ class AuthoringArtifactTests(TestCase):
             if item["path"] == filename:
                 item["bytes"] = len(payload)
                 item["sha256"] = hashlib.sha256(payload).hexdigest()
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    @staticmethod
+    def _refresh_manifest_workflow(output_dir, payload):
+        manifest_path = output_dir / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["workflow"]["bytes"] = len(payload)
+        manifest["workflow"]["sha256"] = hashlib.sha256(payload).hexdigest()
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
