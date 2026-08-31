@@ -17,6 +17,7 @@ working on.
 ## Operate one self-hosted instance
 
 - [Service](service.md) — authenticated loopback service and route boundary
+- [Go-live checklist](go-live.md) — one reviewed single-instance deployment sequence
 - [Service bootstrap](service-bootstrap.md) — secure first-use workspace
 - [Service Doctor](service-doctor.md) — read-only readiness diagnosis
 - [Systemd supervision](systemd-service.md) — manually reviewed Linux unit

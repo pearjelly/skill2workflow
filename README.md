@@ -19,6 +19,9 @@ termination, or automatic reconciliation of unknown external side effects.
 [Governance](GOVERNANCE.md) · [Contributing](CONTRIBUTING.md) ·
 [Code of Conduct](CODE_OF_CONDUCT.md)
 
+For a reviewed single-team deployment path, see the
+[go-live checklist](docs/go-live.md).
+
 The core idea is simple:
 
 - Skills answer: "Can the agent do this?"
