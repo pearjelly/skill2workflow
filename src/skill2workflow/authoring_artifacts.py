@@ -170,6 +170,7 @@ def repair_authoring_artifacts(
         "status": "repaired",
         "valid": True,
         "previous_valid": previous.get("valid") is True,
+        "previous_errors": _verification_error_codes(previous),
         "workflow_id": rebuilt["workflow_id"],
         "workflow_version": rebuilt["workflow_version"],
         "output_dir": str(destination),
@@ -206,6 +207,7 @@ def preflight_authoring_repair(
         "status": "ready",
         "valid": True,
         "previous_valid": previous.get("valid") is True,
+        "previous_errors": _verification_error_codes(previous),
         "workflow_id": rebuilt["workflow_id"],
         "workflow_version": rebuilt["workflow_version"],
         "output_dir": str(destination),
@@ -331,6 +333,17 @@ def _new_verification_report() -> Dict[str, object]:
 def _invalid(report: Dict[str, object], code: str) -> Dict[str, object]:
     report["errors"] = [{"code": code}]
     return report
+
+
+def _verification_error_codes(report: Dict[str, object]) -> list:
+    errors = report.get("errors") if isinstance(report, dict) else None
+    if not isinstance(errors, list):
+        return []
+    codes = []
+    for error in errors:
+        if isinstance(error, dict) and isinstance(error.get("code"), str):
+            codes.append(error["code"])
+    return codes
 
 
 def _validate_repair_locations(destination: Path, backup: Path) -> None:

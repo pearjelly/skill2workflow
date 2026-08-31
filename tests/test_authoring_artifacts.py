@@ -247,6 +247,7 @@ class AuthoringArtifactTests(TestCase):
         self.assertEqual(result["status"], "repaired")
         self.assertTrue(result["valid"])
         self.assertFalse(result["previous_valid"])
+        self.assertEqual(result["previous_errors"], ["artifact_file_digest_mismatch"])
         self.assertTrue(repaired["valid"])
         self.assertFalse(preserved["valid"])
         self.assertEqual(backup_mode, 0o700)
@@ -314,6 +315,7 @@ class AuthoringArtifactTests(TestCase):
         self.assertEqual(result["status"], "ready")
         self.assertTrue(result["valid"])
         self.assertTrue(result["previous_valid"])
+        self.assertEqual(result["previous_errors"], [])
         self.assertEqual(after, before)
         self.assertFalse(backup_exists)
 

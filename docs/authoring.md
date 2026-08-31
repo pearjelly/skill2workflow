@@ -129,8 +129,9 @@ verifies a fresh private replacement. Only then does it rename the old set to
 the requested backup and place the verified replacement at the original path.
 If compilation or replacement preparation fails, the existing set is left
 unchanged; if the final replacement rename fails, it attempts to restore the
-old set. The compact result reports only whether the prior set was valid and
-the new workflow identity/digest, never Skill contents or verification values.
+old set. The compact result reports only whether the prior set was valid, its
+fixed verification error codes, and the new workflow identity/digest—never
+Skill contents or verification values.
 
 Repair is not an in-place edit, a merge, a provenance signature, or a way to
 recover a lost source Skill. Review the preserved backup before deleting it;

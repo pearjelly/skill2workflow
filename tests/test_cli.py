@@ -181,6 +181,7 @@ class CliTests(TestCase):
         self.assertEqual(exit_code, 0)
         self.assertEqual(result["status"], "repaired")
         self.assertFalse(result["previous_valid"])
+        self.assertEqual(result["previous_errors"], ["artifact_file_digest_mismatch"])
         self.assertTrue(backup_exists)
         self.assertEqual(verification_exit, 0)
         self.assertTrue(json.loads(verification_stdout.getvalue())["valid"])
