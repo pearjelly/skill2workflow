@@ -12,7 +12,7 @@ from typing import Callable, Optional
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from .artifact_io import MAX_WORKFLOW_ARTIFACT_BYTES
-from .compiler import compile_ir_to_workflow, validate_workflow_structured
+from .compiler import compile_ir_to_workflow, summarize_skill_compile, validate_workflow_structured
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
 from .parser import MAX_SKILL_FILE_BYTES, parse_skill_text
@@ -1000,13 +1000,17 @@ def serve_ui(
                 self._write_json(400, {"error": "skill compile body is malformed"})
                 return
             try:
-                workflow = compile_ir_to_workflow(
-                    parse_skill_text(payload["skill_markdown"], source_path="SKILL.md")
-                )
+                ir = parse_skill_text(payload["skill_markdown"], source_path="SKILL.md")
+                workflow = compile_ir_to_workflow(ir)
                 if validate_workflow_structured(workflow):
                     raise ValueError("compiled workflow is invalid")
                 response_body = json.dumps(
-                    workflow, ensure_ascii=False, separators=(",", ":")
+                    {
+                        "workflow": workflow,
+                        "review": summarize_skill_compile(ir, workflow),
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
                 ).encode("utf-8")
                 if len(response_body) > _SKILL_COMPILE_MAX_RESPONSE_BYTES:
                     raise ValueError("compiled workflow is too large")

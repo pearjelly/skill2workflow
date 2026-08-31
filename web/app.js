@@ -1,7 +1,14 @@
 (function () {
   const GRAPH_VERSION = "skill2workflow-litegraph-0.1.0";
   const SKILL_COMPILE_URL = "/api/v1/skill-compiles";
+  const SKILL_COMPILE_REVIEW_SCHEMA_VERSION = "skill2workflow-skill-compile-review-0.1.0";
   const MAX_SKILL_INPUT_BYTES = 2 * 1024 * 1024;
+  const MAX_SKILL_COMPILE_REVIEW_COUNT = 10000;
+  const SKILL_COMPILE_REVIEW_NOTICES = {
+    checklist_not_found: "No checklist steps were found. This draft uses the compiler's generic review step.",
+    human_gate_not_inferred: "No human approval node was inferred. Add an explicit review before real-world effects.",
+    verification_not_inferred: "No verification node was inferred. Add a confirmation or validation step before relying on the result.",
+  };
   const NODE_TYPES = ["start", "step", "human_gate", "tool_call", "verification", "instruction", "failure", "end"];
   const TYPE_THEME = {
     start: { color: "#1769aa", background: "#eaf4fc" },
@@ -118,6 +125,8 @@
     els.nodeHttpTimeout = document.getElementById("node-http-timeout");
     els.nodeSource = document.getElementById("node-source");
     els.validationList = document.getElementById("validation-list");
+    els.skillReviewPanel = document.getElementById("skill-review-panel");
+    els.skillReviewList = document.getElementById("skill-review-list");
   }
 
   function bindEvents() {
@@ -292,8 +301,8 @@
           ? "Use skill2workflow ui instead of a static HTTP server to compile SKILL.md"
           : "local SKILL compilation is unavailable");
       }
-      const workflow = await response.json();
-      loadDocument(workflow, "Compiled SKILL.md");
+      const compiled = parseSkillCompileResponse(await response.json());
+      loadDocument(compiled.workflow, "Compiled SKILL.md", compiled.review);
     } catch (error) {
       renderValidation(["Could not compile SKILL.md: " + error.message], new Set());
       setStatus("SKILL compile failed", "invalid");
@@ -308,7 +317,7 @@
     els.compileSkill.textContent = skillCompileLoading ? "Compiling SKILL…" : "Compile SKILL";
   }
 
-  function loadDocument(documentJson, label) {
+  function loadDocument(documentJson, label, skillCompileReview) {
     try {
       const normalized = normalizeDocument(documentJson);
       const graphJson = normalized.graphJson;
@@ -319,12 +328,47 @@
       applyNodeTheme(new Set());
       renderInspector(null);
       validateGraph();
+      renderSkillCompileReview(skillCompileReview || null);
       fitGraph();
       setStatus(label || "Loaded", validationErrors.length ? "invalid" : "valid");
     } catch (error) {
+      renderSkillCompileReview(null);
       renderValidation([error.message], new Set());
       setStatus("Load failed", "invalid");
     }
+  }
+
+  function parseSkillCompileResponse(payload) {
+    if (!plainObject(payload) || !plainObject(payload.workflow) || !plainObject(payload.review)) {
+      throw new Error("local SKILL compilation returned an invalid response");
+    }
+    const review = payload.review;
+    if (review.schema_version !== SKILL_COMPILE_REVIEW_SCHEMA_VERSION) {
+      throw new Error("local SKILL compilation returned an unsupported review");
+    }
+    const countFields = [
+      "ordered_step_count",
+      "executable_node_count",
+      "human_gate_count",
+      "verification_node_count",
+      "hard_gate_count",
+    ];
+    countFields.forEach(function (field) {
+      if (!Number.isSafeInteger(review[field]) || review[field] < 0 || review[field] > MAX_SKILL_COMPILE_REVIEW_COUNT) {
+        throw new Error("local SKILL compilation returned an invalid review");
+      }
+    });
+    if (!Array.isArray(review.notices) || review.notices.length > 3) {
+      throw new Error("local SKILL compilation returned an invalid review");
+    }
+    const seenNotices = new Set();
+    review.notices.forEach(function (notice) {
+      if (!Object.prototype.hasOwnProperty.call(SKILL_COMPILE_REVIEW_NOTICES, notice) || seenNotices.has(notice)) {
+        throw new Error("local SKILL compilation returned an invalid review");
+      }
+      seenNotices.add(notice);
+    });
+    return { workflow: payload.workflow, review: review };
   }
 
   function normalizeDocument(documentJson) {
@@ -647,6 +691,25 @@
       item.className = "error";
       item.textContent = error;
       els.validationList.appendChild(item);
+    });
+  }
+
+  function renderSkillCompileReview(review) {
+    els.skillReviewList.innerHTML = "";
+    els.skillReviewPanel.hidden = !review;
+    if (!review) return;
+
+    const summary = document.createElement("li");
+    summary.className = "ok";
+    summary.textContent = "Compiler inferred " + review.executable_node_count + " executable node(s), "
+      + review.human_gate_count + " human gate(s), "
+      + review.verification_node_count + " verification node(s), and "
+      + review.hard_gate_count + " hard-gate declaration(s).";
+    els.skillReviewList.appendChild(summary);
+    review.notices.forEach(function (notice) {
+      const item = document.createElement("li");
+      item.textContent = SKILL_COMPILE_REVIEW_NOTICES[notice];
+      els.skillReviewList.appendChild(item);
     });
   }
 

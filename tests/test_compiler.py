@@ -2,10 +2,59 @@ import json
 from pathlib import Path
 from unittest import TestCase
 
-from skill2workflow.compiler import compile_ir_to_workflow, validate_workflow, validate_workflow_structured
+from skill2workflow.compiler import (
+    SKILL_COMPILE_REVIEW_SCHEMA_VERSION,
+    compile_ir_to_workflow,
+    summarize_skill_compile,
+    validate_workflow,
+    validate_workflow_structured,
+)
 
 
 class CompilerTests(TestCase):
+    def test_skill_compile_review_is_source_free_and_reports_inferred_controls(self):
+        ir = {
+            "metadata": {"name": "review"},
+            "hard_gates": ["Obtain human approval."],
+            "ordered_step_details": [
+                {"title": "Ask for approval", "detail": "", "line": 10, "section": "Checklist"},
+                {"title": "Verify completion", "detail": "", "line": 11, "section": "Checklist"},
+            ],
+            "ordered_steps": ["Ask for approval", "Verify completion"],
+        }
+
+        review = summarize_skill_compile(ir, compile_ir_to_workflow(ir))
+
+        self.assertEqual(
+            review,
+            {
+                "schema_version": SKILL_COMPILE_REVIEW_SCHEMA_VERSION,
+                "ordered_step_count": 2,
+                "executable_node_count": 2,
+                "human_gate_count": 1,
+                "verification_node_count": 1,
+                "hard_gate_count": 1,
+                "notices": [],
+            },
+        )
+        self.assertNotIn("Obtain human approval.", str(review))
+
+    def test_skill_compile_review_calls_out_missing_inferred_controls(self):
+        ir = {"metadata": {}, "hard_gates": [], "ordered_steps": []}
+
+        review = summarize_skill_compile(ir, compile_ir_to_workflow(ir))
+
+        self.assertEqual(review["ordered_step_count"], 0)
+        self.assertEqual(review["executable_node_count"], 1)
+        self.assertEqual(
+            review["notices"],
+            [
+                "checklist_not_found",
+                "human_gate_not_inferred",
+                "verification_not_inferred",
+            ],
+        )
+
     def test_validate_rejects_non_object_workflow_documents(self):
         structured = validate_workflow_structured(["not", "a", "workflow"])
 

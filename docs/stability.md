@@ -144,6 +144,10 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Browser-side `SKILL.md` staging reads bytes through strict UTF-8 decoding;
   malformed byte sequences are rejected before the loopback compiler route,
   rather than silently normalized into a different Skill document.
+- Local Skill compilation returns a fixed source-free review schema containing
+  inferred structural counts and a finite notice vocabulary. The editor
+  validates that response before showing it; review guidance never mutates the
+  draft, supplies business validation, or grants execution authority.
 - The installed live UI can start only a preflight-ready empty trigger for an
   exact published version through the fixed `/api/v1/workflow-empty-triggers`
   proxy. The proxy fixes `source` to `live-ui` and input to `{}`, requires an

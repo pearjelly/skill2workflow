@@ -12,6 +12,12 @@ from .input_schema import validate_input_schema_contract
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
 _TRANSITION_KEYS = ("on_success", "on_failure", "on_fallback")
+SKILL_COMPILE_REVIEW_SCHEMA_VERSION = "skill2workflow-skill-compile-review-0.1.0"
+_SKILL_COMPILE_REVIEW_NOTICE_CODES = (
+    "checklist_not_found",
+    "human_gate_not_inferred",
+    "verification_not_inferred",
+)
 
 
 def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
@@ -143,6 +149,51 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
             "default_retry": {"max_attempts": 0},
             "default_timeout_ms": 300000,
         },
+    }
+
+
+def summarize_skill_compile(ir: Dict[str, object], workflow: Workflow) -> Dict[str, object]:
+    """Return a compact, source-free review of one compiled Skill draft.
+
+    This is authoring guidance only. It describes what the conservative compiler
+    inferred; it does not validate business intent or alter runtime behavior.
+    """
+
+    node_types = []
+    nodes = workflow.get("nodes") if isinstance(workflow, dict) else None
+    if isinstance(nodes, list):
+        node_types = [node.get("type") for node in nodes if isinstance(node, dict)]
+    ordered_step_details = ir.get("ordered_step_details") if isinstance(ir, dict) else None
+    ordered_steps = ir.get("ordered_steps") if isinstance(ir, dict) else None
+    if isinstance(ordered_step_details, list):
+        ordered_step_count = len(ordered_step_details)
+    elif isinstance(ordered_steps, list):
+        ordered_step_count = len(ordered_steps)
+    else:
+        ordered_step_count = 0
+    hard_gates = ir.get("hard_gates") if isinstance(ir, dict) else None
+    hard_gate_count = len(hard_gates) if isinstance(hard_gates, list) else 0
+    human_gate_count = node_types.count("human_gate")
+    verification_node_count = node_types.count("verification")
+    executable_node_count = sum(
+        node_type in {"step", "human_gate", "tool_call", "verification", "instruction"}
+        for node_type in node_types
+    )
+    notices = []
+    if ordered_step_count == 0:
+        notices.append("checklist_not_found")
+    if human_gate_count == 0:
+        notices.append("human_gate_not_inferred")
+    if verification_node_count == 0:
+        notices.append("verification_not_inferred")
+    return {
+        "schema_version": SKILL_COMPILE_REVIEW_SCHEMA_VERSION,
+        "ordered_step_count": ordered_step_count,
+        "executable_node_count": executable_node_count,
+        "human_gate_count": human_gate_count,
+        "verification_node_count": verification_node_count,
+        "hard_gate_count": hard_gate_count,
+        "notices": notices,
     }
 
 

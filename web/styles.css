@@ -322,6 +322,10 @@ textarea {
   color: var(--danger);
 }
 
+.skill-review-panel[hidden] {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .topbar {
     grid-template-columns: 1fr;

@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added a source-free **SKILL Compile Review** to the local editor flow. It
+  reports compiler-inferred structural counts and fixed missing-control notices
+  without echoing Skill content or changing, publishing, or executing the
+  draft.
+
 - Hardened local `SKILL.md` staging with strict browser-side UTF-8 byte
   decoding. Malformed source files now stop before compilation instead of being
   silently rewritten by replacement decoding.

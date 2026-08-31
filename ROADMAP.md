@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-233
+- Completed delivery loops: 1-234
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 233 is complete with strict local Skill decoding
+- Active loop: None; Loop 234 is complete with source-free compile review
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing the source-fidelity authoring evidence
+- Next decision: select the next Production Baseline loop after reviewing the compile-review authoring evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-233 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-234 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -6292,9 +6292,42 @@ Repeatable focused command:
 PYTHONPATH=src python3 -m unittest tests.test_ui tests.test_parser -v
 ```
 
+### Loop 234: Source-Free Local SKILL.md Compile Review
+
+**Status:** Complete.
+
+**Prior basis:** The installed editor could compile a local Skill and render its
+draft graph, but authors had to inspect every node manually to discover whether
+the conservative compiler had inferred checklist steps, human approvals,
+verification, or hard-gate declarations.
+
+**Outcome:** The fixed loopback compiler response now contains the validated
+Workflow DSL draft plus a bounded `skill2workflow-skill-compile-review-0.1.0`
+summary. It exposes only structural counts and a finite notice vocabulary. The
+editor validates that compact schema and renders an explicit review card after
+compilation, including notices for missing checklist, human-gate, or
+verification inference.
+
+**Evidence:** Compiler tests lock exact inferred counts, a no-content review
+projection, and missing-control notices. UI route tests lock the response shape
+and confirm source text cannot appear in the review. Browser code validates the
+finite summary contract before rendering. Authoring, installation, and
+stability guides distinguish review guidance from execution or safety proof.
+
+**Safety boundary:** This is a local authoring observation, not policy
+enforcement. It does not reveal Skill content, infer business correctness,
+modify the Workflow DSL, add approvals/verification automatically, publish,
+execute, access runtime state, or resolve credentials.
+
+Repeatable focused command:
+
+```bash
+PYTHONPATH=src python3 -m unittest tests.test_compiler tests.test_ui -v
+```
+
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 233 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
+This rolling queue is ordered. Loop 234 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing the release artifact and production-boundary CI evidence.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -6494,6 +6527,7 @@ This rolling queue is ordered. Loop 233 is complete and there is no active deliv
 | Loop 231: Local SKILL.md Editor Compilation | Complete | Let authors compile one standard local SKILL.md directly into the installed visual editor without creating an intermediate file | Fixed loopback compile route, bounded in-memory parser/compiler handoff, no-write/source-path redaction, UI/docs/tests, and full gates |
 | Loop 232: Offline Editor Asset Boundary | Complete | Make the installed visual authoring surface usable without CDN access or runtime internet egress | Pinned local LiteGraph assets, MIT notice, SHA-256 integrity test, offline docs, and full gates |
 | Loop 233: Strict Local SKILL.md Source Decoding | Complete | Keep a selected local Skill's bytes from being silently replacement-decoded before compilation | Fatal UTF-8 byte decoder, explicit browser failure, UI/docs/tests, and full gates |
+| Loop 234: Source-Free Local SKILL.md Compile Review | Complete | Make conservative compiler inference visible before an author changes or publishes a draft | Fixed structural summary, finite notice codes, strict browser validation, UI/docs/tests, and full gates |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

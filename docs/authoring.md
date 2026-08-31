@@ -25,6 +25,14 @@ browser's local file path. The editor renders the returned Workflow DSL only
 after its normal local validation. Use the CLI `compile` command when you need
 a durable JSON artifact in a specified filesystem location.
 
+After a successful compile, the editor shows a source-free **SKILL Compile
+Review**: inferred executable, human-gate, verification, and hard-gate
+declaration counts, plus fixed notices when a checklist, approval node, or
+verification node was not inferred. This is a conservative review aid, not a
+proof of business safety or an execution policy. Review and edit the Workflow
+DSL before publication; the summary neither changes the draft nor authorizes a
+side effect.
+
 This local compile route is intentionally unavailable from a generic static
 server such as `python3 -m http.server`; use `skill2workflow ui` for the
 interactive compiler path. Do not place credentials, tokens, customer data, or

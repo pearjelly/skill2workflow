@@ -31,6 +31,11 @@ path. The browser decodes the selected bytes as strict UTF-8, so invalid source
 files are rejected instead of silently being rewritten. The control-plane page still accepts an exported snapshot file; by
 default it is not a live authenticated service console.
 
+Successful Skill compiles also display a bounded, source-free **SKILL Compile
+Review** with inferred node counts and fixed missing-control notices. It is an
+authoring prompt only: it does not inspect business intent, change the draft,
+validate a real-world action, publish, or execute anything.
+
 For an explicit live view of one running service, configure both the
 service origin and its owner-only ingress token file:
 

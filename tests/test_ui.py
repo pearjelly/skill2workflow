@@ -199,9 +199,12 @@ class UiTests(TestCase):
         self.assertIn(b"Workflow DSL Visual Editor", body)
         self.assertIn(b"Choose SKILL.md", body)
         self.assertIn(b"Compile SKILL", body)
+        self.assertIn(b"SKILL Compile Review", body)
         app = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
         self.assertIn("/api/v1/skill-compiles", app)
         self.assertIn("compileStagedSkill", app)
+        self.assertIn("parseSkillCompileResponse", app)
+        self.assertIn("skill2workflow-skill-compile-review-0.1.0", app)
 
     def test_ui_server_compiles_one_bounded_skill_without_service_credentials(self):
         observed = {}
@@ -232,13 +235,27 @@ class UiTests(TestCase):
             method="POST",
         )
         with urllib.request.urlopen(request, timeout=2) as response:
-            workflow = json.loads(response.read().decode("utf-8"))
+            compiled = json.loads(response.read().decode("utf-8"))
             self.assertEqual(response.status, 200)
             self.assertEqual(response.headers["Cache-Control"], "no-store")
         thread.join(timeout=2)
         self.assertFalse(thread.is_alive())
+        workflow = compiled["workflow"]
         self.assertEqual(workflow["workflow"]["id"], "workflow_local_preview")
         self.assertEqual(workflow["nodes"][1]["metadata"]["source"]["file"], "SKILL.md")
+        self.assertEqual(
+            compiled["review"],
+            {
+                "schema_version": "skill2workflow-skill-compile-review-0.1.0",
+                "ordered_step_count": 1,
+                "executable_node_count": 1,
+                "human_gate_count": 0,
+                "verification_node_count": 0,
+                "hard_gate_count": 0,
+                "notices": ["human_gate_not_inferred", "verification_not_inferred"],
+            },
+        )
+        self.assertNotIn("Review draft", json.dumps(compiled["review"]))
 
     def test_ui_server_rejects_malformed_skill_compile_before_parsing(self):
         observed = {}
