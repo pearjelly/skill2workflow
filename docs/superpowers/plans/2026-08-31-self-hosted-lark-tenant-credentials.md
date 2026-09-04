@@ -30,6 +30,9 @@ the manually supplied token expires.
 - Extend `service-init` with explicit non-secret configuration flags, and add
   service, connector, config, documentation, wheel, and secret-hygiene
   evidence.
+- Provide one installed, explicit preflight command that performs a bounded
+  exchange without starting a workflow or creating a Feishu task, and returns
+  only a fixed value-free readiness result.
 
 ## Contract
 
@@ -102,5 +105,7 @@ telemetry, console responses, or CLI output.
    fake exchange, and changing the private App Secret file is observed by the
    next execution.
 6. Documentation covers private file setup, rotation, scope, non-goals, and
-   the installed `service-init` flags. Full regression, package smoke, secret
-   hygiene, and the production-baseline bundle pass.
+   the installed `service-init` flags. The explicit credential-check command
+   has a fixed value-free CLI result and cannot create business work. Full
+   regression, package smoke, secret hygiene, and the production-baseline
+   bundle pass.

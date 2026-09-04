@@ -7065,7 +7065,9 @@ managed.
 the existing public `lark_bot_access_token` handle from a non-secret App ID and
 a reserved owner-only App Secret source file at connector execution time. It
 uses a fixed direct bounded exchange, retains no token, and preserves existing
-static credentials unchanged.
+static credentials unchanged. Operators can also invoke the installed
+`service-lark-tenant-credential-check` command for one value-free, bounded
+preflight exchange; it neither starts a workflow nor creates a Feishu task.
 
 **Safety boundary:** This does not add generic OAuth, token caching, token
 persistence, hosted secret management, Lark international support, automatic
@@ -7073,9 +7075,10 @@ connector discovery, or exactly-once provider effects. Doctor and all
 read-only service surfaces remain local and do not exchange credentials.
 
 **Evidence:** Strict configuration and source-handle denial tests,
-fake-transport bounded/redacted exchange tests, service-instance secret
-rotation evidence, full-suite regression, and isolated-wheel qualification.
-Design: `docs/superpowers/plans/2026-08-31-self-hosted-lark-tenant-credentials.md`.
+fake-transport bounded/redacted exchange tests, value-free explicit-check CLI
+contract, service-instance secret rotation evidence, full-suite regression,
+and isolated-wheel qualification. Design:
+`docs/superpowers/plans/2026-08-31-self-hosted-lark-tenant-credentials.md`.
 
 
 | Loop | Status | Goal | Exit artifact |

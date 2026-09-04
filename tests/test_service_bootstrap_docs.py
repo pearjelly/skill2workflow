@@ -63,3 +63,18 @@ class ServiceBootstrapDocumentationTests(TestCase):
         self.assertIn("never", guide)
         self.assertIn("service-token-rotation.md", service)
         self.assertIn('"service-token-rotate"', package_smoke)
+
+    def test_feishu_tenant_check_is_documented_as_value_free_preflight(self):
+        guide = (ROOT / "docs" / "service-bootstrap.md").read_text(
+            encoding="utf-8"
+        )
+        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("service-lark-tenant-credential-check", guide)
+        self.assertIn("not create a task, start a workflow", guide)
+        self.assertIn("remain local and do not make this provider call", guide)
+        self.assertIn("service-lark-tenant-credential-check", roadmap)
+        self.assertIn('"service-lark-tenant-credential-check"', package_smoke)
