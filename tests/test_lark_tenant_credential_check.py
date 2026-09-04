@@ -67,6 +67,42 @@ class LarkTenantCredentialCheckTests(TestCase):
         self.assertEqual(result["status"], "not_ready")
         self.assertEqual(result["reason"], "not_configured")
         provider.assert_not_called()
+
+    def test_missing_or_unreadable_config_is_a_fixed_not_ready_result(self):
+        result = check_lark_tenant_credential(Path("/missing/private/service.json"))
+
+        self.assertEqual(result["status"], "not_ready")
+        self.assertEqual(result["reason"], "invalid_config")
+        self.assertNotIn("/missing/private/service.json", str(result))
+
+    def test_cli_unavailable_credential_is_value_free_and_returns_one(self):
+        with TemporaryDirectory() as temporary:
+            initialized = initialize_service_workspace(
+                Path(temporary) / "runtime",
+                lark_app_id="cli_example",
+                lark_app_secret_handle="lark_app_secret",
+            )
+            stdout = StringIO()
+            with patch(
+                "skill2workflow.cli.check_lark_tenant_credential",
+                return_value={
+                    "schema_version": "skill2workflow-lark-tenant-credential-check-0.1.0",
+                    "status": "not_ready",
+                    "provider": "lark_tenant_access_token",
+                    "reason": "credential_unavailable",
+                },
+            ):
+                with redirect_stdout(stdout):
+                    exit_code = main([
+                        "service-lark-tenant-credential-check",
+                        "--config",
+                        str(initialized["config_file"]),
+                    ])
+
+        self.assertEqual(exit_code, 1)
+        result = json.loads(stdout.getvalue())
+        self.assertEqual(result["reason"], "credential_unavailable")
+        self.assertNotIn("private", stdout.getvalue())
 import json
 from contextlib import redirect_stdout
 from io import StringIO

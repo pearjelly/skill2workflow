@@ -23,7 +23,7 @@ def check_lark_tenant_credential(config_path: Path):
     }
     try:
         config = load_service_config(config_path)
-    except ValueError:
+    except (OSError, ValueError):
         result["reason"] = "invalid_config"
         return result
     if config.lark_tenant_access_token is None:
