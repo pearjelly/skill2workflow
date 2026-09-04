@@ -73,6 +73,7 @@ REQUIRED_CONSOLE_COMMANDS = (
     "service-token-rotate",
     "service-doctor",
     "service-go-live-check",
+    "service-lark-tenant-credential-check",
     "systemd-unit",
     "service",
     "schedule-run-due",

@@ -116,6 +116,19 @@ owner-only file through your secret manager. The service derives the existing
 rotate a static tenant-token file. The App Secret is never a command-line
 value, configuration value, or Workflow DSL field.
 
+After creating the private App Secret file, explicitly verify the Feishu
+credential exchange before sending business work:
+
+```bash
+skill2workflow service-lark-tenant-credential-check \
+  --config /srv/skill2workflow/team-a/config/service.json
+```
+
+This command intentionally performs one bounded direct token exchange. It does
+not create a task, start a workflow, retain a token, or print a secret. It
+returns only `ready`/`not_ready` with a fixed reason; ordinary go-live Doctor
+and readiness checks remain local and do not make this provider call.
+
 ## Data And Security Boundary
 
 The generated listener remains loopback-only. Public or cross-host traffic still

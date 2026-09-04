@@ -49,6 +49,7 @@ from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace, rotate_service_token
 from .service_doctor import diagnose_service
 from .go_live import assess_go_live
+from .lark_tenant_credential_check import check_lark_tenant_credential
 from .service_client import (
     fetch_audit_consistency,
     fetch_audit_events,
@@ -508,6 +509,12 @@ def _main(argv=None) -> int:
     service_go_live_cmd.add_argument("--config", type=Path, required=True)
     service_go_live_cmd.add_argument("--service-url", required=True)
     service_go_live_cmd.add_argument("--auth-token-file", type=Path, required=True)
+
+    lark_credential_check_cmd = subparsers.add_parser(
+        "service-lark-tenant-credential-check",
+        help="Explicitly validate configured Feishu China tenant credentials",
+    )
+    lark_credential_check_cmd.add_argument("--config", type=Path, required=True)
 
     service_init_cmd = subparsers.add_parser(
         "service-init",
@@ -1568,6 +1575,11 @@ def _main(argv=None) -> int:
             args.service_url,
             args.auth_token_file,
         )
+        _print_json(result)
+        return 0 if result["status"] == "ready" else 1
+
+    if args.command == "service-lark-tenant-credential-check":
+        result = check_lark_tenant_credential(args.config)
         _print_json(result)
         return 0 if result["status"] == "ready" else 1
 

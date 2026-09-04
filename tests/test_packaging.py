@@ -104,6 +104,7 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("validate", text)
         self.assertIn("systemd-unit", text)
         self.assertIn("service-go-live-check", text)
+        self.assertIn("service-lark-tenant-credential-check", text)
         self.assertIn('"live_snapshot_status": live_snapshot_status', text)
         self.assertIn('"systemd_unit_status": systemd_unit_status', text)
         self.assertIn('"release_manifest_status": True', text)
