@@ -258,6 +258,14 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             raise RuntimeError(
                 f"installed skill2workflow {command} --help did not print usage text"
             )
+    go_live_help = _run(
+        [str(console_script), "service-go-live-check", "--help"],
+        cwd=isolated_dir,
+    )
+    if "--verify-lark-tenant-credential" not in go_live_help:
+        raise RuntimeError(
+            "installed service-go-live-check is missing the Feishu credential preflight option"
+        )
     bootstrap_root = isolated_dir / "service-bootstrap"
     bootstrap_output = _run(
         [
@@ -756,6 +764,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         "service_bootstrap_status": True,
         "service_token_rotation_status": True,
         "service_doctor_status": True,
+        "go_live_preflight_option_status": True,
         "systemd_unit_status": systemd_unit_status,
         "live_snapshot_status": live_snapshot_status,
         "ui_status": ui_status,
