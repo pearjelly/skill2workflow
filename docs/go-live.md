@@ -2,8 +2,10 @@
 
 This guide turns the existing self-hosted Beta controls into one operator
 sequence for a single team. It does not create accounts, install a supervisor,
-configure TLS, issue credentials, or contact a live provider. Complete each
-step with your deployment's own change-control and privacy requirements.
+configure TLS, or issue credentials. The optional Feishu credential preflight
+in step 2a is the sole exception: it contacts the fixed Feishu China
+tenant-token endpoint without creating business work. Complete each step with
+your deployment's own change-control and privacy requirements.
 
 ## 1. Prepare a secure workspace
 
@@ -36,6 +38,28 @@ Proceed only when every fixed check is `passed` and `status` is `ready`. A
 failed check does not modify the workspace. Correct configuration, permission,
 credential-directory, state, or bind problems first; see
 [Service Doctor](service-doctor.md).
+
+### 2a. Preflight a configured Feishu China credential
+
+Only when `config/service.json` contains the approved
+`lark_tenant_access_token` descriptor, run this separate, explicit preflight
+after the App Secret file has been created and before sending any business
+work:
+
+```bash
+skill2workflow service-lark-tenant-credential-check \
+  --config /srv/skill2workflow/config/service.json
+```
+
+It performs one bounded direct tenant-token exchange and exits `0` only when
+the result is `ready`. It does not start the service, publish or start a
+workflow, retain a token, or create a Feishu task. Its fixed result is
+value-free; use `not_ready` to correct the private App Secret or approved
+application configuration through normal change control. Do not run it for a
+deployment without that descriptor: it returns `not_configured` and does not
+contact Feishu. The ordinary Doctor and composite go-live gate intentionally
+remain local/provider-free, so this explicit step cannot be skipped by
+mistaking local readiness for provider credential validity.
 
 ## 3. Start under reviewed supervision
 
