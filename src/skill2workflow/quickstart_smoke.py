@@ -17,6 +17,12 @@ from pathlib import Path
 from typing import Dict, List
 
 
+# Wheel qualification builds an isolated virtual environment. On a busy CI
+# worker, dependency installation alone can exceed the old 25-second limit.
+# Keep a finite bound so an actual stalled build still fails visibly.
+PACKAGE_QUALIFICATION_TIMEOUT_SECONDS = 60
+
+
 def run_quickstart_smoke(
     repo_root: Path, work_dir: Path, reset: bool = True
 ) -> Dict[str, object]:
@@ -36,7 +42,7 @@ def run_quickstart_smoke(
         cwd=str(repo_root),
         capture_output=True,
         text=True,
-        timeout=25,
+        timeout=PACKAGE_QUALIFICATION_TIMEOUT_SECONDS,
     )
     if package.returncode != 0:
         raise RuntimeError("quickstart wheel qualification failed")
