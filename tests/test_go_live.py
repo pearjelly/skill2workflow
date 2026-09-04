@@ -166,6 +166,23 @@ class GoLiveTests(TestCase):
         self.assertNotIn("private-provider-message", json.dumps(result))
         probe.assert_not_called()
 
+    def test_explicit_lark_credential_check_rejects_inconsistent_ready_pair(self):
+        doctor = {"status": "ready", "checks": [{"id": "config", "status": "passed", "code": "valid"}]}
+        with patch("skill2workflow.go_live.diagnose_service", return_value=doctor), patch(
+            "skill2workflow.go_live.check_lark_tenant_credential",
+            return_value={"status": "ready", "reason": "not_configured"},
+        ), patch("skill2workflow.go_live.fetch_service_probe") as probe:
+            result = assess_go_live(
+                Path("service.json"),
+                "https://service.example",
+                Path("token"),
+                verify_lark_tenant_credential=True,
+            )
+
+        self.assertEqual(result["status"], "not_ready")
+        self.assertEqual(result["lark_tenant_credential"]["reason"], "credential_unavailable")
+        probe.assert_not_called()
+
     def test_explicit_lark_credential_check_stays_blocked_by_failed_doctor(self):
         doctor = {"status": "not_ready", "checks": [{"id": "config", "status": "failed", "code": "invalid"}]}
         with patch("skill2workflow.go_live.diagnose_service", return_value=doctor), patch(

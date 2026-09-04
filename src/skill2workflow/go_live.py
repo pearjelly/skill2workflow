@@ -153,11 +153,11 @@ def _summarize_lark_tenant_credential(result):
         }
     status = result.get("status")
     reason = result.get("reason")
-    if status not in {"ready", "not_ready"} or reason not in {
-        "validated",
-        "invalid_config",
-        "not_configured",
-        "credential_unavailable",
+    if (status, reason) not in {
+        ("ready", "validated"),
+        ("not_ready", "invalid_config"),
+        ("not_ready", "not_configured"),
+        ("not_ready", "credential_unavailable"),
     }:
         return {
             "status": "not_ready",

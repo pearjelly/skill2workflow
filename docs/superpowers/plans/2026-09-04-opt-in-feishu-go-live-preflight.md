@@ -49,10 +49,11 @@ With the explicit flag, the report adds only:
 }
 ```
 
-The only accepted selected-check reasons are `validated`, `invalid_config`,
-`not_configured`, and `credential_unavailable`. If Doctor is not ready, the
-summary is instead `not_checked` with `blocked_by_local_doctor`, and no
-provider call occurs. Invalid or unexpected internal check values normalize to
+The only accepted selected-check pairs are `ready` / `validated` and
+`not_ready` with `invalid_config`, `not_configured`, or
+`credential_unavailable`. If Doctor is not ready, the summary is instead
+`not_checked` with `blocked_by_local_doctor`, and no provider call occurs.
+Invalid, unexpected, or inconsistent internal check values normalize to
 `not_ready` / `credential_unavailable` at the composite boundary.
 
 The selected sequence is:
