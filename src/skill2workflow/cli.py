@@ -509,6 +509,11 @@ def _main(argv=None) -> int:
     service_go_live_cmd.add_argument("--config", type=Path, required=True)
     service_go_live_cmd.add_argument("--service-url", required=True)
     service_go_live_cmd.add_argument("--auth-token-file", type=Path, required=True)
+    service_go_live_cmd.add_argument(
+        "--verify-lark-tenant-credential",
+        action="store_true",
+        help="Explicitly perform one value-free Feishu China credential preflight after local Doctor passes",
+    )
 
     lark_credential_check_cmd = subparsers.add_parser(
         "service-lark-tenant-credential-check",
@@ -1574,6 +1579,7 @@ def _main(argv=None) -> int:
             args.config,
             args.service_url,
             args.auth_token_file,
+            verify_lark_tenant_credential=args.verify_lark_tenant_credential,
         )
         _print_json(result)
         return 0 if result["status"] == "ready" else 1

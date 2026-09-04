@@ -90,8 +90,12 @@ skill2workflow service-go-live-check \
 The gate reuses the same local safety checks while reporting only `bind` as
 `skipped` with `running_service`; configuration, ingress authentication,
 credential-directory, and state checks must still pass. It then checks the
-fixed Probe before reading the protected operational-readiness endpoint. See
-the [single-instance go-live checklist](go-live.md) for the complete operator
+fixed Probe before reading the protected operational-readiness endpoint. By
+default it does not contact credential providers. The optional
+`--verify-lark-tenant-credential` flag is the sole explicit Feishu China
+provider preflight: it runs only after Doctor passes and short-circuits before
+the Probe or protected token read when it is not ready. See the
+[single-instance go-live checklist](go-live.md) for the complete operator
 sequence.
 
 ## Evidence

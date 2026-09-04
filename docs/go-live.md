@@ -61,6 +61,25 @@ contact Feishu. The ordinary Doctor and composite go-live gate intentionally
 remain local/provider-free, so this explicit step cannot be skipped by
 mistaking local readiness for provider credential validity.
 
+After the service is running, an operator who needs one combined deployment
+report may opt into the same preflight within the composite gate:
+
+```bash
+skill2workflow service-go-live-check \
+  --config /srv/skill2workflow/config/service.json \
+  --service-url http://127.0.0.1:8080 \
+  --auth-token-file /srv/skill2workflow/secrets/ingress.token \
+  --verify-lark-tenant-credential
+```
+
+The flag is explicit and off by default. The gate runs local Doctor first; a
+failed Doctor prevents any Feishu exchange. A non-ready credential result
+short-circuits before the service Probe or ingress-token read. When selected,
+the JSON report adds only `lark_tenant_credential.status`, `.provider`, and
+`.reason`; it contains no secret, token, provider message, or configuration
+path. Without the flag, the command retains its existing local/provider-free
+behavior and response shape.
+
 ## 3. Start under reviewed supervision
 
 For a Linux host, generate and manually review the least-privilege systemd

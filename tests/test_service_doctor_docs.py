@@ -19,15 +19,16 @@ class ServiceDoctorDocumentationTests(TestCase):
         self.assertIn("## Running-Service Go-Live Check", guide)
         self.assertIn("skill2workflow service-go-live-check", guide)
         self.assertIn("running_service", guide)
+        self.assertIn("--verify-lark-tenant-credential", guide)
         self.assertIn("[single-instance go-live checklist](go-live.md)", guide)
 
     def test_readme_and_roadmap_publish_completed_loop_53(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-261 are complete", readme)
+        self.assertIn("Delivery Loops 1-262 are complete", readme)
         self.assertIn("service-doctor", readme)
         self.assertIn("docs/service-doctor.md", readme)
-        self.assertIn("Completed delivery loops: 1-261", roadmap)
+        self.assertIn("Completed delivery loops: 1-262", roadmap)
         self.assertIn("Loop 53: Operational Readiness Doctor", roadmap)
         self.assertIn("| Loop 53: Operational Readiness Doctor | Complete |", roadmap)

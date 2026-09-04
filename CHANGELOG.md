@@ -13,6 +13,12 @@ release; Roadmap loop completion alone does not publish a new version.
   bounded token exchange without creating a task, starting a workflow,
   retaining a token, or printing credential material.
 
+- Extended `service-go-live-check` with optional
+  `--verify-lark-tenant-credential`. The explicit flag adds one value-free
+  Feishu China credential preflight after local Doctor succeeds; a non-ready
+  result short-circuits before service Probe or ingress-token access. Default
+  go-live behavior remains local and provider-free.
+
 - Added an optional Feishu China tenant-token credential descriptor for the
   self-hosted service. It derives `lark_bot_access_token` from a non-secret App
   ID and a reserved owner-only App Secret file per execution; issued tokens are

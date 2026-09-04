@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-261
+- Completed delivery loops: 1-262
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 261 is complete with self-hosted Feishu tenant credentials
+- Active loop: None; Loop 262 is complete with opt-in Feishu credential go-live preflight
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing live run-action conflict recovery and production-boundary CI evidence
+- Next decision: select the next Production Baseline loop after reviewing opt-in Feishu credential go-live evidence and production-boundary CI evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-260 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-262 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 261 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing self-hosted Feishu credential evidence and production-boundary CI evidence.
+This rolling queue is ordered. Loop 262 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing opt-in Feishu credential go-live evidence and production-boundary CI evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7079,6 +7079,34 @@ fake-transport bounded/redacted exchange tests, value-free explicit-check CLI
 contract, service-instance secret rotation evidence, full-suite regression,
 and isolated-wheel qualification. Design:
 `docs/superpowers/plans/2026-08-31-self-hosted-lark-tenant-credentials.md`.
+
+### Loop 262: Opt-In Feishu Credential Go-Live Preflight
+
+**Status:** Complete.
+
+**Prior basis:** Loop 261 provided a safe explicit Feishu tenant-credential
+preflight, but the normal composite go-live report remained deliberately
+provider-free. An operator who needed one deployment result still had to
+remember a separate command and manually combine two outcomes.
+
+**Outcome:** `service-go-live-check --verify-lark-tenant-credential` invokes
+the existing value-free credential preflight only after local Doctor passes.
+It adds a fixed `lark_tenant_credential` summary only when explicitly
+selected. A non-ready result blocks the service Probe and protected
+operational-readiness token read. Without the flag, the command retains its
+existing local/provider-free behavior and response shape.
+
+**Safety boundary:** This does not enable provider access by default, cache or
+persist a token, create a task or workflow, add generic OAuth, expose provider
+details, or change the service's existing readiness authority. The separate
+credential-check command remains available before service startup.
+
+**Evidence:** Unit and CLI tests prove default no-call behavior, Doctor-first
+ordering, explicit ready and non-ready projections, short-circuiting before
+Probe/token use, and fixed output. Documentation records both the pre-start
+and optional composite paths; focused regression and isolated-wheel
+qualification pass. Design:
+`docs/superpowers/plans/2026-09-04-opt-in-feishu-go-live-preflight.md`.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -7306,6 +7334,7 @@ and isolated-wheel qualification. Design:
 | Loop 259: Live Dispatch-Review Conflict Recovery | Complete | Make true scheduler-review races recoverable without stale-evidence reuse | Fixed 409 proxy, stale-review disablement, explicit evidence reload, no retry, and loopback UI evidence |
 | Loop 260: Live Run-Action Conflict Recovery | Complete | Make true human-decision and cancellation races recoverable without stale-run reuse | Fixed 409 proxy, shared stale-action disablement, explicit live refresh, no retry, and loopback UI evidence |
 | Loop 261: Self-Hosted Feishu Tenant Credentials | Complete | Derive the approved live Feishu token in memory from a protected App Secret instead of a manually rotated static token | Explicit China-only descriptor, reserved secret handle, direct bounded exchange, service rotation, and redaction evidence |
+| Loop 262: Opt-In Feishu Credential Go-Live Preflight | Complete | Let operators include one explicit, value-free Feishu credential preflight in the composite deployment gate | Doctor-first opt-in check, provider-free default, Probe/token short-circuit, CLI/docs/tests, and wheel qualification |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

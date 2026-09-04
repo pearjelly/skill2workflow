@@ -26,8 +26,8 @@ class AuditEventBoundaryDocsTests(TestCase):
     def test_roadmap_and_readme_promote_loop_175(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        self.assertIn("Completed delivery loops: 1-261", roadmap)
+        self.assertIn("Completed delivery loops: 1-262", roadmap)
         self.assertIn(
-            "Loop 261 is complete with self-hosted Feishu tenant credentials", roadmap
+            "Loop 262 is complete with opt-in Feishu credential go-live preflight", roadmap
         )
-        self.assertIn("Delivery Loops 1-261 are complete", readme)
+        self.assertIn("Delivery Loops 1-262 are complete", readme)
