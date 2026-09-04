@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-260
+- Completed delivery loops: 1-261
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 260 is complete with live run-action conflict recovery
+- Active loop: None; Loop 261 is complete with self-hosted Feishu tenant credentials
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing live run-action conflict recovery and production-boundary CI evidence
 
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 260 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing live run-action conflict recovery and production-boundary CI evidence.
+This rolling queue is ordered. Loop 261 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing self-hosted Feishu credential evidence and production-boundary CI evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 

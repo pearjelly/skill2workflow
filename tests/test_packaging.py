@@ -183,13 +183,13 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("compile --output … --review", guide)
         self.assertIn("exact source-free schema", guide)
         self.assertIn("value-free validation result", guide)
-        self.assertIn("- Completed delivery loops: 1-260", roadmap)
+        self.assertIn("- Completed delivery loops: 1-261", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 260 is complete with live run-action conflict recovery",
+            "- Active loop: None; Loop 261 is complete with self-hosted Feishu tenant credentials",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
-        self.assertIn("Delivery Loops 1-260 are complete", readme)
+        self.assertIn("Delivery Loops 1-261 are complete", readme)
         self.assertIn("release-artifact qualification", readme)
         self.assertIn("release artifact manifest", readme)
         self.assertIn("reproducible-builds.md", readme)
