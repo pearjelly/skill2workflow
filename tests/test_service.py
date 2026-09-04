@@ -1,4 +1,5 @@
 import copy
+import io
 import json
 import http.client
 import socket
@@ -58,6 +59,48 @@ AUTH_TOKEN = "loop42-test-bearer-token-0123456789abcdef"
 
 
 class ServiceConfigTests(TestCase):
+    def test_runtime_service_derives_lark_token_and_observes_secret_rotation(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            config = _service_config(root)
+            app_secret = config.credential_dir / "lark_app_secret"
+            app_secret.write_text("first-private-secret", encoding="utf-8")
+            app_secret.chmod(0o600)
+            config = ServiceConfig(
+                config.host,
+                config.port,
+                config.state_dir,
+                config.storage,
+                config.auth_token_file,
+                config.credential_dir,
+                config.backup_parent_dir,
+                config.http_allowed_origins,
+                {
+                    "handle": "lark_bot_access_token",
+                    "app_id": "cli_example",
+                    "app_secret_handle": "lark_app_secret",
+                },
+            )
+            responses = [
+                io.BytesIO(b'{"code":0,"tenant_access_token":"first-token"}'),
+                io.BytesIO(b'{"code":0,"tenant_access_token":"second-token"}'),
+            ]
+            with patch("skill2workflow.credentials.urllib.request.build_opener") as opener:
+                opener.return_value.open.side_effect = responses
+                service = RuntimeService(config)
+                try:
+                    self.assertEqual(service.credential_provider.resolve("lark_bot_access_token"), "first-token")
+                    app_secret.write_text("rotated-private-secret", encoding="utf-8")
+                    self.assertEqual(service.credential_provider.resolve("lark_bot_access_token"), "second-token")
+                    with self.assertRaisesRegex(Exception, "credential handle not found: lark_app_secret"):
+                        service.credential_provider.resolve("lark_app_secret")
+                finally:
+                    service._server.server_close()
+            sent = [json.loads(call.args[0].data.decode("utf-8")) for call in opener.return_value.open.call_args_list]
+            self.assertEqual(sent, [
+                {"app_id": "cli_example", "app_secret": "first-private-secret"},
+                {"app_id": "cli_example", "app_secret": "rotated-private-secret"},
+            ])
     def test_load_service_config_rejects_oversized_file_before_opening(self):
         with TemporaryDirectory() as tmp:
             config_path = Path(tmp) / "service.json"
