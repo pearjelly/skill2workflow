@@ -20,7 +20,10 @@ termination, or automatic reconciliation of unknown external side effects.
 [Code of Conduct](CODE_OF_CONDUCT.md)
 
 For a reviewed single-team deployment path, see the
-[go-live checklist](docs/go-live.md).
+[go-live checklist](docs/go-live.md). Deployments that use the approved
+Feishu China derived credential can explicitly include its value-free preflight
+in the composite gate with `service-go-live-check
+--verify-lark-tenant-credential`; the default gate remains provider-free.
 
 The core idea is simple:
 

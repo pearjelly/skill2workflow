@@ -31,4 +31,5 @@ class GoLiveDocumentationTests(TestCase):
         self.assertIn("claim multi-tenant RBAC", guide)
         self.assertIn("[Go-live checklist](go-live.md)", index)
         self.assertIn("[go-live checklist](docs/go-live.md)", readme)
+        self.assertIn("--verify-lark-tenant-credential", readme)
         self.assertIn("Added `service-go-live-check`", changelog)
