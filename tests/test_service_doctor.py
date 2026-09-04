@@ -16,6 +16,27 @@ from skill2workflow.service_doctor import diagnose_service
 
 
 class ServiceDoctorTests(TestCase):
+    def test_lark_tenant_descriptor_doctor_stays_local_and_does_not_exchange(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / "runtime"
+            initialized = initialize_service_workspace(
+                root,
+                port=0,
+                lark_app_id="cli_example",
+                lark_app_secret_handle="lark_app_secret",
+            )
+            secret = root / "secrets" / "connectors" / "lark_app_secret"
+            secret.write_text("private-app-secret", encoding="utf-8")
+            secret.chmod(0o600)
+            before = _workspace_snapshot(root)
+            with patch("skill2workflow.credentials.urllib.request.build_opener") as opener:
+                result = diagnose_service(Path(initialized["config_file"]))
+            after = _workspace_snapshot(root)
+
+        self.assertEqual(result["status"], "ready")
+        opener.assert_not_called()
+        self.assertEqual(before, after)
+
     def test_running_service_mode_skips_only_the_bind_check(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / "runtime"
