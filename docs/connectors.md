@@ -1,7 +1,7 @@
 # Connector Runtime
 
 `skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace. Built-in HTTP payloads are bounded to protect the self-hosted process from untrusted response sizes and oversized serialized request bodies.
-Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. Loop 38 readiness review approved only a scoped live `create_task` follow-up, documented in `docs/lark-live-connector-readiness.md`. Loop 39 implements that one opt-in live action while preserving explicit loading and the dry-run default; it does not add automatic discovery, OAuth, token refresh, or marketplace behavior.
+Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. Loop 38 readiness review approved only a scoped live `create_task` follow-up, documented in `docs/lark-live-connector-readiness.md`. Loop 39 implements that one opt-in live action while preserving explicit loading and the dry-run default. Loop 261 adds an optional self-hosted Feishu China tenant-token descriptor that derives the existing public credential handle at execution time without caching or persisting a token. The project still does not add automatic discovery, generic OAuth, a general token-refresh system, or marketplace behavior.
 
 Workflow DSL remains the execution truth source. Connector bindings live on workflow nodes, and the local executor records connector lifecycle events in run state and control-plane audit logs.
 
@@ -462,6 +462,12 @@ vibe vault run --env LARK_BOT_ACCESS_TOKEN -- env SKILL2WORKFLOW_LARK_TASK_LIVE=
 ```
 
 Use Avibe Vault as shown, or an equivalent secret manager that injects `LARK_BOT_ACCESS_TOKEN` only into the child process. Never paste the token into the command or shell history.
+
+For a self-hosted Feishu China deployment, the optional service descriptor can
+derive `lark_bot_access_token` from a non-secret App ID and a reserved private
+App Secret file at each connector execution. See
+[`service-bootstrap.md`](service-bootstrap.md); this narrow path has no token
+cache, persistence, generic OAuth flow, or hosted secret manager.
 
 CI injects a fake transport and never accesses the live network. Recognized Feishu provider codes take precedence over generic HTTP status classification. Normalized `provider_status` values are exactly: `live_disabled`, `validation_failed`, `credential_failed`, `authorization_failed`, `permission_denied`, `rate_limited`, `resource_not_found`, `idempotency_conflict`, `provider_unavailable`, `timeout`, `malformed_response`, and `completed`.
 

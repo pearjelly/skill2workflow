@@ -54,7 +54,10 @@ Explicit non-goals:
 - No OAuth.
 - No hosted callback.
 - No automatic connector discovery.
-- No token refresh system.
+- No generic OAuth or token-refresh system. Loop 261 adds only an optional
+  self-hosted Feishu China descriptor that exchanges a reserved App Secret for
+  one in-memory tenant token at connector execution time; it does not cache or
+  persist tokens.
 - No connector marketplace or package installer.
 - No queue, worker pool, or production scheduler.
 - No broad Lark/Feishu connector catalog.
@@ -76,6 +79,14 @@ The token is resolved only through the credential provider at connector executio
 Workflow DSL may reference the handle name, but the resolved credential value must remain outside immutable workflow artifacts and persisted run evidence. Missing credentials, unsupported credential targets, or provider resolution errors must become failed connector results with compact error metadata.
 
 Normal connector execution resolves only that approved handle through the configured credential provider. Unrelated header-target handles are not materialized. `LARK_BOT_ACCESS_TOKEN` is not a general connector configuration surface; it is read only by the guarded live-validation helper, which immediately wraps it in the existing credential provider and never accepts or prints the token as a command-line value.
+
+For a long-running self-hosted Feishu China service, prefer the optional
+`lark_tenant_access_token` descriptor described in
+[`service-bootstrap.md`](service-bootstrap.md). It derives this same public
+handle from a non-secret App ID and a reserved private App Secret file for each
+connector execution. The source handle cannot be requested by a connector, and
+neither the App Secret nor issued tenant token enters Workflow DSL, run state,
+audit, or backups.
 
 ## Idempotency And Duplicate Prevention
 

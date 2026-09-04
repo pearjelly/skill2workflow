@@ -27,12 +27,15 @@ class LiveConnectorReadinessTests(TestCase):
         self.assertIn("connector id: `lark_task`", decision)
         self.assertIn("examples/connectors/lark_task_connector.py remains dry-run-only in Loop 38", decision)
         self.assertIn("No OAuth", decision)
+        self.assertIn("No generic OAuth or token-refresh system", decision)
         self.assertIn("No hosted callback", decision)
         self.assertIn("No automatic connector discovery", decision)
 
         self.assertIn("## Credential Model", decision)
         self.assertIn("credential handle: `lark_bot_access_token`", decision)
         self.assertIn("resolved only through the credential provider", decision)
+        self.assertIn("lark_tenant_access_token", decision)
+        self.assertIn("source handle cannot be requested by a connector", decision)
         self.assertIn("not Workflow DSL", decision)
         self.assertIn("not trigger input", decision)
         self.assertIn("not run state", decision)
@@ -101,6 +104,8 @@ class LiveConnectorReadinessTests(TestCase):
         self.assertIn("SKILL2WORKFLOW_LARK_TASK_LIVE=1", connectors)
         self.assertIn("provider_status", connectors)
         self.assertIn("LARK_BOT_ACCESS_TOKEN", connectors)
+        self.assertIn("Loop 261 adds an optional self-hosted Feishu China tenant-token descriptor", connectors)
+        self.assertIn("cache, persistence, generic OAuth flow", connectors)
         vault_command = (
             "vibe vault run --env LARK_BOT_ACCESS_TOKEN -- env "
             "SKILL2WORKFLOW_LARK_TASK_LIVE=1 python3 scripts/lark_task_live_validation.py"
