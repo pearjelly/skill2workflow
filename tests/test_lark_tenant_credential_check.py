@@ -1,3 +1,6 @@
+import json
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
@@ -75,6 +78,21 @@ class LarkTenantCredentialCheckTests(TestCase):
         self.assertEqual(result["reason"], "invalid_config")
         self.assertNotIn("/missing/private/service.json", str(result))
 
+    def test_cli_missing_config_is_value_free_and_returns_one(self):
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            exit_code = main([
+                "service-lark-tenant-credential-check",
+                "--config",
+                "/missing/private/service.json",
+            ])
+
+        self.assertEqual(exit_code, 1)
+        result = json.loads(stdout.getvalue())
+        self.assertEqual(result["status"], "not_ready")
+        self.assertEqual(result["reason"], "invalid_config")
+        self.assertNotIn("/missing/private/service.json", stdout.getvalue())
+
     def test_cli_unavailable_credential_is_value_free_and_returns_one(self):
         with TemporaryDirectory() as temporary:
             initialized = initialize_service_workspace(
@@ -103,6 +121,3 @@ class LarkTenantCredentialCheckTests(TestCase):
         result = json.loads(stdout.getvalue())
         self.assertEqual(result["reason"], "credential_unavailable")
         self.assertNotIn("private", stdout.getvalue())
-import json
-from contextlib import redirect_stdout
-from io import StringIO
