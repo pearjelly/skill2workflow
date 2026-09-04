@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added `service-lark-tenant-credential-check`, an explicit value-free
+  self-hosted Feishu China credential verification command. It performs one
+  bounded token exchange without creating a task, starting a workflow,
+  retaining a token, or printing credential material.
+
 - Added an optional Feishu China tenant-token credential descriptor for the
   self-hosted service. It derives `lark_bot_access_token` from a non-secret App
   ID and a reserved owner-only App Secret file per execution; issued tokens are
