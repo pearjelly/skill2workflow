@@ -80,6 +80,22 @@ class LarkTenantAccessTokenCredentialProviderTests(TestCase):
         self.assertNotIn("private-app-secret", str(raised.exception))
         self.assertNotIn("private provider detail", str(raised.exception))
 
+    def test_oversized_exchange_response_is_rejected_without_provider_detail(self):
+        provider = LarkTenantAccessTokenCredentialProvider(
+            StaticCredentialProvider({"lark_app_secret": "private-app-secret"}),
+            handle="lark_bot_access_token",
+            app_id="cli_example",
+            app_secret_handle="lark_app_secret",
+            token_transport=lambda request, timeout: _Response(b"x" * (64 * 1024 + 2)),
+        )
+
+        with self.assertRaisesRegex(
+            CredentialResolutionError,
+            "credential handle not found: lark_bot_access_token",
+        ) as raised:
+            provider.resolve("lark_bot_access_token")
+        self.assertNotIn("private-app-secret", str(raised.exception))
+
     def test_rejects_unsafe_configuration_before_source_read(self):
         with self.assertRaisesRegex(ValueError, "must differ"):
             LarkTenantAccessTokenCredentialProvider(
