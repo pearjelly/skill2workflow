@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added an optional Feishu China tenant-token credential descriptor for the
+  self-hosted service. It derives `lark_bot_access_token` from a non-secret App
+  ID and a reserved owner-only App Secret file per execution; issued tokens are
+  not cached or persisted, and the App Secret handle cannot be requested by a
+  connector.
+
 - Added `service-go-live-check`, a read-only single-instance deployment gate.
   It orders the running-service Doctor, fixed unauthenticated Probe, and
   protected operational-readiness report, short-circuiting before network or
