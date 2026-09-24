@@ -146,7 +146,9 @@ docker run --rm --network none --user "$S2W_USER" --read-only \
 ```
 
 Review the restored state, then follow the [restore cutover contract](backup-restore.md)
-before starting exactly one service against it. Never overwrite the current
+before starting exactly one service against it. Stop the original container
+first; mount the restored `state/` at the same container path and re-run
+readiness and authenticated go-live checks. Never overwrite the current
 `state/` directory with a restore or start two containers on the same state.
 
 To update, first qualify the new image and workspace with a one-off Doctor,
@@ -160,7 +162,8 @@ reconciliation, or rollback of provider requests.
 The Linux container smoke gate builds this Dockerfile, initializes a fresh
 workspace, passes Doctor and go-live checks, verifies actual container mounts
 and user identity, proves offline backup/verification/fresh restore, restarts
-the service, and confirms state persistence:
+the original service, then starts the restored state separately and requires
+authenticated go-live while verifying the original SQLite files stay unchanged:
 
 ```bash
 python3 scripts/docker_service_smoke.py

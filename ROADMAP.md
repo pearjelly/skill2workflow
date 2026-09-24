@@ -7123,8 +7123,9 @@ network container runs the existing service with a read-only root filesystem,
 read-only config/secret/backup mounts, and only SQLite state writable. The
 runbook preserves the current loopback listener and authenticated go-live
 check. A CI Docker drill builds the image and proves bootstrap, Doctor,
-authenticated go-live, an isolated offline backup/restore, and state
-persistence across a container restart.
+authenticated go-live, an isolated offline backup/restore, state persistence
+across a container restart, and a separate restored-state service go-live
+without modifying the original SQLite files.
 
 **Safety boundary:** No public port, Docker socket mount, second active
 instance, orchestration platform, automatic TLS/proxy provisioning, online

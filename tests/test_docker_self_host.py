@@ -7,6 +7,7 @@ from unittest.mock import patch
 from scripts.docker_service_smoke import (
     CONTAINER_ROOT,
     _offline_args,
+    _runtime_args,
     _verify_container_boundary,
 )
 
@@ -15,6 +16,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DockerSelfHostTests(TestCase):
+    def test_restored_service_uses_only_the_selected_state_mount(self):
+        original = Path("/tmp/workspace")
+        restored = Path("/tmp/restore/state")
+        args = _runtime_args(original, state_dir=restored)
+        mounts = [args[index + 1] for index, item in enumerate(args[:-1]) if item == "--mount"]
+        self.assertIn(
+            f"type=bind,src={restored},dst={CONTAINER_ROOT}/state", mounts
+        )
+        self.assertNotIn(
+            f"type=bind,src={original / 'state'},dst={CONTAINER_ROOT}/state", mounts
+        )
+
     def test_offline_backup_mounts_exclude_credentials(self):
         args = _offline_args(Path("/tmp/workspace"), writable_backup=True, include_state=True)
         joined = " ".join(args)
@@ -33,6 +46,7 @@ class DockerSelfHostTests(TestCase):
                 "Type": "bind",
                 "Destination": f"{CONTAINER_ROOT}/{name}",
                 "RW": name == "state",
+                "Source": f"/tmp/workspace/{name}",
             }
             for name in ("config", "secrets", "backups", "state")
         ]
@@ -43,9 +57,13 @@ class DockerSelfHostTests(TestCase):
         }]
         with patch("scripts.docker_service_smoke._docker", side_effect=lambda *_: json.dumps(details)):
             _verify_container_boundary("service")
+            _verify_container_boundary("service", expected_state_source=Path("/tmp/workspace/state"))
             mounts[1]["RW"] = True
             with self.assertRaisesRegex(RuntimeError, "mount write boundary"):
                 _verify_container_boundary("service")
+            mounts[1]["RW"] = False
+            with self.assertRaisesRegex(RuntimeError, "restored state mount source"):
+                _verify_container_boundary("service", expected_state_source=Path("/tmp/restore/state"))
 
     def test_image_is_non_root_and_installs_a_wheel(self):
         dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")

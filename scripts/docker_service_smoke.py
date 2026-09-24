@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import socket
@@ -14,6 +15,7 @@ import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
+from typing import Optional
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -33,7 +35,7 @@ def _user_args() -> list[str]:
     return ["--user", f"{os.getuid()}:{os.getgid()}"]
 
 
-def _runtime_args(workspace: Path) -> list[str]:
+def _runtime_args(workspace: Path, *, state_dir: Optional[Path] = None) -> list[str]:
     args = [
         "--network", "host",
         "--read-only",
@@ -44,10 +46,11 @@ def _runtime_args(workspace: Path) -> list[str]:
         *_user_args(),
     ]
     for name in ("config", "secrets", "backups", "state"):
+        source = state_dir if name == "state" and state_dir is not None else workspace / name
         args.extend(
             [
                 "--mount",
-                f"type=bind,src={workspace / name},dst={CONTAINER_ROOT}/{name}"
+                f"type=bind,src={source},dst={CONTAINER_ROOT}/{name}"
                 + ("" if name == "state" else ",readonly"),
             ]
         )
@@ -94,7 +97,7 @@ def _wait_ready(port: int, timeout: float = 25.0) -> None:
     raise RuntimeError("Docker service did not become ready")
 
 
-def _verify_container_boundary(container: str) -> None:
+def _verify_container_boundary(container: str, *, expected_state_source: Optional[Path] = None) -> None:
     details = json.loads(_docker("inspect", container))[0]
     if details["HostConfig"]["NetworkMode"] != "host":
         raise RuntimeError("Docker service lost host networking")
@@ -103,7 +106,7 @@ def _verify_container_boundary(container: str) -> None:
     if details["Config"]["User"] != f"{os.getuid()}:{os.getgid()}":
         raise RuntimeError("Docker service is not running as the operator account")
     mounts = {
-        mount["Destination"]: mount["RW"]
+        mount["Destination"]: mount
         for mount in details["Mounts"]
         if mount["Type"] == "bind"
     }
@@ -111,8 +114,19 @@ def _verify_container_boundary(container: str) -> None:
         f"{CONTAINER_ROOT}/{name}": name == "state"
         for name in ("config", "secrets", "backups", "state")
     }
-    if mounts != expected:
+    if {destination: mount["RW"] for destination, mount in mounts.items()} != expected:
         raise RuntimeError("Docker service mount write boundary changed")
+    if expected_state_source is not None:
+        actual_source = Path(mounts[f"{CONTAINER_ROOT}/state"]["Source"]).resolve()
+        if actual_source != expected_state_source.resolve():
+            raise RuntimeError("Docker restored state mount source changed")
+
+
+def _sqlite_checksums(state_dir: Path) -> dict[str, str]:
+    return {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(state_dir.glob("*.sqlite3"))
+    }
 
 
 def main() -> int:
@@ -211,7 +225,29 @@ def main() -> int:
                         raise RuntimeError("Docker offline restore did not complete")
                 elif current_identity != state_identity:
                     raise RuntimeError("Docker service did not preserve SQLite files across restart")
-            print(json.dumps({"status": "passed", "checks": ["wheel_image", "bootstrap", "doctor", "mount_boundary", "go_live", "offline_backup_restore", "restart_persistence"]}))
+            original_checksums = _sqlite_checksums(workspace / "state")
+            restored_state = restore_parent / "state"
+            _docker(
+                "run", "--detach", "--name", container,
+                *_runtime_args(workspace, state_dir=restored_state), image,
+            )
+            try:
+                _verify_container_boundary(container, expected_state_source=restored_state)
+                _wait_ready(port)
+                restored_gate = json.loads(_docker(
+                    "run", "--rm", *_runtime_args(workspace, state_dir=restored_state), image,
+                    "service-go-live-check", "--config", f"{CONTAINER_ROOT}/config/service.json",
+                    "--service-url", f"http://127.0.0.1:{port}",
+                    "--auth-token-file", f"{CONTAINER_ROOT}/secrets/ingress-token",
+                ))
+                if restored_gate.get("status") != "ready":
+                    raise RuntimeError("Docker restored service go-live gate did not pass")
+            finally:
+                _docker("stop", "--time", "20", container)
+                _docker("rm", container)
+            if _sqlite_checksums(workspace / "state") != original_checksums:
+                raise RuntimeError("Docker restored service changed original SQLite state")
+            print(json.dumps({"status": "passed", "checks": ["wheel_image", "bootstrap", "doctor", "mount_boundary", "go_live", "offline_backup_restore", "restart_persistence", "restored_service_go_live"]}))
     finally:
         subprocess.run(["docker", "rm", "--force", container], capture_output=True)
         subprocess.run(["docker", "image", "rm", image], capture_output=True)

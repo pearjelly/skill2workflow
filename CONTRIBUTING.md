@@ -89,7 +89,8 @@ This builds the wheel-backed image, creates only a temporary private
 workspace, verifies the actual container mount and user boundary, checks
 service readiness and authenticated go-live, proves an offline backup,
 verification, and fresh restore without mounting credentials, then restarts
-the container to prove SQLite file continuity. It never contacts a live
+the original and restored states separately to prove go-live and SQLite file
+continuity. It never contacts a live
 connector provider.
 The dedicated Linux CI job runs the same drill. See the
 [Docker self-hosting guide](docs/docker-self-host.md) for deployment commands.
