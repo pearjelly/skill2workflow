@@ -4,13 +4,29 @@ from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
 
-from scripts.docker_service_smoke import CONTAINER_ROOT, _verify_container_boundary
+from scripts.docker_service_smoke import (
+    CONTAINER_ROOT,
+    _offline_args,
+    _verify_container_boundary,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class DockerSelfHostTests(TestCase):
+    def test_offline_backup_mounts_exclude_credentials(self):
+        args = _offline_args(Path("/tmp/workspace"), writable_backup=True, include_state=True)
+        joined = " ".join(args)
+        self.assertIn("--network none", joined)
+        self.assertIn("/tmp/workspace/state", joined)
+        self.assertIn("/tmp/workspace/backups", joined)
+        self.assertNotIn("/tmp/workspace/secrets", joined)
+        self.assertNotIn("/tmp/workspace/config", joined)
+        verify_args = _offline_args(Path("/tmp/workspace"), writable_backup=False, include_state=False)
+        self.assertIn("/backups,readonly", " ".join(verify_args))
+        self.assertNotIn("/tmp/workspace/state", " ".join(verify_args))
+
     def test_smoke_rejects_a_writable_secret_mount(self):
         mounts = [
             {
@@ -51,6 +67,8 @@ class DockerSelfHostTests(TestCase):
         self.assertIn("--cap-drop ALL", guide)
         self.assertIn("src=$HOST_ROOT/state,dst=/srv/skill2workflow/team-a/state", guide)
         self.assertIn("python3 scripts/docker_service_smoke.py", workflow)
+        self.assertIn("skill2workflow:0.1.0 backup-verify", guide)
+        self.assertIn("skill2workflow:0.1.0 restore", guide)
         self.assertIn("python3 scripts/docker_service_smoke.py",
                       (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8"))
         baseline = (ROOT / "docs/production-baseline-evidence.md").read_text(encoding="utf-8")

@@ -98,6 +98,57 @@ container with only the necessary explicit write mounts. Credential files
 need an independent secure backup and rotation path; state backups do not
 include them.
 
+For one offline backup, stop the service and wait for `docker stop` to return.
+The one-off command mounts SQLite state writable because the backup code must
+take database locks; it mounts the backup parent writable to publish one new,
+non-overwriting set. It mounts neither configuration nor credentials:
+
+```bash
+docker stop --time 60 skill2workflow
+BACKUP_NAME="backup-$(date -u +%Y%m%dT%H%M%SZ)"
+docker run --rm --network none --user "$S2W_USER" --read-only \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+  --mount "type=bind,src=$HOST_ROOT/state,dst=/srv/skill2workflow/team-a/state" \
+  --mount "type=bind,src=$HOST_ROOT/backups,dst=/srv/skill2workflow/team-a/backups" \
+  skill2workflow:0.1.0 backup \
+  --state-dir /srv/skill2workflow/team-a/state \
+  --output-dir "/srv/skill2workflow/team-a/backups/$BACKUP_NAME"
+
+docker run --rm --network none --user "$S2W_USER" --read-only \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+  --mount "type=bind,src=$HOST_ROOT/backups,dst=/srv/skill2workflow/team-a/backups,readonly" \
+  skill2workflow:0.1.0 backup-verify \
+  --backup-dir "/srv/skill2workflow/team-a/backups/$BACKUP_NAME"
+```
+
+Require `status: "valid"` before copying the set to separately controlled,
+encrypted storage. If backup or verification fails, do not resume traffic
+until the state and failure have been reviewed. After a successful backup,
+`docker start skill2workflow` restarts the original service; require `/readyz`
+and the authenticated go-live check again.
+
+For a recovery drill, restore into a **new** owner-only sibling directory. The
+destination `state` child must not exist, and this does not switch the running
+service to restored state:
+
+```bash
+install -d -m 0700 "$HOST_PARENT/restore-candidate"
+docker run --rm --network none --user "$S2W_USER" --read-only \
+  --cap-drop ALL --security-opt no-new-privileges \
+  --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m \
+  --mount "type=bind,src=$HOST_ROOT/backups,dst=/srv/skill2workflow/team-a/backups,readonly" \
+  --mount "type=bind,src=$HOST_PARENT/restore-candidate,dst=/restore" \
+  skill2workflow:0.1.0 restore \
+  --backup-dir "/srv/skill2workflow/team-a/backups/$BACKUP_NAME" \
+  --state-dir /restore/state
+```
+
+Review the restored state, then follow the [restore cutover contract](backup-restore.md)
+before starting exactly one service against it. Never overwrite the current
+`state/` directory with a restore or start two containers on the same state.
+
 To update, first qualify the new image and workspace with a one-off Doctor,
 then stop and remove the old service container and start **one** new service
 container from the reviewed image. Keep the old image and a verified offline
@@ -108,7 +159,8 @@ reconciliation, or rollback of provider requests.
 
 The Linux container smoke gate builds this Dockerfile, initializes a fresh
 workspace, passes Doctor and go-live checks, verifies actual container mounts
-and user identity, restarts the service, and confirms state persistence:
+and user identity, proves offline backup/verification/fresh restore, restarts
+the service, and confirms state persistence:
 
 ```bash
 python3 scripts/docker_service_smoke.py

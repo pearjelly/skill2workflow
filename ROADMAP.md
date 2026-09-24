@@ -7123,7 +7123,8 @@ network container runs the existing service with a read-only root filesystem,
 read-only config/secret/backup mounts, and only SQLite state writable. The
 runbook preserves the current loopback listener and authenticated go-live
 check. A CI Docker drill builds the image and proves bootstrap, Doctor,
-authenticated go-live, and state persistence across a container restart.
+authenticated go-live, an isolated offline backup/restore, and state
+persistence across a container restart.
 
 **Safety boundary:** No public port, Docker socket mount, second active
 instance, orchestration platform, automatic TLS/proxy provisioning, online
@@ -7362,7 +7363,7 @@ tests, and `docs/docker-self-host.md`.
 | Loop 260: Live Run-Action Conflict Recovery | Complete | Make true human-decision and cancellation races recoverable without stale-run reuse | Fixed 409 proxy, shared stale-action disablement, explicit live refresh, no retry, and loopback UI evidence |
 | Loop 261: Self-Hosted Feishu Tenant Credentials | Complete | Derive the approved live Feishu token in memory from a protected App Secret instead of a manually rotated static token | Explicit China-only descriptor, reserved secret handle, direct bounded exchange, service rotation, and redaction evidence |
 | Loop 262: Opt-In Feishu Credential Go-Live Preflight | Complete | Let operators include one explicit, value-free Feishu credential preflight in the composite deployment gate | Doctor-first opt-in check, provider-free default, Probe/token short-circuit, CLI/docs/tests, and wheel qualification |
-| Loop 263: Single-Service Docker Self-Hosting | Complete | Provide a reviewed one-container Linux deployment without weakening the existing loopback and SQLite boundaries | Wheel-built non-root image, private mounts, state-only write, Docker CI restart/go-live drill, and operator runbook |
+| Loop 263: Single-Service Docker Self-Hosting | Complete | Provide a reviewed one-container Linux deployment without weakening the existing loopback and SQLite boundaries | Wheel-built non-root image, private mounts, state-only runtime write, Docker CI backup/restore and restart/go-live drill, and operator runbook |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -54,6 +54,26 @@ def _runtime_args(workspace: Path) -> list[str]:
     return args
 
 
+def _offline_args(workspace: Path, *, writable_backup: bool, include_state: bool) -> list[str]:
+    args = [
+        "--network", "none",
+        "--read-only",
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges",
+        "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=64m",
+        *_user_args(),
+        "--mount",
+        f"type=bind,src={workspace / 'backups'},dst={CONTAINER_ROOT}/backups"
+        + ("" if writable_backup else ",readonly"),
+    ]
+    if include_state:
+        args.extend([
+            "--mount",
+            f"type=bind,src={workspace / 'state'},dst={CONTAINER_ROOT}/state",
+        ])
+    return args
+
+
 def _available_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(("127.0.0.1", 0))
@@ -162,9 +182,36 @@ def main() -> int:
                     raise RuntimeError("Docker service did not initialize SQLite state")
                 if state_identity is None:
                     state_identity = current_identity
+                    backup_dir = f"{CONTAINER_ROOT}/backups/smoke-backup"
+                    created = json.loads(_docker(
+                        "run", "--rm",
+                        *_offline_args(workspace, writable_backup=True, include_state=True),
+                        image, "backup", "--state-dir", f"{CONTAINER_ROOT}/state",
+                        "--output-dir", backup_dir,
+                    ))
+                    if created.get("status") != "created":
+                        raise RuntimeError("Docker offline backup did not complete")
+                    verified = json.loads(_docker(
+                        "run", "--rm",
+                        *_offline_args(workspace, writable_backup=False, include_state=False),
+                        image, "backup-verify", "--backup-dir", backup_dir,
+                    ))
+                    if verified.get("status") != "valid":
+                        raise RuntimeError("Docker offline backup did not verify")
+                    restore_parent = parent / "restore"
+                    restore_parent.mkdir(mode=0o700)
+                    restored = json.loads(_docker(
+                        "run", "--rm",
+                        *_offline_args(workspace, writable_backup=False, include_state=False),
+                        "--mount", f"type=bind,src={restore_parent},dst=/restore",
+                        image, "restore", "--backup-dir", backup_dir,
+                        "--state-dir", "/restore/state",
+                    ))
+                    if restored.get("status") != "restored" or not (restore_parent / "state").is_dir():
+                        raise RuntimeError("Docker offline restore did not complete")
                 elif current_identity != state_identity:
                     raise RuntimeError("Docker service did not preserve SQLite files across restart")
-            print(json.dumps({"status": "passed", "checks": ["wheel_image", "bootstrap", "doctor", "mount_boundary", "go_live", "restart_persistence"]}))
+            print(json.dumps({"status": "passed", "checks": ["wheel_image", "bootstrap", "doctor", "mount_boundary", "go_live", "offline_backup_restore", "restart_persistence"]}))
     finally:
         subprocess.run(["docker", "rm", "--force", container], capture_output=True)
         subprocess.run(["docker", "image", "rm", image], capture_output=True)
