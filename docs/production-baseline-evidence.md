@@ -39,6 +39,12 @@ local evidence suite. It is not an independent-builder attestation, hosted
 availability claim, disaster-recovery guarantee, exactly-once provider claim,
 or automatic maturity promotion.
 
+The 19-check bundle does not build or run the optional Linux Docker image.
+For a Docker deployment or image release review, also run the independent
+[`docker_service_smoke.py` gate](docker-self-host.md) on a local Linux Docker
+Engine (or require its dedicated CI job). A passing baseline bundle alone is
+not Docker deployment evidence.
+
 ## Release integration
 
 The release preflight keeps the bundle opt-in because it repeats the full unit

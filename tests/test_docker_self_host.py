@@ -53,5 +53,7 @@ class DockerSelfHostTests(TestCase):
         self.assertIn("python3 scripts/docker_service_smoke.py", workflow)
         self.assertIn("python3 scripts/docker_service_smoke.py",
                       (ROOT / "CONTRIBUTING.md").read_text(encoding="utf-8"))
+        baseline = (ROOT / "docs/production-baseline-evidence.md").read_text(encoding="utf-8")
+        self.assertIn("bundle does not build or run the optional Linux Docker image", baseline)
         self.assertIn("[Single-service Docker self-hosting](docker-self-host.md)",
                       (ROOT / "docs/README.md").read_text(encoding="utf-8"))
