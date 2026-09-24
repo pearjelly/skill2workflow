@@ -7,20 +7,29 @@ in step 2a is the sole exception: it contacts the fixed Feishu China
 tenant-token endpoint without creating business work. Complete each step with
 your deployment's own change-control and privacy requirements.
 
+For the single-container Linux path, follow [Docker self-hosting](docker-self-host.md)
+for build, initialization, and startup **instead of steps 1-3 below**. The
+checks and operating rules from step 4 onward still apply, but use that
+guide's `docker exec` commands and container paths rather than copying the
+host-install command examples verbatim.
+
 ## 1. Prepare a secure workspace
 
-Install the wheel and create a non-overwriting workspace. The command creates
-an owner-only ingress token without printing it:
+Install the wheel and create a non-overwriting workspace as the dedicated
+non-root service account. In this example `/srv/skill2workflow` is an existing
+owner-only directory writable by that account; the `team-a` child must not
+already exist. The command creates an owner-only ingress token without
+printing it:
 
 ```bash
 skill2workflow service-init \
-  --root /srv/skill2workflow \
+  --root /srv/skill2workflow/team-a \
   --host 127.0.0.1 \
   --port 8080
 ```
 
-Read the returned JSON and retain the reported `config_path` and
-`auth_token_file` privately. Add reviewed connector credentials only through
+Read the returned JSON and retain the reported `config_file` and
+`token_file` paths privately. Add reviewed connector credentials only through
 the documented owner-only credential directory; do not place credentials in a
 Workflow DSL document.
 
@@ -31,7 +40,7 @@ read-only Doctor directly:
 
 ```bash
 skill2workflow service-doctor \
-  --config /srv/skill2workflow/config/service.json
+  --config /srv/skill2workflow/team-a/config/service.json
 ```
 
 Proceed only when every fixed check is `passed` and `status` is `ready`. A
@@ -41,14 +50,14 @@ credential-directory, state, or bind problems first; see
 
 ### 2a. Preflight a configured Feishu China credential
 
-Only when `config/service.json` contains the approved
+Only when `team-a/config/service.json` contains the approved
 `lark_tenant_access_token` descriptor, run this separate, explicit preflight
 after the App Secret file has been created and before sending any business
 work:
 
 ```bash
 skill2workflow service-lark-tenant-credential-check \
-  --config /srv/skill2workflow/config/service.json
+  --config /srv/skill2workflow/team-a/config/service.json
 ```
 
 It performs one bounded direct tenant-token exchange and exits `0` only when
@@ -66,9 +75,9 @@ report may opt into the same preflight within the composite gate:
 
 ```bash
 skill2workflow service-go-live-check \
-  --config /srv/skill2workflow/config/service.json \
+  --config /srv/skill2workflow/team-a/config/service.json \
   --service-url http://127.0.0.1:8080 \
-  --auth-token-file /srv/skill2workflow/secrets/ingress.token \
+  --auth-token-file /srv/skill2workflow/team-a/secrets/ingress-token \
   --verify-lark-tenant-credential
 ```
 
@@ -87,7 +96,7 @@ unit before enabling it:
 
 ```bash
 skill2workflow systemd-unit \
-  --config /srv/skill2workflow/config/service.json \
+  --config /srv/skill2workflow/team-a/config/service.json \
   --output /tmp/skill2workflow.service \
   --service-user skill2workflow \
   --executable /usr/local/bin/skill2workflow
@@ -98,6 +107,8 @@ account creation, `systemd-analyze verify`, review, installation, and service
 manager actions. For a non-systemd deployment, use an equivalent reviewed
 supervisor that sends `SIGTERM` and preserves the same private filesystem
 boundary. The project does not install or enable a supervisor for you.
+Do not run systemd and Docker service instances against the same SQLite
+workspace at once.
 
 ## 4. Verify the running service
 
@@ -108,9 +119,9 @@ operational readiness report:
 
 ```bash
 skill2workflow service-go-live-check \
-  --config /srv/skill2workflow/config/service.json \
+  --config /srv/skill2workflow/team-a/config/service.json \
   --service-url http://127.0.0.1:8080 \
-  --auth-token-file /srv/skill2workflow/secrets/ingress.token
+  --auth-token-file /srv/skill2workflow/team-a/secrets/ingress-token
 ```
 
 The command exits `0` only for `status: "ready"`. If the local Doctor is not
@@ -143,7 +154,7 @@ token only from its owner-only file and returns a bounded, value-free report:
 ```bash
 skill2workflow service-operational-readiness \
   --service-url http://127.0.0.1:8080 \
-  --auth-token-file /srv/skill2workflow/secrets/ingress.token
+  --auth-token-file /srv/skill2workflow/team-a/secrets/ingress-token
 ```
 
 Investigate every `blocking_reasons` entry before business traffic. The report

@@ -6,7 +6,7 @@ or upgrading state, and before changing a supervisor or reverse proxy to a new
 workspace:
 
 ```bash
-skill2workflow service-doctor --config /srv/skill2workflow/config/service.json
+skill2workflow service-doctor --config /srv/skill2workflow/team-a/config/service.json
 ```
 
 The Doctor never starts the service, acquires the scheduler lease, creates a
@@ -82,9 +82,9 @@ For post-start deployment verification, use the ordered read-only gate instead:
 
 ```bash
 skill2workflow service-go-live-check \
-  --config /srv/skill2workflow/config/service.json \
+  --config /srv/skill2workflow/team-a/config/service.json \
   --service-url http://127.0.0.1:8080 \
-  --auth-token-file /srv/skill2workflow/secrets/ingress.token
+  --auth-token-file /srv/skill2workflow/team-a/secrets/ingress-token
 ```
 
 The gate reuses the same local safety checks while reporting only `bind` as
