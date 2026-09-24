@@ -25,6 +25,7 @@ This repository is the `skill2workflow` open-source harness.
 - Installed controlled quickstart: `docs/quickstart.md`.
 - Operational readiness Doctor: `docs/service-doctor.md`.
 - Linux systemd supervision: `docs/systemd-service.md`.
+- Linux single-service Docker self-hosting: `docs/docker-self-host.md`.
 
 ## Local Commands
 
@@ -84,6 +85,7 @@ This repository is the `skill2workflow` open-source harness.
 - Package smoke: `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
 - Service Doctor smoke: `python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-doctor`
 - systemd supervision smoke: `python3 scripts/systemd_service_smoke.py --work-dir /tmp/skill2workflow-systemd-service`
+- Linux Docker service smoke: `python3 scripts/docker_service_smoke.py`
 - Secret hygiene: `python3 scripts/secret_hygiene.py examples/workflows`
 - Editable install: `python3 -m venv /tmp/skill2workflow-venv && /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68" && /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .`
 - Installed CLI smoke: `/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json`

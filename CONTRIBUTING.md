@@ -78,6 +78,20 @@ On Linux, run the systemd smoke with `--systemd-analyze-verify` to exercise the
 host parser against the generated unit. This check never installs, enables, or
 starts a service; the same verification runs in the Linux CI job.
 
+For the single-service Docker path, use a local Linux Docker Engine and a
+non-root operator account:
+
+```bash
+python3 scripts/docker_service_smoke.py
+```
+
+This builds the wheel-backed image, creates only a temporary private
+workspace, verifies the actual container mount and user boundary, checks
+service readiness and authenticated go-live, then restarts the container to
+prove SQLite file continuity. It never contacts a live connector provider.
+The dedicated Linux CI job runs the same drill. See the
+[Docker self-hosting guide](docs/docker-self-host.md) for deployment commands.
+
 To reproduce the production-boundary CI drills locally:
 
 ```bash

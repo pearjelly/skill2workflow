@@ -47,6 +47,16 @@ jobs:
           python-version: "3.14"
       - run: python scripts/systemd_service_smoke.py --work-dir /tmp/skill2workflow-systemd-service-ci --systemd-analyze-verify
 
+  docker-service:
+    name: single-service Docker verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 scripts/docker_service_smoke.py
+
   operational-gates:
     name: recovery and state-safety gates
     runs-on: ubuntu-latest

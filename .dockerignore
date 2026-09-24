@@ -1,0 +1,16 @@
+*
+!Dockerfile
+!pyproject.toml
+!README.md
+!LICENSE
+!src/
+!src/**
+!web/
+!web/**
+!examples/
+!examples/control-plane-snapshot.json
+!examples/workflows/
+!examples/workflows/**
+**/__pycache__/
+**/*.pyc
+**/*.egg-info/

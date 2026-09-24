@@ -67,6 +67,8 @@ class PackageSmokeTests(TestCase):
                         '["Development Status :: 4 - Beta"]}\n'
                     )
                 if command[-1:] == ["--help"]:
+                    if "service-go-live-check" in command:
+                        return "usage: skill2workflow service-go-live-check --verify-lark-tenant-credential\n"
                     return "usage: skill2workflow\n" + "\n".join(
                         REQUIRED_CONSOLE_COMMANDS
                     )

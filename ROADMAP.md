@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-262
+- Completed delivery loops: 1-263
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 262 is complete with opt-in Feishu credential go-live preflight
+- Active loop: None; Loop 263 is complete with single-service Docker self-hosting
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing opt-in Feishu credential go-live evidence and production-boundary CI evidence
+- Next decision: select the next Production Baseline loop after reviewing Linux Docker deployment evidence and production-boundary CI evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-262 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-263 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 262 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing opt-in Feishu credential go-live evidence and production-boundary CI evidence.
+This rolling queue is ordered. Loop 263 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing Linux Docker deployment evidence and production-boundary CI evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7107,6 +7107,33 @@ Probe/token use, and fixed output. Documentation records both the pre-start
 and optional composite paths; focused regression and isolated-wheel
 qualification pass. Design:
 `docs/superpowers/plans/2026-09-04-opt-in-feishu-go-live-preflight.md`.
+
+### Loop 263: Single-Service Docker Self-Hosting
+
+**Status:** Complete.
+
+**Prior basis:** The secure single-instance service had installed-wheel and
+Linux systemd deployment paths, but no qualified container image or Docker
+runbook. A Docker operator otherwise had to infer persistent mounts, user
+identity, and the loopback network boundary.
+
+**Outcome:** A wheel-built image defaults to a non-root user. One short-lived
+container initializes the owner-only workspace; one long-running Linux host-
+network container runs the existing service with a read-only root filesystem,
+read-only config/secret/backup mounts, and only SQLite state writable. The
+runbook preserves the current loopback listener and authenticated go-live
+check. A CI Docker drill builds the image and proves bootstrap, Doctor,
+authenticated go-live, and state persistence across a container restart.
+
+**Safety boundary:** No public port, Docker socket mount, second active
+instance, orchestration platform, automatic TLS/proxy provisioning, online
+state migration, secret baking, or exactly-once external-effect claim.
+Docker Desktop and remote Docker daemon semantics are not qualified by the
+Linux gate.
+
+**Evidence:** `Dockerfile`, `.dockerignore`,
+`scripts/docker_service_smoke.py`, dedicated Linux CI job, static contract
+tests, and `docs/docker-self-host.md`.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -7335,6 +7362,7 @@ qualification pass. Design:
 | Loop 260: Live Run-Action Conflict Recovery | Complete | Make true human-decision and cancellation races recoverable without stale-run reuse | Fixed 409 proxy, shared stale-action disablement, explicit live refresh, no retry, and loopback UI evidence |
 | Loop 261: Self-Hosted Feishu Tenant Credentials | Complete | Derive the approved live Feishu token in memory from a protected App Secret instead of a manually rotated static token | Explicit China-only descriptor, reserved secret handle, direct bounded exchange, service rotation, and redaction evidence |
 | Loop 262: Opt-In Feishu Credential Go-Live Preflight | Complete | Let operators include one explicit, value-free Feishu credential preflight in the composite deployment gate | Doctor-first opt-in check, provider-free default, Probe/token short-circuit, CLI/docs/tests, and wheel qualification |
+| Loop 263: Single-Service Docker Self-Hosting | Complete | Provide a reviewed one-container Linux deployment without weakening the existing loopback and SQLite boundaries | Wheel-built non-root image, private mounts, state-only write, Docker CI restart/go-live drill, and operator runbook |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

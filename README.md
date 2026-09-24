@@ -24,6 +24,8 @@ For a reviewed single-team deployment path, see the
 Feishu China derived credential can explicitly include its value-free preflight
 in the composite gate with `service-go-live-check
 --verify-lark-tenant-credential`; the default gate remains provider-free.
+For a single-container Linux deployment, see the
+[Docker self-hosting guide](docs/docker-self-host.md).
 
 The core idea is simple:
 
@@ -951,7 +953,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-262 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-263 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring

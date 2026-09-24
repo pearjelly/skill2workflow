@@ -21,6 +21,7 @@ working on.
 - [Service Doctor](service-doctor.md) — read-only readiness diagnosis
 - [Go-live checklist](go-live.md) — one reviewed single-instance deployment sequence and safe ordered deployment gate
 - [Systemd supervision](systemd-service.md) — manually reviewed Linux unit
+- [Single-service Docker self-hosting](docker-self-host.md) — Linux host-network deployment with private persistent state
 - [Recurring scheduling](recurring-scheduling.md) — durable dispatch semantics
 - [Human approval](human-approval.md) — remote approve/reject handoff
 - [Remote trigger](remote-trigger.md) — protected workflow start

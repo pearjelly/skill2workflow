@@ -215,7 +215,9 @@ Do not execute before a designated reviewer approves.
                 cwd=Path(__file__).resolve().parents[1],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                # The drill builds an isolated wheel and starts a real service;
+                # slower Linux hosts can exceed 30 seconds without a hang.
+                timeout=90,
             )
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
