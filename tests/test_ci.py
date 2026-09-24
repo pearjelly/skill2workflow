@@ -119,6 +119,8 @@ class ContinuousIntegrationContractTests(TestCase):
         ):
             self.assertIn(script, contributing)
             self.assertIn(script, release)
+        self.assertIn("docker_service_smoke.py", contributing)
+        self.assertIn("docker_service_smoke.py", release)
 
     def test_contributor_and_release_docs_reproduce_state_safety_gates(self):
         root = Path(__file__).resolve().parents[1]

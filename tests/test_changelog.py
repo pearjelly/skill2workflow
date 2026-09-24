@@ -35,6 +35,8 @@ class ChangelogContractTests(TestCase):
         self.assertIn("does not provide exactly-once execution", changelog)
         self.assertIn("external TLS termination", changelog)
         self.assertIn("cross-database operator-action reconciliation", changelog)
+        self.assertIn("single-service Linux Docker self-hosting", changelog)
+        self.assertIn("Corrected self-hosted go-live paths", changelog)
         self.assertIn(
             "[Unreleased]: https://github.com/pearjelly/skill2workflow/compare/v0.1.0...HEAD",
             changelog,

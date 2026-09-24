@@ -85,6 +85,20 @@ fixed-epoch reproducibility proof, and repository secret-hygiene scan on
 Python 3.14. A release PR must keep this job green; the generated evidence
 files remain value-free and are not a signing or registry publication step.
 
+When a release changes `Dockerfile`, `.dockerignore`, the Docker service
+smoke, or the Docker self-hosting runbook, also run this gate on a local Linux
+Docker Engine and require the dedicated CI `docker-service` job to pass:
+
+```bash
+python3 scripts/docker_service_smoke.py
+```
+
+The drill qualifies the source-built image, one-service mount/network
+boundary, authenticated go-live, offline backup/restore, restart continuity,
+and restored-state startup. It does not publish or sign an image, validate
+Docker Desktop or a remote daemon, or replace the separate 19-check
+Production Baseline bundle.
+
 The CI `operational-gates` job also runs the state-safety and recovery drills
 on Python 3.14: backup/restore, state upgrade, retention, cancellation,
 interrupted recovery, one-shot and recurring scheduling, and the service

@@ -8,6 +8,13 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added single-service Linux Docker self-hosting with a wheel-built non-root
+  image, private read-only config and credential mounts, persistent SQLite
+  state, and a manual operator runbook. A dedicated Linux CI drill covers
+  bootstrap, authenticated go-live, offline backup/restore, restart, and
+  restored-state startup. This does not publish an image or provide TLS,
+  multi-instance coordination, or exactly-once external effects.
+
 - Added `service-lark-tenant-credential-check`, an explicit value-free
   self-hosted Feishu China credential verification command. It performs one
   bounded token exchange without creating a task, starting a workflow,
@@ -37,6 +44,10 @@ release; Roadmap loop completion alone does not publish a new version.
   existing immutable publication transaction remains authoritative.
 
 ### Fixed
+
+- Corrected self-hosted go-live paths to the actual `service-init` result
+  fields and `ingress-token` filename, and separated Docker initialization
+  from the installed-wheel/systemd path.
 
 - Made live human-decision and cancellation conflicts actionable. A `409` now
   disables actions from the stale run snapshot until a new live snapshot is
