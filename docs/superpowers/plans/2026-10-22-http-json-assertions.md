@@ -50,3 +50,20 @@ python3 scripts/http_assertion_smoke.py
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-loop266
 python3 scripts/secret_hygiene.py examples/workflows
 ```
+
+## Verified Outcome
+
+Implementation `699e725` passed the local full suite (1,349 tests) and the
+isolated-wheel package gate, including real loopback GET requests through the
+installed CLI. Matching and failing JSON responses determine SQLite workflow
+completion, and canary response headers/body do not enter durable results.
+Focused tests additionally cover JSON state, pointer escaping, type matching,
+invalid JSON, fixed HTTP failures, and destination refusal before credentials.
+Example and repository secret-hygiene scans passed.
+
+[Implementation CI](https://github.com/pearjelly/skill2workflow/actions/runs/39711816875)
+passed all seven jobs: full Python 3.9/3.14 tests and installed qualification,
+Linux Docker/systemd, recovery/state safety, user journeys, and release
+artifacts. The package gate now includes the real HTTP assertion journey, so
+the release preflight uses it as well. Production maturity remains Self-hosted
+Beta; Workflow DSL remains 0.1.0.
