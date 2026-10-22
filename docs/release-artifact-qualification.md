@@ -60,10 +60,17 @@ LiteGraph view, source-free review, and checksum manifest), validates the
 exported Workflow DSL, and confirms no `SKILL.md` is copied. This remains a
 local authoring operation: it does not publish, execute, or resolve a
 credential.
+
 The installed `authoring-verify` command must then accept the exported set
 with its exact value-free verification result.
 The installed `authoring-bundle` command must create and the normal
 `bundle-verify` command must accept the resulting portable Bundle.
+
+The installed process-section compilation drill requires both CLI and local UI
+compilation to keep the top-level Skill identity and decode a folded description
+despite nested metadata with colliding names. It verifies original step source
+lines, gates and resulting DSL validation as well; module imports or source
+markers alone do not qualify frontmatter compatibility.
 
 The installed command set also includes `ui`. The qualification starts it with
 its fixed public asset inventory and requires a separate ten-case static-boundary

@@ -33,6 +33,66 @@ input path in its in-memory IR. The portable `authoring-export` path replaces
 that file reference with the fixed `SKILL.md` before compiling Workflow DSL, so
 an exported artifact or derived Bundle cannot disclose the caller's local path.
 
+## Frontmatter Identity And Text
+
+New compilation keeps top-level `name` and `description` separate from the
+optional `metadata` string map. `metadata.name` is data, not a replacement
+workflow identity. These fields follow the
+[Agent Skills frontmatter structure](https://agentskills.io/specification).
+
+```yaml
+---
+name: reviewed-workflow
+description: >-
+  Compile reviewed requests.
+  Preserve the intended workflow identity.
+metadata:
+  name: packaging-author
+  version: "1.0"
+---
+```
+
+The compiled ID is `workflow_reviewed_workflow`; the description is the two
+sentences joined by a space. Optional metadata is retained in the parsed IR
+as a map, not flattened into root fields, emitted into Workflow DSL, inferred
+as a gate/tool, or used as runtime authorization.
+
+This dependency-free reader supports a documented YAML **string subset**, not
+an arbitrary YAML loader or complete Agent Skills validator:
+
+- Top-level scalar fields and one flat block `metadata` mapping (or `{}`).
+  Keys may be plain or single/double quoted. All scalar values stay strings;
+  booleans/numbers are not implicitly typed. Existing missing-frontmatter
+  fallback and incomplete opening-frontmatter behavior remain unchanged.
+- Single-line plain text, single-quoted strings with doubled apostrophes, and
+  double-quoted strings using JSON escapes. Whitespace-separated comments are
+  removed outside quotes; a URL fragment or quoted `#` stays data.
+- Literal `|` and folded `>` blocks, `-`/`+` chomping, and one indentation digit
+  in either modifier order. Literal text retains line breaks and extra spaces;
+  folding preserves paragraph breaks and more-indented content. Blank blocks,
+  CRLF input and quoted/colon-bearing content keep original source-line counts.
+  The frontmatter closing delimiter must be a column-zero `---` line, optionally
+  followed by spaces/tabs; an indented delimiter inside a scalar is text.
+
+Repeated keys, malformed quotes/indentation, unsupported collections, deeper
+maps, tags, anchors, aliases and merge keys fail with the fixed
+`Invalid SKILL.md frontmatter` message, without source values. Wrapped plain
+or quoted multiline strings, YAML-only quoted escapes and nonempty flow maps
+are unsupported; use the block-scalar forms above. No constructors, includes,
+filesystem reads or variable evaluation are available. The existing 2 MiB
+Skill boundary still applies before parsing.
+Key separators and unquoted comments use linear scans rather than padding-
+sensitive backtracking. The regression includes long malformed keys and long
+valid scalar padding under an owned child-process timeout; it is not a hard
+latency SLA for arbitrary operating-system stalls.
+
+This corrects newly generated identity and description. A Skill that relied on
+old nested-key flattening, duplicate last-key wins, quote stripping or literal
+comment/header markers may now compile differently or be refused. Review the
+new Workflow DSL identity and structural diff before explicit publication;
+published artifacts are never recompiled, renamed or migrated automatically.
+The Workflow DSL, execution and input contracts remain unchanged.
+
 ## Explicit Human Approval
 
 Explicit result checks can use the same selected-step placement with

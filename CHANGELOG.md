@@ -84,6 +84,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Preserve Skill identity when optional metadata contains `name`/`description`;
+  decode common multiline and quoted frontmatter strings, reject ambiguous
+  duplicates safely, and qualify the real installed CLI/UI compilation path.
+
 - Explain editor input-check failures with declared types, missing required
   fields and safe length/range hints instead of a generic path-only error;
   preserve check-only behavior and avoid echoing rejected values or unknown keys.

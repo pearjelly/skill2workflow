@@ -1059,7 +1059,10 @@ def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) 
         fixture_dir.mkdir(parents=True, exist_ok=True)
         source = fixture_dir / "SKILL.md"
         markdown = (
-            "---\nname: installed-process\n---\n\n"
+            "---\nname: installed-process\ndescription: >-\n"
+            "  Compile reviewed input.\n  Keep the intended identity.\n"
+            "metadata:\n  name: private-metadata-name-canary\n"
+            "  description: private-metadata-description-canary\n---\n\n"
             f"## {section}\n\n"
             "1. Prepare output\n"
             "2. 等待负责人审核 <!-- skill2workflow: human_gate -->\n"
@@ -1069,7 +1072,7 @@ def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) 
         compiled = json.loads(
             _run([str(console_script), "compile", str(source), "--review"], cwd=isolated_dir)
         )
-        _require_installed_process_compile(compiled, section, str(source))
+        _require_installed_process_compile(compiled, section, str(source), source_offset=12)
         _validate_installed_process_compile(
             console_script, isolated_dir, compiled, fixture_dir / "cli.workflow.json"
         )
@@ -1080,7 +1083,7 @@ def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) 
         )
         if status != 200:
             raise RuntimeError("installed UI Skill compile did not accept a process section")
-        _require_installed_process_compile(compiled, section, "SKILL.md")
+        _require_installed_process_compile(compiled, section, "SKILL.md", source_offset=12)
         _validate_installed_process_compile(
             console_script, isolated_dir, compiled, fixture_dir / "ui.workflow.json"
         )
@@ -1097,7 +1100,7 @@ def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) 
     return True
 
 
-def _require_installed_process_compile(compiled, section: str, source_file: str) -> None:
+def _require_installed_process_compile(compiled, section: str, source_file: str, *, source_offset: int = 12) -> None:
     expected_review = {
         "schema_version": "skill2workflow-skill-compile-review-0.1.0",
         "ordered_step_count": 3,
@@ -1110,6 +1113,9 @@ def _require_installed_process_compile(compiled, section: str, source_file: str)
     if not isinstance(compiled, dict) or compiled.get("review") != expected_review:
         raise RuntimeError("installed Skill compile did not preserve process step counts and gates")
     workflow = compiled.get("workflow")
+    identity = workflow.get('workflow') if isinstance(workflow, dict) else None
+    if not isinstance(identity, dict) or identity.get('id') != 'workflow_installed_process' or identity.get('name') != 'installed-process' or identity.get('description') != 'Compile reviewed input. Keep the intended identity.':
+        raise RuntimeError('installed Skill compile did not preserve frontmatter identity and text')
     nodes = workflow.get("nodes") if isinstance(workflow, dict) else None
     if (
         not isinstance(nodes, list)
@@ -1127,7 +1133,7 @@ def _require_installed_process_compile(compiled, section: str, source_file: str)
             "file": source_file,
             "kind": "ordered_step",
             "index": index,
-            "line": index + 6,
+            "line": index + source_offset,
             "section": section,
         }:
             raise RuntimeError("installed Skill compile did not preserve process source provenance")

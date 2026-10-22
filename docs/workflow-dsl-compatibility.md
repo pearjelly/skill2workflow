@@ -1,5 +1,15 @@
 # Workflow DSL Compatibility
 
+New Skill compilation isolates top-level identity from nested metadata and
+decodes the documented frontmatter string subset. Duplicate keys and unsupported
+YAML now fail with a fixed refusal instead of producing ambiguous identity or
+text. Parsed IR optional metadata becomes a scoped map; it is not emitted as
+Workflow DSL or runtime permission. Existing flat valid Skills and source lines
+remain compatible, while formerly misparsed identity/text may change on explicit
+recompilation. Review that diff before publication; no stored workflow, alias,
+run, DSL schema or execution behavior is rewritten. See
+[frontmatter compatibility](skill-input-boundary.md#frontmatter-identity-and-text).
+
 The UI static file server admits only the fixed packaged public resources for
 GET/HEAD; arbitrary neighboring files and directory listings are not a supported
 UI interface. Load custom workflows/snapshots with the existing file picker.

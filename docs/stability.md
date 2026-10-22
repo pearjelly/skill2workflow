@@ -312,6 +312,11 @@ These surfaces should remain compatible during the `0.1.x` line:
 These surfaces may change while the project learns from real workflows:
 
 - Parser heuristics for arbitrary `SKILL.md` formats
+- Full YAML compatibility: only the documented frontmatter string subset is
+  supported; optional nested metadata is scoped in the experimental IR, and
+  unsupported/ambiguous declarations are refused rather than executed or
+  flattened into identity. Newly compiled artifacts may correct old identity
+  or text misparsing; published DSL is not reinterpreted.
 - Local `SKILL.md` parse/compile inputs use the fixed 2 MiB regular-file,
   no-follow, device/inode-bound read contract documented in
   `docs/skill-input-boundary.md`

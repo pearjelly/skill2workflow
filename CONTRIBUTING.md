@@ -102,6 +102,14 @@ the explicit `Workflow`/`Steps` fallback through `tests.test_process_steps`,
 CLI/editor compilation, and installed-wheel qualification. The accepted
 heading/list grammar is documented in [the Skill input boundary](docs/skill-input-boundary.md#explicit-process-sections).
 
+Run `tests.test_skill_frontmatter` for identity isolation, quoted/commented
+strings, block-scalar folding/chomping and fixed refusals. The installed
+process-section drill now also requires the intended root name, decoded folded
+description and unchanged source lines despite colliding nested metadata. The
+documented [frontmatter subset](docs/skill-input-boundary.md#frontmatter-identity-and-text)
+is not full YAML support; do not add constructors, alias resolution or a runtime
+dependency as an incidental parser fix.
+
 A separate Python 3.14 CI job also runs the local end-user journeys: the
 customer-support Pilot, the three-scenario Pilot pack, explicit external
 connector loading, and the installed-wheel quickstart. These drills use local

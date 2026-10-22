@@ -29,6 +29,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_ui_compile_preserves_frontmatter_scope_and_refuses_duplicate_identity(self):
+        status, raw = self._post_local_skill_compile('---\nname: intended-name\ndescription: >-\n  First sentence.\n  Next sentence.\nmetadata:\n  name: private-metadata-canary\n---\n## Steps\n1. Review\n')
+        self.assertEqual(status, 200)
+        result = json.loads(raw)
+        self.assertEqual(result['workflow']['workflow']['id'], 'workflow_intended_name')
+        self.assertEqual(result['workflow']['workflow']['description'], 'First sentence. Next sentence.')
+        self.assertNotIn(b'private-metadata-canary', raw)
+        status, raw = self._post_local_skill_compile('---\nname: intended\nname: private-value-canary\n---\n## Steps\n1. Review\n')
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw), {'error': 'skill compile rejected'})
+
     def test_skill_input_schema_declaration_compiles_and_has_fixed_refusal(self):
         schema = {'type': 'object', 'properties': {'record_id': {'type': 'string'}},
                   'required': ['record_id'], 'additionalProperties': False}

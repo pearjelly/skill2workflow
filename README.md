@@ -136,6 +136,11 @@ confirmation-protected promotion to the `production` alias using a
 compare-and-swap precondition; the UI never accepts an arbitrary alias or
 workflow payload.
 
+Skill compilation keeps top-level identity separate from optional metadata and
+supports common folded/literal descriptions. Review the documented
+[frontmatter subset](docs/skill-input-boundary.md#frontmatter-identity-and-text)
+when importing an existing Skill; no full YAML loader is used.
+
 Draft authors can open **Workflow input** to review the read-only input
 contract and check non-secret JSON against the current draft's schema and
 required mappings. Blocked results explain the reason and next edit using

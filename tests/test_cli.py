@@ -18,6 +18,25 @@ from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
 
 
 class CliTests(TestCase):
+    def test_compile_preserves_frontmatter_identity_and_fixed_duplicate_refusal(self):
+        with TemporaryDirectory() as temporary:
+            source = Path(temporary) / 'SKILL.md'
+            source.write_text('---\nname: intended-name\ndescription: >-\n  First sentence.\n  Next sentence.\nmetadata:\n  name: private-metadata-canary\n---\n## Steps\n1. Review\n', encoding='utf-8')
+            stdout = StringIO()
+            with redirect_stdout(stdout):
+                self.assertEqual(main(['compile', str(source)]), 0)
+            workflow = json.loads(stdout.getvalue())
+            self.assertEqual(workflow['workflow']['id'], 'workflow_intended_name')
+            self.assertEqual(workflow['workflow']['description'], 'First sentence. Next sentence.')
+            self.assertNotIn('private-metadata-canary', stdout.getvalue())
+            source.write_text('---\nname: intended\nname: private-value-canary\n---\n## Steps\n1. Review\n', encoding='utf-8')
+            stdout, stderr = StringIO(), StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                self.assertEqual(main(['compile', str(source)]), 1)
+            self.assertEqual(stdout.getvalue(), '')
+            self.assertIn('Invalid SKILL.md frontmatter', stderr.getvalue())
+            self.assertNotIn('private-value-canary', stderr.getvalue())
+
     def test_version_flag_reports_package_version_without_subcommand(self):
         stdout = StringIO()
         with redirect_stdout(stdout):

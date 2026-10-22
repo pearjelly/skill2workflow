@@ -11,6 +11,12 @@ asset SHA-256 records live in `web/vendor/litegraph-0.7.18/` for review.
 
 ## Compile A Local SKILL.md
 
+Common literal/folded frontmatter descriptions and scoped `metadata` maps are
+supported without changing the workflow identity. Review the
+[frontmatter string subset](skill-input-boundary.md#frontmatter-identity-and-text)
+and newly compiled identity when importing existing Skills; unsupported YAML
+is refused rather than flattened or interpreted as workflow instructions.
+
 For an approval → HTTP call → result-check journey without manual binding
 edits, see [Skill HTTP action declarations](skill-http-actions.md).
 For workflow-level business input validation without editing generated JSON,

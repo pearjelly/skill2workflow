@@ -494,7 +494,7 @@ class PackageSmokeTests(TestCase):
         self.assertEqual(len(requests), 3)
 
     def test_installed_skill_compiles_reject_fallback_missing_gates_and_bad_sources(self):
-        for defect in ("fallback", "human_gate", "verification", "section", "line"):
+        for defect in ("fallback", "human_gate", "verification", "section", "line", "identity", "description"):
             with self.subTest(defect=defect), TemporaryDirectory() as temporary:
                 isolated = Path(temporary)
 
@@ -510,6 +510,8 @@ class PackageSmokeTests(TestCase):
                         result["workflow"]["nodes"][index]["type"] = "step"
                     elif defect == "section":
                         result["workflow"]["nodes"][1]["metadata"]["source"]["section"] = "Checklist"
+                    elif defect in ("identity", "description"):
+                        result['workflow']['workflow']['id' if defect == 'identity' else 'description'] = 'private-metadata-canary'
                     else:
                         result["workflow"]["nodes"][1]["metadata"]["source"]["line"] = 99
                     return json.dumps(result)
@@ -659,13 +661,15 @@ def _process_compile_result(section, source_file):
     ]
     return {
         "workflow": {
+            "workflow": {'id': 'workflow_installed_process', 'name': 'installed-process',
+                         'description': 'Compile reviewed input. Keep the intended identity.'},
             "nodes": [{"type": "start"}] + [
                 {
                     "type": node_type,
                     "title": title,
                     "metadata": {"source": {
                         "file": source_file, "kind": "ordered_step", "index": index,
-                        "section": section, "line": index + 6,
+                        "section": section, "line": index + 12,
                     }},
                 }
                 for index, (node_type, title) in enumerate(steps, 1)

@@ -11,6 +11,7 @@ from .http_assertions import load_assertion_json, skill_http_assertion_binding
 from .skill_http import skill_http_action_binding
 from .input_schema import INPUT_SCHEMA_MAX_BYTES
 from .skill_input import SKILL_INPUT_SCHEMA_ERROR, skill_input_schema_contract
+from .frontmatter import parse_frontmatter
 
 
 SkillIR = Dict[str, object]
@@ -165,28 +166,8 @@ def _read_skill_file(path: Path) -> str:
     return raw.decode("utf-8")
 
 
-def _parse_frontmatter(text: str) -> Tuple[Dict[str, str], str, int]:
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return {}, text, 1
-
-    end_index = None
-    for index, line in enumerate(lines[1:], start=1):
-        if line.strip() == "---":
-            end_index = index
-            break
-
-    if end_index is None:
-        return {}, text, 1
-
-    metadata: Dict[str, str] = {}
-    for line in lines[1:end_index]:
-        if ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        metadata[key.strip()] = value.strip().strip("\"'")
-
-    return metadata, "\n".join(lines[end_index + 1 :]), end_index + 2
+def _parse_frontmatter(text: str) -> Tuple[Dict[str, object], str, int]:
+    return parse_frontmatter(text)
 
 
 def _parse_sections(body: str) -> Dict[str, str]:
