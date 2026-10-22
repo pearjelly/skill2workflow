@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-280
+- Completed delivery loops: 1-281
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 280 is complete with scoped Skill frontmatter parsing
+- Active loop: None; Loop 281 is complete with recoverable Skill compile errors
 - Next maturity gate: Production Baseline
 - Next decision: review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery loop
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-280 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-281 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 280 is complete and there is no active delivery loop; review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 280 plan corrects frontmatter identity/text parsing within a documented string subset, not full YAML conformance or automatic migration of published workflows. Installed-build variability and sustained real service/recovery evidence remain part of qualification; maturity is unchanged.
+This rolling queue is ordered. Loop 281 is complete and there is no active delivery loop; review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 281 plan makes safe compile refusals recoverable without changing accepted Skill forms, runtime authority or published artifacts. Installed-build variability and sustained real service/recovery evidence remain part of qualification; maturity is unchanged.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7614,6 +7614,36 @@ and complete production-baseline release preflight passed on the first attempt.
 Exact evidence and the final whitespace-only test cleanup are recorded in
 `docs/superpowers/plans/2026-10-22-skill-frontmatter-identity.md`.
 
+### Loop 281: Recoverable Skill Compile Errors
+
+**Status:** Complete.
+
+**Prior basis:** A healthy local helper reported an invalid Skill as unavailable,
+and the CLI provided no line or repair guidance. A previous asynchronous import
+could also overwrite or repaint a more recent selection or draft.
+
+**Outcome:** Finite source-free frontmatter reasons and approximate original
+lines drive fixed CLI/editor guidance. The error appears directly below the
+compile actions; correct, reselect and explicitly compile again. Failure retains
+the active graph and its validation. Abort/revision/snapshot guards discard late
+file reads and compile results after selection or draft changes.
+
+**Safety boundary:** Explicit boolean diagnostics opt-in preserves the exact
+legacy API refusal and successful response; the library error string and
+accepted Skill forms remain unchanged. Unknown/malformed/oversized evidence gets
+fixed fallback copy. No raw keys, values, excerpts, paths or exception messages,
+runtime dependency, DSL execution authority or published-artifact rewrite.
+
+**Evidence:** At `635695b`, 1,468 Python and 49 editor tests, a 95-member
+isolated wheel, ten installed CLI/API cases, actual served-module/report tests,
+392 unchanged baseline parse comparisons and secret hygiene passed. Real
+desktop/mobile/actual-width, long-error and corrected-success views received a
+fresh independent `ship` review with no material fixes; true 200% magnification
+remains explicitly unqualified. All seven feature CI jobs and complete
+production-baseline release preflight passed on the first attempt. Exact
+evidence is recorded in
+`docs/superpowers/plans/2026-10-22-skill-compile-recovery.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7858,6 +7888,7 @@ Exact evidence and the final whitespace-only test cleanup are recorded in
 | Loop 278: Shared Baseline Execution Deadline | Complete | Enforce the baseline execution budget and stop owned timed-out checks | Absolute shared deadline, capped waits, POSIX group supervision, bounded direct-child reap, fail-closed cleanup and unchanged evidence/check membership |
 | Loop 279: Actionable Draft Input Explanations | Complete | Explain blocked input with a safe next edit | Declared-evidence reason/type/bound hints, payload-relative pointers, private unknown keys, generic fallbacks, real installed module qualification and independent finish review |
 | Loop 280: Skill Frontmatter Identity And Text | Complete | Preserve intended identity and descriptions from ordinary Skill metadata | Scoped root/map parsing, literal/folded/quoted text, fixed refusals, linear key/comment scans, unchanged source lines and real installed compilation/approval evidence |
+| Loop 281: Recoverable Skill Compile Errors | Complete | Turn a refused Skill into a safe next edit | Opt-in finite reason/line evidence, fixed inline/CLI recovery, retained active draft, stale-result fencing and real installed/module qualification |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
