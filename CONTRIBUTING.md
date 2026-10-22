@@ -124,6 +124,19 @@ python3 scripts/skill_compile_recovery_smoke.py --executable /path/to/installed/
 Node is development qualification only, not a runtime dependency. Keep error
 evidence source-free and preserve the library's fixed `ValueError` text.
 
+Versioned Skill iteration is covered by `tests.test_skill_workflow_version` and
+the installed-only package gate. Run the full synthetic two-version journey:
+
+```bash
+python3 scripts/skill_version_smoke.py
+python3 scripts/skill_version_smoke.py --executable /path/to/installed/skill2workflow
+```
+
+It requires compile/export/repair, Bundle review, immutable publication and
+version-pinned runs plus quickstart/local-helper evidence, with no live provider.
+Keep the no-declaration `0.1.0` output and original source lines unchanged;
+ordinary metadata must never become deployment version intent.
+
 A separate Python 3.14 CI job also runs the local end-user journeys: the
 customer-support Pilot, the three-scenario Pilot pack, explicit external
 connector loading, and the installed-wheel quickstart. These drills use local

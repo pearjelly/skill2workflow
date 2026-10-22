@@ -71,6 +71,11 @@ Review** with inferred node counts and fixed missing-control notices. It is an
 authoring prompt only: it does not inspect business intent, change the draft,
 validate a real-world action, publish, or execute anything.
 
+An explicit source `workflow_version` declaration is preserved by editor
+compilation; no declaration keeps `0.1.0`. Review the generated DSL before
+publication. This does not add a version-editing control or automatic publishing.
+See [versioned Skill iteration](skill-workflow-versions.md).
+
 For durable local review artifacts, use `skill2workflow authoring-export
 path/to/SKILL.md --output-dir /private/path` instead. It creates a new
 owner-only DSL, graph, review, and manifest set without copying the source,

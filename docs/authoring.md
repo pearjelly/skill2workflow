@@ -78,6 +78,13 @@ Without `-o`, `compile --review` intentionally prints an explicit
 `{"workflow": ..., "review": ...}` wrapper. Plain `compile` without
 `--review` keeps its existing DSL-only output for compatibility.
 
+For the next reviewed release of an edited Skill, declare its version in the
+source with `<!-- skill2workflow: workflow_version 0.2.0 -->`. Compile, editor,
+export, repair and custom quickstart then agree on the same `workflow.version`.
+See [versioned Skill iteration](skill-workflow-versions.md) for two-version
+review/publication without manually editing generated JSON. Omitting the
+declaration still produces `0.1.0`; publication remains explicit and immutable.
+
 ## Check Draft Input In The Editor
 
 The inspector's **Workflow input** disclosure reviews the whole draft, not the

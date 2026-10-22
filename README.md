@@ -144,6 +144,12 @@ Rejected imports show safe repair guidance and a nearby source line when known;
 correct and reselect the file, then compile again. The active draft is preserved.
 See [compile recovery](docs/skill-input-boundary.md#recover-from-a-compile-refusal).
 
+For the next revision of the same workflow, put
+`<!-- skill2workflow: workflow_version 0.2.0 -->` in the Skill body. Compile,
+editor, export, repair and custom quickstart preserve that version; omission
+keeps `0.1.0`. Compare and publish a new immutable version without editing
+generated JSON using [versioned Skill iteration](docs/skill-workflow-versions.md).
+
 Draft authors can open **Workflow input** to review the read-only input
 contract and check non-secret JSON against the current draft's schema and
 required mappings. Blocked results explain the reason and next edit using

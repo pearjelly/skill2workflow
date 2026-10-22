@@ -12,6 +12,7 @@ from .skill_http import skill_http_action_binding
 from .input_schema import INPUT_SCHEMA_MAX_BYTES
 from .skill_input import SKILL_INPUT_SCHEMA_ERROR, skill_input_schema_contract
 from .frontmatter import parse_frontmatter
+from .skill_version import SKILL_WORKFLOW_VERSION_ERROR, skill_workflow_version
 
 
 SkillIR = Dict[str, object]
@@ -46,6 +47,7 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
         raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
     metadata, body, body_start_line = _parse_frontmatter(text)
     body, input_schema = _extract_input_schema_declaration(body)
+    body, workflow_version = _extract_workflow_version_declaration(body)
     checklist_details = _extract_ordered_step_details(body, body_start_line)
     checklist = [_format_step_detail(step) for step in checklist_details]
     sections = _parse_sections(body)
@@ -85,7 +87,34 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     }
     if input_schema is not None:
         ir['input_schema'] = input_schema
+    if workflow_version is not None:
+        ir['workflow_version'] = workflow_version
     return ir
+
+
+def _extract_workflow_version_declaration(body: str):
+    """Read one explicit standalone version without shifting source lines."""
+    lines = body.splitlines()
+    version = None
+    fence_char, fence_length = '', 0
+    for index, line in enumerate(lines):
+        if fence_char:
+            closing = re.match(r'^ {0,3}([`~]{3,})[ \t]*$', line)
+            if closing and set(closing.group(1)) == {fence_char} and len(closing.group(1)) >= fence_length:
+                fence_char = ''
+            continue
+        opening = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        if opening and not (opening.group(1)[0] == '`' and '`' in opening.group(2)):
+            fence_char, fence_length = opening.group(1)[0], len(opening.group(1))
+            continue
+        if not re.search(r'<!--\s*skill2workflow\s*:\s*workflow_version\b', line, re.IGNORECASE):
+            continue
+        match = re.fullmatch(r' {0,3}<!-- skill2workflow: workflow_version ([A-Za-z0-9][A-Za-z0-9._-]{0,127}) -->[ \t]*', line)
+        if version is not None or match is None:
+            raise ValueError(SKILL_WORKFLOW_VERSION_ERROR)
+        version = skill_workflow_version(match.group(1))
+        lines[index] = ''
+    return ('\n'.join(lines), version) if version is not None else (body, None)
 
 
 def _extract_input_schema_declaration(body: str):

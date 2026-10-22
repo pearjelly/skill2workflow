@@ -167,6 +167,11 @@ These surfaces should remain compatible during the `0.1.x` line:
   replace the active graph after failure, or grant execution authority. Pending
   results are invalidated by selection/draft changes. See
   [compile recovery](skill-input-boundary.md#recover-from-a-compile-refusal).
+- A standalone Skill `workflow_version` declaration selects the existing
+  `workflow.version` across authoring paths, with a bounded safe token and fixed
+  refusal. Missing declarations keep `0.1.0`. Published bytes, existing run
+  bindings, package/DSL versions and alias promotion remain unchanged. See
+  [versioned Skill iteration](skill-workflow-versions.md).
 - The installed visual editor loads its pinned LiteGraph JavaScript and
   stylesheet from committed local MIT-licensed assets with test-locked
   SHA-256 digests. It makes no runtime CDN request or browser-time package

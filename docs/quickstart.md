@@ -65,6 +65,12 @@ Quickstart does not add a human gate to an uncontrolled Skill. Author the
 approval instruction explicitly, review the generated waiting run, and approve
 or reject it through the normal operator command.
 
+A custom Skill's explicit `workflow_version` declaration selects the initial
+published/run version; otherwise it remains `0.1.0`. This does not change the
+package or DSL schema version. See [versioned Skill iteration](skill-workflow-versions.md)
+before preparing subsequent immutable versions. Quickstart still requires a
+new workspace; it never upgrades or replaces an existing one.
+
 Quickstart refuses a non-manual connector before the first human gate on the
 compiled initial success path. HTTP actions and HTTP assertions before approval
 are rejected before initialization. Manual preparation steps remain supported.

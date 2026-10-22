@@ -12,6 +12,7 @@ from .input_schema import validate_input_schema_contract
 from .http_assertions import validate_http_assertion_binding, skill_http_assertion_binding
 from .skill_http import skill_http_action_binding
 from .skill_input import skill_input_schema_contract
+from .skill_version import skill_workflow_version
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -26,6 +27,7 @@ _SKILL_COMPILE_REVIEW_NOTICE_CODES = (
 
 def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
     """Compile Skill IR into the initial skill2workflow DSL."""
+    workflow_version = skill_workflow_version(ir['workflow_version']) if 'workflow_version' in ir else '0.1.0'
     input_schema = skill_input_schema_contract(ir['input_schema']) if 'input_schema' in ir else None
     metadata = ir.get("metadata", {})
     if not isinstance(metadata, dict):
@@ -155,7 +157,7 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
             "id": workflow_id,
             "name": name,
             "description": description,
-            "version": "0.1.0",
+            "version": workflow_version,
             "status": "draft",
         },
         "entry": "start",

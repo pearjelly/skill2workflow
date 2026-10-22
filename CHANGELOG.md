@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Declare `workflow_version` once in a Skill to compile, export, repair and
+  quickstart a reviewed new workflow version without editing generated JSON.
+  Keep the `0.1.0` default, immutable publication and existing run bindings.
+
 - Add workflow-level input contract review and local draft input/mapping
   preflight to the editor, with ephemeral test input, stale-result protection,
   unchanged exports, and mandatory installed endpoint/asset qualification.

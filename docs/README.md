@@ -12,6 +12,7 @@ working on.
 - [Authoring](authoring.md) — compile Skills, review/check draft input, edit the graph, and write back DSL
 - [Skill HTTP actions](skill-http-actions.md) — declare an API call, approve it, and verify the result
 - [Skill trigger inputs](skill-input-contracts.md) — declare typed business inputs and reject invalid triggers before admission
+- [Skill workflow versions](skill-workflow-versions.md) — edit a Skill, compare and publish a new immutable version without editing generated JSON
 - [Examples](examples.md) — scenario gallery and repeatable inspection commands
 - [Workflow DSL contract](workflow-dsl-contract.md) — execution truth and schema
 - [Workflow bundles](workflow-bundles.md) — deterministic shareable artifacts

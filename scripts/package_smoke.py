@@ -350,6 +350,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     ui_status = _qualify_installed_ui(console_script, isolated_dir)
     _qualify_installed_skill_compiles(console_script, isolated_dir)
     _qualify_installed_skill_compile_recovery(repo_root, console_script, isolated_dir)
+    _qualify_installed_skill_versions(repo_root, console_script, isolated_dir)
     _qualify_installed_http_assertions(repo_root, console_script, isolated_dir)
     _qualify_installed_skill_http_actions(repo_root, console_script, isolated_dir)
     _qualify_installed_quickstart_inputs(python_bin, console_script, isolated_dir)
@@ -1062,6 +1063,21 @@ def _qualify_installed_skill_compile_recovery(repo_root: Path, console_script: P
                   'cli_cases_verified': 2, 'module_served': True} or any(
                       result.get(key) is not True for key in ('ok', 'installed', 'module_served')):
         raise RuntimeError('installed Skill compile recovery qualification failed')
+    return True
+
+
+def _qualify_installed_skill_versions(repo_root: Path, console_script: Path, isolated_dir: Path) -> bool:
+    result = json.loads(_run(
+        [sys.executable, str(repo_root / 'scripts' / 'skill_version_smoke.py'), '--executable', str(console_script)],
+        cwd=isolated_dir,
+    ))
+    names = {'compile', 'artifacts', 'repair', 'bundles', 'publication',
+             'immutable_conflict', 'pinned_runs', 'quickstart', 'ui', 'invalid_source'}
+    if (not isinstance(result, dict) or set(result) != {'ok', 'installed', 'checks'}
+            or result.get('ok') is not True or result.get('installed') is not True
+            or not isinstance(result.get('checks'), dict) or set(result['checks']) != names
+            or any(value is not True for value in result['checks'].values())):
+        raise RuntimeError('installed versioned Skill qualification failed')
     return True
 
 

@@ -1,5 +1,12 @@
 # Workflow DSL Compatibility
 
+An explicit standalone Skill `workflow_version` declaration selects the existing
+`workflow.version` field for newly compiled drafts. No declaration retains
+`0.1.0`; ordinary metadata is not deployment intent. This bounded source grammar
+does not narrow manually authored DSL versions or alter published workflows,
+version-pinned runs, schemas, aliases or execution policy. See
+[versioned Skill iteration](skill-workflow-versions.md).
+
 Skill compile failures now have opt-in, source-free diagnostic evidence and
 fixed CLI/editor recovery wording. The library frontmatter `ValueError` string,
 default API refusal and successful compile response stay compatible. Accepted

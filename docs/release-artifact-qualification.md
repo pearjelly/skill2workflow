@@ -82,6 +82,16 @@ to render all four actual installed reports through the served editor and
 pinned vendor modules. No source-backend substitution or silent skip qualifies
 that installed path; Node remains development tooling only.
 
+The mandatory installed `scripts/skill_version_smoke.py` drill requires ten
+actual path checks for source-declared Workflow versions: default/explicit CLI
+compilation, two verified authoring sets, backed-up repair with preview, Bundle
+diff, two-version publication, immutable-conflict preservation, version-pinned
+waiting/approved/rejected runs, custom quickstart, the local editor compile
+route, and invalid-source refusal without output creation. All commands run
+outside the checkout with source imports disabled. Every check must be exactly
+true; incomplete evidence or truthy placeholders fail package qualification.
+It uses synthetic manual steps only and makes no provider/credential call.
+
 The installed command set also includes `ui`. The qualification starts it with
 its fixed public asset inventory and requires a separate ten-case static-boundary
 drill. That drill creates a synthetic private neighbor in the disposable wheel

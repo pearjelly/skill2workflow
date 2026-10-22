@@ -127,6 +127,17 @@ Unknown, malformed, oversized and older-helper responses use safe fixed
 fallback guidance. Static hosting still requires `skill2workflow ui` or CLI
 compilation; a network/helper failure is distinct from a source refusal.
 
+## Explicit Workflow Version
+
+One standalone `<!-- skill2workflow: workflow_version 0.2.0 -->` in the body
+selects the generated workflow version across compile, editor, export, repair
+and custom quickstart. It is removed before step extraction and guidance
+inference, without shifting source lines. It is not approval or permission to
+replace a published artifact. See [versioned Skill iteration](skill-workflow-versions.md)
+for the bounded token grammar, fixed refusal, unchanged `0.1.0` default, Bundle
+comparison and separate immutable publication. Ordinary `metadata.version`
+remains unrelated data; no version is inferred from it.
+
 ## Explicit Human Approval
 
 Explicit result checks can use the same selected-step placement with
@@ -156,8 +167,9 @@ The syntax is case-sensitive, single-line, and permits one marker at the end
 of one nonempty selected item. Within the Skill body, unknown, malformed,
 repeated, or unattached reserved `skill2workflow` comments fail with
 `Invalid Skill step annotation`.
-The separately documented standalone `input_schema` declaration is the explicit
-exception to selected-step placement and has its own fixed refusal message.
+The separately documented standalone `input_schema` and `workflow_version`
+declarations are explicit exceptions to selected-step placement and have their
+own fixed refusal messages.
 This includes a declaration in a process excluded by Checklist precedence.
 Fenced examples do not declare approvals. If legacy Checklist parsing extracts
 an annotated item inside a fence, compilation is refused to prevent accidental
