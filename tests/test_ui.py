@@ -28,6 +28,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_skill_http_assertion_declaration_compiles_and_rejects_invalid_config(self):
+        config = {'request': {'url': 'https://example.invalid/result'}, 'assertions': [{'path': '/ready', 'equals': True}]}
+        status, raw = self._post_local_skill_compile('## Steps\n1. 校验 <!-- skill2workflow: http_assert ' + json.dumps(config) + ' -->\n')
+        self.assertEqual(status, 200)
+        compiled = json.loads(raw)
+        self.assertEqual(compiled['workflow']['nodes'][1]['connector']['id'], 'http_assert')
+        self.assertEqual(compiled['review']['verification_node_count'], 1)
+        status, raw = self._post_local_skill_compile('## Steps\n1. private-source <!-- skill2workflow: http_assert {} -->\n')
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw), {'error': 'skill compile rejected'})
+
     def test_explicit_chinese_approval_and_fixed_annotation_errors(self):
         status, raw = self._post_local_skill_compile(
             '## Steps\n1. 等待负责人审核 <!-- skill2workflow: human_gate -->\n'

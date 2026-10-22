@@ -3,6 +3,7 @@
 import json
 import math
 import re
+from urllib.parse import urlsplit
 
 
 CONFIG_ERROR = "http assertion configuration is invalid"
@@ -66,11 +67,58 @@ def _constant(value):
     raise ValueError("invalid constant")
 
 
+def load_assertion_json(payload):
+    return json.loads(payload, object_pairs_hook=_object, parse_int=_number,
+                      parse_float=_number, parse_constant=_constant)
+
+
+def skill_http_assertion_binding(config):
+    """Build one explicit binding without resolving credentials or using I/O."""
+    try:
+        if not isinstance(config, dict) or set(config) - {"request", "assertions", "credentials"}:
+            raise ValueError()
+        binding = dict(config, id="http_assert", kind="http_assert")
+        if validate_http_assertion_binding(binding):
+            raise ValueError()
+        request = config["request"]
+        if set(request) - {"url", "method", "headers", "timeout_ms", "allowed_origins", "input_mapping", "response_mode"}:
+            raise ValueError()
+        url = request.get("url")
+        if not isinstance(url, str) or len(url.encode("utf-8")) > 16384 or any(c in url for c in "\r\n\x00"):
+            raise ValueError()
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None or parsed.password is not None:
+            raise ValueError()
+        parsed.port
+        if "timeout_ms" in request and (type(request["timeout_ms"]) is not int or not 0 <= request["timeout_ms"] <= 86400000):
+            raise ValueError()
+        headers = request.get("headers", {})
+        if not isinstance(headers, dict) or len(headers) > 64:
+            raise ValueError()
+        if any(not isinstance(k, str) or not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", k)
+               or not isinstance(v, str) or any(c in v for c in "\r\n\x00") for k, v in headers.items()):
+            raise ValueError()
+        if sum(len((k + v).encode("utf-8")) + 2 for k, v in headers.items()) > 65536:
+            raise ValueError()
+        credentials = config.get("credentials", [])
+        if not isinstance(credentials, list) or len(credentials) > 32:
+            raise ValueError()
+        for item in credentials:
+            if (not isinstance(item, dict) or set(item) != {"target", "name", "handle"}
+                    or item["target"] != "header" or not isinstance(item["name"], str)
+                    or not re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", item["name"])
+                    or not isinstance(item["handle"], str) or not item["handle"]
+                    or len(item["handle"].encode("utf-8")) > 1024):
+                raise ValueError()
+        return binding
+    except (ValueError, TypeError, AttributeError, UnicodeError) as error:
+        raise ValueError("Invalid Skill step annotation") from error
+
+
 def evaluate_http_assertions(payload, checks):
     """Return only a fixed outcome; never return response or expected values."""
     try:
-        document = json.loads(payload, object_pairs_hook=_object, parse_int=_number,
-                              parse_float=_number, parse_constant=_constant)
+        document = load_assertion_json(payload)
     except (ValueError, TypeError, RecursionError, OverflowError):
         return "http assertion response is invalid"
     for check in checks:

@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add explicit HTTP assertion declarations in selected Skill steps, preserving
+  clean titles, source mapping, and credential handles while generating the
+  executable connector and failure transitions without manual DSL editing.
+
 - Add the explicit `http_assert` connector for bounded GET/JSON equality
   checks, fixed response-free results, and ordinary success/failure transitions.
 

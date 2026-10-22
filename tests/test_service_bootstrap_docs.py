@@ -31,7 +31,7 @@ class ServiceBootstrapDocumentationTests(TestCase):
 
         self.assertIn("- Completed delivery loops: 1-266", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 266 is complete with executable HTTP JSON assertions",
+            "- Active loop: Loop 267 — Skill HTTP assertion declarations",
             roadmap,
         )
         self.assertIn("| Loop 51: Secure Service Bootstrap | Complete |", roadmap)

@@ -28,6 +28,6 @@ class AuditEventBoundaryDocsTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("Completed delivery loops: 1-266", roadmap)
         self.assertIn(
-            "Loop 266 is complete with executable HTTP JSON assertions", roadmap
+            "Loop 267 — Skill HTTP assertion declarations", roadmap
         )
         self.assertIn("Delivery Loops 1-266 are complete", readme)

@@ -22,6 +22,6 @@ class SqliteTriggerLedgerBoundaryDocsTests(TestCase):
         self.assertIn("sqlite-trigger-ledger-boundary.md", stability)
         self.assertIn("Delivery Loops 1-266 are complete", readme)
         self.assertIn("sqlite-trigger-ledger-boundary.md", readme)
-        self.assertIn("Loop 266 is complete with executable HTTP JSON assertions", roadmap)
+        self.assertIn("Loop 267 — Skill HTTP assertion declarations", roadmap)
         self.assertIn("Loop 177: Bounded SQLite Trigger-Ledger Responses", roadmap)
         self.assertIn("sqlite-trigger-ledger-boundary.md", changelog)

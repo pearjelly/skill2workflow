@@ -9,6 +9,11 @@ publication.
 
 This document defines the compatibility policy for Workflow DSL `0.1.0`.
 
+Skill `http_assert` declarations affect newly compiled drafts and emit the
+existing tool-call/connector contract. They do not reinterpret published DSL
+or infer endpoints from prose. Compile review includes these executable checks
+in `verification_node_count`; its existing fields and version are unchanged.
+
 The DSL is the execution truth source for `skill2workflow`. Visual graphs, editor state, run overlays, and generated artifacts must be converted back into Workflow DSL before execution or publication.
 
 Parser support for explicit numbered `Workflow` and `Steps` sections changes

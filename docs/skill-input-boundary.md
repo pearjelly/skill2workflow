@@ -28,6 +28,12 @@ an exported artifact or derived Bundle cannot disclose the caller's local path.
 
 ## Explicit Human Approval
 
+Explicit result checks can use the same selected-step placement with
+`<!-- skill2workflow: http_assert {JSON} -->`. See
+[Skill HTTP assertions](http-json-assertions.md#declare-a-check-in-skillmd) for
+the JSON contract and the approval/check/delivery journey. Only one declaration
+may be attached to a step; multiple declarations are rejected.
+
 Authors can require a human decision on a selected Checklist, Workflow, or
 Steps item by appending exactly `<!-- skill2workflow: human_gate -->`, with
 whitespace before the comment:

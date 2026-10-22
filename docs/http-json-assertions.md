@@ -1,5 +1,47 @@
 # Executable HTTP JSON Assertions
 
+## Declare A Check In SKILL.md
+
+Append a single-line JSON declaration to the selected step. The compiler builds
+the connector and transitions for you:
+
+```markdown
+## Workflow
+1. 整理结果
+2. 负责人审批 <!-- skill2workflow: human_gate -->
+3. 校验接口结果 <!-- skill2workflow: http_assert {"request":{"url":"https://example.invalid/result"},"assertions":[{"path":"/ready","equals":true}]} -->
+4. 交付结果
+```
+
+Replace the example endpoint with your reviewed result endpoint. `request`
+and `assertions` are required; optional `credentials` contain header handle
+descriptors, never resolved values. Request options include GET, headers,
+timeout, allowed origins, query input mapping, and full response mode. The
+declaration rejects unknown configuration/request fields, malformed or
+duplicate-key JSON, invalid scalar checks, and literal comment delimiters
+inside the JSON. Use JSON Unicode escapes for delimiter characters when they
+are part of an expected string. Credential descriptors are limited to 32
+header handles of at most 1,024 UTF-8 bytes each.
+
+The declaration must be on one nonempty selected Checklist/Workflow/Steps
+item and takes precedence over keyword inference. Use separate steps for
+approval and checking. It is removed from the displayed title, description,
+and node ID; source lines remain available. Invalid declarations use the fixed
+`Invalid Skill step annotation` error. Compilation reads no credentials and
+makes no HTTP request. Normal compile review includes this connector in its
+verification count, which does not prove execution.
+
+```bash
+skill2workflow compile ./SKILL.md --review -o ./workflow.json
+skill2workflow validate ./workflow.json --format json
+```
+
+Review and publish the resulting workflow through the existing handoff. During
+execution, the approval waits before the endpoint is called; rejection stops
+the run. An approved run delivers only if all response assertions match.
+
+## Bind Directly In Workflow DSL
+
 Use the explicit `http_assert` connector on a `tool_call` node to fetch a
 result endpoint and require JSON fields to match expected values. A matching
 HTTP status alone is insufficient: all assertions must pass before the node
@@ -30,8 +72,8 @@ follows `on_success`; a mismatch follows its normal `on_failure` path.
 ```
 
 Supply a real reviewed endpoint and matching transition edges in your DSL,
-then validate it before publication. This connector is not inferred from Skill
-prose. Existing inferred `verification` nodes remain descriptive completion
+then validate it before publication. This connector is not inferred from free
+prose; the explicit Skill declaration above is also supported. Existing inferred `verification` nodes remain descriptive completion
 markers; their presence does not prove that a result was checked. This
 explicit connector performs the network request and comparisons.
 

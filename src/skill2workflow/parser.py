@@ -7,6 +7,7 @@ import re
 import stat
 from pathlib import Path
 from typing import Dict, List, Tuple
+from .http_assertions import load_assertion_json, skill_http_assertion_binding
 
 
 SkillIR = Dict[str, object]
@@ -190,7 +191,7 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
         reserved = re.findall(r'<!--\s*skill2workflow\b', line, re.IGNORECASE)
         if not reserved:
             continue
-        annotation = re.search(r'[ \t]+<!-- skill2workflow: human_gate -->[ \t]*$', line)
+        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|http_assert (\{.*\})) -->[ \t]*$', line)
         if len(reserved) != 1 or annotation is None or line_number not in selected:
             raise ValueError('Invalid Skill step annotation')
         content = re.sub(
@@ -200,7 +201,18 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
         title, detail = _split_step_title_detail(content)
         if not title:
             raise ValueError('Invalid Skill step annotation')
-        selected[line_number].update(title=title, detail=detail, node_type='human_gate')
+        selected[line_number].update(title=title, detail=detail)
+        if annotation.group(1) == 'human_gate':
+            selected[line_number]['node_type'] = 'human_gate'
+        else:
+            try:
+                payload = annotation.group(2)
+                if '<!--' in payload or '-->' in payload:
+                    raise ValueError('nested comment delimiter')
+                binding = skill_http_assertion_binding(load_assertion_json(payload))
+            except (ValueError, TypeError, RecursionError, OverflowError) as error:
+                raise ValueError('Invalid Skill step annotation') from error
+            selected[line_number].update(node_type='tool_call', connector=binding)
     # Legacy Checklist extraction has its own fence grammar. Never let a
     # declaration it extracted inside a fence fall through to keyword inference.
     for step in steps:

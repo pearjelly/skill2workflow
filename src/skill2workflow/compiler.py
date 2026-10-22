@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import re
+import copy
 from typing import Dict, List, Set
 from urllib.parse import urlsplit
 
 from .connectors import MAX_HTTP_ALLOWED_ORIGINS, MAX_HTTP_ORIGIN_BYTES, default_connector_binding
 from .input_schema import validate_input_schema_contract
-from .http_assertions import validate_http_assertion_binding
+from .http_assertions import validate_http_assertion_binding, skill_http_assertion_binding
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -57,7 +58,19 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
         detail = str(step.get("detail") or "")
         node_id = f"node_{index:03d}_{_slugify(title)}"
         explicit_type = step.get("node_type")
-        if explicit_type is not None and explicit_type != "human_gate":
+        explicit_connector = step.get("connector")
+        if explicit_connector is not None:
+            if (explicit_type != "tool_call" or not isinstance(explicit_connector, dict)
+                    or explicit_connector.get("id") != "http_assert"
+                    or explicit_connector.get("kind") != "http_assert"):
+                raise ValueError("Invalid Skill step annotation")
+            config = {k: v for k, v in explicit_connector.items() if k not in {"id", "kind"}}
+            skill_http_assertion_binding(config)
+            errors = []
+            _validate_connector_binding({"id": node_id, "type": explicit_type, "connector": explicit_connector}, index, errors)
+            if errors:
+                raise ValueError("Invalid Skill step annotation")
+        elif explicit_type is not None and explicit_type != "human_gate":
             raise ValueError("Unsupported explicit Skill step type")
         node_type = explicit_type or _node_type_for_step(f"{title} {detail}")
         step_ids.append(node_id)
@@ -82,7 +95,7 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
             "retry": {"max_attempts": 0},
             "metadata": {"source": source},
         }
-        connector = default_connector_binding(node_type)
+        connector = copy.deepcopy(explicit_connector) if explicit_connector is not None else default_connector_binding(node_type)
         if connector:
             node["connector"] = connector
         nodes.append(node)
@@ -178,7 +191,12 @@ def summarize_skill_compile(ir: Dict[str, object], workflow: Workflow) -> Dict[s
     hard_gates = ir.get("hard_gates") if isinstance(ir, dict) else None
     hard_gate_count = len(hard_gates) if isinstance(hard_gates, list) else 0
     human_gate_count = node_types.count("human_gate")
-    verification_node_count = node_types.count("verification")
+    verification_node_count = node_types.count("verification") + sum(
+        1 for node in (nodes if isinstance(nodes, list) else []) if isinstance(node, dict)
+        and node.get("type") == "tool_call"
+        and isinstance(node.get("connector"), dict)
+        and node["connector"].get("id") == "http_assert"
+    )
     executable_node_count = sum(
         node_type in {"step", "human_gate", "tool_call", "verification", "instruction"}
         for node_type in node_types
@@ -771,6 +789,7 @@ def _step_records_from_ir(ir: Dict[str, object]) -> List[Dict[str, object]]:
                     "section": item.get("section"),
                     "index": index,
                     "node_type": item.get("node_type"),
+                    "connector": item.get("connector"),
                 }
             )
         return records

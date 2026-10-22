@@ -66,7 +66,7 @@ result also contains safe `operator_commands` argv arrays for those next
 steps, so integrations do not need to rebuild paths or interpolate shell
 input.
 
-For executable result checks, bind the explicit
+For executable result checks, use an explicit Skill declaration or bind the
 [`http_assert` connector](docs/http-json-assertions.md) to a reviewed GET endpoint
 and JSON expectations; a mismatch follows the workflow failure path.
 
