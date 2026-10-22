@@ -87,3 +87,18 @@ Its quickstart, CLI and qualification modules match source byte-for-byte.
 Repository secret hygiene and whitespace checks pass. README now leads with
 a directly runnable bundled example and separates the optional custom-input
 command; focused documentation checks cover both paths.
+
+## Remote Qualification
+
+Qualified implementation: `213791ca94492e026003c55b84aa9ea43d65f276`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39765234955)
+passed all seven jobs, including Python 3.9/3.14, mandatory installed input
+qualification, editor regressions, Docker, systemd and recovery/state safety.
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39765252668)
+passed the complete production-baseline dry-run on Python 3.9.25; its terminal
+job log explicitly records `PASSED command:production_baseline`.
+
+The roadmap closure also passed 97 focused feature/documentation tests, all
+22 editor regressions, repository secret hygiene and whitespace checks. The
+project remains Self-hosted Beta; no tag, package release, live-provider pilot,
+general runtime restriction or maturity promotion is part of this loop.

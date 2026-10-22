@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-272
+- Completed delivery loops: 1-273
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 272 is complete with Skill-declared trigger input contracts
+- Active loop: None; Loop 273 is complete with input-aware controlled quickstart
 - Next maturity gate: Production Baseline
-- Next decision: review the observed required-input gap in custom-Skill quickstart after the typed-trigger authoring evidence
+- Next decision: review the installed input-aware onboarding and safety evidence before selecting the next Production Baseline delivery loop
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-272 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-273 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 272 is complete and there is no active delivery loop; review the installed custom-Skill quickstart's empty-input first run before selecting the next first-value delivery fix. The Loop 272 plan records the observed gap without claiming it resolved.
+This rolling queue is ordered. Loop 273 is complete and there is no active delivery loop; review the installed input-aware onboarding and pre-approval safety evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 273 plan records how the observed Loop 272 handoff was resolved.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7367,7 +7367,8 @@ approval, HTTP action and result check without hand-editing generated DSL.
 gate, credential access or new execution authority is introduced. Published
 artifacts and unmarked Skills retain their behavior. This is trigger admission;
 raw-executor/non-trigger run behavior is unchanged. The custom quickstart's
-empty-input first-run limitation remains an observed follow-up, not fixed here.
+empty-input first-run limitation remained an observed follow-up at this close;
+Loop 273 resolves that handoff with pre-initialization input validation.
 
 **Evidence:** At `23ea8cf`, 1,393 Python tests, 22 editor tests, 93-member
 isolated-wheel qualification, all seven CI jobs and complete production-baseline
@@ -7376,6 +7377,35 @@ no claims/runs/audit/requests on rejected inputs, approval/failure paths, portab
 artifacts, editor compilation and strict graph write-back preservation.
 Contract: `docs/skill-input-contracts.md`. Scope and qualification:
 `docs/superpowers/plans/2026-10-22-skill-input-contracts.md`.
+
+### Loop 273: Input-Aware Controlled Quickstart
+
+**Status:** Complete.
+
+**Prior basis:** The installed custom-Skill probe bypassed required trigger input
+when starting its first quickstart run. A separate regression proved HTTP and
+HTTP assertions could execute before a later human gate.
+
+**Outcome:** Optional `quickstart --input INPUT.json` and copied Python input
+are normalized as finite, bounded JSON and checked against the compiled input
+contract before workspace or token creation. Explicit input starts through the
+existing durable trigger boundary and survives approval into typed HTTP request
+mappings. The compact result excludes business values and input/source paths.
+
+**Safety boundary:** Quickstart now refuses non-manual connectors before the
+first reachable human gate. No gate is injected, credential resolved or endpoint
+called on refusal. Omitted valid input retains legacy run context; general
+executor, Workflow DSL and quickstart result schemas are unchanged. This does
+not guarantee the outcome of an approved custom workflow or advance maturity.
+
+**Evidence:** At `213791c`, 1,404 Python tests, 22 editor tests, 93-member
+isolated-wheel qualification, all seven CI jobs and complete production-baseline
+release preflight passed. Installed-only
+qualification requires five new evidence checks; the full quickstart drill
+passes 18 checks, including invalid input without workspace creation, waiting
+without HTTP, explicit approval to one owned loopback request and service
+shutdown. Scope, release preflight and qualification:
+`docs/superpowers/plans/2026-10-22-input-aware-quickstart.md`.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -7613,6 +7643,7 @@ Contract: `docs/skill-input-contracts.md`. Scope and qualification:
 | Loop 270: Intent-Preserving HTTP Inspector | Complete | Preserve operator intent through HTTP node inspection and save | Omitted-field fidelity, atomic request edits, explicit resets, typed JSON, actual browser exports, and installed asset qualification |
 | Loop 271: Write-Back-Ready Graph Export | Complete | Make actual browser graph downloads usable by strict CLI write-back | Explicit live titles, sync-before-serialize, graph/DSL parity, unchanged rejection boundaries, real LiteGraph regressions, and installed CLI handoff |
 | Loop 272: Skill-Declared Trigger Input Contracts | Complete | Declare typed business trigger inputs without editing generated DSL | Strict standalone schema declaration, source/data separation, copied IR, pre-admission refusal, corrected retry, synchronized fixtures, and installed seven-case journey |
+| Loop 273: Input-Aware Controlled Quickstart | Complete | Start custom Skills with validated business input and a real pre-effect approval boundary | Pre-initialization finite typed input, durable trigger continuation, pre-gate connector refusal, compact results, and mandatory installed qualification |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

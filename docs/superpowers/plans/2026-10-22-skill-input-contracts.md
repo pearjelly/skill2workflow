@@ -109,3 +109,11 @@ and HTTP journeys, editor regressions, Docker, systemd and recovery/state safety
 [Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39761979306)
 passed the complete production-baseline dry-run on Python 3.9.25. No tag,
 package release, live provider pilot or maturity promotion was performed.
+
+## Follow-Up Resolution
+
+Loop 273 resolves the observed custom-Skill quickstart handoff with explicit
+business input, pre-initialization contract validation and a pre-effect human
+gate requirement. The historical probe above remains evidence of the Loop 272
+boundary, not the current quickstart behavior. See
+[input-aware quickstart qualification](2026-10-22-input-aware-quickstart.md).
