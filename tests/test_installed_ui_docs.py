@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -14,7 +15,7 @@ class InstalledUiDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("skill2workflow ui --port 4173", readme)
-        self.assertIn("docs/installed-ui.md", readme)
+        assert_guide_reachable(self, 'docs/installed-ui.md')
         self.assertIn("loopback-only", docs)
         self.assertIn("does not read runtime state", docs)
         self.assertIn("--service-url", docs)

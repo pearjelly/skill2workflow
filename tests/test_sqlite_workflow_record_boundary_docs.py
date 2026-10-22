@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -21,7 +22,7 @@ class SqliteWorkflowRecordBoundaryDocsTests(TestCase):
         self.assertIn("SQLite workflow registry records use a fixed 2 MiB", stability)
         self.assertIn("sqlite-workflow-record-boundary.md", stability)
         self.assertIn("Delivery Loops 1-284 are complete", readme)
-        self.assertIn("sqlite-workflow-record-boundary.md", readme)
+        assert_guide_reachable(self, 'docs/sqlite-workflow-record-boundary.md')
         self.assertIn("Loop 284 is complete with preflight input admission parity", roadmap)
         self.assertIn("Loop 176: Bounded SQLite Workflow Registry Records", roadmap)
         self.assertIn("sqlite-workflow-record-boundary.md", changelog)

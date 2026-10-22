@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -30,7 +31,7 @@ class ServiceDoctorDocumentationTests(TestCase):
 
         self.assertIn("Delivery Loops 1-284 are complete", readme)
         self.assertIn("service-doctor", readme)
-        self.assertIn("docs/service-doctor.md", readme)
+        assert_guide_reachable(self, 'docs/service-doctor.md')
         self.assertIn("Completed delivery loops: 1-284", roadmap)
         self.assertIn("Loop 53: Operational Readiness Doctor", roadmap)
         self.assertIn("| Loop 53: Operational Readiness Doctor | Complete |", roadmap)

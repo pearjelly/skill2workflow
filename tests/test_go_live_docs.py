@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -37,5 +38,5 @@ class GoLiveDocumentationTests(TestCase):
         self.assertIn("claim multi-tenant RBAC", guide)
         self.assertIn("[Go-live checklist](go-live.md)", index)
         self.assertIn("[go-live checklist](docs/go-live.md)", readme)
-        self.assertIn("--verify-lark-tenant-credential", readme)
+        assert_guide_reachable(self, 'docs/go-live.md')
         self.assertIn("Added `service-go-live-check`", changelog)

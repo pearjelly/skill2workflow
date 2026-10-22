@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -26,7 +27,7 @@ class PublishedArtifactReadBoundaryDocumentationTests(TestCase):
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        self.assertIn("docs/published-artifact-read-boundary.md", readme)
+        assert_guide_reachable(self, 'docs/published-artifact-read-boundary.md')
         self.assertIn("published-artifact-read-boundary.md", stability)
         self.assertIn("Loop 172: Bounded Published Workflow Artifact Reads", roadmap)
         self.assertIn("immutable Workflow artifact publication and reads", changelog)

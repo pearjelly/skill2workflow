@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -25,6 +26,6 @@ class JsonRunStateDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        self.assertIn("docs/json-run-state-boundary.md", readme)
+        assert_guide_reachable(self, 'docs/json-run-state-boundary.md')
         self.assertIn("json-run-state-boundary.md", stability)
         self.assertIn("Loop 170: Bounded Local JSON Run-State", roadmap)

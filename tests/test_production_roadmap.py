@@ -459,7 +459,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("Delivery Loops 1-284 are complete", readme)
         self.assertIn("Loop 40", readme)
-        self.assertIn("self-hosted, single-tenant runtime for one team", readme)
+        self.assertIn("self-hosted, single-tenant runtime for one team", ' '.join(readme.split()))
         self.assertIn("`ROADMAP.md`", readme)
         self.assertIn("Loop 40 completed a paid assisted Pilot", readme)
         candidate_loop_titles = [

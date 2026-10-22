@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 import json
 from unittest import TestCase
 
@@ -58,7 +59,7 @@ class SecurityBoundaryDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Delivery Loops 1-284 are complete", readme)
-        self.assertIn("docs/security-boundary.md", readme)
+        assert_guide_reachable(self, 'docs/security-boundary.md')
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("| Loop 42: Authenticated Ingress And Production Credentials | Complete |", roadmap)
         self.assertIn("| Loop 43: Durable Recurring Scheduling And Safe Dispatch | Complete |", roadmap)

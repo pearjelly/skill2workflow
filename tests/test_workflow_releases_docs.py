@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -362,7 +363,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
             "skill2workflow-workflow-diff-0.1.0",
         )
         self.assertIn("Loop 73: Atomic Workflow Registry Mutations", roadmap)
-        self.assertIn("workflow-diff", readme)
+        assert_guide_reachable(self, 'docs/workflow-releases.md')
 
     def test_cli_registers_review_and_cas_commands(self):
         cli = (ROOT / "src" / "skill2workflow" / "cli.py").read_text(encoding="utf-8")

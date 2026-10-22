@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -30,7 +31,7 @@ class RemoteWorkflowDeprecationDocumentationTests(TestCase):
         self.assertIn("remote-workflow-deprecation.md", service_guide)
         self.assertIn("workflow-deprecations", stability)
         self.assertIn("workflow_deprecation", observability)
-        self.assertIn("Loop 90 adds", readme)
+        assert_guide_reachable(self, 'docs/remote-workflow-deprecation.md')
         self.assertIn("workflow-deprecations", changelog)
         self.assertIn('"service-workflow-deprecate"', package_smoke)
         self.assertIn("Loop 90", roadmap)

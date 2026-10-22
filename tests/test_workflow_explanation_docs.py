@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -24,7 +25,8 @@ class WorkflowExplanationDocumentationTests(TestCase):
             schema["$id"],
             "https://skill2workflow.dev/schemas/workflow-explanation-0.1.0.json",
         )
-        for content in (guide, service, stability, readme):
+        assert_guide_reachable(self, 'docs/workflow-explanation.md')
+        for content in (guide, service, stability):
             self.assertIn("skill2workflow-workflow-explanation-0.1.0", content)
         self.assertIn("GET /api/v1/workflow-explanations", service)
         self.assertIn("service-workflow-explain", guide)

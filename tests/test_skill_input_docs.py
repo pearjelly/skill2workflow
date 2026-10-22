@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -41,5 +42,5 @@ class SkillInputDocumentationTests(TestCase):
     def test_readme_and_stability_link_to_skill_input_boundary(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
-        self.assertIn("docs/skill-input-boundary.md", readme)
+        assert_guide_reachable(self, 'docs/skill-input-boundary.md')
         self.assertIn("docs/skill-input-boundary.md", stability)

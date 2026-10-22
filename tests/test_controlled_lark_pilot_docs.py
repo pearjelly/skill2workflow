@@ -7,6 +7,7 @@ import warnings
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timedelta
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
@@ -679,7 +680,7 @@ class ControlledLarkPilotDocumentationTests(unittest.TestCase):
         self.assertIn("dry-run remains the default", connectors)
         self.assertIn("controlled real-team pilot", examples)
         self.assertIn("docs/pilot-evidence/loop-40/", readme)
-        self.assertIn("docs/controlled-live-pilot.md", readme)
+        assert_guide_reachable(self, 'docs/controlled-live-pilot.md')
         self.assertIn("Loop 40", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("Delivery Loops 1-284 are complete", readme)

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -53,7 +54,7 @@ class MigrationDocumentationTests(TestCase):
 
         self.assertIn("Delivery Loops 1-284 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("docs/upgrade-migration.md", readme)
+        assert_guide_reachable(self, 'docs/upgrade-migration.md')
         self.assertIn("- Completed delivery loops: 1-284", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 45: State Upgrade And Migration | Complete |", roadmap)

@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -117,9 +118,8 @@ class RecurringScheduleDocumentationTests(TestCase):
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("Delivery Loops 1-284 are complete", readme)
-        self.assertIn("Loop 165 adds a fixed 2 MiB UTF-8 document bound", readme)
-        self.assertIn("Loop 146 adds a compact SQLite recurring-schedule projection", readme)
-        self.assertIn("docs/recurring-scheduling.md", readme)
+        assert_guide_reachable(self, 'docs/published-artifact-read-boundary.md')
+        assert_guide_reachable(self, 'docs/recurring-scheduling.md')
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("### Loop 146: Compact SQLite Recurring-Schedule Projections", roadmap)
         create_schema = json.loads(

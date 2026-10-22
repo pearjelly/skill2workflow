@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -161,9 +162,13 @@ class BackupDocumentationTests(TestCase):
             encoding="utf-8"
         )
 
-        for document in (readme, stability, changelog, package_smoke):
+        assert_guide_reachable(self, 'docs/backup-restore.md')
+        self.assertIn('backup-list', guide)
+        assert_guide_reachable(self, 'docs/remote-backup-retention-plan.md')
+        self.assertIn('service-backup-retention-plan',
+                      (ROOT / 'docs/remote-backup-retention-plan.md').read_text(encoding='utf-8'))
+        for document in (stability, changelog, package_smoke):
             self.assertIn("backup-list", document)
-        self.assertIn("service-backup-retention-plan", readme)
         self.assertIn("service-backup-retention-plan", stability)
         self.assertIn("service-backup-retention-plan", changelog)
         self.assertIn('"service-backup-retention-plan"', package_smoke)
@@ -177,7 +182,7 @@ class BackupDocumentationTests(TestCase):
 
         self.assertIn("Delivery Loops 1-284 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("docs/backup-restore.md", readme)
+        assert_guide_reachable(self, 'docs/backup-restore.md')
         self.assertIn("- Completed delivery loops: 1-284", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("| Loop 44: Verified Backup And Restore | Complete |", roadmap)

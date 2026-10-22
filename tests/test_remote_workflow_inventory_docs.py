@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -33,7 +34,7 @@ class RemoteWorkflowInventoryDocumentationTests(TestCase):
         self.assertIn("remote-workflow-inventory.md", service_guide)
         self.assertIn("workflow-inventory-0.1.0", stability)
         self.assertIn("workflow_inventory", observability)
-        self.assertIn("Loop 91 adds", readme)
+        assert_guide_reachable(self, 'docs/remote-workflow-inventory.md')
         self.assertIn("/api/v1/workflows", changelog)
         self.assertIn('"service-workflows"', package_smoke)
         self.assertIn("Loop 91", roadmap)

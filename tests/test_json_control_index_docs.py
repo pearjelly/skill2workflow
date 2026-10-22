@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -25,6 +26,6 @@ class JsonControlIndexDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        self.assertIn("docs/json-control-index-boundary.md", readme)
+        assert_guide_reachable(self, 'docs/json-control-index-boundary.md')
         self.assertIn("json-control-index-boundary.md", stability)
         self.assertIn("Loop 171: Bounded Local JSON Control Index", roadmap)

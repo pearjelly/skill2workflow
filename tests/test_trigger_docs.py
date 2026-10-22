@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -36,8 +37,8 @@ class TriggerDocumentationTests(TestCase):
         ):
             self.assertIn(phrase, guide)
         self.assertIn("Loop 62: Durable SQLite Trigger Idempotency", roadmap)
-        self.assertIn("docs/triggers.md#durable-trigger-idempotency", readme)
-        self.assertIn("docs/triggers.md#stable-workflow-version-aliases", readme)
+        assert_guide_reachable(self, 'docs/triggers.md#durable-trigger-idempotency')
+        assert_guide_reachable(self, 'docs/triggers.md#stable-workflow-version-aliases')
 
     def test_trigger_ledger_is_not_a_payload_store(self):
         schema = json.loads(

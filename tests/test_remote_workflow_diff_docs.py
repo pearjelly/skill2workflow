@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -21,6 +22,6 @@ class RemoteWorkflowDiffDocumentationTests(TestCase):
         self.assertIn("skill2workflow-workflow-diff-0.1.0", guide)
         self.assertIn("remote-workflow-diff.md", service_guide)
         self.assertIn("workflow-diffs", stability)
-        self.assertIn("Loop 88 adds", readme)
+        assert_guide_reachable(self, 'docs/remote-workflow-diff.md')
         self.assertIn("workflow-diffs", changelog)
         self.assertIn('"service-workflow-diff"', package_smoke)

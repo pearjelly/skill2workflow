@@ -10,6 +10,20 @@ runnable, and easy to verify without overstating the production boundary.
 
 ## Project Direction
 
+Keep README focused on a safe first run and a short product boundary, not a
+per-loop changelog or command catalogue. Put detailed contracts in their topic
+guides, link every public top-level guide from [the reference](docs/reference.md),
+and keep the [task guide](docs/README.md) useful for authoring, deployment and
+recovery. Record delivery history in ROADMAP and changes in CHANGELOG.
+
+Run `python3 scripts/documentation_check.py` after documentation changes. The
+ordinary Python suite requires the same check: README at most 300 lines, a
+compact roadmap summary, valid local links/anchors and all public guides
+reachable within three links. The check never fetches external URLs. Keep
+specialist contract assertions in their authoritative guides; use real
+navigation assertions rather than duplicating their text in README to satisfy
+a test. Existing source-of-truth, approval and maturity contracts still apply.
+
 `skill2workflow` converts standard Agent `SKILL.md` files into controlled workflows that can be validated, visualized, executed, resumed, and audited.
 
 The Workflow DSL is the execution truth source. LiteGraph JSON and the web editor are views and authoring surfaces; they must round-trip through Workflow DSL before execution or publication.

@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -37,7 +38,7 @@ class HumanApprovalDocumentationTests(TestCase):
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
-        self.assertIn("docs/human-approval.md", readme)
+        assert_guide_reachable(self, 'docs/human-approval.md')
         self.assertIn("/runs/{run_id}/resume", service)
         self.assertIn("human-approval.md", stability)
         self.assertIn("exact boolean body", changelog)

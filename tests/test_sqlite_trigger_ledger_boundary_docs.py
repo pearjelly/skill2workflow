@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -21,7 +22,7 @@ class SqliteTriggerLedgerBoundaryDocsTests(TestCase):
         self.assertIn("SQLite trigger-ledger responses use a fixed 64 KiB", stability)
         self.assertIn("sqlite-trigger-ledger-boundary.md", stability)
         self.assertIn("Delivery Loops 1-284 are complete", readme)
-        self.assertIn("sqlite-trigger-ledger-boundary.md", readme)
+        assert_guide_reachable(self, 'docs/sqlite-trigger-ledger-boundary.md')
         self.assertIn("Loop 284 is complete with preflight input admission parity", roadmap)
         self.assertIn("Loop 177: Bounded SQLite Trigger-Ledger Responses", roadmap)
         self.assertIn("sqlite-trigger-ledger-boundary.md", changelog)

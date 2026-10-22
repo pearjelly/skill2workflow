@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -37,7 +38,7 @@ class ServiceBootstrapDocumentationTests(TestCase):
         self.assertIn("| Loop 51: Secure Service Bootstrap | Complete |", roadmap)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("Delivery Loops 1-284 are complete", readme)
-        self.assertIn("secure service bootstrap", readme)
+        assert_guide_reachable(self, 'docs/service-bootstrap.md')
         self.assertIn("scripts/service_bootstrap_smoke.py", harness)
         self.assertIn("Secure service bootstrap", agents)
 

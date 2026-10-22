@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -38,7 +39,7 @@ class RemoteWorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("remote-workflow-release.md", service_guide)
         self.assertIn("workflow-releases", stability)
         self.assertIn("Loop 86: Protected Remote Workflow Publication", roadmap)
-        self.assertIn("Loop 86 adds", readme)
+        assert_guide_reachable(self, 'docs/remote-workflow-release.md')
         self.assertIn("workflow-releases", changelog)
         self.assertIn('"service-workflow-publish"', package_smoke)
         self.assertIn('"service-workflow-release-preflight"', package_smoke)

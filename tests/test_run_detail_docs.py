@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -46,8 +47,8 @@ class RunDetailDocumentationTests(TestCase):
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(encoding="utf-8")
 
-        self.assertIn("docs/run-detail.md", readme)
-        self.assertIn("docs/run-list.md", readme)
+        assert_guide_reachable(self, 'docs/run-detail.md')
+        assert_guide_reachable(self, 'docs/run-list.md')
         self.assertIn("GET /runs/{run_id}", service)
         self.assertIn("GET /runs", service)
         self.assertIn("service-show", stability)
@@ -58,7 +59,7 @@ class RunDetailDocumentationTests(TestCase):
         self.assertIn("service-run-page", service)
         self.assertIn("service-run-page", stability)
         self.assertIn('"service-run-page"', package_smoke)
-        self.assertIn("docs/support-bundle.md", readme)
+        assert_guide_reachable(self, 'docs/support-bundle.md')
         self.assertIn("service-support-bundle", stability)
         self.assertIn('"service-support-bundle"', package_smoke)
 

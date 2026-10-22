@@ -88,6 +88,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Restore a short, task-oriented README and a complete public-guide reference;
+  check local links, section anchors and bounded guide reachability without
+  duplicating detailed contracts or delivery history in the product entrypoint.
+
 - Align ordinary and remote preflight input normalization with the existing
   canonical 1 MiB trigger boundary, rejecting oversize/expanded or nonfinite
   input without a misleading ready report or internal availability error.

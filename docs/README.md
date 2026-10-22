@@ -4,6 +4,9 @@
 with the shortest useful path, then choose the guide for the boundary you are
 working on.
 
+For the complete alphabetical list, use the [guide reference](reference.md).
+Start with the task paths below rather than reading every boundary in sequence.
+
 ## Start here
 
 - [README](../README.md) — product boundary and the fastest controlled journey
@@ -45,6 +48,8 @@ working on.
 
 ## Extend and contribute
 
+- [Contributing](../CONTRIBUTING.md) — setup, tests and focused changes
+- [Roadmap](../ROADMAP.md) — current maturity, next decision and delivery history
 - [Connectors](connectors.md) — manifest and execution boundary
 - [External connector loading](external-connector-loading-boundary.md) — bounded local fixture source handoff
 - [Credential boundary](credential-boundary.md) — handles, rotation, and redaction

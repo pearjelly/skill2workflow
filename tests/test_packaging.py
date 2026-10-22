@@ -1,5 +1,6 @@
 import hashlib
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -73,7 +74,8 @@ class PackagingMetadataTests(TestCase):
     def test_installation_docs_match_minimum_build_backend(self):
         root = Path(__file__).resolve().parents[1]
 
-        for relative in ("README.md", "CONTRIBUTING.md", "HARNESS.md"):
+        assert_guide_reachable(self, 'CONTRIBUTING.md')
+        for relative in ("CONTRIBUTING.md", "HARNESS.md"):
             text = (root / relative).read_text(encoding="utf-8")
             self.assertIn('"setuptools>=77.0.1"', text, relative)
             self.assertNotIn('"setuptools>=68"', text, relative)
@@ -196,6 +198,6 @@ class PackagingMetadataTests(TestCase):
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)
         self.assertIn("Delivery Loops 1-284 are complete", readme)
-        self.assertIn("release-artifact qualification", readme)
-        self.assertIn("release artifact manifest", readme)
-        self.assertIn("reproducible-builds.md", readme)
+        assert_guide_reachable(self, 'docs/release-artifact-qualification.md')
+        assert_guide_reachable(self, 'docs/release-artifact-manifest.md')
+        assert_guide_reachable(self, 'docs/reproducible-builds.md')

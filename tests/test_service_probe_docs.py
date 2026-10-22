@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -39,8 +40,8 @@ class ServiceProbeDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        self.assertIn("docs/service-probe.md", readme)
-        self.assertIn("service-wait", readme)
+        assert_guide_reachable(self, 'docs/service-probe.md')
+        assert_guide_reachable(self, 'docs/service-probe.md')
         self.assertIn("service-probe", service)
         self.assertIn("Loop 95: Deployment Service Probe", roadmap)
         self.assertIn("Loops 44-284 complete", roadmap)

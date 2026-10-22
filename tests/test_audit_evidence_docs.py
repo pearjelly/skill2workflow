@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -37,7 +38,7 @@ class AuditEvidenceDocumentationTests(TestCase):
         ):
             with self.subTest(phrase=phrase):
                 self.assertIn(phrase, guide)
-        self.assertIn("docs/audit-evidence.md", readme)
+        assert_guide_reachable(self, 'docs/audit-evidence.md')
         self.assertIn("audit-evidence", stability)
         self.assertIn('"audit-evidence"', package_smoke)
         self.assertIn('"audit-evidence-verify"', package_smoke)

@@ -1,4 +1,5 @@
 from pathlib import Path
+from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
 
 
@@ -117,10 +118,10 @@ class ServiceDocumentationTests(TestCase):
         self.assertIn("Loop 109 adds the matching label-free", guide)
         self.assertIn("Loop 110 adds the installed `service-wait`", guide)
         self.assertIn("Loop 151 adds the bounded", guide)
-        self.assertIn("Loop 153 adds a bounded", (ROOT / "README.md").read_text(encoding="utf-8"))
-        self.assertIn("Loop 154 adds [protected remote recurring-schedule creation]", (ROOT / "README.md").read_text(encoding="utf-8"))
-        self.assertIn("Loop 155 adds [protected remote recurring-schedule updates]", (ROOT / "README.md").read_text(encoding="utf-8"))
-        self.assertIn("Loop 157 hardens [remote recurring-schedule state actions]", (ROOT / "README.md").read_text(encoding="utf-8"))
+        assert_guide_reachable(self, 'docs/remote-audit-events.md')
+        assert_guide_reachable(self, 'docs/remote-schedule-create.md')
+        assert_guide_reachable(self, 'docs/remote-schedule-update.md')
+        assert_guide_reachable(self, 'docs/remote-schedule-actions.md')
         self.assertIn("service-soak-smoke.py", guide)
         self.assertIn("service-soak.md", guide)
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
@@ -134,5 +135,5 @@ class ServiceDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("Delivery Loops 1-284 are complete", readme)
-        self.assertIn("docs/service.md", readme)
+        assert_guide_reachable(self, 'docs/service.md')
         self.assertIn("Current maturity: Self-hosted Beta", readme)
