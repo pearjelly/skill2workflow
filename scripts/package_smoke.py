@@ -1002,7 +1002,7 @@ def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) 
             "---\nname: installed-process\n---\n\n"
             f"## {section}\n\n"
             "1. Prepare output\n"
-            "2. Ask user for approval\n"
+            "2. 等待负责人审核 <!-- skill2workflow: human_gate -->\n"
             "3. Verify completion\n"
         )
         source.write_text(markdown, encoding="utf-8")
@@ -1058,7 +1058,7 @@ def _require_installed_process_compile(compiled, section: str, source_file: str)
         or [node.get("type") for node in nodes]
         != ["start", "step", "human_gate", "verification", "failure", "end"]
         or [node.get("title") for node in nodes[1:4]]
-        != ["Prepare output", "Ask user for approval", "Verify completion"]
+        != ["Prepare output", "等待负责人审核", "Verify completion"]
     ):
         raise RuntimeError("installed Skill compile did not preserve executable steps and gates")
     for index, node in enumerate(nodes[1:4], 1):

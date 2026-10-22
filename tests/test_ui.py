@@ -28,6 +28,20 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_explicit_chinese_approval_and_fixed_annotation_errors(self):
+        status, raw = self._post_local_skill_compile(
+            '## Steps\n1. 等待负责人审核 <!-- skill2workflow: human_gate -->\n'
+        )
+        self.assertEqual(status, 200)
+        compiled = json.loads(raw.decode('utf-8'))
+        self.assertEqual(compiled['review']['human_gate_count'], 1)
+        self.assertEqual(compiled['workflow']['nodes'][1]['title'], '等待负责人审核')
+        status, raw = self._post_local_skill_compile(
+            '## Steps\n1. private-source <!-- skill2workflow: unknown -->\n'
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw.decode('utf-8')), {'error': 'skill compile rejected'})
+
     def test_editor_bundles_pinned_litegraph_assets_without_a_cdn(self):
         vendor = ROOT / "web" / "vendor" / "litegraph-0.7.18"
         expected_digests = {

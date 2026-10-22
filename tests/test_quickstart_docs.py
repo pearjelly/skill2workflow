@@ -39,7 +39,7 @@ class InstalledQuickstartDocumentationTests(TestCase):
 
         self.assertIn("- Completed delivery loops: 1-264", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 264 is complete with explicit Workflow and Steps headings",
+            "- Active loop: Loop 265 — explicit human approval declarations",
             roadmap,
         )
         self.assertIn("| Loop 52: Installed Controlled Quickstart | Complete |", roadmap)

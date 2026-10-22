@@ -349,6 +349,11 @@ When adding a node type:
 
 ## Adding Compiler Rules
 
+For an author-declared approval, append `<!-- skill2workflow: human_gate -->`
+to the selected Skill step. This supports Chinese and other titles without
+approval keywords. See [explicit approvals](skill-input-boundary.md#explicit-human-approval)
+for placement, rejection rules, and the durable decision behavior.
+
 Compiler rules should stay conservative:
 
 - Prefer explicit Skill IR signals over broad keyword matching.

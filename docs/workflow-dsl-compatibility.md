@@ -1,5 +1,12 @@
 # Workflow DSL Compatibility
 
+Explicit Skill step declarations (`<!-- skill2workflow: human_gate -->`) affect
+newly compiled drafts. They emit the existing `human_gate` node contract and
+add no Workflow DSL fields. Unmarked Skill inference and published artifacts
+retain their existing behavior. Invalid reserved declarations are rejected
+before an output workflow is written; review the newly compiled draft before
+publication.
+
 This document defines the compatibility policy for Workflow DSL `0.1.0`.
 
 The DSL is the execution truth source for `skill2workflow`. Visual graphs, editor state, run overlays, and generated artifacts must be converted back into Workflow DSL before execution or publication.

@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add explicit `<!-- skill2workflow: human_gate -->` step declarations so
+  authors can require durable human approval independently of title wording;
+  reject invalid declarations and remove markers from compiled display text.
+
 - Added explicit numbered `Workflow` and `Steps` section compilation when no
   Checklist section is recognized. Source mapping, existing human gates, and
   Checklist precedence are preserved; ambiguous multiple processes are rejected

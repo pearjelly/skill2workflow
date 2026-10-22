@@ -168,9 +168,46 @@ def _extract_hard_gates(body: str) -> List[str]:
 
 def _extract_ordered_step_details(body: str, start_line: int) -> List[Dict[str, object]]:
     checklist, has_checklist = _extract_checklist_details(body, start_line)
-    if has_checklist:
-        return checklist
-    return _extract_process_step_details(body, start_line)
+    steps = checklist if has_checklist else _extract_process_step_details(body, start_line)
+    _apply_step_annotations(body, start_line, steps)
+    return steps
+
+
+def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, object]]) -> None:
+    selected = {step['line']: step for step in steps}
+    fence_char = ''
+    fence_length = 0
+    for line_number, line in enumerate(body.splitlines(), start=start_line):
+        if fence_char:
+            closing = re.match(r'^ {0,3}([`~]{3,})[ \t]*$', line)
+            if closing and set(closing.group(1)) == {fence_char} and len(closing.group(1)) >= fence_length:
+                fence_char = ''
+            continue
+        opening = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        if opening and not (opening.group(1)[0] == '`' and '`' in opening.group(2)):
+            fence_char, fence_length = opening.group(1)[0], len(opening.group(1))
+            continue
+        reserved = re.findall(r'<!--\s*skill2workflow\b', line, re.IGNORECASE)
+        if not reserved:
+            continue
+        annotation = re.search(r'[ \t]+<!-- skill2workflow: human_gate -->[ \t]*$', line)
+        if len(reserved) != 1 or annotation is None or line_number not in selected:
+            raise ValueError('Invalid Skill step annotation')
+        content = re.sub(
+            r'^\s*(?:[-*]\s+\[[ xX]\]\s+|\[[ xX]\]\s+|[-+*]\s+|\d+[.)]\s+)',
+            '', line[:annotation.start()] + ' ', count=1,
+        )
+        title, detail = _split_step_title_detail(content)
+        if not title:
+            raise ValueError('Invalid Skill step annotation')
+        selected[line_number].update(title=title, detail=detail, node_type='human_gate')
+    # Legacy Checklist extraction has its own fence grammar. Never let a
+    # declaration it extracted inside a fence fall through to keyword inference.
+    for step in steps:
+        if 'node_type' not in step and re.search(
+            r'<!--\s*skill2workflow\b', str(step['title']) + str(step['detail']), re.IGNORECASE
+        ):
+            raise ValueError('Invalid Skill step annotation')
 
 
 def _extract_checklist_details(

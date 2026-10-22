@@ -14,7 +14,7 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
 - Completed delivery loops: 1-264
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 264 is complete with explicit Workflow and Steps headings
+- Active loop: Loop 265 — explicit human approval declarations
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing explicit process-step compilation and compatibility evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-264 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-264 complete, Loop 265 in progress.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -154,10 +154,9 @@ Production Baseline remains directional.
 
 ## Active Loop
 
-No delivery loop is currently active. The detailed entries below are retained
-as historical evidence for completed Production Baseline loops; the current
-completion point and next-selection rule are authoritative in “Status At A
-Glance” and “Rolling Loop Queue”.
+Loop 265 is active. Explicit step annotations let authors declare a human
+approval independently of title wording. Scope and acceptance are recorded in
+`docs/superpowers/plans/2026-10-22-explicit-human-approval.md`.
 
 ### Loop 56: Linux systemd Supervision
 
@@ -7049,7 +7048,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 264 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing explicit process-step compilation and compatibility evidence.
+This rolling queue is ordered. Loop 265 is active; select another Production Baseline item after reviewing explicit approval compilation and runtime evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 

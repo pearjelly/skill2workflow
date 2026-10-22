@@ -26,6 +26,34 @@ input path in its in-memory IR. The portable `authoring-export` path replaces
 that file reference with the fixed `SKILL.md` before compiling Workflow DSL, so
 an exported artifact or derived Bundle cannot disclose the caller's local path.
 
+## Explicit Human Approval
+
+Authors can require a human decision on a selected Checklist, Workflow, or
+Steps item by appending exactly `<!-- skill2workflow: human_gate -->`, with
+whitespace before the comment:
+
+```markdown
+## Workflow
+1. 整理草稿
+2. 等待负责人审核 <!-- skill2workflow: human_gate -->
+3. 输出结果
+```
+
+The declaration overrides keyword inference and is removed from the compiled
+title, description, node ID, and approval prompt. Source lines are preserved.
+The existing manual human gate waits durably; approval continues to the next
+step and rejection follows the failure path. Review the generated draft before
+publishing it.
+
+The syntax is case-sensitive, single-line, and permits one marker at the end
+of one nonempty selected item. Unknown, malformed, repeated, or unattached
+reserved `skill2workflow` comments fail with `Invalid Skill step annotation`.
+This includes a declaration in a process excluded by Checklist precedence.
+Fenced examples do not declare approvals. If legacy Checklist parsing extracts
+an annotated item inside a fence, compilation is refused to prevent accidental
+keyword inference. Unmarked items retain their historical inference rules.
+This changes newly compiled drafts only; published workflows retain their DSL.
+
 ## Explicit Process Sections
 
 Checklist extraction keeps its existing precedence and list formats, including

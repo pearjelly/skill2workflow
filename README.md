@@ -67,7 +67,10 @@ steps, so integrations do not need to rebuild paths or interpolate shell
 input.
 
 Skills can use the existing Checklist formats or a single numbered `Workflow`
-or `Steps` section. The [Skill input contract](docs/skill-input-boundary.md#explicit-process-sections)
+or `Steps` section. Append `<!-- skill2workflow: human_gate -->` to a step
+to require human approval, including for Chinese titles. See the
+[approval declaration contract](docs/skill-input-boundary.md#explicit-human-approval).
+The [Skill input contract](docs/skill-input-boundary.md#explicit-process-sections)
 explains precedence and ambiguity checks; inspect the compiled nodes before
 publication rather than treating compilation as proof of business safety.
 

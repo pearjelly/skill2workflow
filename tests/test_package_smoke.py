@@ -452,6 +452,7 @@ class PackageSmokeTests(TestCase):
                 if command[1] == "compile":
                     source = Path(command[2])
                     markdown = source.read_text(encoding="utf-8")
+                    self.assertIn('等待负责人审核 <!-- skill2workflow: human_gate -->', markdown)
                     section = "Workflow" if "## Workflow" in markdown else "Steps"
                     return json.dumps(_process_compile_result(section, str(source)))
                 self.assertEqual(command[1], "validate")
@@ -639,7 +640,7 @@ class PackageSmokeTests(TestCase):
 def _process_compile_result(section, source_file):
     steps = [
         ("step", "Prepare output"),
-        ("human_gate", "Ask user for approval"),
+        ("human_gate", "等待负责人审核"),
         ("verification", "Verify completion"),
     ]
     return {

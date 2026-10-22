@@ -55,7 +55,10 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
         title = str(step["title"])
         detail = str(step.get("detail") or "")
         node_id = f"node_{index:03d}_{_slugify(title)}"
-        node_type = _node_type_for_step(f"{title} {detail}")
+        explicit_type = step.get("node_type")
+        if explicit_type is not None and explicit_type != "human_gate":
+            raise ValueError("Unsupported explicit Skill step type")
+        node_type = explicit_type or _node_type_for_step(f"{title} {detail}")
         step_ids.append(node_id)
         source = {
             "file": ir.get("source_path", "SKILL.md"),
@@ -759,6 +762,7 @@ def _step_records_from_ir(ir: Dict[str, object]) -> List[Dict[str, object]]:
                     "line": item.get("line"),
                     "section": item.get("section"),
                     "index": index,
+                    "node_type": item.get("node_type"),
                 }
             )
         return records
