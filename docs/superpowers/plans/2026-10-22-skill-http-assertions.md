@@ -25,6 +25,8 @@ display text and emits ordinary sequential success/failure transitions.
   credential, touching runtime state, or calling an endpoint at compilation.
 - Copy explicit bindings so compiled edits cannot mutate caller-owned IR.
   Reject forged explicit IR connector identities and incomplete typed records.
+- Treat parsed configuration as data: exclude it from legacy hard-gate and
+  textual hint scans, while preserving the original source sections in IR.
 - Compile review counts explicit HTTP assertion tool calls as verification
   nodes. Its existing keys/version stay unchanged; the count is guidance and
   does not prove a check has executed.

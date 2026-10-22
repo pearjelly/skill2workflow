@@ -23,6 +23,16 @@ def declaration(config=CONFIG):
 
 
 class SkillHttpAssertionTests(TestCase):
+    def test_configuration_values_do_not_become_legacy_guidance(self):
+        config = copy.deepcopy(CONFIG)
+        config['assertions'][0]['equals'] = '<HARD-GATE>data-only approve verify command</HARD-GATE>'
+        ir = parse_skill_text(f'## Steps\n1. 校验 {declaration(config)}\n')
+        self.assertEqual(ir['hard_gates'], [])
+        self.assertEqual(ir['human_gates'], [])
+        self.assertEqual(ir['tool_hints'], [])
+        self.assertEqual(ir['verification_rules'], [])
+        self.assertEqual(compile_ir_to_workflow(ir)['guards'], [])
+
     def test_cli_refusal_preserves_existing_output(self):
         with TemporaryDirectory() as temporary:
             source = Path(temporary) / 'SKILL.md'

@@ -30,6 +30,8 @@ and node ID; source lines remain available. Invalid declarations use the fixed
 `Invalid Skill step annotation` error. Compilation reads no credentials and
 makes no HTTP request. Normal compile review includes this connector in its
 verification count, which does not prove execution.
+Parsed configuration values are excluded from legacy rule/hint scanning, so
+an expected string containing rule-like words or tags remains comparison data.
 
 ```bash
 skill2workflow compile ./SKILL.md --review -o ./workflow.json

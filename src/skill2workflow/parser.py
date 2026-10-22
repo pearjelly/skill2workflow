@@ -44,16 +44,25 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     checklist_details = _extract_ordered_step_details(body, body_start_line)
     checklist = [_format_step_detail(step) for step in checklist_details]
     sections = _parse_sections(body)
+    declaration_lines = {
+        step['line'] for step in checklist_details
+        if isinstance(step.get('connector'), dict) and step['connector'].get('id') == 'http_assert'
+    }
+    guidance_body = '\n'.join(
+        re.sub(r'[ \t]+<!-- skill2workflow: http_assert \{.*\} -->[ \t]*$', '', line)
+        if line_number in declaration_lines else line
+        for line_number, line in enumerate(body.splitlines(), start=body_start_line)
+    )
 
     return {
         "metadata": metadata,
         "description": metadata.get("description", ""),
-        "hard_gates": _extract_hard_gates(body),
+        "hard_gates": _extract_hard_gates(guidance_body),
         "ordered_steps": checklist,
         "ordered_step_details": checklist_details,
-        "tool_hints": _find_lines(body, ("tool", "command", "Run:", "Use ")),
+        "tool_hints": _find_lines(guidance_body, ("tool", "command", "Run:", "Use ")),
         "human_gates": _find_lines(
-            body,
+            guidance_body,
             (
                 "approval",
                 "approve",
@@ -65,7 +74,7 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
             ),
             skip_section_terms=("verification", "validation"),
         ),
-        "verification_rules": _find_lines(body, ("verify", "test", "check", "validation")),
+        "verification_rules": _find_lines(guidance_body, ("verify", "test", "check", "validation")),
         "sections": sections,
         "source_path": source_path,
     }
