@@ -56,3 +56,21 @@ returned `ship`; that verdict covers the listed fix, not a new whole-surface
 certification. The documentation handoff compared the addition with incumbent
 CSS and confirmed no new global design system was needed. Existing unrelated
 visual advisories were preserved rather than redesigned.
+
+## Verified Outcome
+
+Implementation commit: `4d820ee604d4b9aa55638b1d5533a2d8f5ba954a`.
+
+- Final local Python suite: 1,359 tests passed in 115.849 seconds.
+- JavaScript renderer: all five tests passed locally and in the release
+  artifact CI job, including the red-green malformed-value regression.
+- Isolated final wheel: all package/CLI/service/UI checks passed in
+  `/tmp/skill2workflow-package-loop268-final-20261022`; installed editor HTML
+  and JavaScript matched the checked source byte-for-byte.
+- [CI](https://github.com/pearjelly/skill2workflow/actions/runs/39717876494):
+  all seven jobs passed, including Python 3.9/3.14, Docker, systemd, recovery,
+  user journeys, renderer tests, and release artifacts.
+- [Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39717883556):
+  production-baseline dry-run passed on Python 3.9. No release or tag created.
+- Repository secret hygiene and whitespace checks passed. Workflow DSL and
+  runtime semantics remain unchanged; maturity remains Self-hosted Beta.
