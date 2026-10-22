@@ -4,6 +4,8 @@
 import argparse
 import json
 import os
+import sqlite3
+from contextlib import closing
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import subprocess
@@ -60,9 +62,11 @@ def main():
     try:
         with TemporaryDirectory() as temporary:
             root = Path(temporary)
+            def invoke(*arguments):
+                return subprocess.run(command + list(arguments), cwd=str(root), env=environment,
+                                      capture_output=True, text=True, timeout=30)
             def run(*arguments):
-                result = subprocess.run(command + list(arguments), cwd=str(root), env=environment,
-                                        capture_output=True, text=True, timeout=30)
+                result = invoke(*arguments)
                 if result.returncode:
                     raise RuntimeError('Skill HTTP action CLI qualification failed')
                 return json.loads(result.stdout)
@@ -76,7 +80,12 @@ def main():
                                  'input_mapping': [{'from': '/input/record_id', 'to': '/query/id'}]},
                      'assertions': [{'path': '/ready', 'equals': True}]}
             skill, source, inputs, credentials = [root / name for name in ('SKILL.md', 'workflow.json', 'input.json', 'credentials.json')]
-            skill.write_text('---\nname: http-action-journey\n---\n## Steps\n'
+            input_schema = {'type': 'object', 'properties': {
+                'record_id': {'type': 'string', 'minLength': 1, 'maxLength': 64},
+                'title': {'type': 'string', 'minLength': 1, 'maxLength': 200}},
+                'required': ['record_id', 'title'], 'additionalProperties': False}
+            skill.write_text('---\nname: http-action-journey\n---\n'
+                             '<!-- skill2workflow: input_schema ' + json.dumps(input_schema) + ' -->\n## Steps\n'
                              '1. 负责人审批 <!-- skill2workflow: human_gate -->\n'
                              '2. 提交请求 <!-- skill2workflow: http ' + json.dumps(action) + ' -->\n'
                              '3. 校验结果 <!-- skill2workflow: http_assert ' + json.dumps(check) + ' -->\n'
@@ -86,7 +95,8 @@ def main():
             review = run('compile', str(skill), '--review', '-o', str(source))
             workflow = json.loads(source.read_text(encoding='utf-8'))
             if (review['verification_node_count'] != 1 or review['human_gate_count'] != 1
-                    or workflow['nodes'][2]['connector']['request']['response_mode'] != 'metadata'):
+                    or workflow['nodes'][2]['connector']['request']['response_mode'] != 'metadata'
+                    or workflow.get('input_schema') != input_schema):
                 raise RuntimeError('Skill HTTP action compilation qualification failed')
             run('validate', str(source), '--format', 'json')
             if server.events:
@@ -96,6 +106,25 @@ def main():
                 state_dir = root / outcome
                 common = ('--state-dir', str(state_dir), '--storage', 'sqlite')
                 run('publish', str(source), *common)
+                if outcome == 'match':
+                    audit_before = run('audit', *common)
+                    invalid_inputs = [
+                        {'title': 'private-invalid-input-canary'},
+                        {'record_id': 123, 'title': 'private-invalid-input-canary'},
+                        {'record_id': 'match', 'title': 'Example task', 'unexpected': 'private-invalid-input-canary'},
+                    ]
+                    for value in invalid_inputs:
+                        inputs.write_text(json.dumps(value), encoding='utf-8')
+                        rejected = invoke('trigger', 'workflow_http_action_journey', '--version', '0.1.0',
+                                          '--source', 'local-qualification', '--idempotency-key', outcome,
+                                          '--input', str(inputs), *common)
+                        if rejected.returncode != 1 or 'private-invalid-input-canary' in rejected.stdout + rejected.stderr:
+                            raise RuntimeError('Skill input contract refusal qualification failed')
+                    with closing(sqlite3.connect(state_dir / 'control.sqlite3')) as connection:
+                        claimed = connection.execute('select count(*) from trigger_idempotency').fetchone()[0]
+                    if (claimed or run('control-runs', *common) != [] or run('audit', *common) != audit_before
+                            or len(server.events) != start):
+                        raise RuntimeError('Rejected Skill input caused admission or provider effects')
                 inputs.write_text(json.dumps({'record_id': outcome, 'title': 'Example task'}), encoding='utf-8')
                 triggered = run('trigger', 'workflow_http_action_journey', '--version', '0.1.0',
                                 '--source', 'local-qualification', '--idempotency-key', outcome,
@@ -121,7 +150,7 @@ def main():
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
-    print(json.dumps({'ok': True, 'installed': bool(args.executable), 'cases_verified': 4}))
+    print(json.dumps({'ok': True, 'installed': bool(args.executable), 'cases_verified': 7}))
     return 0
 
 

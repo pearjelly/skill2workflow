@@ -1008,7 +1008,7 @@ def _qualify_installed_skill_http_actions(repo_root: Path, console_script: Path,
         [sys.executable, str(repo_root / "scripts" / "skill_http_action_smoke.py"),
          "--executable", str(console_script)], cwd=isolated_dir,
     ))
-    if result != {"ok": True, "installed": True, "cases_verified": 4}:
+    if result != {"ok": True, "installed": True, "cases_verified": 7}:
         raise RuntimeError("installed Skill HTTP action qualification failed")
     return True
 

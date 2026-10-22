@@ -11,6 +11,7 @@ working on.
 - [Installed UI](installed-ui.md) — serve the packaged editor and inspect one live service with readiness status
 - [Authoring](authoring.md) — compile Skills, edit the graph, and write back DSL
 - [Skill HTTP actions](skill-http-actions.md) — declare an API call, approve it, and verify the result
+- [Skill trigger inputs](skill-input-contracts.md) — declare typed business inputs and reject invalid triggers before admission
 - [Examples](examples.md) — scenario gallery and repeatable inspection commands
 - [Workflow DSL contract](workflow-dsl-contract.md) — execution truth and schema
 - [Workflow bundles](workflow-bundles.md) — deterministic shareable artifacts

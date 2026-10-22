@@ -9,6 +9,12 @@ publication.
 
 This document defines the compatibility policy for Workflow DSL `0.1.0`.
 
+Explicit [Skill trigger input declarations](skill-input-contracts.md) emit the
+existing top-level `input_schema` on newly compiled drafts. Skills without the
+declaration and published artifacts keep their prior behavior. Trigger admission
+is unchanged; no schema dialect, default injection, coercion, raw-executor context
+validation, implicit approval or new write-back field is added.
+
 Service takeover readiness and recurring dispatch now wait for completed
 recovery/reconciliation, rather than lease acquisition alone. This strengthens
 the existing recovery contract without changing DSL, state layout, or replay

@@ -13,6 +13,8 @@ Provide non-secret `record_id` and `title` trigger inputs. Resolve the
 POST can create provider-side effects; neither approval nor trigger replay
 protection guarantees exactly-once effects. This example adds no retries.
 
+<!-- skill2workflow: input_schema {"type":"object","properties":{"record_id":{"type":"string","minLength":1,"maxLength":64},"title":{"type":"string","minLength":1,"maxLength":200}},"required":["record_id","title"],"additionalProperties":false} -->
+
 ## Steps
 
 1. 负责人审批 <!-- skill2workflow: human_gate -->

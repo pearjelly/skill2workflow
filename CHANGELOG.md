@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add explicit Skill trigger-input declarations using the existing bounded
+  `input_schema`; qualify typed admission before claims, runs, audit or HTTP
+  effects through the installed approval/action/assertion journey.
+
 - Add explicit Skill HTTP action declarations with request bodies, input
   mappings, credential handles, and metadata-only response retention by default;
   qualify approval → POST → result check through the installed published-run CLI.

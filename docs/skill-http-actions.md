@@ -3,6 +3,10 @@
 An explicit `http` step compiles directly into the existing HTTP tool-call
 binding. You do not need to edit the generated DSL to attach the request.
 
+Use a standalone [typed trigger input declaration](skill-input-contracts.md)
+to require and constrain mapped business fields before trigger admission. The
+complete example Skill includes that source-level contract.
+
 ```markdown
 ## Steps
 1. 负责人审批 <!-- skill2workflow: human_gate -->

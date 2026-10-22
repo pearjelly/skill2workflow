@@ -76,6 +76,10 @@ For ordinary API calls, [declare HTTP actions in the Skill](docs/skill-http-acti
 and compile an approval → request → result-check journey without hand-editing
 bindings. New declarations default to metadata-only response retention.
 
+[Declare typed trigger inputs in the Skill](docs/skill-input-contracts.md) to
+reject missing, wrong-typed or unexpected business data before a trigger starts
+a run, without adding `input_schema` to generated DSL by hand.
+
 Skills can use the existing Checklist formats or a single numbered `Workflow`
 or `Steps` section. Append `<!-- skill2workflow: human_gate -->` to a step
 to require human approval, including for Chinese titles. See the

@@ -28,6 +28,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_skill_input_schema_declaration_compiles_and_has_fixed_refusal(self):
+        schema = {'type': 'object', 'properties': {'record_id': {'type': 'string'}},
+                  'required': ['record_id'], 'additionalProperties': False}
+        status, raw = self._post_local_skill_compile(
+            '<!-- skill2workflow: input_schema ' + json.dumps(schema) + ' -->\n## Steps\n1. Deliver\n')
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(raw)['workflow']['input_schema'], schema)
+        status, raw = self._post_local_skill_compile(
+            '<!-- skill2workflow: input_schema {"private-source":"private-value"} -->\n## Steps\n1. Deliver\n')
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw), {'error': 'skill compile rejected'})
+
     def test_skill_http_action_compiles_with_metadata_retention_and_fixed_refusal(self):
         config = {'request': {'method': 'POST', 'url': 'https://example.invalid/tasks', 'body': {'source': 'workflow'}}}
         status, raw = self._post_local_skill_compile('## Steps\n1. 提交 <!-- skill2workflow: http ' + json.dumps(config) + ' -->\n')

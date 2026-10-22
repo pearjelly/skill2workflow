@@ -11,6 +11,7 @@ from .connectors import MAX_HTTP_ALLOWED_ORIGINS, MAX_HTTP_ORIGIN_BYTES, default
 from .input_schema import validate_input_schema_contract
 from .http_assertions import validate_http_assertion_binding, skill_http_assertion_binding
 from .skill_http import skill_http_action_binding
+from .skill_input import skill_input_schema_contract
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -25,6 +26,7 @@ _SKILL_COMPILE_REVIEW_NOTICE_CODES = (
 
 def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
     """Compile Skill IR into the initial skill2workflow DSL."""
+    input_schema = skill_input_schema_contract(ir['input_schema']) if 'input_schema' in ir else None
     metadata = ir.get("metadata", {})
     if not isinstance(metadata, dict):
         metadata = {}
@@ -147,7 +149,7 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
                 }
             )
 
-    return {
+    workflow = {
         "schema_version": "0.1.0",
         "workflow": {
             "id": workflow_id,
@@ -170,6 +172,9 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
             "default_timeout_ms": 300000,
         },
     }
+    if input_schema is not None:
+        workflow['input_schema'] = input_schema
+    return workflow
 
 
 def summarize_skill_compile(ir: Dict[str, object], workflow: Workflow) -> Dict[str, object]:

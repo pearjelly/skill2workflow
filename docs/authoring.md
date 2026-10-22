@@ -13,6 +13,8 @@ asset SHA-256 records live in `web/vendor/litegraph-0.7.18/` for review.
 
 For an approval → HTTP call → result-check journey without manual binding
 edits, see [Skill HTTP action declarations](skill-http-actions.md).
+For workflow-level business input validation without editing generated JSON,
+use [Skill trigger input declarations](skill-input-contracts.md).
 
 When the editor is served by the installed `skill2workflow ui` command, choose
 one local `SKILL.md` and select **Compile SKILL**. The loopback UI process parses

@@ -38,7 +38,7 @@
           "file": "examples/skills/http-action-flow/SKILL.md",
           "kind": "ordered_step",
           "index": 1,
-          "line": 18,
+          "line": 20,
           "section": "Steps"
         }
       },
@@ -71,7 +71,7 @@
           "file": "examples/skills/http-action-flow/SKILL.md",
           "kind": "ordered_step",
           "index": 2,
-          "line": 19,
+          "line": 21,
           "section": "Steps"
         }
       },
@@ -132,7 +132,7 @@
           "file": "examples/skills/http-action-flow/SKILL.md",
           "kind": "ordered_step",
           "index": 3,
-          "line": 20,
+          "line": 22,
           "section": "Steps"
         }
       },
@@ -190,7 +190,7 @@
           "file": "examples/skills/http-action-flow/SKILL.md",
           "kind": "ordered_step",
           "index": 4,
-          "line": 21,
+          "line": 23,
           "section": "Steps"
         }
       },
@@ -291,5 +291,25 @@
       "max_attempts": 0
     },
     "default_timeout_ms": 300000
+  },
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "record_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "title": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      }
+    },
+    "required": [
+      "record_id",
+      "title"
+    ],
+    "additionalProperties": false
   }
 }

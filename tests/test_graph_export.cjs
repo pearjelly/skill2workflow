@@ -191,3 +191,17 @@ test('Save Graph synchronizes pending allowlisted form edits before serializatio
     if (!graphOnly) assert.deepEqual(result.workflow, graph.extra.source_workflow);
   }
 });
+
+test('workflow input contracts survive browser graph save and strict CLI write-back', () => {
+  const context = setup();
+  const workflow = clone(fixture);
+  workflow.input_schema = {type:'object',properties:{record_id:{type:'string',minLength:1}},
+    required:['record_id'],additionalProperties:false};
+  context.api.load(workflow);
+  const graph = context.save();
+  assert.deepEqual(graph.extra.source_workflow.input_schema, workflow.input_schema);
+  const result = writeBack(graph, workflow);
+  assert.equal(result.status, 0, result.message);
+  assert.deepEqual(result.workflow, workflow);
+  assert.deepEqual(clone(context.api.source), workflow);
+});

@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 from .http_assertions import load_assertion_json, skill_http_assertion_binding
 from .skill_http import skill_http_action_binding
+from .input_schema import INPUT_SCHEMA_MAX_BYTES
+from .skill_input import SKILL_INPUT_SCHEMA_ERROR, skill_input_schema_contract
 
 
 SkillIR = Dict[str, object]
@@ -42,6 +44,7 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     if len(encoded) > MAX_SKILL_FILE_BYTES:
         raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
     metadata, body, body_start_line = _parse_frontmatter(text)
+    body, input_schema = _extract_input_schema_declaration(body)
     checklist_details = _extract_ordered_step_details(body, body_start_line)
     checklist = [_format_step_detail(step) for step in checklist_details]
     sections = _parse_sections(body)
@@ -55,7 +58,7 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
         for line_number, line in enumerate(body.splitlines(), start=body_start_line)
     )
 
-    return {
+    ir = {
         "metadata": metadata,
         "description": metadata.get("description", ""),
         "hard_gates": _extract_hard_gates(guidance_body),
@@ -79,6 +82,40 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
         "sections": sections,
         "source_path": source_path,
     }
+    if input_schema is not None:
+        ir['input_schema'] = input_schema
+    return ir
+
+
+def _extract_input_schema_declaration(body: str):
+    """Remove one active data declaration without shifting any source lines."""
+    lines = body.splitlines()
+    schema = None
+    fence_char, fence_length = '', 0
+    for index, line in enumerate(lines):
+        if fence_char:
+            closing = re.match(r'^ {0,3}([`~]{3,})[ \t]*$', line)
+            if closing and set(closing.group(1)) == {fence_char} and len(closing.group(1)) >= fence_length:
+                fence_char = ''
+            continue
+        opening = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        if opening and not (opening.group(1)[0] == '`' and '`' in opening.group(2)):
+            fence_char, fence_length = opening.group(1)[0], len(opening.group(1))
+            continue
+        if not re.search(r'<!--\s*skill2workflow\s*:\s*input_schema\b', line, re.IGNORECASE):
+            continue
+        match = re.fullmatch(r' {0,3}<!-- skill2workflow: input_schema (\{.*\}) -->[ \t]*', line)
+        try:
+            if schema is not None or match is None:
+                raise ValueError()
+            payload = match.group(1)
+            if len(payload.encode('utf-8')) > INPUT_SCHEMA_MAX_BYTES or '<!--' in payload or '-->' in payload:
+                raise ValueError()
+            schema = skill_input_schema_contract(load_assertion_json(payload))
+        except (ValueError, TypeError, OverflowError, RecursionError) as error:
+            raise ValueError(SKILL_INPUT_SCHEMA_ERROR) from error
+        lines[index] = ''
+    return ('\n'.join(lines), schema) if schema is not None else (body, None)
 
 
 def _read_skill_file(path: Path) -> str:

@@ -3,6 +3,10 @@
 Explicit [HTTP action declarations](skill-http-actions.md) bind a reviewed
 request to a selected step without endpoint inference or compilation-time I/O.
 
+A standalone [trigger input declaration](skill-input-contracts.md) emits the
+existing bounded `input_schema` contract. It is workflow-level data, not a step
+annotation, and does not alter process selection or infer a gate.
+
 Loop 169 hardens the first step of the compile pipeline: the local `parse` and
 `compile` commands now read a user-provided `SKILL.md` through a bounded file
 boundary before applying parser heuristics.
@@ -58,6 +62,8 @@ The syntax is case-sensitive, single-line, and permits one marker at the end
 of one nonempty selected item. Within the Skill body, unknown, malformed,
 repeated, or unattached reserved `skill2workflow` comments fail with
 `Invalid Skill step annotation`.
+The separately documented standalone `input_schema` declaration is the explicit
+exception to selected-step placement and has its own fixed refusal message.
 This includes a declaration in a process excluded by Checklist precedence.
 Fenced examples do not declare approvals. If legacy Checklist parsing extracts
 an annotated item inside a fence, compilation is refused to prevent accidental
