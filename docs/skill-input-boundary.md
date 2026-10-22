@@ -26,6 +26,51 @@ input path in its in-memory IR. The portable `authoring-export` path replaces
 that file reference with the fixed `SKILL.md` before compiling Workflow DSL, so
 an exported artifact or derived Bundle cannot disclose the caller's local path.
 
+## Explicit Process Sections
+
+Checklist extraction keeps its existing precedence and list formats, including
+headings such as `Verification Checklist`. Even an empty Checklist section
+prevents fallback to another process section.
+
+When no Checklist section is recognized, the parser accepts one populated
+ATX heading named exactly `Workflow` or `Steps` (case-insensitive):
+
+```markdown
+## Workflow
+1. **Prepare output** — use the reviewed draft
+2. Ask user for approval
+3. Deliver output
+```
+
+The same numbered process under `## Steps` compiles identically except for
+source-section metadata. The fallback rules are deliberately explicit:
+
+- Heading depth and ancestor names do not change eligibility. `Workflow notes`
+  is not an eligible heading; a heading's optional closing `#` markers are
+  allowed. Illustrative processes must be fenced, even under `Examples`.
+- Only direct numbered items (`1.` or `1)`) become steps. The next heading,
+  including a child heading, ends that section's content. Numbering may repeat
+  or start above one; source order determines execution order.
+- Top-level list markers must use consistent indentation of zero to three
+  spaces. The smallest indentation among all direct list markers establishes
+  the top level. Deeper numbered items, bullet inventories, indented code,
+  and prose do not become steps. A numbered sublist beneath `- Notes` is not
+  promoted into a process.
+- Backtick and tilde fences are ignored in the fallback. A closing fence must
+  use the same character and at least the opening length; an unclosed fence
+  excludes the remaining text. Legacy Checklist parsing is unchanged.
+- Empty candidate sections are ignored. More than one populated `Workflow`
+  or `Steps` section is rejected with a fixed error; consolidate the intended
+  process into one section or use an explicit Checklist. Separate procedures
+  are never silently concatenated.
+
+The parser preserves title/detail splitting, original line numbers, and section
+names in the IR and compiled node source metadata. Compilation still produces a
+draft for review; this grammar neither executes prose nor makes standalone
+hard-gate declarations executable. Existing node typing and human-gate behavior
+are unchanged. Newly recognized steps can therefore introduce existing tool or
+approval nodes: review the generated DSL before publishing or running it.
+
 ## Verification
 
 `tests/test_parser.py` covers pre-open size rejection, symlink rejection,
@@ -34,6 +79,7 @@ The focused command is:
 
 ```bash
 PYTHONPATH=src python3 -m unittest tests.test_parser -v
+PYTHONPATH=src python3 -m unittest tests.test_process_steps -v
 ```
 
 This is a local authoring-input boundary only. It does not add remote upload,
@@ -53,3 +99,6 @@ The review contains only inferred structural counts and the finite notices
 `checklist_not_found`, `human_gate_not_inferred`, and
 `verification_not_inferred`. It does not include Skill text, local paths,
 credentials, validation of business intent, or authorization to publish/run.
+The historical `checklist_not_found` code means that no supported ordered steps
+were found, including the `Workflow`/`Steps` fallback; its schema and spelling
+remain unchanged.

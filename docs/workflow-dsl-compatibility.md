@@ -4,6 +4,15 @@ This document defines the compatibility policy for Workflow DSL `0.1.0`.
 
 The DSL is the execution truth source for `skill2workflow`. Visual graphs, editor state, run overlays, and generated artifacts must be converted back into Workflow DSL before execution or publication.
 
+Parser support for explicit numbered `Workflow` and `Steps` sections changes
+only newly compiled drafts that lack a Checklist section. Existing Checklist
+extraction and committed example fixtures remain compatible; published Workflow
+DSL artifacts are not recompiled or reinterpreted. The DSL schema and execution
+semantics are unchanged. Authors should review newly recognized nodes before
+publication, especially inferred tool calls and human gates. Multiple populated
+fallback process sections now fail compilation instead of producing a generic
+review step. See the [Skill input contract](skill-input-boundary.md#explicit-process-sections).
+
 ## Versioning
 
 Current schema version:

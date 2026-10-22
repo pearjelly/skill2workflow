@@ -348,6 +348,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
         bootstrap_secret_path,
     )
     ui_status = _qualify_installed_ui(console_script, isolated_dir)
+    _qualify_installed_skill_compiles(console_script, isolated_dir)
     validate_output = _run(
         [
             str(console_script),
@@ -988,6 +989,154 @@ def _qualify_systemd_unit(
     ):
         raise RuntimeError("installed systemd unit generator did not preserve its contract")
     return True
+
+
+def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) -> bool:
+    """Qualify process headings through only the installed CLI and local UI."""
+
+    for section in ("Workflow", "Steps"):
+        fixture_dir = isolated_dir / f"skill-compile-{section.lower()}"
+        fixture_dir.mkdir(parents=True, exist_ok=True)
+        source = fixture_dir / "SKILL.md"
+        markdown = (
+            "---\nname: installed-process\n---\n\n"
+            f"## {section}\n\n"
+            "1. Prepare output\n"
+            "2. Ask user for approval\n"
+            "3. Verify completion\n"
+        )
+        source.write_text(markdown, encoding="utf-8")
+        compiled = json.loads(
+            _run([str(console_script), "compile", str(source), "--review"], cwd=isolated_dir)
+        )
+        _require_installed_process_compile(compiled, section, str(source))
+        _validate_installed_process_compile(
+            console_script, isolated_dir, compiled, fixture_dir / "cli.workflow.json"
+        )
+
+        status, compiled = _installed_ui_json_request(
+            console_script, isolated_dir, "/api/v1/skill-compiles",
+            {"skill_markdown": markdown},
+        )
+        if status != 200:
+            raise RuntimeError("installed UI Skill compile did not accept a process section")
+        _require_installed_process_compile(compiled, section, "SKILL.md")
+        _validate_installed_process_compile(
+            console_script, isolated_dir, compiled, fixture_dir / "ui.workflow.json"
+        )
+
+    status, rejected = _installed_ui_json_request(
+        console_script, isolated_dir, "/api/v1/skill-compiles",
+        {"skill_markdown": (
+            "## Workflow\n\n1. Private ambiguous source step\n\n"
+            "## Steps\n\n1. Verify completion\n"
+        )},
+    )
+    if status != 400 or rejected != {"error": "skill compile rejected"}:
+        raise RuntimeError("installed UI Skill compile did not reject ambiguity without source text")
+    return True
+
+
+def _require_installed_process_compile(compiled, section: str, source_file: str) -> None:
+    expected_review = {
+        "schema_version": "skill2workflow-skill-compile-review-0.1.0",
+        "ordered_step_count": 3,
+        "executable_node_count": 3,
+        "human_gate_count": 1,
+        "verification_node_count": 1,
+        "hard_gate_count": 0,
+        "notices": [],
+    }
+    if not isinstance(compiled, dict) or compiled.get("review") != expected_review:
+        raise RuntimeError("installed Skill compile did not preserve process step counts and gates")
+    workflow = compiled.get("workflow")
+    nodes = workflow.get("nodes") if isinstance(workflow, dict) else None
+    if (
+        not isinstance(nodes, list)
+        or len(nodes) != 6
+        or not all(isinstance(node, dict) for node in nodes)
+        or [node.get("type") for node in nodes]
+        != ["start", "step", "human_gate", "verification", "failure", "end"]
+        or [node.get("title") for node in nodes[1:4]]
+        != ["Prepare output", "Ask user for approval", "Verify completion"]
+    ):
+        raise RuntimeError("installed Skill compile did not preserve executable steps and gates")
+    for index, node in enumerate(nodes[1:4], 1):
+        metadata = node.get("metadata")
+        if not isinstance(metadata, dict) or metadata.get("source") != {
+            "file": source_file,
+            "kind": "ordered_step",
+            "index": index,
+            "line": index + 6,
+            "section": section,
+        }:
+            raise RuntimeError("installed Skill compile did not preserve process source provenance")
+
+
+def _validate_installed_process_compile(
+    console_script: Path, isolated_dir: Path, compiled, output: Path,
+) -> None:
+    output.write_text(json.dumps(compiled["workflow"]), encoding="utf-8")
+    validation = json.loads(
+        _run([str(console_script), "validate", str(output), "--format", "json"], cwd=isolated_dir)
+    )
+    if not isinstance(validation, dict) or validation.get("valid") is not True:
+        raise RuntimeError("installed Skill compile did not produce valid Workflow DSL")
+
+
+def _installed_ui_json_request(
+    console_script: Path, isolated_dir: Path, path: str, payload: Dict[str, object],
+):
+    """Make one JSON request to a credential-free installed UI process."""
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+    environment["PYTHONNOUSERSITE"] = "1"
+    process = subprocess.Popen(
+        [str(console_script), "ui", "--port", str(port), "--once"],
+        cwd=str(isolated_dir),
+        env=environment,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    result = None
+    deadline = time.monotonic() + 5
+    try:
+        while time.monotonic() < deadline:
+            try:
+                request = urllib.request.Request(
+                    f"http://127.0.0.1:{port}{path}",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                try:
+                    response = urllib.request.urlopen(request, timeout=1)
+                except urllib.error.HTTPError as error:
+                    response = error
+                with response:
+                    if response.headers.get("Cache-Control") != "no-store":
+                        raise RuntimeError("installed UI JSON response was cacheable")
+                    result = response.status, json.loads(response.read().decode("utf-8"))
+                break
+            except (OSError, urllib.error.URLError):
+                if process.poll() is not None:
+                    break
+                time.sleep(0.05)
+        if result is None:
+            raise RuntimeError("installed UI JSON request did not complete")
+        process.wait(timeout=5)
+    finally:
+        if process.poll() is None:
+            process.kill()
+        process.communicate(timeout=5)
+    if process.returncode != 0:
+        raise RuntimeError("installed UI JSON server did not exit cleanly")
+    return result
 
 
 def _qualify_installed_ui(console_script: Path, isolated_dir: Path) -> bool:

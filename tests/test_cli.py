@@ -9,6 +9,7 @@ from unittest import TestCase
 from unittest.mock import patch
 
 from skill2workflow.cli import MAX_CLI_JSON_DOCUMENT_BYTES, main
+from skill2workflow.compiler import validate_workflow
 from skill2workflow.external_connector_smoke import _external_connector_workflow
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.state_layout import STATE_LAYOUT_MARKER
@@ -78,6 +79,87 @@ class CliTests(TestCase):
         self.assertEqual(set(compiled), {"workflow", "review"})
         self.assertEqual(compiled["workflow"]["workflow"]["id"], "workflow_skill_workflow")
         self.assertEqual(compiled["review"]["ordered_step_count"], 1)
+
+    def test_compile_review_recognizes_numbered_workflow_and_steps_sections(self):
+        for section in ("Workflow", "Steps"):
+            with self.subTest(section=section), TemporaryDirectory() as temporary:
+                skill = Path(temporary) / "SKILL.md"
+                skill.write_text(
+                    "---\nname: cli-process\n---\n\n"
+                    f"## {section}\n\n"
+                    "1. Prepare output\n"
+                    "2. Ask user for approval\n"
+                    "3. Verify completion\n",
+                    encoding="utf-8",
+                )
+                stdout = StringIO()
+                with redirect_stdout(stdout):
+                    self.assertEqual(main(["compile", str(skill), "--review"]), 0)
+                compiled = json.loads(stdout.getvalue())
+                workflow = compiled["workflow"]
+                self.assertEqual(validate_workflow(workflow), [])
+                self.assertEqual(
+                    compiled["review"],
+                    {
+                        "schema_version": "skill2workflow-skill-compile-review-0.1.0",
+                        "ordered_step_count": 3,
+                        "executable_node_count": 3,
+                        "human_gate_count": 1,
+                        "verification_node_count": 1,
+                        "hard_gate_count": 0,
+                        "notices": [],
+                    },
+                )
+                nodes = workflow["nodes"][1:-2]
+                self.assertEqual(
+                    [node["title"] for node in nodes],
+                    ["Prepare output", "Ask user for approval", "Verify completion"],
+                )
+                self.assertEqual(
+                    [node["type"] for node in nodes],
+                    ["step", "human_gate", "verification"],
+                )
+                self.assertEqual(
+                    [node["metadata"]["source"] for node in nodes],
+                    [
+                        {
+                            "file": str(skill),
+                            "kind": "ordered_step",
+                            "index": index,
+                            "line": index + 6,
+                            "section": section,
+                        }
+                        for index in range(1, 4)
+                    ],
+                )
+                self.assertNotIn("Review skill guidance", json.dumps(workflow))
+
+    def test_compile_rejects_ambiguous_process_sections_without_writing_output(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skill = root / "SKILL.md"
+            output = root / "workflow.json"
+            marker = "private source step must not be echoed"
+            skill.write_text(
+                f"## Workflow\n\n1. {marker}\n\n"
+                "## Steps\n\n1. Verify completion\n",
+                encoding="utf-8",
+            )
+            stdout = StringIO()
+            stderr = StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                exit_code = main(
+                    ["compile", str(skill), "--output", str(output), "--review"]
+                )
+            self.assertEqual(exit_code, 1)
+            self.assertFalse(output.exists())
+            self.assertEqual(stdout.getvalue(), "")
+            self.assertEqual(
+                stderr.getvalue(),
+                "SKILL.md has multiple Workflow or Steps sections; "
+                "use one process section or an explicit Checklist\n",
+            )
+            self.assertNotIn(marker, stderr.getvalue())
 
     def test_authoring_export_creates_workflow_review_and_graph(self):
         with TemporaryDirectory() as temporary:

@@ -10,7 +10,7 @@
   const MAX_WORKFLOW_VALIDATION_ERRORS = 100;
   const MAX_WORKFLOW_VALIDATION_NODE_INDEX = 100000;
   const SKILL_COMPILE_REVIEW_NOTICES = {
-    checklist_not_found: "No checklist steps were found. This draft uses the compiler's generic review step.",
+    checklist_not_found: "No supported ordered steps were found. This draft uses the compiler's generic review step.",
     human_gate_not_inferred: "No human approval node was inferred. Add an explicit review before real-world effects.",
     verification_not_inferred: "No verification node was inferred. Add a confirmation or validation step before relying on the result.",
   };

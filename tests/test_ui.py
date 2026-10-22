@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest import TestCase
 
 from skill2workflow.cli import main
+from skill2workflow.compiler import validate_workflow
 from skill2workflow.ui import (
     _parse_live_audit_page_cursor,
     _parse_live_workflow_explanation_path,
@@ -261,6 +262,102 @@ class UiTests(TestCase):
             },
         )
         self.assertNotIn("Review draft", json.dumps(compiled["review"]))
+
+    def test_ui_server_compiles_numbered_workflow_and_steps_without_credentials(self):
+        for section in ("Workflow", "Steps"):
+            with self.subTest(section=section):
+                status, raw = self._post_local_skill_compile(
+                    "---\nname: local-process\n---\n\n"
+                    f"## {section}\n\n"
+                    "1. Prepare output\n"
+                    "2. Ask user for approval\n"
+                    "3. Verify completion\n"
+                )
+                self.assertEqual(status, 200)
+                compiled = json.loads(raw.decode("utf-8"))
+                workflow = compiled["workflow"]
+                self.assertEqual(validate_workflow(workflow), [])
+                self.assertEqual(
+                    compiled["review"],
+                    {
+                        "schema_version": "skill2workflow-skill-compile-review-0.1.0",
+                        "ordered_step_count": 3,
+                        "executable_node_count": 3,
+                        "human_gate_count": 1,
+                        "verification_node_count": 1,
+                        "hard_gate_count": 0,
+                        "notices": [],
+                    },
+                )
+                nodes = workflow["nodes"][1:-2]
+                self.assertEqual(
+                    [node["title"] for node in nodes],
+                    ["Prepare output", "Ask user for approval", "Verify completion"],
+                )
+                self.assertEqual(
+                    [node["type"] for node in nodes],
+                    ["step", "human_gate", "verification"],
+                )
+                self.assertEqual(
+                    [node["metadata"]["source"] for node in nodes],
+                    [
+                        {
+                            "file": "SKILL.md",
+                            "kind": "ordered_step",
+                            "index": index,
+                            "line": index + 6,
+                            "section": section,
+                        }
+                        for index in range(1, 4)
+                    ],
+                )
+                self.assertNotIn("Review skill guidance", json.dumps(workflow))
+
+    def test_ui_server_rejects_ambiguous_process_sections_without_echoing_source(self):
+        marker = "private source step must not be echoed"
+        status, raw = self._post_local_skill_compile(
+            f"## Workflow\n\n1. {marker}\n\n"
+            "## Steps\n\n1. Verify completion\n"
+        )
+
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw.decode("utf-8")), {"error": "skill compile rejected"})
+        self.assertNotIn(marker.encode("utf-8"), raw)
+
+    def _post_local_skill_compile(self, markdown):
+        observed = {}
+        ready_event = threading.Event()
+
+        def ready(server):
+            server.timeout = 2
+            observed["port"] = server.server_port
+            ready_event.set()
+
+        thread = threading.Thread(
+            target=serve_ui,
+            kwargs={"host": "127.0.0.1", "port": 0, "once": True, "ready_callback": ready},
+            daemon=True,
+        )
+        thread.start()
+        try:
+            self.assertTrue(ready_event.wait(timeout=2), "local UI server did not start")
+            request = urllib.request.Request(
+                f"http://127.0.0.1:{observed['port']}/api/v1/skill-compiles",
+                data=json.dumps({"skill_markdown": markdown}).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            try:
+                response = urllib.request.urlopen(request, timeout=2)
+            except urllib.error.HTTPError as error:
+                response = error
+            with response:
+                self.assertEqual(response.headers["Cache-Control"], "no-store")
+                result = response.status, response.read()
+        finally:
+            thread.join(timeout=3)
+            self.assertFalse(thread.is_alive(), "local UI server did not stop")
+        return result
 
     def test_ui_server_validates_one_workflow_with_a_source_free_result(self):
         observed = {}

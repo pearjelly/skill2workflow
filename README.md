@@ -66,6 +66,11 @@ result also contains safe `operator_commands` argv arrays for those next
 steps, so integrations do not need to rebuild paths or interpolate shell
 input.
 
+Skills can use the existing Checklist formats or a single numbered `Workflow`
+or `Steps` section. The [Skill input contract](docs/skill-input-boundary.md#explicit-process-sections)
+explains precedence and ambiguity checks; inspect the compiled nodes before
+publication rather than treating compilation as proof of business safety.
+
 The installed wheel also includes the static editor and control-plane inspector:
 
 ```bash

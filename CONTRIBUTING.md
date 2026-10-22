@@ -39,6 +39,11 @@ boundary. Contributors may use any supported Python locally;
 compatibility-sensitive changes should be reviewed against both matrix
 endpoints.
 
+Parser changes must preserve the checked-in Checklist fixtures and exercise
+the explicit `Workflow`/`Steps` fallback through `tests.test_process_steps`,
+CLI/editor compilation, and installed-wheel qualification. The accepted
+heading/list grammar is documented in [the Skill input boundary](docs/skill-input-boundary.md#explicit-process-sections).
+
 A separate Python 3.14 CI job also runs the local end-user journeys: the
 customer-support Pilot, the three-scenario Pilot pack, explicit external
 connector loading, and the installed-wheel quickstart. These drills use local

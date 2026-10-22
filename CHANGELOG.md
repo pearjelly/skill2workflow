@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Added explicit numbered `Workflow` and `Steps` section compilation when no
+  Checklist section is recognized. Source mapping, existing human gates, and
+  Checklist precedence are preserved; ambiguous multiple processes are rejected
+  instead of silently becoming a generic review step. Published DSL is unchanged.
+
 - Added single-service Linux Docker self-hosting with a wheel-built non-root
   image, private read-only config and credential mounts, persistent SQLite
   state, and a manual operator runbook. A dedicated Linux CI drill covers

@@ -22,6 +22,6 @@ class SqliteWorkflowRecordBoundaryDocsTests(TestCase):
         self.assertIn("sqlite-workflow-record-boundary.md", stability)
         self.assertIn("Delivery Loops 1-263 are complete", readme)
         self.assertIn("sqlite-workflow-record-boundary.md", readme)
-        self.assertIn("Loop 263 is complete with single-service Docker self-hosting", roadmap)
+        self.assertIn("Loop 264 — explicit Workflow and Steps headings", roadmap)
         self.assertIn("Loop 176: Bounded SQLite Workflow Registry Records", roadmap)
         self.assertIn("sqlite-workflow-record-boundary.md", changelog)

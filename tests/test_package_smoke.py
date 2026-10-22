@@ -1,11 +1,14 @@
 import json
 import os
+import urllib.error
 import zipfile
+from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
+from scripts import package_smoke
 from scripts.package_smoke import (
     PACKAGED_UI_DATA_FILES,
     REQUIRED_CONSOLE_COMMANDS,
@@ -365,7 +368,10 @@ class PackageSmokeTests(TestCase):
             ) as qualify_live_snapshot, patch(
                 "scripts.package_smoke._qualify_installed_ui",
                 return_value=True,
-            ) as qualify_installed_ui:
+            ) as qualify_installed_ui, patch(
+                "scripts.package_smoke._qualify_installed_skill_compiles",
+                return_value=True,
+            ) as qualify_installed_skill_compiles:
                 result = run_package_smoke(repo, work)
 
         flattened = [part for command, _cwd in commands for part in command]
@@ -397,6 +403,9 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(systemd_commands[0][executable_index].endswith("skill2workflow"))
         qualify_live_snapshot.assert_called_once()
         qualify_installed_ui.assert_called_once()
+        qualify_installed_skill_compiles.assert_called_once_with(
+            Path(result["console_script"]), (work / "isolated").resolve()
+        )
         self.assertTrue(result["ui_status"])
         self.assertTrue(result["license_included"])
         self.assertTrue(result["private_artifacts_excluded"])
@@ -428,6 +437,142 @@ class PackageSmokeTests(TestCase):
         self.assertTrue(
             all(cwd == (work / "isolated").resolve() for cwd in runtime_cwds)
         )
+
+    def test_installed_skill_compiles_cover_cli_ui_and_ambiguity(self):
+        commands = []
+        requests = []
+        with TemporaryDirectory() as temporary:
+            isolated = Path(temporary)
+            console = isolated / "bin" / "skill2workflow"
+
+            def fake_run(command, cwd):
+                self.assertEqual(command[0], str(console))
+                self.assertEqual(cwd, isolated)
+                commands.append(command)
+                if command[1] == "compile":
+                    source = Path(command[2])
+                    markdown = source.read_text(encoding="utf-8")
+                    section = "Workflow" if "## Workflow" in markdown else "Steps"
+                    return json.dumps(_process_compile_result(section, str(source)))
+                self.assertEqual(command[1], "validate")
+                self.assertTrue(Path(command[2]).is_file())
+                return json.dumps({"valid": True})
+
+            def fake_request(_console, _isolated, path, payload):
+                self.assertEqual((_console, _isolated), (console, isolated))
+                self.assertEqual(path, "/api/v1/skill-compiles")
+                markdown = payload["skill_markdown"]
+                requests.append(markdown)
+                if "## Workflow" in markdown and "## Steps" in markdown:
+                    return 400, {"error": "skill compile rejected"}
+                section = "Workflow" if "## Workflow" in markdown else "Steps"
+                return 200, _process_compile_result(section, "SKILL.md")
+
+            with patch("scripts.package_smoke._run", side_effect=fake_run), patch(
+                "scripts.package_smoke._installed_ui_json_request",
+                side_effect=fake_request,
+            ):
+                self.assertTrue(package_smoke._qualify_installed_skill_compiles(console, isolated))
+
+        self.assertEqual([command[1] for command in commands].count("compile"), 2)
+        self.assertEqual([command[1] for command in commands].count("validate"), 4)
+        self.assertEqual(len(requests), 3)
+
+    def test_installed_skill_compiles_reject_fallback_missing_gates_and_bad_sources(self):
+        for defect in ("fallback", "human_gate", "verification", "section", "line"):
+            with self.subTest(defect=defect), TemporaryDirectory() as temporary:
+                isolated = Path(temporary)
+
+                def fake_run(command, cwd):
+                    result = _process_compile_result("Workflow", str(command[2]))
+                    if defect == "fallback":
+                        result["review"]["ordered_step_count"] = 0
+                        result["workflow"]["nodes"] = [
+                            {"type": "step", "title": "Review skill guidance"}
+                        ]
+                    elif defect in ("human_gate", "verification"):
+                        index = 2 if defect == "human_gate" else 3
+                        result["workflow"]["nodes"][index]["type"] = "step"
+                    elif defect == "section":
+                        result["workflow"]["nodes"][1]["metadata"]["source"]["section"] = "Checklist"
+                    else:
+                        result["workflow"]["nodes"][1]["metadata"]["source"]["line"] = 99
+                    return json.dumps(result)
+
+                with patch("scripts.package_smoke._run", side_effect=fake_run), patch(
+                    "scripts.package_smoke._installed_ui_json_request"
+                ) as ui_request, self.assertRaisesRegex(RuntimeError, "Skill compile"):
+                    package_smoke._qualify_installed_skill_compiles(Path("installed-cli"), isolated)
+                ui_request.assert_not_called()
+
+    def test_installed_skill_compiles_reject_invalid_dsl_and_unsafe_ambiguity_results(self):
+        for defect in ("invalid_dsl", "accepted_ambiguity", "echoed_source"):
+            with self.subTest(defect=defect), TemporaryDirectory() as temporary:
+                isolated = Path(temporary)
+
+                def fake_run(command, cwd):
+                    if command[1] == "compile":
+                        source = Path(command[2])
+                        section = "Workflow" if "## Workflow" in source.read_text() else "Steps"
+                        return json.dumps(_process_compile_result(section, str(source)))
+                    return json.dumps({"valid": defect != "invalid_dsl"})
+
+                def fake_request(_console, _isolated, _path, payload):
+                    markdown = payload["skill_markdown"]
+                    if "## Workflow" in markdown and "## Steps" in markdown:
+                        if defect == "accepted_ambiguity":
+                            return 200, _process_compile_result("Workflow", "SKILL.md")
+                        return 400, {"error": markdown}
+                    section = "Workflow" if "## Workflow" in markdown else "Steps"
+                    return 200, _process_compile_result(section, "SKILL.md")
+
+                with patch("scripts.package_smoke._run", side_effect=fake_run), patch(
+                    "scripts.package_smoke._installed_ui_json_request",
+                    side_effect=fake_request,
+                ), self.assertRaisesRegex(RuntimeError, "Skill compile"):
+                    package_smoke._qualify_installed_skill_compiles(Path("installed-cli"), isolated)
+
+    def test_installed_ui_json_request_handles_rejection_once_and_isolates_python(self):
+        response = urllib.error.HTTPError(
+            "http://127.0.0.1/test", 400, "Bad Request",
+            {"Cache-Control": "no-store"}, BytesIO(b'{"error":"skill compile rejected"}'),
+        )
+        with patch.dict(os.environ, {"PYTHONPATH": "/source/leak"}), patch(
+            "scripts.package_smoke.subprocess.Popen"
+        ) as popen, patch(
+            "scripts.package_smoke.urllib.request.urlopen", side_effect=response
+        ) as urlopen:
+            process = popen.return_value
+            process.returncode = 0
+            process.poll.return_value = 0
+            status, payload = package_smoke._installed_ui_json_request(
+                Path("installed-cli"), Path("/tmp"), "/api/v1/skill-compiles",
+                {"skill_markdown": "## Workflow\n1. Step"},
+            )
+
+        self.assertEqual((status, payload), (400, {"error": "skill compile rejected"}))
+        urlopen.assert_called_once()
+        environment = popen.call_args.kwargs["env"]
+        self.assertNotIn("PYTHONPATH", environment)
+        self.assertEqual(environment["PYTHONNOUSERSITE"], "1")
+        self.assertNotIn("--service-url", popen.call_args.args[0])
+        self.assertNotIn("--auth-token-file", popen.call_args.args[0])
+        process.wait.assert_called_once_with(timeout=5)
+        process.communicate.assert_called_once_with(timeout=5)
+
+    def test_installed_ui_json_request_cleans_up_failed_response(self):
+        with patch("scripts.package_smoke.subprocess.Popen") as popen, patch(
+            "scripts.package_smoke.urllib.request.urlopen", side_effect=RuntimeError("failed response")
+        ):
+            process = popen.return_value
+            process.poll.return_value = None
+            with self.assertRaisesRegex(RuntimeError, "failed response"):
+                package_smoke._installed_ui_json_request(
+                    Path("installed-cli"), Path("/tmp"), "/api/v1/skill-compiles", {}
+                )
+
+        process.kill.assert_called_once()
+        process.communicate.assert_called_once_with(timeout=5)
 
     def test_run_removes_pythonpath_and_disables_user_site_packages(self):
         with patch.dict(os.environ, {"PYTHONPATH": "/source/leak"}, clear=False), patch(
@@ -489,6 +634,35 @@ class PackageSmokeTests(TestCase):
 
             with self.assertRaisesRegex(RuntimeError, "license"):
                 _inspect_wheel(wheel)
+
+
+def _process_compile_result(section, source_file):
+    steps = [
+        ("step", "Prepare output"),
+        ("human_gate", "Ask user for approval"),
+        ("verification", "Verify completion"),
+    ]
+    return {
+        "workflow": {
+            "nodes": [{"type": "start"}] + [
+                {
+                    "type": node_type,
+                    "title": title,
+                    "metadata": {"source": {
+                        "file": source_file, "kind": "ordered_step", "index": index,
+                        "section": section, "line": index + 6,
+                    }},
+                }
+                for index, (node_type, title) in enumerate(steps, 1)
+            ] + [{"type": "failure"}, {"type": "end"}],
+        },
+        "review": {
+            "schema_version": "skill2workflow-skill-compile-review-0.1.0",
+            "ordered_step_count": 3, "executable_node_count": 3,
+            "human_gate_count": 1, "verification_node_count": 1,
+            "hard_gate_count": 0, "notices": [],
+        },
+    }
 
 
 def _write_test_wheel(

@@ -40,7 +40,7 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     if len(encoded) > MAX_SKILL_FILE_BYTES:
         raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
     metadata, body, body_start_line = _parse_frontmatter(text)
-    checklist_details = _extract_checklist_details(body, body_start_line)
+    checklist_details = _extract_ordered_step_details(body, body_start_line)
     checklist = [_format_step_detail(step) for step in checklist_details]
     sections = _parse_sections(body)
 
@@ -166,10 +166,22 @@ def _extract_hard_gates(body: str) -> List[str]:
     return gates
 
 
-def _extract_checklist_details(body: str, start_line: int) -> List[Dict[str, object]]:
+def _extract_ordered_step_details(body: str, start_line: int) -> List[Dict[str, object]]:
+    checklist, has_checklist = _extract_checklist_details(body, start_line)
+    if has_checklist:
+        return checklist
+    return _extract_process_step_details(body, start_line)
+
+
+def _extract_checklist_details(
+    body: str, start_line: int
+) -> Tuple[List[Dict[str, object]], bool]:
+    """Retain the legacy Checklist grammar, including empty-section precedence."""
+
     items: List[Dict[str, object]] = []
     current_section = "_root"
     in_fence = False
+    has_checklist = False
 
     for line_number, raw_line in enumerate(body.splitlines(), start=start_line):
         stripped = raw_line.strip()
@@ -182,6 +194,7 @@ def _extract_checklist_details(body: str, start_line: int) -> List[Dict[str, obj
         heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", raw_line)
         if heading:
             current_section = heading.group(2).strip()
+            has_checklist = has_checklist or "checklist" in current_section.lower()
             continue
 
         if "checklist" not in current_section.lower():
@@ -205,7 +218,77 @@ def _extract_checklist_details(body: str, start_line: int) -> List[Dict[str, obj
                 }
             )
 
-    return items
+    return items, has_checklist
+
+
+def _extract_process_step_details(body: str, start_line: int) -> List[Dict[str, object]]:
+    """Read one explicit numbered process without interpreting prose or examples."""
+
+    sections = []
+    current = None
+    current_section = ""
+    fence_char = ""
+    fence_length = 0
+    for line_number, raw_line in enumerate(body.splitlines(), start=start_line):
+        if fence_char:
+            closing = re.match(r"^ {0,3}([`~]{3,})[ \t]*$", raw_line)
+            if (
+                closing
+                and set(closing.group(1)) == {fence_char}
+                and len(closing.group(1)) >= fence_length
+            ):
+                fence_char = ""
+            continue
+        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", raw_line)
+        if opening and not (opening.group(1)[0] == "`" and "`" in opening.group(2)):
+            fence_char = opening.group(1)[0]
+            fence_length = len(opening.group(1))
+            continue
+
+        heading = re.match(r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?[ \t]*$", raw_line)
+        if heading:
+            current_section = re.sub(r"[ \t]+#+[ \t]*$", "", heading.group(1) or "").strip()
+            current = None
+            if current_section.lower() in {"workflow", "steps"}:
+                current = []
+                sections.append(current)
+            continue
+        if current is None:
+            continue
+        # Include bullet markers when choosing the outer indentation, so a
+        # numbered sublist under an unnumbered Notes item is never promoted.
+        item = re.match(
+            r"^( {0,3})(?:(\d+[.)])|[-+*])(?:[ \t]+(.*?))?[ \t]*$", raw_line
+        )
+        if item:
+            current.append((
+                len(item.group(1)), bool(item.group(2)), item.group(3) or "",
+                line_number, current_section,
+            ))
+
+    populated = []
+    for section in sections:
+        if not section:
+            continue
+        outer_indent = min(item[0] for item in section)
+        steps = []
+        for indent, numbered, content, line_number, section_name in section:
+            if not numbered or indent != outer_indent:
+                continue
+            title, detail = _split_step_title_detail(content)
+            if title:
+                steps.append({
+                    "title": title, "detail": detail,
+                    "line": line_number, "section": section_name,
+                })
+        if steps:
+            populated.append(steps)
+    if len(populated) > 1:
+        raise ValueError(
+            "SKILL.md has multiple Workflow or Steps sections; "
+            "use one process section or an explicit Checklist"
+        )
+    return populated[0] if populated else []
 
 
 def _clean_markdown_item(value: str) -> str:

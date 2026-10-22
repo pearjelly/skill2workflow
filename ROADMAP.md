@@ -14,9 +14,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
 - Completed delivery loops: 1-263
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 263 is complete with single-service Docker self-hosting
+- Active loop: Loop 264 — explicit Workflow and Steps headings
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing Linux Docker deployment evidence and production-boundary CI evidence
+- Next decision: review explicit process-step compilation evidence before selecting another Production Baseline loop
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-263 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-263 complete, Loop 264 in progress.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -154,10 +154,14 @@ Production Baseline remains directional.
 
 ## Active Loop
 
-No delivery loop is currently active. The detailed entries below are retained
-as historical evidence for completed Production Baseline loops; the current
-completion point and next-selection rule are authoritative in “Status At A
-Glance” and “Rolling Loop Queue”.
+Loop 264 is active: preserve explicit numbered processes beneath `Workflow`
+and `Steps` headings when no Checklist section is present. Existing Checklist
+precedence, published DSL, and runtime semantics remain unchanged. Scope,
+exclusions, and acceptance evidence are recorded in
+`docs/superpowers/plans/2026-10-22-workflow-step-headings.md`.
+
+The detailed entries below are retained as historical evidence for completed
+Production Baseline loops.
 
 ### Loop 56: Linux systemd Supervision
 
@@ -7049,7 +7053,9 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 263 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing Linux Docker deployment evidence and production-boundary CI evidence.
+This rolling queue is ordered. Loop 263 and its deployment CI evidence are
+complete. Loop 264 is active; select another Production Baseline item only
+after reviewing explicit process-step compilation and compatibility evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 

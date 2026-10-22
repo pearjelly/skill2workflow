@@ -31,7 +31,7 @@ class ServiceBootstrapDocumentationTests(TestCase):
 
         self.assertIn("- Completed delivery loops: 1-263", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 263 is complete with single-service Docker self-hosting",
+            "- Active loop: Loop 264 — explicit Workflow and Steps headings",
             roadmap,
         )
         self.assertIn("| Loop 51: Secure Service Bootstrap | Complete |", roadmap)

@@ -28,6 +28,6 @@ class AuditEventBoundaryDocsTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("Completed delivery loops: 1-263", roadmap)
         self.assertIn(
-            "Loop 263 is complete with single-service Docker self-hosting", roadmap
+            "Loop 264 — explicit Workflow and Steps headings", roadmap
         )
         self.assertIn("Delivery Loops 1-263 are complete", readme)

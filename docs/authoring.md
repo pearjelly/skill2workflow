@@ -33,6 +33,13 @@ proof of business safety or an execution policy. Review and edit the Workflow
 DSL before publication; the summary neither changes the draft nor authorizes a
 side effect.
 
+Numbered steps under an exact `Workflow` or `Steps` heading are also supported
+when no Checklist section is recognized. Multiple populated process sections
+must be consolidated before compilation. The [Skill input contract](skill-input-boundary.md#explicit-process-sections)
+defines precedence, nesting, fences, and source mapping for both CLI and editor
+compilation. The legacy `checklist_not_found` notice means no supported ordered
+steps were found, not that a heading must literally be named Checklist.
+
 The same review is available to local automation. To write the ordinary DSL
 artifact while emitting only the source-free review on standard output:
 
