@@ -3,7 +3,8 @@ import json
 import os
 import threading
 import tempfile
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from tests.http_fixtures import HTTPServer
 import urllib.error
 import urllib.request
 from pathlib import Path

@@ -1,7 +1,8 @@
 import json
 import threading
 from contextlib import redirect_stdout
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from tests.http_fixtures import HTTPServer
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory

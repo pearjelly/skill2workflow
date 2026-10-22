@@ -37,6 +37,14 @@ Run the full test suite:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
+Use `tests.http_fixtures.HTTPServer` or `ThreadingHTTPServer` for owned local
+HTTP fixtures. They inherit the real stdlib protocol and shutdown behavior but
+use a 10 ms idle polling interval, avoiding repeated half-second teardown waits.
+Explicit intervals remain supported. Keep this optimization test-only: do not
+change production server polling, bypass network assertions, or relax release
+deadlines to speed up tests. Restore scoped substitutions and join/close owned
+servers during cleanup.
+
 Editor renderer/export changes also run the dependency-free JavaScript behavior
 tests with Node.js (development only, not a Python runtime dependency). Graph
 export tests use the real bundled LiteGraph and invoke the Python write-back CLI:

@@ -8,6 +8,7 @@ import tempfile
 import threading
 from unittest import TestCase
 from unittest.mock import patch
+from tests.http_fixtures import ThreadingHTTPServer
 
 from scripts.release_manifest import PACKAGED_UI_DATA_FILES
 from skill2workflow import ui
@@ -26,7 +27,8 @@ def server(root):
     def callback(value):
         state['server'] = value
         ready.set()
-    with patch('skill2workflow.ui.find_ui_root', return_value=root):
+    with patch('skill2workflow.ui.find_ui_root', return_value=root), \
+         patch('skill2workflow.ui.ThreadingHTTPServer', ThreadingHTTPServer):
         thread = threading.Thread(target=ui.serve_ui, kwargs={
             'port': 0, 'ready_callback': callback}, daemon=True)
         thread.start()

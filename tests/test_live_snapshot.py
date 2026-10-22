@@ -1,6 +1,7 @@
 import json
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from tests.http_fixtures import HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase

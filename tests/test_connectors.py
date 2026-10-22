@@ -4,7 +4,8 @@ import os
 import threading
 import time
 import urllib.error
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from tests.http_fixtures import HTTPServer
 from io import BytesIO
 from pathlib import Path
 from unittest import TestCase

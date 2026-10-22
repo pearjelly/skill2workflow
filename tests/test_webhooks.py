@@ -5,7 +5,8 @@ import threading
 import urllib.error
 import urllib.request
 from email.message import Message
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from tests.http_fixtures import HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace

@@ -12,7 +12,8 @@ import urllib.error
 import urllib.request
 from contextlib import closing
 from pathlib import Path
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from tests.http_fixtures import HTTPServer
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch

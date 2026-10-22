@@ -4,7 +4,8 @@ import threading
 import urllib.error
 from datetime import datetime, timedelta, timezone
 from contextlib import closing
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler
+from tests.http_fixtures import HTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase

@@ -20,6 +20,13 @@ retention/cancellation/recovery/scheduling drills, and the three-cycle service
 soak. Each check is isolated under an owner-only work directory and is bounded
 to 180 seconds; the complete bundle is bounded to ten minutes.
 
+Owned HTTP test fixtures use the shared test-only short-polling servers from
+`tests/http_fixtures.py`. They still perform real protocol requests and ordinary
+joined shutdown/close; only avoidable idle teardown waits are shortened.
+Production server classes, check membership, assertions and the 180/600-second
+guards are unchanged. Faster fixture teardown adds deadline headroom, but does
+not prove the cause of an earlier timing failure or guarantee future CI timing.
+
 Child artifacts are removed after each check. The final directory contains
 only the owner-readable safety marker and `production-baseline-evidence.json`.
 If the process is interrupted, treat the directory as sensitive until it has

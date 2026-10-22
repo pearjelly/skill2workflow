@@ -84,6 +84,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Reduce repeated idle shutdown waits in owned HTTP test fixtures while
+  preserving real network checks, all assertions and production timeout policies.
+
 - Restrict UI static GET/HEAD to the fixed packaged public assets instead of
   serving its surrounding directory. Refuse directory listings, private
   neighbors, symlink components, special files and oversized assets; require
