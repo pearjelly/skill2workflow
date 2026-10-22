@@ -34,6 +34,11 @@ cannot replace `interrupted` with a stale success or failure snapshot. Owner
 identities and ticket values are not copied into run JSON, audit events, metrics,
 or the control snapshot.
 
+Acquiring a lease alone does not make a standby ready. An internal completion
+barrier keeps readiness false and recurring dispatch inactive until takeover
+recovery and audit reconciliation finish. Lease loss, recovery failure, and
+shutdown clear activation; this introduces no automatic replay or retry.
+
 Foreign active-execution rows are read through the SQLite cursor and converted one
 at a time. Recovery therefore avoids materializing the full execution ledger or
 holding one unbounded lease-held write transaction before fencing runs; the

@@ -9,6 +9,11 @@ publication.
 
 This document defines the compatibility policy for Workflow DSL `0.1.0`.
 
+Service takeover readiness and recurring dispatch now wait for completed
+recovery/reconciliation, rather than lease acquisition alone. This strengthens
+the existing recovery contract without changing DSL, state layout, or replay
+policy.
+
 Explicit Skill `http` declarations emit the existing HTTP binding on newly
 compiled drafts. They default `response_mode` to `metadata`; an explicit `full`
 retains the existing opt-in response projection. Published DSL, unmarked Skill

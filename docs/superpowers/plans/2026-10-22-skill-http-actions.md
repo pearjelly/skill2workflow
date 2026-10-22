@@ -18,7 +18,7 @@ This default affects only new declarations, not existing DSL or inferred nodes.
 Configuration remains data, not inferred prose guidance. Unknown/malformed
 fields fail with the existing fixed annotation error before output replacement.
 
-No runtime execution semantics, DSL fields, implicit approvals, automatic
+No HTTP transport semantics, DSL fields, implicit approvals, automatic
 endpoint inference, retries, credential resolution, or live SaaS pilot are added.
 Compilation and validation perform no HTTP calls. Running an explicitly
 configured workflow can cause the declared provider effects; authors must review
@@ -52,7 +52,8 @@ The parser recognizes explicit `http` declarations using the existing strict
 JSON/placement boundary. A pure factory reuses HTTP metadata/mapping/origin
 validation, copies the binding, and adds the new-declaration metadata retention
 default. The compiler revalidates explicit IR and retains that default without
-mutating IR. Existing runtime modules and UI code are unchanged.
+mutating IR. HTTP connector/executor semantics and UI code are unchanged;
+the takeover activation correction below was required during qualification.
 
 Eleven feature tests cover source compilation, data/guidance separation,
 configuration rejection, forged IR, retention, query/body mapping, and six
@@ -66,9 +67,33 @@ qualification correctly rejected the additional wheel data members; a
 red-green inventory test and two exact release allowlist entries reconciled
 the fixture inventory without weakening the artifact boundary.
 
-Final local full suite: 1,374 tests passed in 119.269 seconds. The stable final
+Initial feature full suite: 1,374 tests passed in 119.269 seconds. The initial
 isolated wheel passed all qualification, including the new journey, with 92
 members in `/tmp/skill2workflow-package-loop269-final-20261022`. Its SHA-256 is
 `4e827ce537338eab7ee0cf79e28464d067b6e83bad8093bfe03d7ae057d64fe9`.
 The five unchanged editor renderer tests, example fixture checks, repository
 and example secret hygiene, and whitespace checks also passed.
+
+## Qualification Correction: Takeover Activation
+
+The initial release preflight at `3eae43e` passed unit tests, wheel qualification,
+and reproducible builds, but its production-baseline aggregate reported a failed
+interrupted-recovery drill. That aggregate discards child output, so the exact
+failure detail from that run is unavailable. The same drill passed separately
+in CI and twice locally; this is not evidence of a diagnosed one-off cause.
+
+Inspection and a new deterministic blocked-recovery test independently proved
+that a standby could report readiness and dispatch after lease acquisition but
+before takeover reconciliation completed. The test failed before the fix.
+An internal completion barrier now gates readiness and dispatch until recovery
+succeeds; lease loss, failure, and shutdown clear it. This is a narrow existing
+recovery-contract correction, not a new retry, replay, or execution authority.
+No assertion is made that the unavailable original failure had only this cause.
+The complete qualification must pass again on the corrected service.
+
+Post-correction local evidence: 1,375 tests passed in 129.082 seconds; the
+blocked-recovery regression and real process-loss drill passed. The corrected
+isolated wheel passed all gates (92 members) in
+`/tmp/skill2workflow-package-loop269-takeover-20261022`, SHA-256
+`a9979589fb2f48ad5f43e69a17141179503b055b1124788cc360ac8f118a21e8`.
+Its installed service module matched the corrected source byte-for-byte.

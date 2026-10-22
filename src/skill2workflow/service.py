@@ -652,6 +652,9 @@ class ServiceScheduleLoop:
         self.telemetry = telemetry
         self._dispatch_stop = threading.Event()
         self._heartbeat_stop = threading.Event()
+        # A newly held lease is not an activation signal: takeover must first
+        # finish fencing interrupted work and reconciling its audit evidence.
+        self._recovery_complete = threading.Event()
         self._dispatch_thread = None
         self._heartbeat_thread = None
         self._last_error = ""
@@ -663,6 +666,8 @@ class ServiceScheduleLoop:
         now = time.time()
         if self.dispatcher.try_acquire(now_epoch=now):
             self._recover_after_acquire(now)
+            if not self._dispatch_stop.is_set():
+                self._recovery_complete.set()
         self._heartbeat_thread = threading.Thread(
             target=self._heartbeat,
             name="skill2workflow-scheduler-heartbeat",
@@ -684,6 +689,7 @@ class ServiceScheduleLoop:
             and self._dispatch_thread.is_alive()
             and not self._last_error
             and self.dispatcher.has_lease(now_epoch=time.time())
+            and self._recovery_complete.is_set()
         )
 
     def stop(self) -> None:
@@ -701,6 +707,7 @@ class ServiceScheduleLoop:
         with self._dispatch_gate_lock:
             self._dispatch_enabled = False
             self._dispatch_stop.set()
+            self._recovery_complete.clear()
 
     def _heartbeat(self) -> None:
         while not self._heartbeat_stop.is_set():
@@ -713,9 +720,12 @@ class ServiceScheduleLoop:
                     self.dispatcher.renew(now_epoch=now)
                     delay = self.dispatcher.lease_seconds / 3
                 else:
+                    self._recovery_complete.clear()
                     acquired = self.dispatcher.try_acquire(now_epoch=now)
                     if acquired:
                         self._recover_after_acquire(now)
+                        if not self._dispatch_stop.is_set():
+                            self._recovery_complete.set()
                     delay = 0.2
             except Exception as error:
                 self._record_failure(error)
@@ -728,7 +738,7 @@ class ServiceScheduleLoop:
                 return
             try:
                 now_epoch = time.time()
-                if self.dispatcher.has_lease(now_epoch=now_epoch):
+                if self.dispatcher.has_lease(now_epoch=now_epoch) and self._recovery_complete.is_set():
                     self._sweep_workflow_deadlines(now_epoch)
                     tracked_dispatch = False
                     if self.telemetry is not None:
@@ -763,6 +773,7 @@ class ServiceScheduleLoop:
             return self._dispatch_enabled
 
     def _record_failure(self, error: Exception) -> None:
+        self._recovery_complete.clear()
         self._last_error = type(error).__name__
         try:
             self.dispatcher.release()

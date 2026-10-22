@@ -69,6 +69,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Keep standby readiness and recurring dispatch inactive until takeover
+  recovery and audit reconciliation complete, rather than enabling on lease
+  acquisition alone.
+
 - Pinned Python 3.9 CI and release preflight to Ubuntu 24.04 so the supported
   floor remains executable after `ubuntu-latest` moved to Ubuntu 26.04.
   Python 3.14 and the deployment gates still use `ubuntu-latest`.

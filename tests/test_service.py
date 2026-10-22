@@ -313,6 +313,46 @@ class ServiceConfigTests(TestCase):
 
 
 class RuntimeServiceTests(TestCase):
+    def test_standby_is_not_ready_or_dispatching_until_takeover_recovery_finishes(self):
+        with TemporaryDirectory() as temporary:
+            state_dir = Path(temporary)
+            owner = RecurringScheduleDispatcher(state_dir, owner_id='prior-owner', lease_seconds=10)
+            self.assertTrue(owner.try_acquire(now_epoch=time.time()))
+            scheduler = ServiceScheduleLoop(state_dir)
+            entered, release, dispatched = threading.Event(), threading.Event(), threading.Event()
+            recover = scheduler._recover_after_acquire
+            def blocked_recovery(now):
+                entered.set()
+                if not release.wait(timeout=5):
+                    raise RuntimeError('test recovery release timed out')
+                recover(now)
+            ready_during = ready_after = False
+            dispatched_during = False
+            with patch.object(scheduler, '_recover_after_acquire', side_effect=blocked_recovery), patch.object(
+                scheduler.dispatcher, 'dispatch_due', side_effect=lambda *args, **kwargs: dispatched.set()
+            ):
+                try:
+                    scheduler.start()
+                    owner.release()
+                    self.assertTrue(entered.wait(timeout=2))
+                    self.assertTrue(scheduler.dispatcher.has_lease(now_epoch=time.time()))
+                    ready_during = scheduler.is_ready()
+                    dispatched_during = dispatched.wait(timeout=0.3)
+                    release.set()
+                    deadline = time.monotonic() + 2
+                    while time.monotonic() < deadline:
+                        if scheduler.is_ready():
+                            ready_after = True
+                            break
+                        time.sleep(0.01)
+                finally:
+                    release.set()
+                    scheduler.stop()
+                    owner.release()
+            self.assertFalse(ready_during)
+            self.assertFalse(dispatched_during)
+            self.assertTrue(ready_after)
+
     def test_service_http_origin_policy_is_shared_by_http_and_scheduler_execution(self):
         with TemporaryDirectory() as tmp:
             service = RuntimeService(
@@ -511,6 +551,7 @@ class RuntimeServiceTests(TestCase):
             release = threading.Event()
 
             scheduler.dispatcher.has_lease = lambda now_epoch: True
+            scheduler._recovery_complete.set()
 
             def blocking_dispatch(*_args, **_kwargs):
                 entered.set()
@@ -535,6 +576,7 @@ class RuntimeServiceTests(TestCase):
             dispatched = threading.Event()
             calls = []
             scheduler.dispatcher.has_lease = lambda now_epoch: True
+            scheduler._recovery_complete.set()
 
             def dispatch(*args, **kwargs):
                 calls.append((args, kwargs))

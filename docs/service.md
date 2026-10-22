@@ -286,7 +286,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli service \
 | Request | Behavior |
 | --- | --- |
 | `GET /healthz` | Confirms that the process HTTP boundary is alive. |
-| `GET /readyz` | Returns `200` only while the service accepts work, its providers and SQLite control state are usable, and this process owns the scheduler lease. |
+| `GET /readyz` | Returns `200` only while the service accepts work, its providers and SQLite control state are usable, and this process owns the scheduler lease with takeover recovery/reconciliation completed. |
 | `GET /metrics` | Requires Bearer authentication and exports aggregate Prometheus text metrics, including while the process is not ready. |
 | `GET /api/v1/control-snapshot` | Requires Bearer authentication and returns a read-only, 100-item-per-collection, 1 MiB Operator snapshot without appending persisted audit state. |
 | `GET /api/v1/workflow-artifacts` | Requires Bearer authentication and returns the fixed value-free workflow artifact consistency report with at most 64 remote issue records and a 64 KiB response cap. It does not repair registry or filesystem state. |
