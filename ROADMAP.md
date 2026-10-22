@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-281
+- Completed delivery loops: 1-282
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 281 is complete with recoverable Skill compile errors
+- Active loop: None; Loop 282 is complete with explicit Skill workflow versions
 - Next maturity gate: Production Baseline
 - Next decision: review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery loop
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-281 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-282 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 281 is complete and there is no active delivery loop; review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 281 plan makes safe compile refusals recoverable without changing accepted Skill forms, runtime authority or published artifacts. Installed-build variability and sustained real service/recovery evidence remain part of qualification; maturity is unchanged.
+This rolling queue is ordered. Loop 282 is complete and there is no active delivery loop; review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 282 plan lets an edited Skill declare its next reviewed Workflow version across authoring paths without changing immutable published artifacts, pinned runs or runtime authority. Installed-build variability and sustained real service/recovery evidence remain part of qualification; maturity is unchanged.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7644,6 +7644,35 @@ production-baseline release preflight passed on the first attempt. Exact
 evidence is recorded in
 `docs/superpowers/plans/2026-10-22-skill-compile-recovery.md`.
 
+### Loop 282: Versioned Skill Iteration
+
+**Status:** Complete.
+
+**Prior basis:** An edited Skill still compiled as `0.1.0`, so its next
+publication conflicted with the existing immutable version unless an author
+manually edited generated Workflow DSL. Ordinary metadata is not deployment
+intent and must not silently select the runtime version.
+
+**Outcome:** One explicit standalone `workflow_version` declaration chooses the
+existing `workflow.version` across compile, editor helper, private export,
+backed-up repair/preview and custom quickstart. Authors can compare two verified
+Bundles and separately publish the next version without editing generated JSON.
+
+**Safety boundary:** No declaration preserves `0.1.0`. The bounded ASCII token
+and original lines are validated without coercion or source-value error echo;
+fenced examples never declare a deployment. No auto-increment, overwrite,
+metadata inference, alias promotion, package/DSL version change, migration,
+execution policy change or new runtime dependency. Existing runs stay pinned.
+
+**Evidence:** At `b22d412`, 1,482 Python and 49 editor tests, unchanged examples,
+a 96-member isolated wheel and ten mandatory installed-path checks passed.
+The synthetic journey verifies two versions, repair/preview, Bundle diff,
+immutable-conflict preservation of registry and bytes, version-pinned approval/
+rejection, custom quickstart, actual loopback compile and invalid-source refusal.
+All seven feature CI jobs and the full production-baseline release preflight
+passed on the first attempt. Exact evidence is recorded in
+`docs/superpowers/plans/2026-10-23-versioned-skill-iteration.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7889,6 +7918,7 @@ evidence is recorded in
 | Loop 279: Actionable Draft Input Explanations | Complete | Explain blocked input with a safe next edit | Declared-evidence reason/type/bound hints, payload-relative pointers, private unknown keys, generic fallbacks, real installed module qualification and independent finish review |
 | Loop 280: Skill Frontmatter Identity And Text | Complete | Preserve intended identity and descriptions from ordinary Skill metadata | Scoped root/map parsing, literal/folded/quoted text, fixed refusals, linear key/comment scans, unchanged source lines and real installed compilation/approval evidence |
 | Loop 281: Recoverable Skill Compile Errors | Complete | Turn a refused Skill into a safe next edit | Opt-in finite reason/line evidence, fixed inline/CLI recovery, retained active draft, stale-result fencing and real installed/module qualification |
+| Loop 282: Versioned Skill Iteration | Complete | Release a reviewed Skill revision without editing generated JSON | Explicit source version across authoring paths, unchanged defaults, two-version Bundle/publication review and installed pinned-run/conflict evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -68,3 +68,34 @@ invalid-source refusal. Source imports were disabled outside the checkout;
 synthetic manual steps required no provider request or credential resolution.
 Repository secret hygiene passed without findings. Exact feature CI, complete
 release preflight and roadmap closure remain required before delivery.
+
+The local documentation-closure suite passed all 1,482 tests in 108.105
+seconds after advancing completed-loop assertions and adding the Loop 282
+roadmap entry. Runtime and UI assets are unchanged by that follow-up.
+
+## Remote Feature Qualification And Closure
+
+Feature commit `b22d4127ec829f6001cf788607f8bd49572385e7` passed all seven
+completed jobs in [CI run 39813909924](https://github.com/pearjelly/skill2workflow/actions/runs/39813909924),
+attempt 1. Python 3.9 ran all 1,482 tests in 114.001 seconds; Python 3.14 ran
+them in 116.110 seconds. The source user-journey job reported all ten versioned
+iteration checks true. The package gates additionally require the separate
+selected-installed-CLI path with source imports disabled; no source-only
+substitution or conditional skip qualifies it.
+
+[Release-preflight run 39813947068](https://github.com/pearjelly/skill2workflow/actions/runs/39813947068)
+completed with `success` on the same exact feature commit, attempt 1, using
+Python 3.9.25. Complete logs confirm unit tests, Python compilation, installed
+wheel, reproducible wheel and the full `production_baseline` command passed.
+Only the documented dry-run git/tag availability checks were skipped. The
+platform delayed its run/job metadata after all steps completed; the original
+run was followed without cancellation, rerun or duplicate dispatch. At record
+time the overall run was terminal-success and full logs were available while
+the detailed job summary still lagged; no success was inferred from a pending
+step summary alone.
+
+The documentation-only closure advances existing completed-loop assertions and
+adds the Loop 282 outcome. Local closure tests and hygiene passed. Its exact
+pushed commit must pass all seven final CI jobs before handoff. Self-hosted
+Beta, package/release versions, existing published artifacts and the broad
+iterative goal remain unchanged; no PR, release or tag is created.
