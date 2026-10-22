@@ -92,5 +92,20 @@ only fixed public evidence and its safety marker remain in the baseline root.
 
 ## Remote Qualification
 
-Pending exact feature-commit CI and complete production-baseline release
-preflight. Keep Self-hosted Beta and the overall project goal unchanged.
+Qualified implementation: `e3be3c8ffb937fa4fd615d24dac8ab6173cb5355`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39786584218)
+passed all seven jobs, including Python 3.9/3.14, installed wheel qualification,
+real user journeys, editor regressions, Docker, systemd and recovery/state safety.
+The Python 3.14 unit job explicitly records all 1,445 tests passing in 85.473
+seconds, independently qualifying the final feature source rather than relying
+on the earlier pre-guard local run.
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39786621966)
+passed on its first attempt in 4m49s with Python 3.9.25. The terminal job log
+explicitly records `PASSED command:production_baseline` under the final supervisor.
+This is qualification of the fixed execution/cleanup path, not an assertion of
+an absolute wall-clock bound over OS or filesystem stalls.
+
+Roadmap closure passed 120 focused feature/documentation tests in 0.870 seconds,
+plus repository secret hygiene and whitespace checks. No tag, package release,
+live-provider operation or maturity promotion was performed. The broad project
+goal remains active.
