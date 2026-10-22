@@ -23,7 +23,7 @@ the wheel, so the editor works without CDN access or general internet egress.
 Their upstream version, MIT notice, and SHA-256 digests are recorded beside the
 assets at `web/vendor/litegraph-0.7.18/`; no browser dependency is fetched at
 runtime.
-The editor's **Compile SKILL** action is the one local authoring exception: it
+The editor's **Compile SKILL** action is a local authoring helper: it
 accepts one bounded 2 MiB `SKILL.md` in memory and returns a draft Workflow DSL
 document without writing, publishing, executing, or contacting the service.
 Its generated source reference is the fixed `SKILL.md`, not a browser file
@@ -50,6 +50,17 @@ execution access. **Save DSL** performs that check before download. A generic
 static server has only the editor's
 local structural checks, so it reports that full compiler validation is
 unavailable; use `skill2workflow ui` or the CLI before publishing.
+
+**Workflow input** reviews a draft's read-only declared contract and offers
+**Check input** for ephemeral non-secret JSON. The fixed local
+`/api/v1/draft-input-preflights` route reuses the existing schema/mapping preflight
+without live configuration, credentials, file output, publication or execution.
+Missing schema fields and required mapping sources produce a blocked report;
+the check never calls the workflow's endpoints. Input and draft edits invalidate
+the result, document replacement clears the input, and exports exclude it.
+Static hosting honestly reports the missing helper. See
+[draft input review](authoring.md#check-draft-input-in-the-editor) for byte bounds,
+finite/duplicate-key handling and readiness limitations.
 
 For an explicit live view of one running service, configure both the
 service origin and its owner-only ingress token file:

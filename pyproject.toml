@@ -55,6 +55,7 @@ where = ["src"]
   "web/control.html",
   "web/control.js",
   "web/index.html",
+  "web/input-review.js",
   "web/styles.css",
 ]
 "share/skill2workflow/web/vendor/litegraph-0.7.18" = [

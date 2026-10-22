@@ -16,6 +16,8 @@ from .compiler import compile_ir_to_workflow, summarize_skill_compile, validate_
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
 from .parser import MAX_SKILL_FILE_BYTES, parse_skill_text
+from .preflight import MAX_WORKFLOW_PREFLIGHT_BYTES, build_workflow_preflight
+from .triggers import MAX_TRIGGER_INPUT_BYTES, normalize_trigger_input
 from .service import read_service_bearer_token
 from .service_client import (
     MAX_SERVICE_ACTION_RESPONSE_BYTES,
@@ -143,6 +145,21 @@ _LOCAL_WORKFLOW_VALIDATION_MAX_REQUEST_BYTES = MAX_WORKFLOW_ARTIFACT_BYTES + 102
 _LOCAL_WORKFLOW_VALIDATION_MAX_RESPONSE_BYTES = 32 * 1024
 _LOCAL_WORKFLOW_VALIDATION_MAX_ERRORS = 100
 _LOCAL_WORKFLOW_VALIDATION_CODE_PATTERN = re.compile(r"^[a-z0-9_]{1,64}$")
+_DRAFT_INPUT_PREFLIGHT_PATH = "/api/v1/draft-input-preflights"
+_DRAFT_INPUT_PREFLIGHT_MAX_REQUEST_BYTES = MAX_WORKFLOW_ARTIFACT_BYTES + MAX_TRIGGER_INPUT_BYTES + 1024
+
+
+def _draft_preflight_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON key")
+        result[key] = value
+    return result
+
+
+def _draft_preflight_constant(_value):
+    raise ValueError("nonfinite JSON")
 
 
 def _local_workflow_validation_error(error: object) -> dict:
@@ -363,6 +380,12 @@ def serve_ui(
 
         def do_POST(self):
             parsed = urlsplit(self.path)
+            if parsed.path == _DRAFT_INPUT_PREFLIGHT_PATH:
+                if parsed.query:
+                    self._write_json(404, {"error": "draft input preflight path is not available"})
+                    return
+                self._serve_draft_input_preflight()
+                return
             if parsed.path == _SKILL_COMPILE_PATH:
                 if parsed.query:
                     self._write_json(404, {"error": "skill compile path is not available"})
@@ -1071,6 +1094,46 @@ def serve_ui(
                 self._write_json(400, {"error": "skill compile rejected"})
                 return
             self._write_json(200, response_body, content_type="application/json")
+
+        def _serve_draft_input_preflight(self):
+            rejected = {"error": "draft input preflight rejected"}
+            lengths = self.headers.get_all("Content-Length", [])
+            if self.headers.get("Transfer-Encoding") or len(lengths) != 1:
+                self._write_json(400, rejected)
+                return
+            try:
+                length = int(lengths[0])
+            except (TypeError, ValueError):
+                length = -1
+            if length < 0:
+                self._write_json(400, rejected)
+                return
+            if length > _DRAFT_INPUT_PREFLIGHT_MAX_REQUEST_BYTES:
+                self._write_json(413, {"error": "draft input preflight body is too large"})
+                return
+            raw = self.rfile.read(length)
+            try:
+                if len(raw) != length:
+                    raise ValueError("incomplete JSON")
+                payload = json.loads(raw.decode("utf-8"), object_pairs_hook=_draft_preflight_object,
+                                     parse_constant=_draft_preflight_constant)
+                if (not isinstance(payload, dict) or 'workflow' not in payload
+                        or set(payload) - {'workflow', 'input'}):
+                    raise ValueError("invalid envelope")
+                workflow = payload['workflow']
+                encoded = json.dumps(workflow, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')
+                if len(encoded) > MAX_WORKFLOW_ARTIFACT_BYTES:
+                    raise ValueError("workflow too large")
+                supplied = normalize_trigger_input(payload.get('input', {}))
+                json.dumps(supplied, ensure_ascii=False, allow_nan=False)
+                report = build_workflow_preflight(workflow, supplied, input_present='input' in payload)
+                response = json.dumps(report, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')
+                if len(response) > MAX_WORKFLOW_PREFLIGHT_BYTES:
+                    raise ValueError("report too large")
+            except (ValueError, TypeError, UnicodeError, OverflowError, RecursionError):
+                self._write_json(400, rejected)
+                return
+            self._write_json(200, response, content_type="application/json")
 
         def _serve_local_workflow_validation(self):
             if self.headers.get("Transfer-Encoding"):

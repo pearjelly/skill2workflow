@@ -44,6 +44,7 @@
     "risk-review.workflow.json": "../examples/workflows/risk-review.workflow.json",
     "operations-analysis.workflow.json": "../examples/workflows/operations-analysis.workflow.json",
     "http-connector.workflow.json": "../examples/workflows/http-connector.workflow.json",
+    "http-action-flow.workflow.json": "../examples/workflows/http-action-flow.workflow.json",
   };
 
   let graph;
@@ -55,6 +56,7 @@
   let validationErrors = [];
   let stagedSkillMarkdown = null;
   let skillCompileLoading = false;
+  let inputReview = null;
 
   const els = {};
 
@@ -92,6 +94,16 @@
     };
 
     bindEvents();
+    inputReview = window.skill2workflowInputReview.create({
+      elements: {
+        panel: document.getElementById("workflow-input-panel"), summary: document.getElementById("input-contract-summary"),
+        fields: document.getElementById("input-contract-fields"), schema: document.getElementById("input-schema-json"),
+        schemaDetails: document.getElementById("input-schema-details"), input: document.getElementById("draft-input-json"),
+        check: document.getElementById("check-draft-input"), clear: document.getElementById("clear-draft-input"),
+        status: document.getElementById("input-preflight-status"), issues: document.getElementById("input-preflight-issues"),
+      }, getWorkflow: workflowFromEditor,
+    });
+    document.getElementById("node-form").addEventListener("input", function () { inputReview.invalidate(); });
     resizeCanvas();
     graph.start();
     loadSample();
@@ -189,6 +201,7 @@
       WorkflowNode.desc = "skill2workflow " + nodeType;
       WorkflowNode.prototype.onDrawForeground = drawNodeOverlay;
       WorkflowNode.prototype.onConnectionsChange = function () {
+        if (inputReview) inputReview.invalidate();
         window.requestAnimationFrame(validateGraph);
       };
       WorkflowNode.prototype.onConnectOutput = function (slot, type, input, targetNode) {
@@ -338,6 +351,7 @@
       graph.configure(graphJson);
       currentWorkflow = graphJson.workflow || {};
       currentWorkflowDsl = normalized.workflowDsl ? deepClone(normalized.workflowDsl) : null;
+      if (inputReview) inputReview.reset(currentWorkflowDsl);
       applyNodeTheme(new Set());
       renderInspector(null);
       validateGraph();

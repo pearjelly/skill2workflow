@@ -108,8 +108,9 @@ skill2workflow ui --port 4173
 ```
 
 Open `http://127.0.0.1:4173/web/` or
-`http://127.0.0.1:4173/web/control.html`. The UI server is loopback-only and
-static; it does not read runtime state or credentials. Its pinned LiteGraph
+`http://127.0.0.1:4173/web/control.html`. The UI server is loopback-only. Without
+explicit live configuration, its local authoring helpers do not read runtime
+state or credentials. Its pinned LiteGraph
 assets are bundled locally, so the editor does not require CDN access at
 runtime. See the [installed UI guide](docs/installed-ui.md). With an explicit service origin and protected
 token file, the same console can inspect bounded live state, download a
@@ -133,6 +134,13 @@ Selecting a published live workflow version also enables a fixed,
 confirmation-protected promotion to the `production` alias using a
 compare-and-swap precondition; the UI never accepts an arbitrary alias or
 workflow payload.
+
+Draft authors can open **Workflow input** to review the read-only input
+contract and check non-secret JSON against the current draft's schema and
+required mappings. The result is local and value-free; it never runs or
+publishes the workflow. Test input is cleared on document replacement and is
+excluded from DSL/graph exports. See
+[draft input review](docs/authoring.md#check-draft-input-in-the-editor).
 
 ## Visual Overview
 

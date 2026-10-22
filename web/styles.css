@@ -194,7 +194,7 @@ textarea {
 
 .inspector {
   display: grid;
-  grid-template-rows: auto auto minmax(120px, 1fr);
+  grid-template-rows: auto auto auto minmax(120px, 1fr);
   gap: 14px;
   min-width: 0;
   padding: 16px;
@@ -405,6 +405,31 @@ textarea {
 .skill-review-panel[hidden] {
   display: none;
 }
+
+.workflow-input-panel { min-width: 0; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+.workflow-input-panel summary { cursor: pointer; color: var(--text); font-weight: 700; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.workflow-input-panel summary span { display: block; color: var(--muted); font-size: 12px; font-weight: 400; margin: 3px 0 0 16px; }
+.workflow-input-content { display: grid; gap: 10px; padding-top: 14px; min-width: 0; }
+.workflow-input-content label { color: var(--muted); font-size: 12px; font-weight: 700; }
+.workflow-input-content textarea { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 6px; background: #fbfcfe; color: var(--text); font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; resize: vertical; caret-color: var(--accent); }
+.workflow-input-content textarea[readonly] { color: #566273; background: #f4f6f9; margin-top: 6px; }
+.workflow-input-content textarea::placeholder { color: var(--muted); opacity: 1; }
+.workflow-input-content textarea:focus-visible, .workflow-input-panel summary:focus-visible, .input-review-actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.workflow-input-content p, .input-contract-fields, .input-preflight-issues { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.input-contract-fields, .input-preflight-issues { list-style: none; padding: 0; display: grid; gap: 6px; }
+.input-contract-fields li { color: var(--text); }
+.input-review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.input-review-actions button { min-height: 34px; padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--text); background: var(--panel); cursor: pointer; }
+.input-review-actions button:first-child { background: var(--accent); border-color: var(--accent); color: #fff; }
+.input-review-actions button:hover:not(:disabled) { border-color: var(--accent-strong); color: var(--accent-strong); }
+.input-review-actions button:first-child:hover:not(:disabled) { color: #fff; background: var(--accent-strong); }
+.input-review-actions button:active:not(:disabled) { transform: translateY(1px); }
+.input-review-actions button:disabled { opacity: .55; cursor: not-allowed; }
+#input-preflight-status { padding: 10px; background: #f4f6f9; color: var(--text); border-radius: 6px; }
+#input-preflight-status[data-state="ready"] { color: var(--success); background: #e9f7ef; }
+#input-preflight-status[data-state="blocked"], #input-preflight-status[data-state="error"] { color: var(--danger); background: #fdeceb; }
+.input-preflight-issues li { color: var(--danger); }
+.workflow-input-content ::selection { background: #d6eaff; color: var(--text); }
 
 @media (max-width: 900px) {
   .app-shell {

@@ -40,6 +40,18 @@ node --test tests/test_*.cjs
 
 The release artifact CI job runs these checks alongside wheel qualification.
 
+For the local draft-input helper and packaged editor module, the focused drill
+compiles a synthetic Skill and checks omitted, invalid, corrected and missing-
+mapping input without a live provider:
+
+```bash
+PYTHONPATH=src python3 scripts/draft_input_ui_smoke.py
+```
+
+Package qualification also runs it through the isolated installed CLI with
+source imports disabled. Keep new browser modules in both the wheel data list
+and the release artifact's strict public-member allowlist.
+
 CI repeats the full release-relevant checks on Python 3.9 and 3.14, covering
 the supported floor and the primary runtime baseline. The Python 3.9 matrix
 entry and release preflight use Ubuntu 24.04 because `setup-python` does not

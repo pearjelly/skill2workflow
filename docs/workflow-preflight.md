@@ -35,6 +35,19 @@ does not start a run. Real quickstart initialization also requires ready input
 and mappings; general trigger admission is unchanged. See
 [quickstart preview](quickstart.md#preview-before-creating-a-workspace).
 
+## Editor draft check
+
+The installed editor's **Workflow input → Check input** checks the in-memory
+draft through `POST /api/v1/draft-input-preflights`, independent of any live
+service. The body is exactly `{"workflow": <DSL>}` with optional object `input`.
+It returns this same value-free report with `Cache-Control: no-store`; valid
+requests return HTTP 200 even when `ready` is false. Malformed/invalid envelopes,
+duplicate keys, nonfinite input or invalid DSL receive the fixed 400 refusal;
+over-limit request bodies receive 413, and query parameters are refused with
+404. The response contains no request values, credential values or input values.
+See [draft input review](authoring.md#check-draft-input-in-the-editor) for bounds,
+ephemeral input behavior and the distinction between readiness and execution.
+
 ## Published service check
 
 The authenticated client calls:

@@ -25,6 +25,7 @@
             <option value="risk-review.workflow.json">Risk Review</option>
             <option value="operations-analysis.workflow.json">Operations Analysis</option>
             <option value="http-connector.workflow.json">HTTP Connector</option>
+            <option value="http-action-flow.workflow.json">HTTP Action + Typed Input</option>
           </select>
           <button id="load-sample" type="button">Load Example</button>
           <label class="file-action">
@@ -49,6 +50,26 @@
           <canvas id="graph-canvas"></canvas>
         </div>
         <aside class="inspector" aria-label="Node parameters">
+          <details id="workflow-input-panel" class="workflow-input-panel">
+            <summary>Workflow input <span id="input-contract-summary">No draft loaded</span></summary>
+            <div class="workflow-input-content">
+              <ul id="input-contract-fields" class="input-contract-fields" aria-label="Declared input fields"></ul>
+              <details id="input-schema-details" hidden>
+                <summary>Full input schema</summary>
+                <label for="input-schema-json">Read-only source contract</label>
+                <textarea id="input-schema-json" rows="6" readonly></textarea>
+              </details>
+              <label for="draft-input-json">Test input JSON</label>
+              <textarea id="draft-input-json" rows="5" placeholder="{}" spellcheck="false" aria-describedby="input-check-boundary"></textarea>
+              <p id="input-check-boundary">Non-secret data only. Kept in this tab, not in exports; cleared when another workflow loads. A check does not run or publish the workflow, resolve credentials, or prove provider availability.</p>
+              <div class="input-review-actions">
+                <button id="check-draft-input" type="button">Check input</button>
+                <button id="clear-draft-input" type="button">Clear input</button>
+              </div>
+              <p id="input-preflight-status" role="status" aria-live="polite" data-state="unchecked">Not checked.</p>
+              <ul id="input-preflight-issues" class="input-preflight-issues" aria-label="Input check issues"></ul>
+            </div>
+          </details>
           <div class="inspector-header">
             <p>Node</p>
             <strong id="node-heading">No selection</strong>
@@ -169,6 +190,7 @@
     </main>
 
     <script src="./vendor/litegraph-0.7.18/litegraph.min.js"></script>
+    <script src="./input-review.js"></script>
     <script src="./app.js"></script>
   </body>
 </html>

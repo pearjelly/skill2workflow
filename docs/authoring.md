@@ -66,6 +66,47 @@ Without `-o`, `compile --review` intentionally prints an explicit
 `{"workflow": ..., "review": ...}` wrapper. Plain `compile` without
 `--review` keeps its existing DSL-only output for compatibility.
 
+## Check Draft Input In The Editor
+
+The inspector's **Workflow input** disclosure reviews the whole draft, not the
+selected node. A declared contract opens it automatically. It lists field names,
+types and required/optional status; **Full input schema** exposes the complete
+read-only source contract, including nested constraints. Change the Skill or
+source DSL to edit the schema. Without a declaration, the panel explains that
+required connector mappings can still need input. A graph without embedded
+source DSL cannot be checked.
+
+Use **HTTP Action + Typed Input** in the example selector, or compile your own
+Skill. Enter non-secret JSON in **Test input JSON** and choose **Check input**.
+Blank input checks `{}` as omitted; supplied input must be a finite object.
+The installed `skill2workflow ui` helper runs the existing
+[input/mapping preflight](workflow-preflight.md) against the current draft,
+including allowlisted node edits. No live service configuration is required.
+
+Blocked results identify the invalid field path or required mapping source and
+its node. Correct the JSON and check again. Ready means the input contract and
+required mapping sources passed, not that credentials, query conversion,
+provider availability or future execution are proven. A check never publishes,
+starts or resumes a run, resolves credentials, or sends the workflow's HTTP
+request. Static hosting reports that the installed UI helper is needed rather
+than claiming validation passed.
+
+Input is ephemeral test data: the editor does not put it in browser local
+storage, Save DSL, Save Graph, or server-side files. **Clear input** removes it;
+loading or compiling another workflow clears it and the old result. Input and
+node edits invalidate readiness, and stale asynchronous responses cannot mark a
+changed draft ready. This is not encrypted or secret storage. The check sends
+the original JSON number text to the local helper, avoiding browser rounding
+before Python validation; it does not echo input values in its result.
+
+The text box accepts at most 1 MiB of UTF-8 input; canonical input also uses the
+shared 1 MiB limit. Draft DSL is bounded to 2 MiB, the combined request to
+3 MiB + 1 KiB, and the streamed report to 64 KiB. Existing preflight bounds
+remain 1,000 nodes, 128 top-level input properties, 2,000 mappings per node and
+64 issues. Duplicate keys, nonfinite values and malformed UTF-8/JSON are refused.
+Reports may contain workflow/node identities and field paths; review names
+before sharing them. No new Workflow DSL or report schema is introduced.
+
 ## Export A Reviewable Local Authoring Set
 
 When an author needs durable review artifacts instead of an in-memory editor

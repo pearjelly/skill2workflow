@@ -33,6 +33,9 @@ class PackagingMetadataTests(TestCase):
         self.assertIn('"web/vendor/litegraph-0.7.18/litegraph.min.js"', text)
         self.assertIn('"web/vendor/litegraph-0.7.18/litegraph.css"', text)
         self.assertIn('"web/control.js"', text)
+        self.assertIn('"web/input-review.js"', text)
+        manifest = pyproject.parent / 'scripts/release_manifest.py'
+        self.assertIn('data/share/skill2workflow/web/input-review.js', manifest.read_text(encoding='utf-8'))
         for version in ("3.9", "3.10", "3.11", "3.12", "3.13", "3.14"):
             self.assertIn(
                 f'"Programming Language :: Python :: {version}"', text

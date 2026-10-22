@@ -9,6 +9,13 @@ publication.
 
 This document defines the compatibility policy for Workflow DSL `0.1.0`.
 
+The editor's workflow-input review is read-only and its fixed local draft
+preflight returns the existing `skill2workflow-workflow-preflight-0.1.0` report.
+Ephemeral test input is not embedded into Workflow DSL, LiteGraph, downloads or
+runtime state. No schema dialect, execution authority, service trigger semantics
+or write-back permission is added. Static hosting retains honest helper-
+unavailable feedback. See [draft input review](authoring.md#check-draft-input-in-the-editor).
+
 Quickstart accepts optional `--input` and validates finite, bounded business
 data against the compiled contract before initialization. Missing required
 input and non-manual connectors before its first human gate now fail before

@@ -352,6 +352,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     _qualify_installed_http_assertions(repo_root, console_script, isolated_dir)
     _qualify_installed_skill_http_actions(repo_root, console_script, isolated_dir)
     _qualify_installed_quickstart_inputs(python_bin, console_script, isolated_dir)
+    _qualify_installed_draft_input_ui(repo_root, console_script, isolated_dir)
     validate_output = _run(
         [
             str(console_script),
@@ -1026,6 +1027,16 @@ def _qualify_installed_quickstart_inputs(python_bin: Path, console_script: Path,
                 'quickstart_preview_no_workspace', 'required_mapping_no_workspace')}
     if result != expected:
         raise RuntimeError('installed input-aware quickstart qualification failed')
+    return True
+
+
+def _qualify_installed_draft_input_ui(repo_root: Path, console_script: Path, isolated_dir: Path) -> bool:
+    result = json.loads(_run(
+        [sys.executable, str(repo_root / 'scripts' / 'draft_input_ui_smoke.py'), '--executable', str(console_script)],
+        cwd=isolated_dir,
+    ))
+    if result != {'ok': True, 'installed': True, 'cases_verified': 5, 'module_served': True}:
+        raise RuntimeError('installed draft input UI qualification failed')
     return True
 
 

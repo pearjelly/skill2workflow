@@ -21,6 +21,11 @@ combines typed inputs, explicit approval, POST input mapping and a GET result
 check. Its [compiled DSL](../examples/workflows/http-action-flow.workflow.json)
 contains the contract at top-level `input_schema`.
 
+In the installed editor, **Workflow input** shows the read-only contract and
+**Check input** validates non-secret test JSON against the current draft and
+required mappings without running it. See
+[draft input review](authoring.md#check-draft-input-in-the-editor).
+
 ## Declaration Boundary
 
 The declaration is case-sensitive, single-line and standalone, with zero to
