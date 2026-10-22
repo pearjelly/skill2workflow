@@ -27,7 +27,10 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
 CI repeats the full release-relevant checks on Python 3.9 and 3.14, covering
-the supported floor and the current stable interpreter. Each matrix entry also
+the supported floor and the primary runtime baseline. The Python 3.9 matrix
+entry and release preflight use Ubuntu 24.04 because `setup-python` does not
+provide Python 3.9 for Ubuntu 26.04; Python 3.14 continues on `ubuntu-latest`.
+Each matrix entry also
 runs the security-boundary, observability, and service restart-continuity
 smokes, while a dedicated Python 3.14 job runs the backup, migration,
 retention, cancellation, crash-recovery, scheduling, and Doctor gates. A green

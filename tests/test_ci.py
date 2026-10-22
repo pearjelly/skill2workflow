@@ -3,7 +3,7 @@ from unittest import TestCase
 
 
 class ContinuousIntegrationContractTests(TestCase):
-    def test_ci_covers_supported_floor_and_current_stable_python(self):
+    def test_ci_covers_supported_floor_and_primary_runtime_python(self):
         workflow = (
             Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ci.yml"
         ).read_text(encoding="utf-8")
@@ -28,6 +28,17 @@ class ContinuousIntegrationContractTests(TestCase):
             "python scripts/secret_hygiene.py --repository-root .", workflow
         )
 
+    def test_python_floor_uses_an_explicit_supported_runner(self):
+        root = Path(__file__).resolve().parents[1]
+        workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        matrix_job = workflow.split("  test:\n", 1)[1].split("  systemd-verify:\n", 1)[0]
+        self.assertIn("runs-on: ${{ matrix.os }}", matrix_job)
+        self.assertIn('- python-version: "3.9"\n            os: ubuntu-24.04', matrix_job)
+        self.assertIn('- python-version: "3.14"\n            os: ubuntu-latest', matrix_job)
+        release = (root / ".github/workflows/release-preflight.yml").read_text(encoding="utf-8")
+        self.assertIn('python-version: "3.9"', release)
+        self.assertIn("runs-on: ubuntu-24.04", release)
+
     def test_contributor_guide_explains_the_compatibility_matrix(self):
         guide = (
             Path(__file__).resolve().parents[1] / "CONTRIBUTING.md"
@@ -35,6 +46,7 @@ class ContinuousIntegrationContractTests(TestCase):
 
         self.assertIn("Python 3.9 and 3.14", guide)
         self.assertIn("supported floor", guide)
+        self.assertIn("Ubuntu 24.04", guide)
         self.assertIn("--systemd-analyze-verify", guide)
 
     def test_ci_verifies_generated_systemd_units_on_linux(self):
