@@ -94,4 +94,15 @@ browser's full-page capture limitation was explicitly disclosed in review.
 
 ## Remote Qualification
 
-Pending exact feature-commit CI and production-baseline release preflight.
+Qualified implementation: `cf7532c78a3514712c07fc98b3673f7d0c8c4d4c`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39773958905)
+passed all seven jobs, including Python 3.9/3.14, installed endpoint qualification,
+editor regressions, user journeys, Docker, systemd and recovery/state-safety.
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39773989097)
+passed the complete production-baseline dry-run on Python 3.9.25. The terminal
+job log explicitly records `PASSED command:production_baseline`.
+
+Roadmap closure passed 95 focused feature/documentation tests and all 30 editor
+regressions. Repository secret hygiene and whitespace checks passed. No new tag,
+package release, live-provider pilot or maturity promotion was performed. The
+broad project goal remains active.
