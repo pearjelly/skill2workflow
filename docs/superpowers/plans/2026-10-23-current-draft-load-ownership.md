@@ -77,5 +77,25 @@ release, tag, PR, version or maturity change. Keep the broad goal active.
   viewport/font metrics; 640px evidence is reflow only, not a zoom pass. This is
   a documented nonblocking limitation for this unchanged-CSS scope.
 
-Remote feature CI, complete release preflight and roadmap closure remain
-required before marking Loop 283 complete. No release or maturity promotion.
+## Remote Feature Qualification And Closure
+
+Feature commit `4054ed8bad0f45b76f512cc5b44e45ab1f2fe4d9` passed all seven
+completed jobs in [CI run 39822726486](https://github.com/pearjelly/skill2workflow/actions/runs/39822726486),
+attempt 1. Python 3.9 passed all 1,483 tests in 132.393 seconds; Python 3.14
+passed them in 130.757 seconds. The artifact job separately passed both module
+suites against the editor/vendor actually served by its isolated installed
+wheel. It does not substitute source modules for installed qualification.
+
+[Release-preflight run 39822748680](https://github.com/pearjelly/skill2workflow/actions/runs/39822748680)
+completed with `success` on that exact feature commit, attempt 1, using Python
+3.9.25. All job/step summaries are terminal-success. Full logs confirm unit
+tests, Python compilation, installed wheel, reproducible wheel and the complete
+`production_baseline` command passed; only the documented dry-run git/tag
+availability checks were skipped. No cancellation, rerun or duplicate dispatch.
+
+Documentation-only closure advances the existing completed-loop assertions and
+adds the Loop 283 outcome; its new roadmap assertions first failed before the
+entry existed. All 1,483 local closure tests passed in 109.436 seconds and
+whole-repository secret hygiene passed. All seven exact pushed-commit CI jobs
+remain required before handoff. No UI/runtime changes, PR, release, tag, version
+or maturity promotion. The broad iterative goal remains active.

@@ -29,14 +29,14 @@ class ServiceBootstrapDocumentationTests(TestCase):
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-        self.assertIn("- Completed delivery loops: 1-282", roadmap)
+        self.assertIn("- Completed delivery loops: 1-283", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 282 is complete with explicit Skill workflow versions",
+            "- Active loop: None; Loop 283 is complete with current draft load ownership",
             roadmap,
         )
         self.assertIn("| Loop 51: Secure Service Bootstrap | Complete |", roadmap)
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-282 are complete", readme)
+        self.assertIn("Delivery Loops 1-283 are complete", readme)
         self.assertIn("secure service bootstrap", readme)
         self.assertIn("scripts/service_bootstrap_smoke.py", harness)
         self.assertIn("Secure service bootstrap", agents)
