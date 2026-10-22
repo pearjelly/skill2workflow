@@ -41,3 +41,18 @@ PYTHONPATH=src python3 -m unittest tests.test_explicit_approval tests.test_proce
 PYTHONPATH=src python3 -m unittest discover -s tests -q
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-loop265
 ```
+
+## Verified Outcome
+
+Implementation commit `73cbe8a` passed the local full suite (1,340 tests) and
+the actual isolated-wheel smoke on 2026-10-22. The installed CLI and real local
+UI preserve Chinese approval titles, source lines, and fixed review counts.
+Tests cover malformed and misplaced declarations, clean prompts and node IDs,
+and a Chinese custom quickstart whose durable approval/rejection determines
+whether its successor executes. Existing examples and secret-hygiene checks
+pass.
+
+[Implementation CI](https://github.com/pearjelly/skill2workflow/actions/runs/39710180022)
+passed all seven jobs, including full Python 3.9/3.14 tests, installed-wheel
+qualification, Linux Docker/systemd, recovery/state safety, and user journeys.
+The project remains Self-hosted Beta on Workflow DSL 0.1.0.

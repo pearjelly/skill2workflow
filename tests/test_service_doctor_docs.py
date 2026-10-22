@@ -28,9 +28,9 @@ class ServiceDoctorDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-264 are complete", readme)
+        self.assertIn("Delivery Loops 1-265 are complete", readme)
         self.assertIn("service-doctor", readme)
         self.assertIn("docs/service-doctor.md", readme)
-        self.assertIn("Completed delivery loops: 1-264", roadmap)
+        self.assertIn("Completed delivery loops: 1-265", roadmap)
         self.assertIn("Loop 53: Operational Readiness Doctor", roadmap)
         self.assertIn("| Loop 53: Operational Readiness Doctor | Complete |", roadmap)

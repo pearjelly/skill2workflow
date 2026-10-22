@@ -46,8 +46,9 @@ step and rejection follows the failure path. Review the generated draft before
 publishing it.
 
 The syntax is case-sensitive, single-line, and permits one marker at the end
-of one nonempty selected item. Unknown, malformed, repeated, or unattached
-reserved `skill2workflow` comments fail with `Invalid Skill step annotation`.
+of one nonempty selected item. Within the Skill body, unknown, malformed,
+repeated, or unattached reserved `skill2workflow` comments fail with
+`Invalid Skill step annotation`.
 This includes a declaration in a process excluded by Checklist precedence.
 Fenced examples do not declare approvals. If legacy Checklist parsing extracts
 an annotated item inside a fence, compilation is refused to prevent accidental

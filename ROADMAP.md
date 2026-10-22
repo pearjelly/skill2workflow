@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-264
+- Completed delivery loops: 1-265
 - Current maturity: Self-hosted Beta
-- Active loop: Loop 265 — explicit human approval declarations
+- Active loop: None; Loop 265 is complete with explicit human approval declarations
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing explicit process-step compilation and compatibility evidence
+- Next decision: select the next Production Baseline loop after reviewing explicit approval compilation and runtime evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-264 complete, Loop 265 in progress.
+**Status:** Directional; Loops 44-265 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -154,9 +154,10 @@ Production Baseline remains directional.
 
 ## Active Loop
 
-Loop 265 is active. Explicit step annotations let authors declare a human
-approval independently of title wording. Scope and acceptance are recorded in
-`docs/superpowers/plans/2026-10-22-explicit-human-approval.md`.
+No delivery loop is currently active. The detailed entries below are retained
+as historical evidence for completed Production Baseline loops; the current
+completion point and next-selection rule are authoritative in “Status At A
+Glance” and “Rolling Loop Queue”.
 
 ### Loop 56: Linux systemd Supervision
 
@@ -7048,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 265 is active; select another Production Baseline item after reviewing explicit approval compilation and runtime evidence.
+This rolling queue is ordered. Loop 265 is complete and there is no active delivery loop; select the next Production Baseline item after reviewing explicit approval compilation and runtime evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7161,6 +7162,29 @@ jobs passed, including full Python 3.9/3.14 tests, artifact qualification,
 deployment, recovery, and user journeys. Scope and reproducible checks:
 `docs/superpowers/plans/2026-10-22-workflow-step-headings.md`.
 
+
+### Loop 265: Explicit Human Approval Declarations
+
+**Status:** Complete.
+
+**Prior basis:** Chinese approval instructions could compile as normal steps
+because human-gate classification depended on English keywords.
+
+**Outcome:** Authors can append `<!-- skill2workflow: human_gate -->` to a
+selected step. The parser records the explicit type and removes the marker
+from display text; the compiler emits the existing manual approval node.
+Chinese custom quickstarts durably wait, continue after approval, and fail
+after rejection. CLI, local editor, and installed wheel paths agree.
+
+**Safety boundary:** Invalid reserved declarations fail with fixed errors;
+examples and excluded sections cannot silently declare approvals. Unmarked
+inference, published DSL, and the existing approval runtime retain their
+behavior. No arbitrary command execution or new dependency is introduced.
+
+**Evidence:** Local full suite (1,340 tests), real isolated-wheel compilation,
+and all seven CI jobs at implementation commit `73cbe8a` passed, including
+Python 3.9/3.14, deployment, recovery, and user journeys. Design and acceptance:
+`docs/superpowers/plans/2026-10-22-explicit-human-approval.md`.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -7390,6 +7414,7 @@ deployment, recovery, and user journeys. Scope and reproducible checks:
 | Loop 262: Opt-In Feishu Credential Go-Live Preflight | Complete | Let operators include one explicit, value-free Feishu credential preflight in the composite deployment gate | Doctor-first opt-in check, provider-free default, Probe/token short-circuit, CLI/docs/tests, and wheel qualification |
 | Loop 263: Single-Service Docker Self-Hosting | Complete | Provide a reviewed one-container Linux deployment without weakening the existing loopback and SQLite boundaries | Wheel-built non-root image, private mounts, state-only runtime write, Docker CI backup/restore and restart/go-live drill, and operator runbook |
 | Loop 264: Explicit Workflow And Steps Headings | Complete | Preserve explicitly numbered Skill processes without requiring a Checklist rewrite | Legacy precedence, bounded grammar, ambiguity refusal, source provenance, durable approval, CLI/UI, and installed-wheel evidence |
+| Loop 265: Explicit Human Approval Declarations | Complete | Let authors require approval independently of title language or keywords | Explicit IR type, clean display text, invalid-declaration refusal, Chinese quickstart approval/rejection, CLI/UI and installed-wheel evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

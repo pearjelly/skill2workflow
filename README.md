@@ -961,7 +961,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-264 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-265 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring
