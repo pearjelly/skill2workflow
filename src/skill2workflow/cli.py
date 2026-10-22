@@ -572,6 +572,7 @@ def _main(argv=None) -> int:
         type=Path,
         help="Optional local SKILL.md to compile into the new controlled workspace",
     )
+    quickstart_cmd.add_argument("--input", type=Path, help="Non-secret JSON object for the initial controlled run")
 
     backup_cmd = subparsers.add_parser(
         "backup",
@@ -1624,6 +1625,7 @@ def _main(argv=None) -> int:
                 host=args.host,
                 port=args.port,
                 skill_path=args.skill,
+                trigger_input=_load_trigger_input(args.input) if args.input is not None else None,
             )
         )
 

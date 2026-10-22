@@ -224,4 +224,7 @@ Do not execute before a designated reviewer approves.
         evidence = json.loads(completed.stdout)
         self.assertEqual(evidence["status"], "passed")
         self.assertTrue(all(evidence["checks"].values()))
+        for check in ('custom_input_waiting', 'invalid_input_no_workspace',
+                      'network_prefix_refused', 'custom_input_approved_http', 'custom_input_compact_result'):
+            self.assertTrue(evidence['checks'][check])
         self.assertNotIn("secret", json.dumps(evidence).lower())

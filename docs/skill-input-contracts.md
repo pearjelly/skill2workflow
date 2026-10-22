@@ -92,9 +92,12 @@ can be submitted under that same unused key.
 This is specifically **trigger admission**, including the existing webhook,
 service and recurring-trigger paths. It does not add validation to raw
 `LocalExecutor` contexts or direct `run`/`run-published` calls without a trigger.
-The current `quickstart --skill` first run also has no trigger input; use the
-compile → publish → trigger path above for a Skill requiring business inputs.
-Do not treat an empty-input quickstart run as validation of this contract.
+For a controlled first run, `quickstart --skill SKILL.md --input input.json`
+validates the input before initializing its workspace and uses normal trigger
+admission. Omitted input is checked as `{}`; required business fields must be
+supplied. See [input-aware quickstart](quickstart.md#provide-business-input).
+Quickstart also refuses non-manual connectors before its first human gate;
+this does not add validation to other direct non-trigger run paths.
 
 ## Compatibility And Qualification
 

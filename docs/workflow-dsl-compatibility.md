@@ -9,6 +9,14 @@ publication.
 
 This document defines the compatibility policy for Workflow DSL `0.1.0`.
 
+Quickstart accepts optional `--input` and validates finite, bounded business
+data against the compiled contract before initialization. Missing required
+input and non-manual connectors before its first human gate now fail before
+workspace or token creation. Explicit input uses existing SQLite trigger
+admission; omitted valid empty input retains legacy first-run context. The
+quickstart result schema, Workflow DSL, general executor and other direct-run
+semantics are unchanged. See [input-aware quickstart](quickstart.md#provide-business-input).
+
 Explicit [Skill trigger input declarations](skill-input-contracts.md) emit the
 existing top-level `input_schema` on newly compiled drafts. Skills without the
 declaration and published artifacts keep their prior behavior. Trigger admission

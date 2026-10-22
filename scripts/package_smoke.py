@@ -351,6 +351,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     _qualify_installed_skill_compiles(console_script, isolated_dir)
     _qualify_installed_http_assertions(repo_root, console_script, isolated_dir)
     _qualify_installed_skill_http_actions(repo_root, console_script, isolated_dir)
+    _qualify_installed_quickstart_inputs(python_bin, console_script, isolated_dir)
     validate_output = _run(
         [
             str(console_script),
@@ -1010,6 +1011,20 @@ def _qualify_installed_skill_http_actions(repo_root: Path, console_script: Path,
     ))
     if result != {"ok": True, "installed": True, "cases_verified": 7}:
         raise RuntimeError("installed Skill HTTP action qualification failed")
+    return True
+
+
+def _qualify_installed_quickstart_inputs(python_bin: Path, console_script: Path, isolated_dir: Path) -> bool:
+    code = (
+        'import json, os, sys; from pathlib import Path; '
+        'from skill2workflow.quickstart_smoke import _qualify_input_quickstart; '
+        'print(json.dumps(_qualify_input_quickstart(Path(sys.argv[1]), Path(sys.argv[2]), dict(os.environ))))'
+    )
+    result = json.loads(_run([str(python_bin), '-c', code, str(console_script), str(isolated_dir)], cwd=isolated_dir))
+    expected = {name: True for name in ('custom_input_waiting', 'invalid_input_no_workspace',
+                'network_prefix_refused', 'custom_input_approved_http', 'custom_input_compact_result')}
+    if result != expected:
+        raise RuntimeError('installed input-aware quickstart qualification failed')
     return True
 
 

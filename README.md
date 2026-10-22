@@ -52,14 +52,25 @@ source .venv/bin/activate
 python -m pip install .
 skill2workflow quickstart \
   --root /tmp/skill2workflow-quickstart \
-  --skill /absolute/path/to/SKILL.md \
   --port 8080
 ```
 
 The command generates an owner-only ingress secret without printing it, uses
-SQLite state, and returns the waiting `run_id`. Omit `--skill` to use the
-bundled example; a supplied local Skill must compile to a valid workflow with
-an explicit human gate. Follow the
+SQLite state, and returns the waiting `run_id` for the bundled example.
+For your own controlled Skill with business data, use another fresh root:
+
+```bash
+skill2workflow quickstart \
+  --root /tmp/skill2workflow-custom \
+  --skill /absolute/path/to/SKILL.md \
+  --input /absolute/path/to/input.json \
+  --port 8080
+```
+
+A supplied local Skill must compile to a valid workflow with
+an explicit human gate before any non-manual connector on its initial success
+path. Omit `--input` only when the Skill's input contract accepts `{}`; input
+is validated before creating the workspace. Follow the
 [installed quickstart guide](docs/quickstart.md) to inspect and approve that
 run, start the authenticated service, and submit a second trigger. Its JSON
 result also contains safe `operator_commands` argv arrays for those next
@@ -293,13 +304,16 @@ compiled, published workflow that is already waiting at a human gate. Omit
 skill2workflow quickstart \
   --root /tmp/skill2workflow-quickstart \
   --skill /absolute/path/to/SKILL.md \
+  --input /absolute/path/to/input.json \
   --port 8080
 ```
 
 The command never overwrites an existing root or prints its generated ingress
 secret. A supplied Skill is compiled before workspace creation and is rejected
-unless it contains a real human gate; its original path is not written into the
-generated DSL. Use the returned `run_id` with `control-run` and
+unless its initial success path reaches a real human gate before any non-manual
+connector. Optional `--input` is validated before initialization; omit it only
+when `{}` satisfies the input contract. Source/input paths and input values
+are not added to the compact result. Use the returned `run_id` with `control-run` and
 `resume-published` to inspect and approve the first controlled run. See [the
 installed quickstart guide](docs/quickstart.md) for the complete service and
 authenticated-trigger journey.

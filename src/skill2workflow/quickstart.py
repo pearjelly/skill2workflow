@@ -12,6 +12,8 @@ from .compiler import compile_ir_to_workflow, validate_workflow
 from .control_plane import LocalControlPlane
 from .parser import parse_skill_text, read_skill_text
 from .service_bootstrap import initialize_service_workspace
+from .input_schema import validate_trigger_input
+from .triggers import MAX_TRIGGER_INPUT_BYTES, normalize_trigger_input
 
 
 QUICKSTART_RESULT_SCHEMA_VERSION = "skill2workflow-quickstart-result-0.1.0"
@@ -49,6 +51,7 @@ def initialize_quickstart_workspace(
     port: int = 8080,
     token_factory: Optional[Callable[[], str]] = None,
     skill_path: Optional[Path] = None,
+    trigger_input: Optional[Dict[str, object]] = None,
 ) -> Dict[str, object]:
     """Create a secure service workspace and one waiting controlled workflow."""
 
@@ -62,6 +65,15 @@ def initialize_quickstart_workspace(
         raise ValueError(
             "quickstart SKILL must compile to a valid workflow with a human gate"
         )
+    _require_pre_effect_gate(workflow)
+    try:
+        normalized_input = normalize_trigger_input({} if trigger_input is None else trigger_input)
+        json.dumps(normalized_input, ensure_ascii=False, allow_nan=False)
+    except (ValueError, TypeError, OverflowError, RecursionError) as error:
+        raise ValueError(
+            f"quickstart input must be a finite JSON object of at most {MAX_TRIGGER_INPUT_BYTES} UTF-8 bytes"
+        ) from error
+    validate_trigger_input(workflow.get('input_schema'), normalized_input)
 
     bootstrap = initialize_service_workspace(
         root,
@@ -93,7 +105,15 @@ def initialize_quickstart_workspace(
             Path(str(bootstrap["state_dir"])), storage="sqlite"
         )
         control.publish_workflow(workflow)
-        run = control.run_published_workflow(workflow_id, workflow_version)
+        if trigger_input is None:
+            run = control.run_published_workflow(workflow_id, workflow_version)
+        else:
+            triggered = control.trigger_workflow({
+                'workflow_id': workflow_id, 'version': workflow_version,
+                'source': 'quickstart', 'idempotency_key': 'quickstart-initial',
+                'input': normalized_input,
+            })
+            run = control.get_run(str(triggered['run_id']))
         if str(run.get("status", "")) != "waiting":
             raise ValueError("quickstart run did not stop at its human gate")
     except Exception:
@@ -172,3 +192,20 @@ def _has_human_gate(workflow: Dict[str, object]) -> bool:
         isinstance(node, dict) and node.get("type") == "human_gate"
         for node in nodes
     )
+
+
+def _require_pre_effect_gate(workflow: Dict[str, object]) -> None:
+    """Bound the compiled success prefix before creating a service workspace."""
+    nodes = {node['id']: node for node in workflow['nodes']}
+    current = workflow.get('entry')
+    visited = set()
+    while current in nodes and current not in visited:
+        visited.add(current)
+        node = nodes[current]
+        if node.get('type') == 'human_gate':
+            return
+        connector = node.get('connector')
+        if connector and connector.get('id') != 'manual':
+            raise ValueError('quickstart SKILL cannot execute a non-manual connector before the first human gate')
+        current = node.get('on_success')
+    raise ValueError('quickstart SKILL must reach a human gate on its initial success path')

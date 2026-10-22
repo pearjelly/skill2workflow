@@ -65,6 +65,54 @@ Quickstart does not add a human gate to an uncontrolled Skill. Author the
 approval instruction explicitly, review the generated waiting run, and approve
 or reject it through the normal operator command.
 
+Quickstart refuses a non-manual connector before the first human gate on the
+compiled initial success path. HTTP actions and HTTP assertions before approval
+are rejected before initialization. Manual preparation steps remain supported.
+This conservative onboarding check does not change the general executor or
+insert a gate into the Skill.
+
+## Provide Business Input
+
+For a Skill with a [typed input contract](skill-input-contracts.md), prepare a
+non-secret JSON object, for example:
+
+```json
+{"record_id":"reviewed-record-001","title":"Example task"}
+```
+
+Pass its explicit local path:
+
+```bash
+skill2workflow quickstart \
+  --root /srv/skill2workflow/customer-review \
+  --skill /srv/customer-workflows/review/SKILL.md \
+  --input /srv/customer-workflows/review/input.json \
+  --host 127.0.0.1 --port 8080
+```
+
+Input must be a finite JSON object. The existing CLI JSON reader accepts at
+most 8 MiB of file bytes; the shared canonical UTF-8 input limit is **1 MiB**.
+The compiled `input_schema` is checked before workspace initialization,
+ingress-token generation, publication or execution. Missing, wrong-typed,
+out-of-range and extra values fail without creating the destination. If input
+is omitted, `{}` must still satisfy the declared contract. Correct the input
+and rerun against the still-unused root; quickstart never overwrites a root.
+
+Explicit input starts the first run through normal SQLite trigger admission,
+with source `quickstart` and the workspace-local key `quickstart-initial`.
+The existing private run context retains the values for approval/resume and
+input mappings. The input file is not copied into `example/`; its path and
+values are not added to the compact result or operator command arrays. The
+result schema remains unchanged. When input is omitted and `{}` is valid,
+legacy bundled/custom first-run context remains unchanged.
+
+Input is durable business data, not a credential store, encryption or redaction
+boundary. Use the separate [credential provider](credential-boundary.md) for
+authentication. Custom HTTP workflows may need an explicit credential file
+when resumed and can cause their declared effects only after approval; the
+generated command does not invent that credential setup. Review endpoints,
+origins and response retention before approving.
+
 ## Inspect And Approve
 
 Copy `run_id` and `state_dir` from the command result. Inspect the waiting run:
@@ -86,7 +134,9 @@ skill2workflow resume-published <run_id> \
   --storage sqlite
 ```
 
-The resumed run completes and preserves the gate and completion audit trail.
+The bundled example's resumed run completes and preserves the gate and
+completion audit trail. Custom workflows depend on their reviewed input,
+connector configuration and provider outcomes.
 
 ## Start The Service
 
@@ -129,3 +179,7 @@ installed bundled and custom-Skill quickstarts, verifies their waiting runs,
 resumes the bundled run to completion, starts the generated service unchanged,
 submits an authenticated webhook, and proves the second run waits at the same
 human gate before graceful shutdown.
+It also qualifies typed initial input, invalid-input rejection before workspace
+creation, rejection of network-before-approval Skills, and approval to a real
+owned loopback HTTP receiver. The same input checks are mandatory in isolated
+wheel package qualification; no live SaaS endpoint is contacted.

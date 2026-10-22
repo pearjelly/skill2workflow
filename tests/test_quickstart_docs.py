@@ -6,6 +6,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstalledQuickstartDocumentationTests(TestCase):
+    def test_input_aware_first_run_has_clear_admission_and_approval_boundaries(self):
+        guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
+        for phrase in ('--input', '1 MiB', 'before workspace', 'finite JSON',
+                       'quickstart-initial', 'before the first human gate', 'not copied'):
+            self.assertIn(phrase, guide)
+        source_guide = (ROOT / 'docs/skill-input-contracts.md').read_text(encoding='utf-8')
+        self.assertIn('quickstart --skill', source_guide)
+        self.assertIn('--input', source_guide)
+        self.assertNotIn('first run also has no trigger input', source_guide)
+
     def test_guide_documents_the_complete_installed_controlled_journey(self):
         guide = (ROOT / "docs" / "quickstart.md").read_text(encoding="utf-8")
 
@@ -31,6 +41,11 @@ class InstalledQuickstartDocumentationTests(TestCase):
         self.assertIn("Source-checkout contributor demo", readme)
         self.assertIn("Delivery Loops 1-272 are complete", readme)
         self.assertIn("installed controlled quickstart", readme)
+        fastest = readme[readme.index('## Fastest Controlled Journey'):readme.index('For executable result checks')]
+        first_command = fastest.split('```bash', 1)[1].split('```', 1)[0]
+        self.assertNotIn('--skill', first_command)
+        self.assertNotIn('--input', first_command)
+        self.assertIn('--input', fastest)
 
     def test_roadmap_and_harness_record_completed_loop_52(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")

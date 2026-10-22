@@ -15,6 +15,8 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Dict, List
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from threading import Thread
 
 
 # Wheel qualification builds an isolated virtual environment. On a busy CI
@@ -102,6 +104,7 @@ Do not complete the review before an operator approves it.
     custom_workflow_path = custom_workspace / "example" / "workflow.json"
     custom_workflow = json.loads(custom_workflow_path.read_text(encoding="utf-8"))
     custom_workspace_skill = custom_workspace / "example" / "SKILL.md"
+    input_checks = _qualify_input_quickstart(console, isolated, environment)
     state_dir = Path(str(initialized["state_dir"]))
     config_file = Path(str(initialized["config_file"]))
     ingress_file = Path(str(initialized["token_file"]))
@@ -243,6 +246,7 @@ Do not complete the review before an operator approves it.
         "authenticated_trigger_waiting": triggered_run.get("status") == "waiting",
         "graceful_exit": graceful,
     }
+    checks.update(input_checks)
     if not all(checks.values()):
         raise RuntimeError("quickstart evidence checks failed")
     return {
@@ -250,6 +254,95 @@ Do not complete the review before an operator approves it.
         "status": "passed",
         "checks": checks,
     }
+
+
+def _qualify_input_quickstart(console: Path, isolated: Path, environment: Dict[str, str]) -> Dict[str, bool]:
+    """Qualify installed typed-input onboarding against one owned HTTP receiver."""
+    directory = isolated / 'input-qualification'
+    directory.mkdir(mode=0o700)
+    payload = {'customer_id': 'quickstart-business-input-canary', 'count': 2}
+    requests = []
+
+    class Receiver(BaseHTTPRequestHandler):
+        def do_POST(self):
+            requests.append(json.loads(self.rfile.read(int(self.headers.get('Content-Length', '0')))))
+            raw = b'{"ok":true,"private":"quickstart-response-canary"}'
+            self.send_response(201)
+            self.send_header('Content-Length', str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(('127.0.0.1', 0), Receiver)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        origin = 'http://127.0.0.1:' + str(server.server_port)
+        schema = {'type': 'object', 'properties': {'customer_id': {'type': 'string', 'minLength': 1},
+                  'count': {'type': 'integer', 'minimum': 1}},
+                  'required': ['customer_id', 'count'], 'additionalProperties': False}
+        action = {'request': {'method': 'POST', 'url': origin + '/tasks', 'allowed_origins': [origin],
+                  'body': {'source': 'quickstart'}, 'input_mapping': [
+                      {'from': '/input/customer_id', 'to': '/body/id'},
+                      {'from': '/input/count', 'to': '/body/count'}]}}
+        approval = 'Review <!-- skill2workflow: human_gate -->'
+        submit = 'Submit <!-- skill2workflow: http ' + json.dumps(action) + ' -->'
+        def markdown(steps):
+            return ('---\nname: input-quickstart\n---\n<!-- skill2workflow: input_schema '
+                    + json.dumps(schema) + ' -->\n## Steps\n'
+                    + '\n'.join(str(index) + '. ' + step for index, step in enumerate(steps, 1)) + '\n')
+        source = directory / 'private-source.SKILL.md'
+        source.write_text(markdown([approval, submit, 'Deliver']), encoding='utf-8')
+        input_file = directory / 'private-input.json'
+        rejected_root = directory / 'rejected'
+        base = [str(console), 'quickstart', '--root', str(rejected_root), '--skill', str(source), '--port', '0']
+        refused = []
+        for value in (None, {'customer_id': 123, 'count': 2}, dict(payload, extra='invalid-input-canary'), 'malformed'):
+            arguments = []
+            if value is not None:
+                input_file.write_text('{invalid-input-canary}' if value == 'malformed' else json.dumps(value), encoding='utf-8')
+                arguments = ['--input', str(input_file)]
+            completed = subprocess.run(base + arguments, cwd=str(isolated), env=environment,
+                                       capture_output=True, text=True, timeout=10)
+            refused.append(completed.returncode == 1 and not rejected_root.exists()
+                           and 'invalid-input-canary' not in completed.stdout + completed.stderr)
+        input_file.write_text(json.dumps(payload), encoding='utf-8')
+        unsafe = directory / 'unsafe.SKILL.md'
+        unsafe.write_text(markdown([submit, approval, 'Deliver']), encoding='utf-8')
+        unsafe_root = directory / 'unsafe'
+        rejected = subprocess.run([str(console), 'quickstart', '--root', str(unsafe_root),
+                                  '--skill', str(unsafe), '--input', str(input_file), '--port', '0'],
+                                 cwd=str(isolated), env=environment, capture_output=True, text=True, timeout=10)
+        prefix_refused = (rejected.returncode == 1 and not unsafe_root.exists() and not requests
+                          and 'before the first human gate' in rejected.stderr)
+        accepted_root = directory / 'accepted'
+        initialized, raw = _run_json([str(console), 'quickstart', '--root', str(accepted_root),
+                                      '--skill', str(source), '--input', str(input_file), '--port', '0'], isolated, environment)
+        common = ['--state-dir', str(initialized['state_dir']), '--storage', 'sqlite']
+        waiting, _ = _run_json([str(console), 'control-run', initialized['run_id']] + common, isolated, environment)
+        waiting_ok = (waiting.get('status') == 'waiting' and waiting.get('context', {}).get('input') == payload
+                      and not requests)
+        completed, raw_resume = _run_json([str(console), 'resume-published', initialized['run_id']] + common, isolated, environment)
+        compact = (payload['customer_id'] not in raw and str(source) not in raw and str(input_file) not in raw
+                   and not (accepted_root / 'example' / 'input.json').exists())
+        checks = {
+            'custom_input_waiting': waiting_ok,
+            'invalid_input_no_workspace': all(refused),
+            'network_prefix_refused': prefix_refused,
+            'custom_input_approved_http': (completed.get('status') == 'completed'
+                and requests == [{'source': 'quickstart', 'id': payload['customer_id'], 'count': 2}]
+                and 'quickstart-response-canary' not in raw_resume),
+            'custom_input_compact_result': compact,
+        }
+        if not all(checks.values()):
+            raise RuntimeError('installed input-aware quickstart qualification failed')
+        return checks
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def main(argv=None) -> int:

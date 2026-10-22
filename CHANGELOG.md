@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add optional quickstart business input, validated before initialization and
+  retained through normal trigger admission for approval and connector mapping.
+
 - Add explicit Skill trigger-input declarations using the existing bounded
   `input_schema`; qualify typed admission before claims, runs, audit or HTTP
   effects through the installed approval/action/assertion journey.
@@ -72,6 +75,9 @@ release; Roadmap loop completion alone does not publish a new version.
   existing immutable publication transaction remains authoritative.
 
 ### Fixed
+
+- Reject custom quickstart Skills with a non-manual connector before their
+  first human gate, rather than running that connector during initialization.
 
 - Make browser graph downloads compatible with strict CLI write-back by
   including actual type-default titles and synchronizing pending parameter
