@@ -8,7 +8,37 @@ from typing import Dict, List, Tuple
 
 
 ERROR = "Invalid SKILL.md frontmatter"
+DIAGNOSTIC_VERSION = 'skill2workflow-skill-compile-diagnostic-0.1.0'
+_DIAGNOSTIC_CODES = frozenset({'frontmatter_duplicate_key', 'frontmatter_invalid', 'frontmatter_unsupported'})
 _BLOCK = re.compile(r'^([|>])([1-9][+-]?|[+-][1-9]?|)$')
+
+
+class FrontmatterError(ValueError):
+    """Keep the legacy message while carrying source-free diagnostic evidence."""
+
+    def __init__(self, code: str, line=None):
+        super().__init__(ERROR)
+        self.code = code
+        self.line = line
+
+
+def skill_compile_diagnostic(error: Exception) -> Dict[str, object]:
+    code, line = 'skill_invalid', None
+    if isinstance(error, FrontmatterError) and type(error.code) is str and error.code in _DIAGNOSTIC_CODES:
+        code = error.code
+        if type(error.line) is int and 1 <= error.line <= 2 * 1024 * 1024 + 1:
+            line = error.line
+    return {'schema_version': DIAGNOSTIC_VERSION, 'code': code, 'line': line}
+
+
+def format_frontmatter_error(error: FrontmatterError) -> str:
+    diagnostic = skill_compile_diagnostic(error)
+    location = ' near line ' + str(diagnostic['line']) if diagnostic['line'] is not None else ''
+    if diagnostic['code'] == 'frontmatter_duplicate_key':
+        return ERROR + '. A frontmatter field is repeated' + location + '. Keep one declaration per field.'
+    if diagnostic['code'] == 'frontmatter_unsupported':
+        return ERROR + '. Unsupported frontmatter form' + location + '. Use supported strings, | or > text blocks, or a flat metadata map.'
+    return ERROR + '. Check frontmatter syntax' + location + ': quoting, indentation and supported text-block headers.'
 
 
 def parse_frontmatter(text: str) -> Tuple[Dict[str, object], str, int]:
@@ -19,13 +49,18 @@ def parse_frontmatter(text: str) -> Tuple[Dict[str, object], str, int]:
     if end is None:
         return {}, text, 1  # Preserve legacy incomplete-document behavior.
     header = lines[1:end]
+    location = [2]
     try:
-        first = next((line for line in header if line.strip() and not line.lstrip().startswith('#')), '')
-        metadata, index = _mapping(header, 0, _indent(first), nested=False)
+        first_index = next((i for i, line in enumerate(header) if line.strip() and not line.lstrip().startswith('#')), None)
+        first = header[first_index] if first_index is not None else ''
+        location[0] = first_index + 2 if first_index is not None else 2
+        metadata, index = _mapping(header, 0, _indent(first), nested=False, location=location)
         if index != len(header):
             raise ValueError(ERROR)
+    except FrontmatterError as error:
+        raise FrontmatterError(error.code, error.line if error.line is not None else location[0]) from error
     except (ValueError, UnicodeError, TypeError, OverflowError, RecursionError) as error:
-        raise ValueError(ERROR) from error
+        raise FrontmatterError('frontmatter_invalid', location[0]) from error
     return metadata, '\n'.join(lines[end + 1:]), end + 2
 
 
@@ -53,7 +88,7 @@ def _scalar(raw: str) -> str:
     else:
         value = _uncomment(raw)
         if value in {'-', '?', ':'} or value.startswith(('*', '&', '!', '{', '}', '[', ']', '|', '>', '%', '@', '`', '- ', '? ', ': ')) or re.search(r':[ \t]', value):
-            raise ValueError(ERROR)
+            raise FrontmatterError('frontmatter_unsupported')
     value.encode('utf-8')
     return value
 
@@ -90,21 +125,26 @@ def _entry(line: str) -> Tuple[str, str]:
     return key, tail[1:].strip()
 
 
-def _mapping(lines: List[str], index: int, indent: int, *, nested: bool) -> Tuple[Dict[str, object], int]:
+def _mapping(lines: List[str], index: int, indent: int, *, nested: bool, location: List[int]) -> Tuple[Dict[str, object], int]:
     result: Dict[str, object] = {}
     while index < len(lines):
         line = lines[index]
         if not line.strip() or line.lstrip().startswith('#'):
             index += 1
             continue
+        location[0] = index + 2
         level = _indent(line)
         if level < indent:
             break
         if level != indent:
             raise ValueError(ERROR)
         key, raw = _entry(line[level:])
-        if not key or key == '<<' or key in result:
+        if not key:
             raise ValueError(ERROR)
+        if key == '<<':
+            raise FrontmatterError('frontmatter_unsupported')
+        if key in result:
+            raise FrontmatterError('frontmatter_duplicate_key')
         index += 1
         header = _uncomment(raw)
         if key == 'metadata' and not nested:
@@ -112,10 +152,10 @@ def _mapping(lines: List[str], index: int, indent: int, *, nested: bool) -> Tupl
                 result[key] = {}
                 continue
             if raw and not raw.startswith('#'):
-                raise ValueError(ERROR)
+                raise FrontmatterError('frontmatter_unsupported')
             child = next((i for i in range(index, len(lines)) if lines[i].strip() and not lines[i].lstrip().startswith('#')), len(lines))
             if child < len(lines) and _indent(lines[child]) > indent:
-                result[key], index = _mapping(lines, index, _indent(lines[child]), nested=True)
+                result[key], index = _mapping(lines, index, _indent(lines[child]), nested=True, location=location)
             else:
                 result[key] = {}
             continue

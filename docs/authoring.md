@@ -27,6 +27,12 @@ one local `SKILL.md` and select **Compile SKILL**. The loopback UI process parse
 and compiles that one in-memory document into a draft Workflow DSL document,
 then loads the result into the normal editor for review and allowlisted edits.
 
+If compilation is refused, the inline message identifies a supported safe reason
+and approximate source line when available. Correct the local file, choose it
+again and compile explicitly. The active draft and its validation are preserved;
+changing the selection or draft discards pending compile results. No source
+values or exception text are displayed. See [compile recovery](skill-input-boundary.md#recover-from-a-compile-refusal).
+
 The request is bounded to 2 MiB and decoded from the selected file's bytes as
 strict UTF-8. Invalid UTF-8 stops the import rather than replacing bytes with
 look-alike characters. It has no filesystem output, does not access the runtime

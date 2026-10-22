@@ -7,7 +7,115 @@ related_targets: ["web/app.js","web/input-review.js","web/styles.css"]
 
 # Workflow Editor — Operate
 
-## Current clarification (Loop 279)
+## Current clarification (Loop 281)
+
+Explain safe compile refusals with a known reason, original line when available
+and a concrete next edit/reselect/recompile action. Keep the existing draft and
+discard stale results after selection/draft changes. No preference reply has
+arrived; use the narrow non-executing scope in
+`docs/superpowers/plans/2026-10-22-skill-compile-recovery.md`.
+
+THESIS: Make a rejected Skill recoverable without guessing or exposing source.
+
+OWN-WORLD: Preserve the incumbent neutral/white, blue-accent system-sans editor,
+native controls, semantic feedback and existing wrapping validation list.
+
+STORY: Choose a Skill, compile, read a safe reason/line, correct the local file,
+reselect and explicitly compile again; failure never replaces the active draft.
+
+FIRST VIEWPORT: Keep the canvas/sidebar and narrow stacked layout. Compile
+remains in the toolbar; a normally hidden, wrapping inline error directly below
+the toolbar makes recovery visible immediately. It is text, not a modal, new
+panel or source preview; active-graph validation remains in its own inspector.
+
+FORM: Code-led local clarification, seed key not applicable. No comp, imagery,
+motion or new system tokens. Signature behavior is current-source-only feedback.
+
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+Missing global design documents are pre-existing drift and remain untouched.
+
+### Completed-clarification evidence (Loop 281)
+
+The implemented change in `web/app.js`, `web/index.html` and `web/styles.css`
+puts a normally hidden compile-feedback row directly below the toolbar. Known
+frontmatter refusals now explain the problem, an approximate original line when
+available, and how to edit, reselect and explicitly compile again. A refusal
+does not replace the active draft or overwrite its separate validation list.
+This is an ordinary clarification of the incumbent Operate surface, not a new
+visual world, global token system or execution capability.
+
+Keep these surface-local recovery rules:
+
+- **Evidence before specificity:** the editor explicitly requests diagnostics
+  and maps only the finite, versioned duplicate-field, invalid-frontmatter and
+  unsupported-form categories to fixed copy. A line is shown only when it is a
+  safe integer within the selected source's line count; “near line” communicates
+  its approximate nature. Diagnostic bodies are bounded to 1 KiB and decoded
+  as strict UTF-8 before validation. Unknown, malformed, oversized or unsupported
+  evidence stays generic; older/static helpers receive fixed availability or
+  update guidance, not a fabricated source diagnosis.
+- **No source echo:** render feedback with `textContent`. Never repeat private
+  keys, rejected values, source excerpts, paths, raw response bodies or exception
+  messages. The next action is to correct the local file, choose it again and
+  compile explicitly, not to expose source in a new panel.
+- **Current selection, current draft:** abort, selection/revision and serialized
+  draft-snapshot guards discard late file reads and compile success/failure
+  after selection or draft changes. Reselecting or loading another document
+  clears old feedback; corrected successful compilation replaces the draft and
+  removes the refusal. Failure keeps active-graph validation independent.
+- **Adjacent text, not another panel:** associate Choose SKILL.md and Compile
+  SKILL with the feedback through `aria-describedby`; use an atomic `role="alert"`
+  for the result. Preserve native controls, the white/neutral and blue-accent
+  frame, and the existing status pill. The plain error row reuses semantic
+  danger (`#b42318`), 12px supporting text with 18px line height, a 75ch maximum
+  measure and anywhere wrapping. Its measured contrast against white is 6.57:1.
+  It adds no card, accent stripe, imagery, motion, shadow or global token.
+- **Make room for the message:** showing or hiding feedback resizes the actual
+  graph canvas below the header. Keep the incumbent 340px desktop inspector
+  and 900px stacked breakpoint; long recovery copy wraps without document-level
+  overflow at 390px and 640px. Horizontal toolbar scrolling remains local.
+  Validation, export, runtime and DSL authority remain unchanged.
+
+Visual evidence under `.impeccable/review/loop281/` is `desktop-full.jpg`
+(1440 × 1000, duplicate-field refusal), `current-full.jpg` (actual 1280 × 720
+viewport, the same refusal), `mobile-full.jpg` (390px, duplicate refusal and
+valid active graph), `mobile-long-full.jpg` (390px, longer unsupported-form
+guidance and visible Fit keyboard focus), `reflow-640-full.jpg` (640px, long
+guidance), and `corrected-desktop.jpg` (real corrected upload success, with the
+old feedback gone). The builder and fresh reviewer opened all six; this
+documentation pass independently opened all six and checked the desktop/sidebar,
+narrow/stacked layout and corrected state. These synthetic-Skill captures are
+review evidence, not shipping raster assets; no raster provenance or concept
+comp is introduced.
+
+True 200% browser/text magnification remains **unqualified**. The attempted
+Super-plus shortcut left the actual viewport at 1280 × 720, device-pixel ratio
+at 1, visual scale at 1 and feedback text at 12px. Only the in-app browser and
+MCP Apps were available, without a usable zoom capability. The 640px capture
+proves narrow reflow, not magnification. The fresh independent finish reviewer
+returned **SHIP** in the five required sections (`persistence`, `fidelity`,
+`ceiling`, `material_fixes`, `keep`), with no material fixes. The reviewer
+explicitly treated this gap as non-blocking for the bounded wrapping feedback
+row and unchanged control typography, not as a zoom pass, and independently
+passed all 12 recovery module tests.
+
+The main loop reports 1,468 Python tests passed (102.324 seconds), 49 Node tests
+passed, and isolated-wheel qualification passed with 95 members (SHA-256
+`ee00054793bf83a18d8ee7efff37e62d4b61f374eb4821c22cfc5ef39c278427`). A
+separate installed `--browser-module-tests` run supplied four actual backend
+reports and passed all 12 recovery tests; 392 baseline acceptance/output
+differential cases remained unchanged. These are local qualification gates
+only; feature CI, release preflight and closure CI are not claimed complete.
+
+The detector ran exactly once; its `detector.json` records inherited Inter and
+validation thick-border warnings plus the actual graph-canvas grid advisory.
+None is introduced or canonized by this change. `PRODUCT.md`, `DESIGN.md` and
+`.impeccable/design.json` remain absent and untouched as pre-existing drift.
+The finish wording above does not authorize creating global design artifacts
+or repairing that drift during this narrow refinement.
+
+## Prior clarification (Loop 279)
 
 Explain the existing backend input rejection reasons beside Test input JSON.
 Use payload-relative paths, declared types and safe schema constraints; never

@@ -56,6 +56,9 @@
   let validationErrors = [];
   let stagedSkillMarkdown = null;
   let skillCompileLoading = false;
+  let skillSelectionRevision = 0;
+  let skillCompileRevision = 0;
+  let skillCompileController = null;
   let inputReview = null;
 
   const els = {};
@@ -103,7 +106,10 @@
         status: document.getElementById("input-preflight-status"), issues: document.getElementById("input-preflight-issues"),
       }, getWorkflow: workflowFromEditor,
     });
-    document.getElementById("node-form").addEventListener("input", function () { inputReview.invalidate(); });
+    document.getElementById("node-form").addEventListener("input", function () {
+      inputReview.invalidate();
+      if (skillCompileLoading) cancelSkillCompile();
+    });
     resizeCanvas();
     graph.start();
     loadSample();
@@ -116,6 +122,8 @@
     els.fileInput = document.getElementById("file-input");
     els.skillInput = document.getElementById("skill-input");
     els.compileSkill = document.getElementById("compile-skill");
+    els.skillInput = document.getElementById("skill-input");
+    els.skillCompileFeedback = document.getElementById("skill-compile-feedback");
     els.fitView = document.getElementById("fit-view");
     els.validateGraph = document.getElementById("validate-graph");
     els.saveWorkflow = document.getElementById("save-workflow");
@@ -202,6 +210,7 @@
       WorkflowNode.prototype.onDrawForeground = drawNodeOverlay;
       WorkflowNode.prototype.onConnectionsChange = function () {
         if (inputReview) inputReview.invalidate();
+        if (skillCompileLoading) cancelSkillCompile();
         window.requestAnimationFrame(validateGraph);
       };
       WorkflowNode.prototype.onConnectOutput = function (slot, type, input, targetNode) {
@@ -283,6 +292,8 @@
 
   async function stageSelectedSkill(event) {
     const file = event.target.files && event.target.files[0];
+    const selection = ++skillSelectionRevision;
+    cancelSkillCompile();
     stagedSkillMarkdown = null;
     updateSkillCompileControls();
     if (!file) return;
@@ -293,48 +304,135 @@
       if (typeof TextDecoder !== "function") {
         throw new Error("this browser cannot verify UTF-8 SKILL.md input");
       }
-      const markdown = new TextDecoder("utf-8", { fatal: true }).decode(
-        await file.arrayBuffer()
-      );
+      const bytes = await file.arrayBuffer();
+      if (selection !== skillSelectionRevision) return;
+      const markdown = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
       if (!markdown || new TextEncoder().encode(markdown).length > MAX_SKILL_INPUT_BYTES) {
         throw new Error("SKILL.md is outside the 2 MiB limit");
       }
       stagedSkillMarkdown = markdown;
-      setStatus("SKILL staged", "valid");
+      validateGraph();
+      setStatus("SKILL staged", "idle");
     } catch (error) {
-      renderValidation(["Could not stage SKILL.md: " + error.message], new Set());
+      if (selection !== skillSelectionRevision) return;
+      setSkillCompileFeedback("Could not read SKILL.md. Choose a UTF-8 file between 1 byte and 2 MiB.");
       setStatus("SKILL rejected", "invalid");
     } finally {
-      event.target.value = "";
-      updateSkillCompileControls();
+      if (selection === skillSelectionRevision) {
+        event.target.value = "";
+        updateSkillCompileControls();
+      }
     }
+  }
+
+  function cancelSkillCompile() {
+    skillCompileRevision++;
+    if (skillCompileController) skillCompileController.abort();
+    skillCompileController = null;
+    skillCompileLoading = false;
+    setSkillCompileFeedback("");
+    updateSkillCompileControls();
+  }
+
+  function setSkillCompileFeedback(message) {
+    if (!els.skillCompileFeedback) return;
+    els.skillCompileFeedback.textContent = message;
+    els.skillCompileFeedback.hidden = !message;
+    resizeCanvas();
+  }
+
+  function compileDraftSnapshot() {
+    return JSON.stringify({ workflow: currentWorkflowDsl, graph: graph ? graph.serialize() : null });
+  }
+
+  async function skillCompileFailure(response, markdown) {
+    const fallback = "SKILL.md was rejected. Review its frontmatter, process sections and step declarations; choose the corrected file and compile again.";
+    if (response.status === 404 || response.status === 405 || response.status === 501) {
+      return "Use skill2workflow ui instead of a static HTTP server to compile SKILL.md.";
+    }
+    if (response.status === 413) return "The local compile request exceeds its size limit. Shorten the Skill or use the CLI compile command.";
+    if (response.status !== 400) return "Local SKILL compilation is unavailable. Check the helper and retry.";
+    try {
+      if (Number(response.headers.get("Content-Length")) > 1024) {
+        if (response.body) await response.body.cancel();
+        return fallback;
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8", { fatal: true });
+      let total = 0, text = "";
+      try {
+        while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          total += chunk.value.byteLength;
+          if (total > 1024) { await reader.cancel(); return fallback; }
+          text += decoder.decode(chunk.value, { stream: true });
+        }
+        text += decoder.decode();
+      } finally { reader.releaseLock(); }
+      const payload = JSON.parse(text);
+      if (plainObject(payload) && payload.error === "skill compile body is malformed" && !payload.diagnostic) {
+        return "The local helper could not accept this compile request. Update skill2workflow ui or use the CLI compile command.";
+      }
+      if (!plainObject(payload) || payload.error !== "skill compile rejected" || Object.keys(payload).length !== 2
+        || !plainObject(payload.diagnostic)) return fallback;
+      const diagnostic = payload.diagnostic;
+      if (Object.keys(diagnostic).length !== 3 || diagnostic.schema_version !== "skill2workflow-skill-compile-diagnostic-0.1.0"
+        || !Object.prototype.hasOwnProperty.call(diagnostic, "line") || typeof diagnostic.code !== "string"
+        || diagnostic.line !== null && (!Number.isSafeInteger(diagnostic.line) || diagnostic.line < 1
+          || diagnostic.line > markdown.split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/).length)) return fallback;
+      const location = diagnostic.line === null ? "" : " near line " + diagnostic.line;
+      const recovery = " Choose the corrected SKILL.md and compile again.";
+      if (diagnostic.code === "frontmatter_duplicate_key") return "A frontmatter field is repeated" + location + ". Keep one declaration per field." + recovery;
+      if (diagnostic.code === "frontmatter_invalid") return "Invalid frontmatter" + location + ". Check quoting, indentation and text-block headers." + recovery;
+      if (diagnostic.code === "frontmatter_unsupported") return "Unsupported frontmatter form" + location + ". Use supported strings, | or > text blocks, or a flat metadata map." + recovery;
+    } catch (_error) { /* A failed diagnostic is not evidence of a specific source error. */ }
+    return fallback;
   }
 
   async function compileStagedSkill() {
     if (!stagedSkillMarkdown || skillCompileLoading) return;
+    const markdown = stagedSkillMarkdown;
+    const selection = skillSelectionRevision;
+    const revision = ++skillCompileRevision;
+    let snapshot;
+    let failure = "Could not compile SKILL.md. Check the local helper and retry, or use the CLI compile command.";
+    setSkillCompileFeedback("");
     skillCompileLoading = true;
     updateSkillCompileControls();
     setStatus("Compiling SKILL", "idle");
     try {
+      snapshot = compileDraftSnapshot();
+      skillCompileController = new AbortController();
       const response = await fetch(SKILL_COMPILE_URL, {
         method: "POST",
         cache: "no-store",
+        credentials: "omit",
+        signal: skillCompileController.signal,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skill_markdown: stagedSkillMarkdown }),
+        body: JSON.stringify({ skill_markdown: markdown, diagnostics: true }),
       });
+      if (revision !== skillCompileRevision || selection !== skillSelectionRevision) return;
       if (!response.ok) {
-        throw new Error(response.status === 404
-          ? "Use skill2workflow ui instead of a static HTTP server to compile SKILL.md"
-          : "local SKILL compilation is unavailable");
+        failure = await skillCompileFailure(response, markdown);
+        throw new Error("compile rejected");
       }
+      failure = "The helper returned an invalid compiled draft. Retry with skill2workflow ui or use the CLI compile command.";
       const compiled = parseSkillCompileResponse(await response.json());
+      if (revision !== skillCompileRevision || selection !== skillSelectionRevision) return;
+      if (compileDraftSnapshot() !== snapshot) { setStatus("Draft changed; compile again", "idle"); return; }
       loadDocument(compiled.workflow, "Compiled SKILL.md", compiled.review);
     } catch (error) {
-      renderValidation(["Could not compile SKILL.md: " + error.message], new Set());
+      if (revision !== skillCompileRevision || selection !== skillSelectionRevision) return;
+      if (snapshot !== undefined && compileDraftSnapshot() !== snapshot) { setStatus("Draft changed; compile again", "idle"); return; }
+      setSkillCompileFeedback(failure);
       setStatus("SKILL compile failed", "invalid");
     } finally {
-      skillCompileLoading = false;
-      updateSkillCompileControls();
+      if (revision === skillCompileRevision) {
+        skillCompileController = null;
+        skillCompileLoading = false;
+        updateSkillCompileControls();
+      }
     }
   }
 
@@ -344,6 +442,9 @@
   }
 
   function loadDocument(documentJson, label, skillCompileReview) {
+    skillSelectionRevision++;
+    if (els.skillInput) els.skillInput.value = "";
+    cancelSkillCompile();
     try {
       const normalized = normalizeDocument(documentJson);
       const graphJson = normalized.graphJson;

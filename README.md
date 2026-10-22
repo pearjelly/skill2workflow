@@ -140,6 +140,9 @@ Skill compilation keeps top-level identity separate from optional metadata and
 supports common folded/literal descriptions. Review the documented
 [frontmatter subset](docs/skill-input-boundary.md#frontmatter-identity-and-text)
 when importing an existing Skill; no full YAML loader is used.
+Rejected imports show safe repair guidance and a nearby source line when known;
+correct and reselect the file, then compile again. The active draft is preserved.
+See [compile recovery](docs/skill-input-boundary.md#recover-from-a-compile-refusal).
 
 Draft authors can open **Workflow input** to review the read-only input
 contract and check non-secret JSON against the current draft's schema and

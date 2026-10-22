@@ -98,6 +98,7 @@ from .visualizer import apply_litegraph_edits_to_workflow, workflow_to_litegraph
 from .webhooks import serve_webhook_requests
 from .external_connectors import load_external_connector
 from .ui import serve_ui
+from .frontmatter import FrontmatterError, format_frontmatter_error
 
 
 MAX_CLI_JSON_DOCUMENT_BYTES = 8 * 1024 * 1024
@@ -111,7 +112,7 @@ def main(argv=None) -> int:
     try:
         return _main(argv)
     except (OSError, UnicodeError, ValueError) as error:
-        print(str(error), file=sys.stderr)
+        print(format_frontmatter_error(error) if isinstance(error, FrontmatterError) else str(error), file=sys.stderr)
         return 1
 
 

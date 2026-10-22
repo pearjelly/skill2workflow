@@ -59,6 +59,13 @@ path. The browser decodes the selected bytes as strict UTF-8, so invalid source
 files are rejected instead of silently being rewritten. The control-plane page still accepts an exported snapshot file; by
 default it is not a live authenticated service console.
 
+Compile refusals show fixed recovery guidance beside the toolbar, with a known
+reason and approximate original line when available. Correct and reselect the
+file, then compile again. The active graph is retained; stale results after a
+selection/draft change are discarded. The helper's legacy error response is
+unchanged unless the caller explicitly requests diagnostics. See
+[safe compile diagnostics](skill-input-boundary.md#recover-from-a-compile-refusal).
+
 Successful Skill compiles also display a bounded, source-free **SKILL Compile
 Review** with inferred node counts and fixed missing-control notices. It is an
 authoring prompt only: it does not inspect business intent, change the draft,

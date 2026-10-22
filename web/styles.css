@@ -99,6 +99,16 @@ textarea {
   overflow-x: auto;
 }
 
+.skill-compile-feedback {
+  grid-column: 1 / -1;
+  max-width: 75ch;
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .toolbar button,
 .toolbar select,
 .file-action {

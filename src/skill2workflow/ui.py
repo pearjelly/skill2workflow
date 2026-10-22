@@ -19,6 +19,7 @@ from .compiler import compile_ir_to_workflow, summarize_skill_compile, validate_
 from .dashboard import MAX_LIVE_SNAPSHOT_BYTES
 from .live_snapshot import fetch_live_control_snapshot
 from .parser import MAX_SKILL_FILE_BYTES, parse_skill_text
+from .frontmatter import skill_compile_diagnostic
 from .preflight import MAX_WORKFLOW_PREFLIGHT_BYTES, build_workflow_preflight
 from .triggers import MAX_TRIGGER_INPUT_BYTES, normalize_trigger_input
 from .service import read_service_bearer_token
@@ -1158,8 +1159,9 @@ def serve_ui(
                 payload = None
             if (
                 not isinstance(payload, dict)
-                or set(payload) != {"skill_markdown"}
+                or set(payload) not in ({"skill_markdown"}, {"skill_markdown", "diagnostics"})
                 or not isinstance(payload.get("skill_markdown"), str)
+                or not isinstance(payload.get('diagnostics', False), bool)
             ):
                 self._write_json(400, {"error": "skill compile body is malformed"})
                 return
@@ -1178,8 +1180,11 @@ def serve_ui(
                 ).encode("utf-8")
                 if len(response_body) > _SKILL_COMPILE_MAX_RESPONSE_BYTES:
                     raise ValueError("compiled workflow is too large")
-            except (TypeError, ValueError, UnicodeEncodeError):
-                self._write_json(400, {"error": "skill compile rejected"})
+            except (TypeError, ValueError, UnicodeEncodeError) as error:
+                rejected = {"error": "skill compile rejected"}
+                if payload.get('diagnostics') is True:
+                    rejected['diagnostic'] = skill_compile_diagnostic(error)
+                self._write_json(400, rejected)
                 return
             self._write_json(200, response_body, content_type="application/json")
 

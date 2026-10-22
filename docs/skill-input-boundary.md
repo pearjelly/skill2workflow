@@ -76,7 +76,10 @@ an arbitrary YAML loader or complete Agent Skills validator:
 
 Repeated keys, malformed quotes/indentation, unsupported collections, deeper
 maps, tags, anchors, aliases and merge keys fail with the fixed
-`Invalid SKILL.md frontmatter` message, without source values. Wrapped plain
+library `ValueError` text `Invalid SKILL.md frontmatter`, without source values.
+The CLI adds a fixed reason, approximate original line when known, and a next
+edit; it never repeats field names, values, source excerpts or local paths.
+Wrapped plain
 or quoted multiline strings, YAML-only quoted escapes and nonempty flow maps
 are unsupported; use the block-scalar forms above. No constructors, includes,
 filesystem reads or variable evaluation are available. The existing 2 MiB
@@ -92,6 +95,37 @@ comment/header markers may now compile differently or be refused. Review the
 new Workflow DSL identity and structural diff before explicit publication;
 published artifacts are never recompiled, renamed or migrated automatically.
 The Workflow DSL, execution and input contracts remain unchanged.
+
+## Recover From A Compile Refusal
+
+In the editor, read the inline reason beside the compile actions, correct the
+local file, choose it again and explicitly select **Compile SKILL**. A refused
+Skill does not invalidate or replace the already loaded graph. Changing the
+selection or draft invalidates pending compile results and clears old feedback.
+Unknown errors remain generic rather than guessing which source edit is needed.
+
+`POST /api/v1/skill-compiles` still returns exactly
+`{"error":"skill compile rejected"}` for an ordinary compile refusal by default.
+An optional **boolean** `diagnostics: true` in the existing `skill_markdown`
+request opts into an additional `diagnostic` object; `false` preserves the
+legacy response. Invalid envelopes/flags receive only the existing fixed
+malformed-body error. Successful responses remain unchanged.
+
+The [diagnostic schema](../schemas/skill-compile-diagnostic-0.1.0.schema.json)
+requires exactly `schema_version`, `code`, and `line`. The version is
+`skill2workflow-skill-compile-diagnostic-0.1.0`; codes are
+`frontmatter_duplicate_key`, `frontmatter_invalid`, `frontmatter_unsupported`,
+or generic `skill_invalid`. `line` is a one-based original source line or null;
+text-block errors may point near the declaration rather than the precise
+malformed character. It includes no source text, keys, values, paths, or raw
+exception messages. This is repair evidence, not full YAML validation or a new
+Workflow DSL/execution contract.
+
+The editor consumes at most 1 KiB of strict UTF-8 error evidence, accepts only
+the known version/shape and source-bounded line, and maps it to fixed copy.
+Unknown, malformed, oversized and older-helper responses use safe fixed
+fallback guidance. Static hosting still requires `skill2workflow ui` or CLI
+compilation; a network/helper failure is distinct from a source refusal.
 
 ## Explicit Human Approval
 

@@ -84,6 +84,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Make rejected Skill imports recoverable with safe frontmatter reasons,
+  approximate source lines and explicit edit/reselect/recompile guidance;
+  preserve the active draft and fence stale requests. Keep legacy API refusals
+  unchanged unless diagnostics are explicitly requested.
+
 - Preserve Skill identity when optional metadata contains `name`/`description`;
   decode common multiline and quoted frontmatter strings, reject ambiguous
   duplicates safely, and qualify the real installed CLI/UI compilation path.

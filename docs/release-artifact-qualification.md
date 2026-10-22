@@ -72,6 +72,16 @@ despite nested metadata with colliding names. It verifies original step source
 lines, gates and resulting DSL validation as well; module imports or source
 markers alone do not qualify frontmatter compatibility.
 
+The installed compile-recovery drill additionally requires ten actual CLI/API
+cases: four finite diagnostic refusals, two exact legacy refusals, invalid
+opt-in rejection, corrected API success, and refused/corrected CLI compilation.
+It checks no-store, source-free bounded evidence and absence of API filesystem
+effects. Incomplete evidence fails the package gate. The artifact CI separately
+runs `scripts/skill_compile_recovery_smoke.py --executable … --browser-module-tests`
+to render all four actual installed reports through the served editor and
+pinned vendor modules. No source-backend substitution or silent skip qualifies
+that installed path; Node remains development tooling only.
+
 The installed command set also includes `ui`. The qualification starts it with
 its fixed public asset inventory and requires a separate ten-case static-boundary
 drill. That drill creates a synthetic private neighbor in the disposable wheel

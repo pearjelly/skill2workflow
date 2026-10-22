@@ -110,6 +110,20 @@ documented [frontmatter subset](docs/skill-input-boundary.md#frontmatter-identit
 is not full YAML support; do not add constructors, alias resolution or a runtime
 dependency as an incidental parser fix.
 
+Run `tests.test_skill_compile_diagnostics` and
+`node --test tests/test_skill_compile_recovery.cjs` for safe refusal wording,
+legacy/opt-in boundaries, draft retention and stale-request fencing. The
+installed package gate requires ten CLI/API recovery cases; the artifact CI
+also requires real installed reports rendered through the served editor and
+pinned vendor modules, not source markers:
+
+```bash
+python3 scripts/skill_compile_recovery_smoke.py --executable /path/to/installed/skill2workflow --browser-module-tests
+```
+
+Node is development qualification only, not a runtime dependency. Keep error
+evidence source-free and preserve the library's fixed `ValueError` text.
+
 A separate Python 3.14 CI job also runs the local end-user journeys: the
 customer-support Pilot, the three-scenario Pilot pack, explicit external
 connector loading, and the installed-wheel quickstart. These drills use local

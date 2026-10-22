@@ -349,6 +349,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     )
     ui_status = _qualify_installed_ui(console_script, isolated_dir)
     _qualify_installed_skill_compiles(console_script, isolated_dir)
+    _qualify_installed_skill_compile_recovery(repo_root, console_script, isolated_dir)
     _qualify_installed_http_assertions(repo_root, console_script, isolated_dir)
     _qualify_installed_skill_http_actions(repo_root, console_script, isolated_dir)
     _qualify_installed_quickstart_inputs(python_bin, console_script, isolated_dir)
@@ -1048,6 +1049,19 @@ def _qualify_installed_draft_input_ui(repo_root: Path, console_script: Path, iso
     ))
     if result != {'ok': True, 'installed': True, 'cases_verified': 13, 'module_served': True, 'diagnostics_verified': 8}:
         raise RuntimeError('installed draft input UI qualification failed')
+    return True
+
+
+def _qualify_installed_skill_compile_recovery(repo_root: Path, console_script: Path, isolated_dir: Path) -> bool:
+    result = json.loads(_run(
+        [sys.executable, str(repo_root / 'scripts' / 'skill_compile_recovery_smoke.py'), '--executable', str(console_script)],
+        cwd=isolated_dir,
+    ))
+    if result != {'ok': True, 'installed': True, 'cases_verified': 10,
+                  'diagnostic_cases_verified': 4, 'legacy_cases_verified': 2,
+                  'cli_cases_verified': 2, 'module_served': True} or any(
+                      result.get(key) is not True for key in ('ok', 'installed', 'module_served')):
+        raise RuntimeError('installed Skill compile recovery qualification failed')
     return True
 
 

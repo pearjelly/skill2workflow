@@ -161,6 +161,12 @@ These surfaces should remain compatible during the `0.1.x` line:
   Workflow DSL document. It neither writes files nor accesses service state,
   credentials, publication, or execution, and it fixes the generated source
   reference to `SKILL.md`.
+- Compile refusal diagnostics are explicit opt-in, finite reason/line evidence;
+  the default API refusal and library frontmatter error text remain compatible.
+  CLI/editor repair wording does not echo source values or exception messages,
+  replace the active graph after failure, or grant execution authority. Pending
+  results are invalidated by selection/draft changes. See
+  [compile recovery](skill-input-boundary.md#recover-from-a-compile-refusal).
 - The installed visual editor loads its pinned LiteGraph JavaScript and
   stylesheet from committed local MIT-licensed assets with test-locked
   SHA-256 digests. It makes no runtime CDN request or browser-time package

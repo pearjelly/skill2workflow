@@ -1,5 +1,11 @@
 # Workflow DSL Compatibility
 
+Skill compile failures now have opt-in, source-free diagnostic evidence and
+fixed CLI/editor recovery wording. The library frontmatter `ValueError` string,
+default API refusal and successful compile response stay compatible. Accepted
+Skill forms, Workflow DSL, published artifacts and execution authority do not
+change. See [compile recovery](skill-input-boundary.md#recover-from-a-compile-refusal).
+
 New Skill compilation isolates top-level identity from nested metadata and
 decodes the documented frontmatter string subset. Duplicate keys and unsupported
 YAML now fail with a fixed refusal instead of producing ambiguous identity or

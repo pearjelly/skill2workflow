@@ -33,16 +33,17 @@
             Load JSON
           </label>
           <label class="file-action">
-            <input id="skill-input" type="file" accept="text/markdown,text/plain,.md" />
+            <input id="skill-input" type="file" accept="text/markdown,text/plain,.md" aria-describedby="skill-compile-feedback" />
             Choose SKILL.md
           </label>
-          <button id="compile-skill" type="button" disabled>Compile SKILL</button>
+          <button id="compile-skill" type="button" aria-describedby="skill-compile-feedback" disabled>Compile SKILL</button>
           <button id="fit-view" type="button">Fit</button>
           <button id="validate-graph" type="button">Validate DSL</button>
           <button id="save-workflow" type="button">Save DSL</button>
           <button id="save-graph" type="button">Save Graph</button>
         </div>
         <div id="status-pill" class="status-pill status-idle">Idle</div>
+        <p id="skill-compile-feedback" class="skill-compile-feedback" role="alert" aria-atomic="true" hidden></p>
       </header>
 
       <section class="workspace" aria-label="Workflow graph editor">
