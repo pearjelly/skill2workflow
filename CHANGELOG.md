@@ -69,6 +69,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Make browser graph downloads compatible with strict CLI write-back by
+  including actual type-default titles and synchronizing pending parameter
+  edits before serialization; announce successful graph export explicitly.
+
 - Preserve omitted HTTP request fields when inspecting and saving a node;
   reject invalid edits without partially changing the request, retain typed
   JSON bodies, and explain explicit reset values in the editor.

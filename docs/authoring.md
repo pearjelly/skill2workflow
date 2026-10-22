@@ -348,6 +348,20 @@ Allowlisted fields:
 
 Unsupported visual edits should be rejected or ignored rather than silently changing execution semantics.
 
+### Browser Graph Export
+
+`Save Graph` writes every live node title explicitly, including titles equal to
+the node type's default (such as Start, Failure, and End). It synchronizes the
+selected parameter form before serializing, so node timeout and retry-backoff
+edits appear in both graph properties and the embedded source DSL. A successful
+download shows `Graph saved`; invalid form input blocks the download.
+
+The result can be passed to the existing CLI write-back operation with its
+original Workflow DSL. Graph-only editing also synchronizes parameter controls,
+but does not invent an embedded source DSL. This does not repair blank titles,
+accept changed identities/topology, or add new editable execution fields.
+The pinned third-party LiteGraph assets are unchanged.
+
 ### HTTP Inspector Editing
 
 Selecting an HTTP node and saving without edits preserves its request exactly,

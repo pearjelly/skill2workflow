@@ -30,11 +30,12 @@ Run the full test suite:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
-Editor renderer changes also run the dependency-free JavaScript behavior tests
-with Node.js (development only, not a Python runtime dependency):
+Editor renderer/export changes also run the dependency-free JavaScript behavior
+tests with Node.js (development only, not a Python runtime dependency). Graph
+export tests use the real bundled LiteGraph and invoke the Python write-back CLI:
 
 ```bash
-node --test tests/test_*inspector.cjs
+node --test tests/test_*.cjs
 ```
 
 The release artifact CI job runs these checks alongside wheel qualification.

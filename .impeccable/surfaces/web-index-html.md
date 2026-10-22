@@ -7,7 +7,18 @@ related_targets: ["web/app.js","web/styles.css"]
 
 # Workflow Editor — Operate
 
-## Current hardening (Loop 270)
+## Current hardening (Loop 271)
+
+Keep Save Graph exports compatible with strict CLI write-back by materializing
+actual live titles, including registered defaults. Do not invent replacement
+text for blank titles or relax identity/topology checks. Synchronize pending
+parameter edits before serialization in both DSL-backed and graph-only modes. Preserve the existing
+editor world and all HTTP inspection behavior. Save feedback must distinguish a
+completed graph export from validation alone. This is a scoped harden → polish
+correction, with no visual redesign or global context rewrite. Acceptance:
+`docs/superpowers/plans/2026-10-22-graph-export-titles.md`.
+
+## Prior hardening (Loop 270)
 
 Preserve configured versus omitted HTTP fields when inspecting, editing, and
 saving a node. Unchanged controls must not create a body, headers, method, or

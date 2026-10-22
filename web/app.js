@@ -962,20 +962,28 @@
   }
 
   function saveGraph() {
+    let sourceWorkflow = null;
+    try {
+      if (currentWorkflowDsl) {
+        sourceWorkflow = workflowDslFromGraph();
+      } else {
+        const syncResult = syncInspectorToSelectedNode(true);
+        if (!syncResult.ok) throw new Error(syncResult.error);
+      }
+    } catch (error) {
+      renderValidation([error.message]);
+      setStatus("Invalid DSL", "invalid");
+      return;
+    }
     if (validateGraph().length) {
       return;
     }
     const serialized = graph.serialize();
-    let sourceWorkflow = null;
-    if (currentWorkflowDsl) {
-      try {
-        sourceWorkflow = workflowDslFromGraph();
-      } catch (error) {
-        renderValidation([error.message]);
-        setStatus("Invalid DSL", "invalid");
-        return;
-      }
-    }
+    serialized.nodes.forEach(function (node) {
+      const liveNode = getNodeByGraphId(node.id);
+      // LiteGraph omits type-default titles; write-back requires actual text.
+      if (liveNode) node.title = liveNode.title;
+    });
     const graphJson = Object.assign({}, serialized, {
       version: GRAPH_VERSION,
       workflow: currentWorkflow,
@@ -987,6 +995,7 @@
       ),
     });
     downloadJson(graphJson, (currentWorkflow.name || "workflow") + ".litegraph.json");
+    setStatus("Graph saved", "valid");
   }
 
   async function saveWorkflow() {

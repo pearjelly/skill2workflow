@@ -51,7 +51,18 @@ class UiTests(TestCase):
         self.assertIn('renderHttpAssertionReview(node, connector);', app)
         self.assertIn('els.httpSection.hidden = !connector || connector.id !== "http";', app)
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        self.assertIn('node --test tests/test_*inspector.cjs', workflow)
+        self.assertIn('node --test tests/test_*.cjs', workflow)
+
+    def test_graph_export_materializes_live_titles_and_announces_completion(self):
+        app = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+        start = app.index("  function saveGraph()")
+        end = app.index("  async function saveWorkflow()", start)
+        save_source = app[start:end]
+        self.assertIn("node.title = liveNode.title", save_source)
+        self.assertLess(save_source.index("workflowDslFromGraph()"), save_source.index("graph.serialize()"))
+        self.assertLess(save_source.index("syncInspectorToSelectedNode(true)"), save_source.index("graph.serialize()"))
+        self.assertLess(save_source.index("node.title = liveNode.title"), save_source.index("downloadJson("))
+        self.assertGreater(save_source.index('setStatus("Graph saved", "valid")'), save_source.index("downloadJson("))
 
     def test_http_inspector_explains_omission_and_explicit_reset_values(self):
         page = (ROOT / "web" / "index.html").read_text(encoding="utf-8")

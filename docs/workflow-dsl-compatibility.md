@@ -304,6 +304,12 @@ Connector package conventions remain local-first: explicit file loading and regi
 
 ## Consumer Guidance
 
+Browser graph exports explicitly include actual node titles even when LiteGraph
+would normally omit a registered default. Pending form edits synchronize before
+graph serialization. CLI write-back still requires non-empty titles and rejects
+changed identities/topology; no fallback or field-deletion protocol is added.
+See [browser graph export](authoring.md#browser-graph-export).
+
 The HTTP browser inspector preserves omitted request properties on an unedited
 save. Its explicit reset values (`GET`, `{}`, `null`, and timeout `0`) use the
 existing DSL contract. Clearing a declared form control does not request field
