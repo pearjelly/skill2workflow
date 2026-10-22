@@ -84,6 +84,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Restrict UI static GET/HEAD to the fixed packaged public assets instead of
+  serving its surrounding directory. Refuse directory listings, private
+  neighbors, symlink components, special files and oversized assets; require
+  installed-only private-file refusal qualification.
+
 - Refuse quickstart initialization when a required HTTP input mapping source is
   missing, even when the declared input schema accepts the supplied object.
 

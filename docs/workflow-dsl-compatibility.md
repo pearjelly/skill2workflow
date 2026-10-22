@@ -1,5 +1,12 @@
 # Workflow DSL Compatibility
 
+The UI static file server admits only the fixed packaged public resources for
+GET/HEAD; arbitrary neighboring files and directory listings are not a supported
+UI interface. Load custom workflows/snapshots with the existing file picker.
+This tightened delivery boundary does not change the Workflow DSL, graph
+write-back, local authoring helpers or authenticated service routes. See
+[installed UI](installed-ui.md#fixed-static-asset-boundary).
+
 Explicit Skill step declarations (`<!-- skill2workflow: human_gate -->`) affect
 newly compiled drafts. They emit the existing `human_gate` node contract and
 add no Workflow DSL fields. Unmarked Skill inference and published artifacts

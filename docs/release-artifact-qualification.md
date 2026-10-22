@@ -66,6 +66,14 @@ The installed `authoring-bundle` command must create and the normal
 `bundle-verify` command must accept the resulting portable Bundle.
 
 The installed command set also includes `ui`. The qualification starts it with
+its fixed public asset inventory and requires a separate ten-case static-boundary
+drill. That drill creates a synthetic private neighbor in the disposable wheel
+installation, proves GET/HEAD exclude it, checks fixed refusals and editor
+redirects, and removes the neighbor afterward. The selected installed CLI runs
+outside the checkout with source imports disabled. Incomplete refusal evidence
+fails the package gate.
+
+The qualification also starts the installed `ui` with
 the source checkout unavailable, fetches `/web/index.html`, and checks that the
 static editor, interactive control script, and example assets were carried into
 the wheel's data area.

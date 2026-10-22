@@ -378,7 +378,9 @@ class PackageSmokeTests(TestCase):
             ) as qualify_installed_skill_http_actions:
                 with patch('scripts.package_smoke._qualify_installed_quickstart_inputs', return_value=True) as qualify_quickstart_inputs, patch(
                     'scripts.package_smoke._qualify_installed_draft_input_ui', return_value=True
-                ) as qualify_draft_input:
+                ) as qualify_draft_input, patch(
+                    'scripts.package_smoke._qualify_installed_ui_static', return_value=True
+                ) as qualify_ui_static:
                     result = run_package_smoke(repo, work)
 
         flattened = [part for command, _cwd in commands for part in command]
@@ -414,6 +416,7 @@ class PackageSmokeTests(TestCase):
         qualify_installed_skill_http_actions.assert_called_once()
         qualify_quickstart_inputs.assert_called_once()
         qualify_draft_input.assert_called_once()
+        qualify_ui_static.assert_called_once()
         qualify_installed_skill_compiles.assert_called_once_with(
             Path(result["console_script"]), (work / "isolated").resolve()
         )

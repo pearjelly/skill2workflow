@@ -14,6 +14,13 @@ runnable, and easy to verify without overstating the production boundary.
 
 The Workflow DSL is the execution truth source. LiteGraph JSON and the web editor are views and authoring surfaces; they must round-trip through Workflow DSL before execution or publication.
 
+UI static resources are a fixed public inventory, not a directory tree. Keep
+`UI_STATIC_FILES`, package data and the strict release-manifest inventory equal
+when adding an asset. Run `tests.test_ui_static_boundary` and the package smoke;
+the latter requires installed-only GET/HEAD and synthetic private-file refusal
+evidence. The static loader requires no-follow descriptor-relative file support;
+do not add a path-based fallback or loosen the gate to bypass that requirement.
+
 ## Local Setup
 
 Requirements:

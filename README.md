@@ -110,7 +110,8 @@ skill2workflow ui --port 4173
 Open `http://127.0.0.1:4173/web/` or
 `http://127.0.0.1:4173/web/control.html`. The UI server is loopback-only. Without
 explicit live configuration, its local authoring helpers do not read runtime
-state or credentials. Its pinned LiteGraph
+state or credentials. Static GET/HEAD serve only a fixed public asset inventory,
+not directory listings or neighboring private files. Its pinned LiteGraph
 assets are bundled locally, so the editor does not require CDN access at
 runtime. See the [installed UI guide](docs/installed-ui.md). With an explicit service origin and protected
 token file, the same console can inspect bounded live state, download a

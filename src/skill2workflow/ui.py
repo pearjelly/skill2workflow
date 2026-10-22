@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import json
+import os
 import re
+import stat
 import sysconfig
 from functools import partial
 from http.server import HTTPServer, SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -70,6 +73,30 @@ from .service_client import (
 
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 _DATA_ROOT = Path("share") / "skill2workflow"
+# Keep this exact inventory equal to the strict release data-member gate.
+UI_STATIC_FILES = frozenset({
+    "web/app.js", "web/control.css", "web/control.html", "web/control.js",
+    "web/index.html", "web/input-review.js", "web/styles.css",
+    "web/vendor/litegraph-0.7.18/LICENSE", "web/vendor/litegraph-0.7.18/README.md",
+    "web/vendor/litegraph-0.7.18/litegraph.css",
+    "web/vendor/litegraph-0.7.18/litegraph.min.js",
+    "examples/control-plane-snapshot.json",
+    "examples/workflows/approval-flow.litegraph.json",
+    "examples/workflows/approval-flow.workflow.json",
+    "examples/workflows/customer-service-escalation.litegraph.json",
+    "examples/workflows/customer-service-escalation.workflow.json",
+    "examples/workflows/http-connector.litegraph.json",
+    "examples/workflows/http-connector.workflow.json",
+    "examples/workflows/http-action-flow.litegraph.json",
+    "examples/workflows/http-action-flow.workflow.json",
+    "examples/workflows/operations-analysis.litegraph.json",
+    "examples/workflows/operations-analysis.workflow.json",
+    "examples/workflows/risk-review.litegraph.json",
+    "examples/workflows/risk-review.workflow.json",
+    "examples/workflows/sales-follow-up.litegraph.json",
+    "examples/workflows/sales-follow-up.workflow.json",
+})
+_MAX_UI_ASSET_BYTES = 8 * 1024 * 1024
 _LIVE_SNAPSHOT_PATH = "/api/v1/control-snapshot"
 _LIVE_SNAPSHOT_MAX_RESPONSE_BYTES = MAX_LIVE_SNAPSHOT_BYTES
 _SERVICE_PROBE_PATH = "/api/v1/service-probe"
@@ -219,6 +246,33 @@ def find_ui_root() -> Path:
     )
 
 
+def _read_ui_asset(root: Path, relative: str) -> bytes:
+    """Read only one declared regular asset through no-follow descriptors."""
+
+    if relative not in UI_STATIC_FILES or not getattr(os, "O_NOFOLLOW", 0):
+        raise ValueError("UI asset unavailable")
+    flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    directory_flags = flags | os.O_DIRECTORY
+    descriptors = []
+    try:
+        descriptors.append(os.open(root, directory_flags))
+        parts = relative.split("/")
+        for part in parts[:-1]:
+            descriptors.append(os.open(part, directory_flags, dir_fd=descriptors[-1]))
+        descriptor = os.open(parts[-1], flags, dir_fd=descriptors[-1])
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > _MAX_UI_ASSET_BYTES:
+                raise ValueError("UI asset unavailable")
+            body = stream.read(_MAX_UI_ASSET_BYTES + 1)
+            if len(body) > _MAX_UI_ASSET_BYTES:
+                raise ValueError("UI asset unavailable")
+            return body
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
 def serve_ui(
     host: str = "127.0.0.1",
     port: int = 4173,
@@ -249,8 +303,42 @@ def serve_ui(
         def log_message(self, *_args):
             return
 
+        def send_head(self):
+            # Both static GET and inherited HEAD enter this exact admission path.
+            try:
+                parsed = urlsplit(self.path)
+                if parsed.scheme or parsed.netloc or parsed.fragment:
+                    raise ValueError("UI asset unavailable")
+                path = parsed.path
+                if path in {"/", "/web"}:
+                    self.send_response(307)
+                    self.send_header("Location", "/web/")
+                    self.send_header("Content-Length", "0")
+                    self.send_header("Cache-Control", "no-store")
+                    self.send_header("X-Content-Type-Options", "nosniff")
+                    self.end_headers()
+                    return None
+                if path == "/web/":
+                    path = "/web/index.html"
+                relative = path[1:] if path.startswith("/") else ""
+                body = _read_ui_asset(root, relative)
+            except (OSError, ValueError, TypeError, NotImplementedError, AttributeError):
+                self._write_json(404, {"error": "UI asset is not available"})
+                return None
+            self.send_response(200)
+            self.send_header("Content-Type", self.guess_type(relative))
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.end_headers()
+            return io.BytesIO(body)
+
         def do_GET(self):
-            parsed = urlsplit(self.path)
+            try:
+                parsed = urlsplit(self.path)
+            except ValueError:
+                self._write_json(404, {"error": "UI asset is not available"})
+                return
             if parsed.path == _LIVE_RUN_PAGE_PATH:
                 try:
                     cursor = _parse_live_run_page_cursor(parsed.query)
@@ -1864,7 +1952,8 @@ def serve_ui(
                 self.send_header("Content-Disposition", content_disposition)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(body)
+            if self.command != "HEAD":
+                self.wfile.write(body)
 
     handler = partial(QuietHandler, directory=str(root))
     server_class = HTTPServer if once else ThreadingHTTPServer

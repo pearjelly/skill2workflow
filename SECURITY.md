@@ -48,6 +48,13 @@ value reports include authentication bypass, credential disclosure, unsafe
 path or symlink handling, state-integrity failure, cross-workflow data leakage,
 or automatic replay after an unknown external side effect.
 
+The installed/source `ui` command serves only its fixed public asset inventory,
+not the surrounding directory. GET and HEAD reject unknown paths and symlinked
+assets without exposing file names or contents. See the
+[UI static boundary](docs/installed-ui.md#fixed-static-asset-boundary) for its
+descriptor, size and platform limits; generic development file servers do not
+provide that product boundary.
+
 Executing an intentionally trusted workflow's configured outbound HTTP request
 is expected behavior. Hosted multi-tenancy, built-in TLS, OAuth, a managed
 secret store, distributed workers, and exactly-once execution are not current

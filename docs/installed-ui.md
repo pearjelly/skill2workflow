@@ -23,6 +23,34 @@ the wheel, so the editor works without CDN access or general internet egress.
 Their upstream version, MIT notice, and SHA-256 digests are recorded beside the
 assets at `web/vendor/litegraph-0.7.18/`; no browser dependency is fetched at
 runtime.
+
+### Fixed static asset boundary
+
+`skill2workflow ui` is not a general directory server. GET and HEAD admit only
+the fixed packaged editor/control assets, pinned vendor notices and non-sensitive
+example JSON. `/` and `/web` redirect to `/web/` so relative assets keep working.
+Asset query strings may be used for cache busting; they do not select files.
+Directory listings, source/development metadata, arbitrary files under `web/` or
+`examples/`, and neighboring state or token files are not served. A custom
+workflow or snapshot must be selected through the existing file picker, not
+placed beside the server and fetched by URL.
+
+Static reads pin directory descriptors below the discovered asset root and
+refuse symlink components, non-regular files and assets over 8 MiB. The reader
+requires no-follow and descriptor-relative OS file primitives (qualified on
+Linux and macOS); unavailable primitives fail closed. Assets and fixed, value-free
+404 refusals are `no-store` and `nosniff`; HEAD has the same admission rules and
+metadata but no body. HEAD never forwards a live API request. The inventory is
+locked to the release data-member allowlist, not discovered from directory
+contents. This protects file selection, not a compromised installation or a
+trusted public asset deliberately rewritten by someone who can modify it.
+
+This boundary applies to the product's `ui` command. A generic `python -m
+http.server` preview remains a general file server; run it only over public
+content and do not place private artifacts in its served directory.
+
+### Local authoring helpers
+
 The editor's **Compile SKILL** action is a local authoring helper: it
 accepts one bounded 2 MiB `SKILL.md` in memory and returns a draft Workflow DSL
 document without writing, publishing, executing, or contacting the service.
