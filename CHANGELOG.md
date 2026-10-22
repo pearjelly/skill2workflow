@@ -84,6 +84,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Enforce the production-baseline bundle's shared remaining execution budget;
+  stop owned POSIX check process groups on timeout and preserve artifacts when
+  cleanup cannot be confirmed, without changing its 19 checks or evidence schema.
+
 - Reduce repeated idle shutdown waits in owned HTTP test fixtures while
   preserving real network checks, all assertions and production timeout policies.
 

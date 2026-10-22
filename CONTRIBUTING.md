@@ -45,6 +45,14 @@ change production server polling, bypass network assertions, or relax release
 deadlines to speed up tests. Restore scoped substitutions and join/close owned
 servers during cleanup.
 
+The optional production-baseline bundle keeps all 19 checks within a shared
+execution budget on qualified POSIX hosts. Its supervisor must stop the owned
+process group and reap its direct child before normal artifact cleanup; an
+unconfirmed stop preserves the work directory and fails the bundle. Do not
+replace this with direct-child-only termination, reset the suite budget between
+checks, or treat skipped checks as a passing release. See
+[execution/cleanup limits](docs/production-baseline-evidence.md).
+
 Editor renderer/export changes also run the dependency-free JavaScript behavior
 tests with Node.js (development only, not a Python runtime dependency). Graph
 export tests use the real bundled LiteGraph and invoke the Python write-back CLI:

@@ -39,6 +39,10 @@ The command checks:
 When `--production-baseline` is supplied, it also runs the fixed 19-check
 Production Baseline evidence bundle. Without that flag, the preflight keeps its
 historical artifact-only command set for faster routine checks.
+The bundle uses a shared check-execution deadline and owned POSIX process groups;
+an unconfirmed cleanup is a failed release check with preserved artifacts, not
+permission to remove a possibly live directory. See
+[baseline execution and cleanup limits](production-baseline-evidence.md).
 
 The isolated wheel smoke also executes the installed `systemd-unit` command
 against a fixed-port secure workspace and checks its redacted least-privilege

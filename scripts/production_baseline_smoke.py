@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
+import signal
 import shutil
 import subprocess
 import sys
@@ -25,6 +27,12 @@ WORK_DIR_MARKER = ".skill2workflow-production-baseline"
 WORK_DIR_MARKER_VALUE = "skill2workflow production baseline work directory\n"
 CHECK_TIMEOUT_SECONDS = 180
 SUITE_TIMEOUT_SECONDS = 600
+PROCESS_REAP_TIMEOUT_SECONDS = 5
+
+
+class _ProcessCleanupError(RuntimeError):
+    def __init__(self):
+        super().__init__("production baseline process cleanup could not be confirmed")
 
 
 def run_baseline(
@@ -41,15 +49,24 @@ def run_baseline(
     (work_dir / WORK_DIR_MARKER).write_text(WORK_DIR_MARKER_VALUE, encoding="utf-8")
     (work_dir / WORK_DIR_MARKER).chmod(0o600)
 
-    runner = command_runner or _run_command
-    started = time.monotonic()
+    deadline = time.monotonic() + SUITE_TIMEOUT_SECONDS
     checks: List[Dict[str, object]] = []
     for name, command, child_dir in _suite(work_dir):
-        if time.monotonic() - started >= SUITE_TIMEOUT_SECONDS:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
             checks.append({"name": name, "status": "skipped", "reason": "suite_timeout"})
             continue
+        safe_to_clean = True
         try:
-            result = runner(command, ROOT)
+            if command_runner is None:
+                result = _run_command(
+                    command, ROOT,
+                    timeout_seconds=min(CHECK_TIMEOUT_SECONDS, remaining),
+                    suite_deadline=deadline,
+                )
+            else:
+                # Preserve the existing test injection contract; production uses the supervisor.
+                result = command_runner(command, ROOT)
             exit_code, timed_out = _normalize_result(result)
             checks.append(
                 {
@@ -59,6 +76,9 @@ def run_baseline(
                     "timed_out": timed_out,
                 }
             )
+        except _ProcessCleanupError:
+            safe_to_clean = False
+            raise
         except (OSError, RuntimeError, ValueError):
             checks.append(
                 {
@@ -70,7 +90,7 @@ def run_baseline(
                 }
             )
         finally:
-            if child_dir is not None:
+            if safe_to_clean and child_dir is not None:
                 _remove_owned_path(child_dir)
 
     passed = sum(check["status"] == "passed" for check in checks)
@@ -145,24 +165,69 @@ def _suite(work_dir: Path):
     ]
 
 
-def _run_command(command: Sequence[str], cwd: Path) -> Tuple[int, bool]:
+def _process_group_available() -> bool:
+    return os.name == "posix" and callable(getattr(os, "killpg", None))
+
+
+def _stop_owned_group(process) -> None:
+    """Signal only the new session's group while its direct child is unreaped."""
+
+    try:
+        if process.pid <= 1:
+            raise _ProcessCleanupError()
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        process.wait(timeout=PROCESS_REAP_TIMEOUT_SECONDS)
+    except BaseException:
+        raise _ProcessCleanupError() from None
+
+
+def _run_command(
+    command: Sequence[str], cwd: Path, *, timeout_seconds=None, suite_deadline=None
+) -> Tuple[int, bool]:
+    limit = float(CHECK_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds)
+    if not math.isfinite(limit) or limit <= 0:
+        return 124, True
+    limit = min(CHECK_TIMEOUT_SECONDS, limit)
+    if not _process_group_available():
+        raise RuntimeError("production baseline process supervision unavailable")
+    deadline = time.monotonic() + limit
+    if suite_deadline is not None:
+        shared_deadline = float(suite_deadline)
+        if not math.isfinite(shared_deadline):
+            return 124, True
+        deadline = min(deadline, shared_deadline)
     environment = dict(os.environ)
     source_path = str(cwd / "src")
     existing = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = source_path if not existing else f"{source_path}{os.pathsep}{existing}"
-    try:
-        completed = subprocess.run(
-            list(command),
-            cwd=str(cwd),
-            env=environment,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=CHECK_TIMEOUT_SECONDS,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
+    if time.monotonic() >= deadline:
         return 124, True
-    return int(completed.returncode), False
+    process = subprocess.Popen(
+        list(command),
+        cwd=str(cwd),
+        env=environment,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    try:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise subprocess.TimeoutExpired(command, limit)
+        returncode = process.wait(timeout=remaining)
+    except subprocess.TimeoutExpired:
+        _stop_owned_group(process)
+        return 124, True
+    except BaseException:
+        if process.returncode is None:
+            _stop_owned_group(process)
+        raise
+    if time.monotonic() >= deadline:
+        return 124, True
+    return int(returncode), False
 
 
 def _normalize_result(result) -> Tuple[int, bool]:
