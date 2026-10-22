@@ -82,6 +82,31 @@ YAML dependency. The extra wheel member is the standard-library-only reader.
 
 Portable authoring retains the intended name/description without copying
 optional metadata. Invalid duplicates are value-free CLI refusals and fixed
-local API 400 responses. Secret hygiene and whitespace checks passed. No UI
+local API 400 responses. Secret hygiene passed. A staged whitespace scan found
+one extra blank line at the new test file's EOF; the documentation closure
+removes it without changing test behavior or runtime source. No UI
 source, provider, credential, execution policy, published artifact or DSL/report
 schema changed; owned temporary children/once-only listeners have stopped.
+
+An additional wheel-only quickstart reused the qualified folded-description,
+colliding-metadata Skill from outside the checkout. It preserved
+`workflow_installed_process`, stopped in `waiting`, then completed through the
+generated explicit approval command with only manual fixture steps. No external
+provider was called. The fresh owner-only test workspace was removed afterward;
+the installed wheel and source fixture remain available as qualification evidence.
+
+## Remote Qualification
+
+Implementation `1a24126b1fc54b6f177d796a6244dc25e1afcd62` passed all seven
+[CI jobs](https://github.com/pearjelly/skill2workflow/actions/runs/39799059823),
+including installed CLI/UI qualification, both Python floors, real user journeys,
+recovery/state safety, Docker and systemd. Terminal logs independently record
+all 1,460 tests on Python 3.9 (127.331s) and Python 3.14 (121.458s).
+
+[Complete release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39799120872)
+passed on attempt 1 at the same exact implementation, on Python 3.9.25. Its
+terminal log explicitly records `PASSED command:production_baseline`; the fixed
+19-check suite and existing budgets were not reduced or bypassed. Delayed
+remote status propagation was observed until the run and every job were
+terminal; no successful run was restarted to resolve that observation delay.
+No package version, release/tag, runtime dependency, DSL or maturity change.

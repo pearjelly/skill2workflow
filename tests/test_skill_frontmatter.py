@@ -138,4 +138,3 @@ class SkillFrontmatterTests(TestCase):
     def test_absent_and_unclosed_frontmatter_keep_legacy_body_behavior(self):
         for text in ('## Steps\n1. Review', '---\nname: unfinished\n## Steps\n1. Review'):
             self.assertEqual(parse_skill_text(text)['ordered_steps'], ['Review'])
-

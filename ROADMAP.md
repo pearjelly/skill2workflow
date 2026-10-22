@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-279
+- Completed delivery loops: 1-280
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 279 is complete with actionable draft input explanations
+- Active loop: None; Loop 280 is complete with scoped Skill frontmatter parsing
 - Next maturity gate: Production Baseline
-- Next decision: review the end-to-end Skill-to-controlled-run handoff and remaining service/recovery evidence before selecting the next first-value or Production Baseline delivery loop
+- Next decision: review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery loop
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-279 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-280 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 279 is complete and there is no active delivery loop; review the end-to-end Skill-to-controlled-run handoff and remaining service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 279 plan clarifies existing input rejection reasons without changing validation or execution. Its unchanged-CSS finish review does not qualify true 200% magnification or promote maturity. Installed-build variability and real service/recovery work remain part of qualification.
+This rolling queue is ordered. Loop 280 is complete and there is no active delivery loop; review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 280 plan corrects frontmatter identity/text parsing within a documented string subset, not full YAML conformance or automatic migration of published workflows. Installed-build variability and sustained real service/recovery evidence remain part of qualification; maturity is unchanged.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7585,6 +7585,35 @@ and complete production-baseline release preflight passed on the first attempt.
 Exact qualification is recorded in
 `docs/superpowers/plans/2026-10-22-input-check-explanations.md`.
 
+### Loop 280: Skill Frontmatter Identity And Text
+
+**Status:** Complete.
+
+**Prior basis:** A valid optional `metadata.name` overwrote top-level Skill
+identity, and a folded description became literal `>-` in the compiled DSL.
+The old reader split every colon-bearing line without respecting scalar scope.
+
+**Outcome:** A standard-library-only reader isolates root identity and a flat
+metadata map, decodes common literal/folded/quoted text, preserves source lines
+and rejects duplicates or unsupported constructs with a value-free error. Key
+and comment scans avoid padding-sensitive regex backtracking. Optional metadata
+does not become workflow instructions or runtime authorization.
+
+**Safety boundary:** This is a documented string subset, not full YAML support
+or a complete Agent Skills validator. No constructors, tags, aliases, includes,
+new dependency, DSL/report schema, runtime policy or published-artifact rewrite.
+Corrected newly compiled identities/text require review before publication.
+
+**Evidence:** At `1a24126`, 1,460 Python and 37 editor tests, 118 focused tests,
+unchanged examples and a 95-member isolated wheel passed. A local development
+oracle matched 784 valid and refused 216 invalid block-text combinations without
+becoming a dependency. Mandatory installed CLI/UI checks assert actual identity,
+description, gates and source mapping; an installed quickstart preserved identity,
+waited for approval, then completed with manual fixture steps. All seven CI jobs
+and complete production-baseline release preflight passed on the first attempt.
+Exact evidence and the final whitespace-only test cleanup are recorded in
+`docs/superpowers/plans/2026-10-22-skill-frontmatter-identity.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7828,6 +7857,7 @@ Exact qualification is recorded in
 | Loop 277: Fast HTTP Test Fixture Teardown | Complete | Add release-gate headroom by removing unnecessary HTTP fixture waits | Shared test-only servers, preserved explicit intervals and real assertions, local package identity, complete timing comparison and unchanged production guards |
 | Loop 278: Shared Baseline Execution Deadline | Complete | Enforce the baseline execution budget and stop owned timed-out checks | Absolute shared deadline, capped waits, POSIX group supervision, bounded direct-child reap, fail-closed cleanup and unchanged evidence/check membership |
 | Loop 279: Actionable Draft Input Explanations | Complete | Explain blocked input with a safe next edit | Declared-evidence reason/type/bound hints, payload-relative pointers, private unknown keys, generic fallbacks, real installed module qualification and independent finish review |
+| Loop 280: Skill Frontmatter Identity And Text | Complete | Preserve intended identity and descriptions from ordinary Skill metadata | Scoped root/map parsing, literal/folded/quoted text, fixed refusals, linear key/comment scans, unchanged source lines and real installed compilation/approval evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
