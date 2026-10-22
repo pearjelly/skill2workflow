@@ -78,6 +78,29 @@ static-boundary, installed-UI, packaging and package-gate tests also passed.
 
 ## Remote Qualification
 
-Pending exact feature-commit CI and complete production-baseline release
-preflight. No tag, package release or maturity promotion is authorized by this
-loop's completion.
+Qualified implementation: `e721a84e5741275eb224ae842d7957d68a48d5ff`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39776704971)
+passed all seven jobs, including Python 3.9/3.14, installed static exclusion,
+local user journeys, editor regressions, Docker, systemd and recovery/state safety.
+[Release preflight, attempt 2](https://github.com/pearjelly/skill2workflow/actions/runs/39776720416/attempts/2)
+passed the complete production-baseline dry-run on Python 3.9.25. Its terminal
+job log explicitly records `PASSED command:production_baseline`.
+
+Release-preflight attempt 1 passed its first full unit suite, wheel qualification
+and reproducible build. Within the subsequent production-baseline drill, the
+second full unit suite reached the unchanged 180-second command deadline; the
+other 18 baseline checks passed. The same commit's Python 3.9 CI full suite
+completed in 151.836 seconds. Attempt 2 reruns the same commit and unchanged
+checks/deadlines and passed. The first attempt is not counted as a pass; this
+successful retry does not prove the timing root cause.
+
+An additional complete local production-baseline run passed all 19 checks with
+the unchanged 180-second command deadline and 600-second suite guard. Its public
+evidence is `/tmp/skill2workflow-production-baseline-loop276/production-baseline-evidence.json`.
+This supplements rather than replaces exact-commit remote qualification. The
+initial remote timeout remains an observed release-gate timing risk for next
+selection; environmental variance is a hypothesis, not a proven root cause.
+
+Roadmap closure passed 106 focused feature/documentation tests, repository secret
+hygiene and whitespace checks. No tag, package release, live-provider operation
+or maturity promotion was performed. The broad project goal remains active.

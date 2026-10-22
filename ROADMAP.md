@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-275
+- Completed delivery loops: 1-276
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 275 is complete with editor draft input preflight
+- Active loop: None; Loop 276 is complete with fixed UI static asset serving
 - Next maturity gate: Production Baseline
-- Next decision: review the installed visual-authoring handoff and operator evidence before selecting the next Production Baseline delivery loop
+- Next decision: review release-gate timing, the installed visual-authoring handoff and operator evidence before selecting the next Production Baseline delivery loop
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-275 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-276 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 275 is complete and there is no active delivery loop; review the installed visual-authoring handoff and operator evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 275 plan records the editor input-review gap and its resolution without claiming provider health or future execution success.
+This rolling queue is ordered. Loop 276 is complete and there is no active delivery loop; review release-gate timing, the installed visual-authoring handoff and operator evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 276 plan records and closes the observed static file-serving boundary and preserves the first release attempt's unit-suite deadline failure without claiming a proven timing root cause, protection against a compromised installation or a maturity promotion.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7466,6 +7466,36 @@ jobs and complete production-baseline release preflight passed on that commit.
 Exact remote qualification is recorded in
 `docs/superpowers/plans/2026-10-22-editor-input-preflight.md`.
 
+### Loop 276: Fixed UI Static Asset Boundary
+
+**Status:** Complete.
+
+**Prior basis:** The UI claimed to serve editor assets and non-sensitive examples,
+but its general directory handler also admitted arbitrary neighboring files and
+directory listings. A synthetic private-file HTTP test reproduced the gap.
+
+**Outcome:** Static GET and HEAD now admit only the exact packaged 26-member
+UI/example inventory. Descriptor-relative no-follow reads refuse symlinks,
+non-regular files and assets above 8 MiB. Unknown paths have a fixed value-free
+404; root aliases redirect to the editor's correct relative-resource base.
+
+**Safety boundary:** No path-based fallback when safe OS primitives are absent.
+HEAD sends no body and never invokes live helpers. Public asset bytes, local
+authoring helpers, authenticated service routes, DSL and execution authority
+are unchanged. This is not protection against a compromised installation or
+authorized rewriting of a trusted public asset. Generic development file
+servers remain outside this product boundary; maturity stays Self-hosted Beta.
+
+**Evidence:** At `e721a84`, 1,431 Python tests, 30 editor tests and a 94-member
+isolated-wheel qualification passed locally. Eleven new regressions include
+GET/HEAD parity, every public asset, private neighbors, traversal, symlinks,
+special files, replacement races and inventory/release parity. Mandatory
+installed qualification proves ten cases with a synthetic private neighbor.
+All seven CI jobs and complete production-baseline release preflight passed;
+the latter required a same-code retry after a unit-suite deadline failure.
+Exact remote qualification is recorded in
+`docs/superpowers/plans/2026-10-22-ui-static-asset-boundary.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7705,6 +7735,7 @@ Exact remote qualification is recorded in
 | Loop 273: Input-Aware Controlled Quickstart | Complete | Start custom Skills with validated business input and a real pre-effect approval boundary | Pre-initialization finite typed input, durable trigger continuation, pre-gate connector refusal, compact results, and mandatory installed qualification |
 | Loop 274: Quickstart Readiness Preview | Complete | Preview local input/mapping readiness before workspace creation and approval | Shared bounded preflight, fixed refusals, read-only location checks, corrected-input retry, and mandatory installed preview qualification |
 | Loop 275: Draft Input Review In The Editor | Complete | Inspect Skill input contracts and check draft payloads inside visual authoring | Read-only contract, bounded pure local preflight, ephemeral input, stale-result invalidation, export isolation and installed qualification |
+| Loop 276: Fixed UI Static Asset Boundary | Complete | Prevent the UI asset server from exposing surrounding files | Exact public inventory, shared GET/HEAD admission, descriptor-bound no-follow reads, fixed refusals, replacement-race tests and installed exclusion qualification |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
