@@ -77,3 +77,20 @@ hygiene and whitespace checks passed.
 After the final CLI error-wrapper fix and added regression, the complete local
 suite passed 1,413 tests in 126.417 seconds. The earlier 1,412-test run also
 passed, but is not used as final-source qualification.
+
+## Remote Qualification
+
+Qualified implementation: `a4659e480dfd82d572b40432560f2d10e8aa2569`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39768118607)
+passed all seven jobs, including Python 3.9/3.14, isolated installed preview
+qualification, user journeys, editor regressions, Docker, systemd and recovery
+and state-safety drills.
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39768121973)
+passed the complete production-baseline dry-run on Python 3.9.25. The terminal
+job log explicitly records `PASSED command:production_baseline`.
+
+Roadmap closure passed 106 focused feature/documentation tests, repository
+secret hygiene and whitespace checks. README's custom-Skill example now leads
+with the read-only preview and explicitly requires removing `--dry-run` to
+initialize. The default bundled first command remains directly runnable.
+No tag, package release, live-provider pilot or maturity promotion was performed.

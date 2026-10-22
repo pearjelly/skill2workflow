@@ -64,15 +64,15 @@ skill2workflow quickstart \
   --root /tmp/skill2workflow-custom \
   --skill /absolute/path/to/SKILL.md \
   --input /absolute/path/to/input.json \
-  --port 8080
+  --port 8080 --dry-run
 ```
 
 A supplied local Skill must compile to a valid workflow with
 an explicit human gate before any non-manual connector on its initial success
 path. Omit `--input` only when the Skill's input contract accepts `{}`; input
 and required HTTP mapping sources are validated before creating the workspace.
-Add `--dry-run` to preview readiness without creating files or starting a run;
-remove it to explicitly initialize. Follow the
+The custom command above previews readiness without creating files or starting
+a run; remove `--dry-run` to explicitly initialize. Follow the
 [installed quickstart guide](docs/quickstart.md) to inspect and approve that
 run, start the authenticated service, and submit a second trigger. Its JSON
 result also contains safe `operator_commands` argv arrays for those next
@@ -996,7 +996,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-273 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-274 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring

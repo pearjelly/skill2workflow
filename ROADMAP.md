@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-273
+- Completed delivery loops: 1-274
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 273 is complete with input-aware controlled quickstart
+- Active loop: None; Loop 274 is complete with quickstart readiness preview
 - Next maturity gate: Production Baseline
-- Next decision: review the installed input-aware onboarding and safety evidence before selecting the next Production Baseline delivery loop
+- Next decision: review the installed readiness-preview handoff and operator evidence before selecting the next Production Baseline delivery loop
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-273 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-274 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 273 is complete and there is no active delivery loop; review the installed input-aware onboarding and pre-approval safety evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 273 plan records how the observed Loop 272 handoff was resolved.
+This rolling queue is ordered. Loop 274 is complete and there is no active delivery loop; review the installed readiness-preview and operator evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 274 plan records the observed required-mapping handoff and its resolution without claiming provider health or future execution success.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7407,6 +7407,37 @@ without HTTP, explicit approval to one owned loopback request and service
 shutdown. Scope, release preflight and qualification:
 `docs/superpowers/plans/2026-10-22-input-aware-quickstart.md`.
 
+### Loop 274: Quickstart Readiness Preview
+
+**Status:** Complete.
+
+**Prior basis:** A custom Skill could pass its typed input contract while a
+required HTTP mapping referenced a missing nested field. Quickstart still
+created a waiting run, delaying that deterministic failure until approval.
+
+**Outcome:** `quickstart --dry-run` returns the existing bounded value-free
+workflow-preflight report after checking the same Skill, finite input, initial
+human-gate boundary and workspace location. Blocked input returns a report and
+nonzero status without consuming the root. Real initialization now also checks
+required mapping sources before creating a workspace or token, including Skills
+without a declared input schema. Corrected input can use the same unused root.
+
+**Safety boundary:** No preview publication, run, audit, credential lookup or
+HTTP request. This is source-presence readiness, not query conversion, provider
+health, writable-filesystem or port-availability testing, a root reservation,
+implicit approval or a guarantee of workflow success. The existing preflight
+bounds apply to quickstart; normal result/DSL schemas and general trigger or
+executor behavior are unchanged. Bootstrap rechecks the location at creation.
+
+**Evidence:** At `a4659e4`, 1,413 Python tests, 22 editor tests, a 93-member
+isolated wheel and 20-check installed quickstart drill passed. Package admission
+and all seven CI jobs passed, as did complete production-baseline release
+preflight. Package qualification
+requires all seven input/onboarding checks, including blocked/corrected previews,
+missing-mapping refusal with no schema and explicit approval to one owned
+loopback request. Scope and remote qualification:
+`docs/superpowers/plans/2026-10-22-quickstart-readiness-preview.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7644,6 +7675,7 @@ shutdown. Scope, release preflight and qualification:
 | Loop 271: Write-Back-Ready Graph Export | Complete | Make actual browser graph downloads usable by strict CLI write-back | Explicit live titles, sync-before-serialize, graph/DSL parity, unchanged rejection boundaries, real LiteGraph regressions, and installed CLI handoff |
 | Loop 272: Skill-Declared Trigger Input Contracts | Complete | Declare typed business trigger inputs without editing generated DSL | Strict standalone schema declaration, source/data separation, copied IR, pre-admission refusal, corrected retry, synchronized fixtures, and installed seven-case journey |
 | Loop 273: Input-Aware Controlled Quickstart | Complete | Start custom Skills with validated business input and a real pre-effect approval boundary | Pre-initialization finite typed input, durable trigger continuation, pre-gate connector refusal, compact results, and mandatory installed qualification |
+| Loop 274: Quickstart Readiness Preview | Complete | Preview local input/mapping readiness before workspace creation and approval | Shared bounded preflight, fixed refusals, read-only location checks, corrected-input retry, and mandatory installed preview qualification |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

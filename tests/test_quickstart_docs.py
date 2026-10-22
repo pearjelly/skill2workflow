@@ -47,22 +47,26 @@ class InstalledQuickstartDocumentationTests(TestCase):
         self.assertLess(quickstart, source_demo)
         self.assertIn("Installed wheel quickstart", readme)
         self.assertIn("Source-checkout contributor demo", readme)
-        self.assertIn("Delivery Loops 1-273 are complete", readme)
+        self.assertIn("Delivery Loops 1-274 are complete", readme)
         self.assertIn("installed controlled quickstart", readme)
         fastest = readme[readme.index('## Fastest Controlled Journey'):readme.index('For executable result checks')]
         first_command = fastest.split('```bash', 1)[1].split('```', 1)[0]
         self.assertNotIn('--skill', first_command)
         self.assertNotIn('--input', first_command)
         self.assertIn('--input', fastest)
+        custom_preview = fastest.split('```bash', 2)[2].split('```', 1)[0]
+        self.assertIn('--skill', custom_preview)
+        self.assertIn('--input', custom_preview)
+        self.assertIn('--dry-run', custom_preview)
 
     def test_roadmap_and_harness_record_completed_loop_52(self):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-        self.assertIn("- Completed delivery loops: 1-273", roadmap)
+        self.assertIn("- Completed delivery loops: 1-274", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 273 is complete with input-aware controlled quickstart",
+            "- Active loop: None; Loop 274 is complete with quickstart readiness preview",
             roadmap,
         )
         self.assertIn("| Loop 52: Installed Controlled Quickstart | Complete |", roadmap)
