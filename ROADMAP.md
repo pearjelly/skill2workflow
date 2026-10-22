@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-271
+- Completed delivery loops: 1-272
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 271 is complete with write-back-ready graph exports
+- Active loop: None; Loop 272 is complete with Skill-declared trigger input contracts
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing published HTTP action evidence
+- Next decision: review the observed required-input gap in custom-Skill quickstart after the typed-trigger authoring evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-271 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-272 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 271 is complete and there is no active delivery loop; select the next Production Baseline item after reviewing the verified browser-to-CLI authoring handoff.
+This rolling queue is ordered. Loop 272 is complete and there is no active delivery loop; review the installed custom-Skill quickstart's empty-input first run before selecting the next first-value delivery fix. The Loop 272 plan records the observed gap without claiming it resolved.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7349,6 +7349,34 @@ deep-equal the original or equivalently edited Save DSL and embedded DSL.
 Contract: `docs/authoring.md#browser-graph-export`. Scope and qualification:
 `docs/superpowers/plans/2026-10-22-graph-export-titles.md`.
 
+### Loop 272: Skill-Declared Trigger Input Contracts
+
+**Status:** Complete.
+
+**Prior basis:** Authors could declare HTTP actions and result checks in Skill
+source, but still needed manual DSL edits to require typed business input.
+
+**Outcome:** One explicit standalone `input_schema` declaration compiles the
+existing bounded contract. Active configuration stays data rather than inferred
+guidance, source lines are preserved, and forged IR is revalidated and copied.
+The example and installed journey now prove refusal of missing, wrong-typed and
+extra input before admission, followed by a corrected same-key trigger, explicit
+approval, HTTP action and result check without hand-editing generated DSL.
+
+**Safety boundary:** No schema dialect, default injection, coercion, implicit
+gate, credential access or new execution authority is introduced. Published
+artifacts and unmarked Skills retain their behavior. This is trigger admission;
+raw-executor/non-trigger run behavior is unchanged. The custom quickstart's
+empty-input first-run limitation remains an observed follow-up, not fixed here.
+
+**Evidence:** At `23ea8cf`, 1,393 Python tests, 22 editor tests, 93-member
+isolated-wheel qualification, all seven CI jobs and complete production-baseline
+release preflight passed. JSON/SQLite and installed seven-case evidence covers
+no claims/runs/audit/requests on rejected inputs, approval/failure paths, portable
+artifacts, editor compilation and strict graph write-back preservation.
+Contract: `docs/skill-input-contracts.md`. Scope and qualification:
+`docs/superpowers/plans/2026-10-22-skill-input-contracts.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7584,6 +7612,7 @@ Contract: `docs/authoring.md#browser-graph-export`. Scope and qualification:
 | Loop 269: Skill HTTP Action Declarations | Complete | Compile controlled business API calls without manual DSL binding edits | Typed requests, input mappings, handle boundaries, metadata retention, source-first fixtures, installed POST/assertion journey, and takeover activation barrier |
 | Loop 270: Intent-Preserving HTTP Inspector | Complete | Preserve operator intent through HTTP node inspection and save | Omitted-field fidelity, atomic request edits, explicit resets, typed JSON, actual browser exports, and installed asset qualification |
 | Loop 271: Write-Back-Ready Graph Export | Complete | Make actual browser graph downloads usable by strict CLI write-back | Explicit live titles, sync-before-serialize, graph/DSL parity, unchanged rejection boundaries, real LiteGraph regressions, and installed CLI handoff |
+| Loop 272: Skill-Declared Trigger Input Contracts | Complete | Declare typed business trigger inputs without editing generated DSL | Strict standalone schema declaration, source/data separation, copied IR, pre-admission refusal, corrected retry, synchronized fixtures, and installed seven-case journey |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

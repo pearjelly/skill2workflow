@@ -99,3 +99,13 @@ first run with empty input despite required `record_id`/`title`. It was not
 approved or served; the owned probe run was cancelled after inspection. No
 endpoint request was made. This preserves evidence for the separate input-aware
 first-value path instead of claiming it is already covered.
+
+## Remote Qualification
+
+Qualified implementation: `23ea8cfdad695c70eb8266c3635beb799f3d9916`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39761972222)
+passed all seven jobs, including Python 3.9/3.14, isolated installed admission
+and HTTP journeys, editor regressions, Docker, systemd and recovery/state safety.
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39761979306)
+passed the complete production-baseline dry-run on Python 3.9.25. No tag,
+package release, live provider pilot or maturity promotion was performed.
