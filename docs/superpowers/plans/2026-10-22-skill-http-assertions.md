@@ -48,3 +48,26 @@ PYTHONPATH=src python3 -m unittest discover -s tests -q
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-loop267
 python3 scripts/secret_hygiene.py examples/workflows
 ```
+
+## Verified Outcome
+
+Implementation `cfaf906` plus guidance-data correction `6e7ae2c` passed the
+local full suite (1,358 tests) and isolated-wheel qualification on 2026-10-22.
+Focused red-green cases cover declaration grammar, copied bindings, no-I/O
+compilation, credential descriptors, preserved existing output on refusal,
+and configuration text excluded from legacy guidance scans. Approval then
+actual assertion controls delivery in both JSON and SQLite storage.
+
+The installed CLI compiles Chinese Skill source with review, validates the
+generated DSL, and performs real matching and failing HTTP requests. Request
+counts prove compile/validate make no HTTP request and execution makes exactly
+one per case. Source provenance and review counts are checked, and response
+canaries do not enter durable results. Repository/example secret hygiene passes.
+
+- [Implementation CI](https://github.com/pearjelly/skill2workflow/actions/runs/39713786295):
+  all seven jobs passed, including full Python 3.9/3.14 tests, installed wheel,
+  deployment, recovery/state safety, and user journeys.
+- [Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39713828640):
+  successful dry run with the production-baseline gate.
+
+The project remains Self-hosted Beta on Workflow DSL 0.1.0.

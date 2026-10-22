@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-266
+- Completed delivery loops: 1-267
 - Current maturity: Self-hosted Beta
-- Active loop: Loop 267 — Skill HTTP assertion declarations
+- Active loop: None; Loop 267 is complete with Skill HTTP assertion declarations
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing executable HTTP assertion evidence
+- Next decision: select the next Production Baseline loop after reviewing Skill-to-runtime HTTP assertion evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-266 complete, Loop 267 in progress.
+**Status:** Directional; Loops 44-267 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -154,9 +154,10 @@ Production Baseline remains directional.
 
 ## Active Loop
 
-Loop 267 is active: explicit Skill declarations compile HTTP result assertions
-into executable bindings and transitions. Scope and acceptance are recorded in
-`docs/superpowers/plans/2026-10-22-skill-http-assertions.md`.
+No delivery loop is currently active. The detailed entries below are retained
+as historical evidence for completed Production Baseline loops; the current
+completion point and next-selection rule are authoritative in “Status At A
+Glance” and “Rolling Loop Queue”.
 
 ### Loop 56: Linux systemd Supervision
 
@@ -7048,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 267 is active; select another Production Baseline item after reviewing Skill-to-runtime HTTP assertion evidence.
+This rolling queue is ordered. Loop 267 is complete and there is no active delivery loop; select the next Production Baseline item after reviewing Skill-to-runtime HTTP assertion evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7210,6 +7211,31 @@ reject the new explicit connector ID.
 and all seven CI jobs at `699e725` passed, including Python 3.9/3.14,
 deployment, recovery, and user journeys. Contract: `docs/http-json-assertions.md`.
 Scope and commands: `docs/superpowers/plans/2026-10-22-http-json-assertions.md`.
+
+### Loop 267: Skill HTTP Assertion Declarations
+
+**Status:** Complete.
+
+**Prior basis:** Executable HTTP assertions required manually editing Workflow
+DSL bindings and transitions after Skill compilation.
+
+**Outcome:** A selected Skill step can declare explicit request and assertion
+JSON. Compilation emits a validated, copied `http_assert` tool-call binding
+with clean display text and original source lines. Compile review counts it
+as verification. Chinese Skills compile through CLI and editor; approval then
+assertion controls delivery with durable JSON/SQLite state. The installed-wheel
+gate compiles the Skill before real matching and failing HTTP requests.
+
+**Safety boundary:** Compilation neither reads credentials nor calls an
+endpoint. Unknown/malformed declarations fail without partial output; parsed
+configuration stays data rather than becoming inferred guidance. Existing
+unmarked Skills, approval declarations, published DSL, and runtime semantics
+retain compatibility. Endpoint and expected-value inference remain excluded.
+
+**Evidence:** At `6e7ae2c`, the local full suite (1,358 tests), isolated-wheel
+qualification, all seven CI jobs, and production-baseline release preflight
+passed. Contract: `docs/http-json-assertions.md`. Scope and evidence:
+`docs/superpowers/plans/2026-10-22-skill-http-assertions.md`.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -7441,6 +7467,7 @@ Scope and commands: `docs/superpowers/plans/2026-10-22-http-json-assertions.md`.
 | Loop 264: Explicit Workflow And Steps Headings | Complete | Preserve explicitly numbered Skill processes without requiring a Checklist rewrite | Legacy precedence, bounded grammar, ambiguity refusal, source provenance, durable approval, CLI/UI, and installed-wheel evidence |
 | Loop 265: Explicit Human Approval Declarations | Complete | Let authors require approval independently of title language or keywords | Explicit IR type, clean display text, invalid-declaration refusal, Chinese quickstart approval/rejection, CLI/UI and installed-wheel evidence |
 | Loop 266: Executable HTTP JSON Assertions | Complete | Make workflow progress depend on real bounded HTTP JSON comparisons | Explicit connector, strict JSON/pointers, response-discarding results, failure transitions, and installed real-HTTP qualification |
+| Loop 267: Skill HTTP Assertion Declarations | Complete | Compile author-declared result checks without manual DSL binding and transition edits | Typed binding IR, strict declarations, data-only configuration, accurate review counts, and installed Skill-to-HTTP execution |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 
