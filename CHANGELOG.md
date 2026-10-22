@@ -69,6 +69,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Preserve omitted HTTP request fields when inspecting and saving a node;
+  reject invalid edits without partially changing the request, retain typed
+  JSON bodies, and explain explicit reset values in the editor.
+
 - Keep standby readiness and recurring dispatch inactive until takeover
   recovery and audit reconciliation complete, rather than enabling on lease
   acquisition alone.

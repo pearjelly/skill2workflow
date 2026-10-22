@@ -128,9 +128,10 @@
               </label>
               <div id="http-section" class="form-section nested">
                 <p>HTTP Request</p>
+                <p id="http-request-hint" class="http-edit-hint">Only changed fields are applied. Reset declared values with GET, {} for literal headers, null for no body, or 0 for the default timeout.</p>
                 <label>
                   Method
-                  <input id="node-http-method" type="text" />
+                  <input id="node-http-method" type="text" placeholder="GET (default)" aria-describedby="http-request-hint" />
                 </label>
                 <label>
                   URL
@@ -138,15 +139,15 @@
                 </label>
                 <label>
                   Headers JSON
-                  <textarea id="node-http-headers" rows="4"></textarea>
+                  <textarea id="node-http-headers" rows="4" placeholder="Not declared" aria-describedby="http-request-hint"></textarea>
                 </label>
                 <label>
                   Body JSON
-                  <textarea id="node-http-body" rows="5"></textarea>
+                  <textarea id="node-http-body" rows="5" placeholder="Not declared" aria-describedby="http-request-hint"></textarea>
                 </label>
                 <label>
                   Timeout MS
-                  <input id="node-http-timeout" type="number" min="0" step="1" />
+                  <input id="node-http-timeout" type="number" min="0" step="1" placeholder="5000 (default)" aria-describedby="http-request-hint" />
                 </label>
               </div>
             </div>

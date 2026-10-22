@@ -304,6 +304,12 @@ Connector package conventions remain local-first: explicit file loading and regi
 
 ## Consumer Guidance
 
+The HTTP browser inspector preserves omitted request properties on an unedited
+save. Its explicit reset values (`GET`, `{}`, `null`, and timeout `0`) use the
+existing DSL contract. Clearing a declared form control does not request field
+deletion; CLI partial-graph write-back behavior and allowlists are unchanged.
+See [HTTP inspector editing](authoring.md#http-inspector-editing).
+
 Consumers should:
 
 - Branch on structured validation error `code` and `path`, not message text.

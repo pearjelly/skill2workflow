@@ -49,6 +49,7 @@
   let graph;
   let canvas;
   let selectedNode = null;
+  let httpInspectorSnapshot = null;
   let currentWorkflow = {};
   let currentWorkflowDsl = null;
   let validationErrors = [];
@@ -799,8 +800,8 @@
     els.nodeConnectorKind.value = connector ? connector.kind || "" : "";
     els.nodeHttpMethod.value = request.method || "";
     els.nodeHttpUrl.value = request.url || "";
-    els.nodeHttpHeaders.value = stringifyJsonInput(request.headers || {});
-    els.nodeHttpBody.value = stringifyJsonInput(request.body === undefined ? {} : request.body);
+    els.nodeHttpHeaders.value = request.headers === undefined ? "" : stringifyJsonInput(request.headers);
+    els.nodeHttpBody.value = request.body === undefined ? "" : stringifyJsonInput(request.body);
     els.nodeHttpTimeout.value = request.timeout_ms !== undefined ? request.timeout_ms : "";
     els.nodeSource.value = hasNode ? JSON.stringify(props.source || {}, null, 2) : "";
     renderHttpAssertionReview(node, connector);
@@ -817,6 +818,20 @@
     els.nodeHttpHeaders.disabled = !hasNode || !connector || connector.id !== "http";
     els.nodeHttpBody.disabled = !hasNode || !connector || connector.id !== "http";
     els.nodeHttpTimeout.disabled = !hasNode || !connector || connector.id !== "http";
+    httpInspectorSnapshot = connector && connector.id === "http" ? {
+      node: node,
+      hasRequest: Object.prototype.hasOwnProperty.call(connector, "request"),
+      request: connector.request === undefined ? undefined : deepClone(connector.request),
+      values: httpInspectorValues(),
+    } : null;
+  }
+
+  function httpInspectorValues() {
+    return {
+      method: els.nodeHttpMethod.value, url: els.nodeHttpUrl.value,
+      headers: els.nodeHttpHeaders.value, body: els.nodeHttpBody.value,
+      timeout_ms: els.nodeHttpTimeout.value,
+    };
   }
 
   function updateSelectedNode() {
@@ -875,33 +890,55 @@
     if (!connector || typeof connector !== "object" || connector.id !== "http") {
       return { ok: true };
     }
-    connector.request = connector.request && typeof connector.request === "object" ? connector.request : {};
-    connector.request.method = els.nodeHttpMethod.value.trim();
-    connector.request.url = els.nodeHttpUrl.value.trim();
-    if (els.nodeHttpTimeout.value !== "") {
-      const timeout = Number(els.nodeHttpTimeout.value);
-      if (!Number.isInteger(timeout) || timeout < 0) {
-        return { ok: false, error: "HTTP timeout must be a non-negative integer." };
+    const snapshot = httpInspectorSnapshot;
+    if (!snapshot || snapshot.node !== selectedNode) {
+      return { ok: false, error: "Select the HTTP node again before editing its request." };
+    }
+    const values = httpInspectorValues();
+    const changed = Object.keys(values).filter(function (key) { return values[key] !== snapshot.values[key]; });
+    if (!changed.length) {
+      if (snapshot.hasRequest) {
+        connector.request = snapshot.request === undefined ? undefined : deepClone(snapshot.request);
+      } else {
+        delete connector.request;
       }
-      connector.request.timeout_ms = timeout;
+      return { ok: true };
     }
-    const headers = parseJsonInput(els.nodeHttpHeaders.value, "Headers JSON", strict);
-    if (!headers.ok) {
-      return headers;
-    }
-    if (headers.hasValue) {
-      if (!headers.value || typeof headers.value !== "object" || Array.isArray(headers.value)) {
-        return { ok: false, error: "Headers JSON must be an object." };
+    const request = snapshot.request && typeof snapshot.request === "object" && !Array.isArray(snapshot.request)
+      ? deepClone(snapshot.request) : {};
+    for (const key of changed) {
+      const value = values[key].trim();
+      if (key === "method") {
+        if (!value || value.length > 32 || !/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(value)) {
+          return { ok: false, error: "Method must be an HTTP token (1-32 characters). Use GET for the default method." };
+        }
+        request.method = value;
+      } else if (key === "url") {
+        request.url = value;
+      } else if (key === "timeout_ms") {
+        const timeout = Number(value);
+        if (!value || !Number.isInteger(timeout) || timeout < 0) {
+          return { ok: false, error: "HTTP timeout must be a non-negative integer. Enter 0 for the runtime default." };
+        }
+        request.timeout_ms = timeout;
+      } else {
+        const parsed = parseJsonInput(value, key === "headers" ? "Headers JSON" : "Body JSON", strict);
+        if (!parsed.ok) return parsed;
+        if (!parsed.hasValue) {
+          return { ok: false, error: key === "headers"
+            ? "Headers JSON is empty. Enter {} to clear literal headers."
+            : "Body JSON is empty. Enter null to send no body." };
+        }
+        if (key === "headers" && (!parsed.value || typeof parsed.value !== "object" || Array.isArray(parsed.value))) {
+          return { ok: false, error: "Headers JSON must be an object." };
+        }
+        request[key] = parsed.value;
       }
-      connector.request.headers = headers.value;
     }
-    const body = parseJsonInput(els.nodeHttpBody.value, "Body JSON", strict);
-    if (!body.ok) {
-      return body;
+    if (typeof request.url !== "string" || !/^https?:\/\/[^/?#\s]+/.test(request.url)) {
+      return { ok: false, error: "Set an HTTP(S) URL to configure this request." };
     }
-    if (body.hasValue) {
-      connector.request.body = body.value;
-    }
+    connector.request = request;
     return { ok: true };
   }
 

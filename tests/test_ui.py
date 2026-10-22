@@ -51,7 +51,18 @@ class UiTests(TestCase):
         self.assertIn('renderHttpAssertionReview(node, connector);', app)
         self.assertIn('els.httpSection.hidden = !connector || connector.id !== "http";', app)
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-        self.assertIn('node --test tests/test_assertion_inspector.cjs', workflow)
+        self.assertIn('node --test tests/test_*inspector.cjs', workflow)
+
+    def test_http_inspector_explains_omission_and_explicit_reset_values(self):
+        page = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+        app = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertIn('id="http-request-hint"', page)
+        self.assertEqual(page.count('aria-describedby="http-request-hint"'), 4)
+        self.assertIn('Only changed fields are applied.', page)
+        self.assertIn('null for no body', page)
+        self.assertIn('placeholder="Not declared"', page)
+        self.assertIn('snapshot.node !== selectedNode', app)
+        self.assertIn('values[key] !== snapshot.values[key]', app)
 
     def test_skill_http_assertion_declaration_compiles_and_rejects_invalid_config(self):
         config = {'request': {'url': 'https://example.invalid/result'}, 'assertions': [{'path': '/ready', 'equals': True}]}

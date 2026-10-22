@@ -34,7 +34,7 @@ Editor renderer changes also run the dependency-free JavaScript behavior tests
 with Node.js (development only, not a Python runtime dependency):
 
 ```bash
-node --test tests/test_assertion_inspector.cjs
+node --test tests/test_*inspector.cjs
 ```
 
 The release artifact CI job runs these checks alongside wheel qualification.

@@ -359,6 +359,13 @@ textarea {
   text-transform: uppercase;
 }
 
+.form-section .http-edit-hint {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-transform: none;
+}
+
 .validation-panel {
   min-height: 0;
   padding-top: 12px;

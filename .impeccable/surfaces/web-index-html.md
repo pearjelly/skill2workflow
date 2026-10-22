@@ -5,7 +5,20 @@ primary_target: "web/index.html"
 related_targets: ["web/app.js","web/styles.css"]
 ---
 
-# Loop 268: HTTP Assertion Inspector
+# Workflow Editor — Operate
+
+## Current hardening (Loop 270)
+
+Preserve configured versus omitted HTTP fields when inspecting, editing, and
+saving a node. Unchanged controls must not create a body, headers, method, or
+request object. Apply changed fields atomically; reverting restores the selected
+baseline. Errors explain explicit reset values. Existing assertion review,
+write-back permissions, and the incumbent light/system-sans/blue visual language
+remain authoritative. Follow the scoped harden → polish playbooks; this is a
+behavioral correction, not a new surface or visual world. Current acceptance:
+`docs/superpowers/plans/2026-10-22-http-inspector-roundtrip.md`.
+
+## Prior extension (Loop 268)
 
 ## Scope
 
