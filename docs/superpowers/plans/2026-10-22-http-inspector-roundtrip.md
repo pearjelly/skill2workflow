@@ -82,6 +82,16 @@ Its three modified editor assets match the source byte-for-byte. Repository
 secret hygiene and whitespace checks pass.
 The complete local Python suite passed 1,376 tests in 119.239 seconds.
 
+## Remote Qualification
+
+Qualified implementation: `7c189b8728b8eb6f5152db84d6a1b72193165718`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39724125808)
+passed all seven jobs, including Python 3.9/3.14, Docker, systemd, user journeys,
+recovery/state safety, and release artifacts with both inspector suites.
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39724137298)
+passed the complete production-baseline dry-run on Python 3.9.25. No tag,
+package release, provider pilot, or maturity promotion was performed.
+
 ## Separate Follow-Up Evidence
 
 An additional Save Graph → CLI write-back probe rejected the browser's graph

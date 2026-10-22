@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-269
+- Completed delivery loops: 1-270
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 269 is complete with Skill HTTP action declarations
+- Active loop: None; Loop 270 is complete with intent-preserving HTTP inspection
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing published HTTP action evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-269 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-270 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 269 is complete and there is no active delivery loop; select the next Production Baseline item after reviewing published HTTP action evidence.
+This rolling queue is ordered. Loop 270 is complete and there is no active delivery loop; investigate the observed Save Graph default-title omission before selecting the next authoring delivery fix. Its evidence is recorded in the Loop 270 plan, not claimed resolved.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7295,6 +7295,32 @@ issue are recorded without claiming unavailable original failure details.
 Contract: `docs/skill-http-actions.md`. Scope and qualification:
 `docs/superpowers/plans/2026-10-22-skill-http-actions.md`.
 
+### Loop 270: Intent-Preserving HTTP Inspector
+
+**Status:** Complete.
+
+**Prior basis:** Selecting an HTTP node and saving inserted omitted method,
+headers, and body fields; invalid edits could partially mutate the request.
+
+**Outcome:** Unedited saves preserve configured values and property absence.
+Changed controls build a separate request and commit only after validation;
+reverting restores the selected baseline. Typed JSON values remain data and
+reset guidance explains GET, literal headers, null body, and default timeout.
+The incumbent editor layout and visual language are preserved.
+
+**Safety boundary:** No HTTP calls, credential access, runtime policy, topology,
+write-back allowlist, or backend deletion protocol is added. The browser still
+cannot edit assertion bindings. Body input mappings retain their runtime role.
+The separately observed default-title graph export issue remains open.
+
+**Evidence:** At `7c189b8`, 1,376 Python tests, 14 executable editor tests,
+isolated-wheel qualification, all seven CI jobs, and complete production-baseline
+release preflight passed. Browser exports prove unchanged/reverted binding
+equality and explicit null; mocked transport proves no body. Desktop, narrow,
+and actual-window checks preserve the existing surface. Contract:
+`docs/authoring.md#http-inspector-editing`. Scope and qualification:
+`docs/superpowers/plans/2026-10-22-http-inspector-roundtrip.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7528,6 +7554,7 @@ Contract: `docs/skill-http-actions.md`. Scope and qualification:
 | Loop 267: Skill HTTP Assertion Declarations | Complete | Compile author-declared result checks without manual DSL binding and transition edits | Typed binding IR, strict declarations, data-only configuration, accurate review counts, and installed Skill-to-HTTP execution |
 | Loop 268: HTTP Assertion Inspector | Complete | Review executable result checks at node selection | Readonly typed criteria, source-DSL destinations, complete config disclosure, guarded rendering, and responsive editor evidence |
 | Loop 269: Skill HTTP Action Declarations | Complete | Compile controlled business API calls without manual DSL binding edits | Typed requests, input mappings, handle boundaries, metadata retention, source-first fixtures, installed POST/assertion journey, and takeover activation barrier |
+| Loop 270: Intent-Preserving HTTP Inspector | Complete | Preserve operator intent through HTTP node inspection and save | Omitted-field fidelity, atomic request edits, explicit resets, typed JSON, actual browser exports, and installed asset qualification |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

@@ -353,15 +353,17 @@ Unsupported visual edits should be rejected or ignored rather than silently chan
 Selecting an HTTP node and saving without edits preserves its request exactly,
 including omitted method, headers, body, and timeout fields. Blank controls mean
 not declared; placeholders show runtime defaults but do not insert them. Only
-changed controls are applied, and invalid JSON, method, URL, or timeout edits
-are rejected before changing the HTTP request. Reverting all controls to their
-selected values restores the original request, including property absence.
+changed controls are applied. Invalid JSON, method or timeout edits and missing
+HTTP(S) URLs are rejected before changing the HTTP request. Reverting all
+controls to their selected values restores the original request, including
+property absence.
 
 To reset a previously declared value, enter `GET` for method, `{}` for literal
 headers, `null` for no body, or `0` for the default timeout. Clearing a declared
 control is not a field-deletion command. Explicit JSON `null`, `false`, `0`,
-empty strings, arrays, and objects remain typed values; only `null` sends no
-body. Credential handles, input mappings, response retention, origin policies,
+empty strings, arrays, and objects remain typed values. `null` supplies no
+literal body; existing body input mappings can still build one at execution.
+Credential handles, input mappings, response retention, origin policies,
 and other fields not exposed by the form remain unchanged. The generic HTTP
 editor does not edit the read-only HTTP assertion binding.
 
