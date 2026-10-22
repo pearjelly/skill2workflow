@@ -88,6 +88,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Align ordinary and remote preflight input normalization with the existing
+  canonical 1 MiB trigger boundary, rejecting oversize/expanded or nonfinite
+  input without a misleading ready report or internal availability error.
+
 - Prevent obsolete JSON, example and Skill import work from replacing newer
   drafts or repainting stale errors. Preserve edits, keep example fallbacks
   current-intent-only and provide source-safe JSON read/parse recovery.

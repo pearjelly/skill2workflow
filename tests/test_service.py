@@ -3946,6 +3946,18 @@ class RuntimeServiceTests(TestCase):
             try:
                 denied_status, denied = _post_json(url, {"input": {"customer_id": "private"}})
                 malformed_status, malformed = _post_json(url, {"input": "not-object"}, token=AUTH_TOKEN)
+                nonfinite_status, nonfinite = _post_json(url, {"input": {"private-canary": float('nan')}}, token=AUTH_TOKEN)
+                numeric_input = b'{"input":{"payload":[' + b','.join([b'1e5'] * 125000) + b']}}'
+                request = urllib.request.Request(url, data=numeric_input, method='POST',
+                                  headers={'Authorization': 'Bearer ' + AUTH_TOKEN, 'Content-Type': 'application/json'})
+                try:
+                    with urllib.request.urlopen(request, timeout=5) as response:
+                        oversized_status = response.status
+                        oversized = json.loads(response.read())
+                except urllib.error.HTTPError as error:
+                    with error:
+                        oversized_status = error.code
+                        oversized = json.loads(error.read())
                 report = fetch_workflow_preflight(
                     base_url,
                     config.auth_token_file,
@@ -3963,6 +3975,10 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(denied, {"error": "authentication required"})
         self.assertEqual(malformed_status, 400)
         self.assertEqual(malformed, {"error": "workflow preflight request rejected"})
+        self.assertEqual(oversized_status, 400)
+        self.assertEqual(oversized, {"error": "workflow preflight request rejected"})
+        self.assertEqual(nonfinite_status, 400)
+        self.assertEqual(nonfinite, {"error": "workflow preflight request rejected"})
         self.assertTrue(report["ready"])
         self.assertEqual(report["nodes"][1]["connector"]["credential_handle_count"], 1)
         self.assertFalse(report["safety"]["connector_calls"])

@@ -147,6 +147,13 @@ development-only and ordinary Python installation remains unchanged. The Python
 gate test verifies both suites are required without adding Node to the unit-suite
 requirements.
 
+Run `python3 scripts/preflight_input_boundary_smoke.py` for canonical trigger-
+input admission parity. Its `--executable /path/to/installed/skill2workflow`
+mode uses only that actual CLI with source imports disabled. Wheel
+qualification requires all eight checks: exact ASCII/UTF-8 limits, oversize
+refusals, compact-number expansion, Bundle parity, unchanged run/audit inventory
+after refusals and an exact-limit trigger reaching its human gate.
+
 A separate Python 3.14 CI job also runs the local end-user journeys: the
 customer-support Pilot, the three-scenario Pilot pack, explicit external
 connector loading, and the installed-wheel quickstart. These drills use local

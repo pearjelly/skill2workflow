@@ -26,6 +26,16 @@ Without `--input`, preflight validates an empty object and reports
 report remains safe to share with an operator because it contains counts,
 stable issue codes, and paths only.
 
+Supplied input uses trigger admission's canonical JSON copy and **1 MiB of
+canonical UTF-8 bytes**, before schema or mapping checks. Exactly 1 MiB is
+accepted; one byte more is refused without a readiness report. The local
+8 MiB file limit and service request-body limit are separate: compact numeric
+JSON can grow when parsed and canonically serialized, while whitespace can
+shrink. Multibyte text is counted in bytes, not characters. Nonfinite,
+unencodable and non-JSON values are refused with fixed, value-free input
+guidance. This aligns ordinary draft preflight with Bundle, quickstart and
+editor checks; it does not raise their existing transport or report limits.
+
 ## Quickstart source preview
 
 For an uncompiled local Skill, `quickstart --skill SKILL.md --input input.json
@@ -61,6 +71,13 @@ before runtime readiness, is bounded to the normal service request limit, and
 does not append an audit event because it has no durable or external side
 effect. Unknown workflow versions return the same fixed 404 contract as the
 other published-version inspection routes.
+
+Malformed, nonfinite or over-canonical-limit input returns the existing fixed
+HTTP 400 `workflow preflight request rejected`, not a ready report or an
+internal availability error. Oversize wire bodies retain the existing 413
+boundary. The client applies the same input normalization before reading a
+token or making a network request. Rejected preflight does not create a run,
+dispatch a connector, resolve a credential or append an audit event.
 
 ```bash
 skill2workflow service-workflow-preflight workflow_http_connector \

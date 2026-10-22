@@ -351,6 +351,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     _qualify_installed_skill_compiles(console_script, isolated_dir)
     _qualify_installed_skill_compile_recovery(repo_root, console_script, isolated_dir)
     _qualify_installed_skill_versions(repo_root, console_script, isolated_dir)
+    _qualify_installed_preflight_inputs(repo_root, console_script, isolated_dir)
     _qualify_installed_http_assertions(repo_root, console_script, isolated_dir)
     _qualify_installed_skill_http_actions(repo_root, console_script, isolated_dir)
     _qualify_installed_quickstart_inputs(python_bin, console_script, isolated_dir)
@@ -995,6 +996,18 @@ def _qualify_systemd_unit(
         or "ReadWritePaths=" + config["runtime"]["state_dir"] not in content
     ):
         raise RuntimeError("installed systemd unit generator did not preserve its contract")
+    return True
+
+
+def _qualify_installed_preflight_inputs(repo_root: Path, console_script: Path, isolated_dir: Path) -> bool:
+    result = json.loads(_run([
+        sys.executable, str(repo_root / 'scripts/preflight_input_boundary_smoke.py'),
+        '--executable', str(console_script),
+    ], cwd=isolated_dir))
+    checks = ('exact_ascii', 'exact_unicode', 'oversize_ascii', 'oversize_unicode',
+              'numeric_expansion', 'bundle_parity', 'refusal_no_effects', 'valid_trigger')
+    if result != {'ok': True, 'installed': True, 'checks': {name: True for name in checks}}:
+        raise RuntimeError('installed preflight input qualification failed')
     return True
 
 

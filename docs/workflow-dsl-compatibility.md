@@ -1,5 +1,12 @@
 # Workflow DSL Compatibility
 
+Preflight now applies the existing trigger input canonical-copy and 1 MiB UTF-8
+bound before schema/mapping analysis. Over-limit or nonfinite input cannot
+produce a ready report; authenticated malformed preflights receive fixed 400
+refusals and clients reject invalid input before I/O. Workflow/report schemas,
+runtime admission, exports and existing transport/report limits are unchanged.
+See [preflight input limits](workflow-preflight.md#local-draft-check).
+
 The editor now coordinates asynchronous JSON/example/Skill imports so obsolete
 results cannot overwrite newer drafts or edits. Current JSON read/parse errors
 use fixed recovery text and retain active-graph validation; document replacement

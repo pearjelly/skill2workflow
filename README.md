@@ -89,6 +89,11 @@ For ordinary API calls, [declare HTTP actions in the Skill](docs/skill-http-acti
 and compile an approval → request → result-check journey without hand-editing
 bindings. New declarations default to metadata-only response retention.
 
+Before triggering, [check workflow input](docs/workflow-preflight.md) against
+the same canonical 1 MiB input boundary used by admission, including UTF-8 and
+compact-number expansion. Preflight never runs a connector or resolves a
+credential; readiness is not proof of future execution success.
+
 [Declare typed trigger inputs in the Skill](docs/skill-input-contracts.md) to
 reject missing, wrong-typed or unexpected business data before a trigger starts
 a run, without adding `input_schema` to generated DSL by hand.

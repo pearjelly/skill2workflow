@@ -45,6 +45,7 @@ from .preflight import (
     MAX_WORKFLOW_PREFLIGHT_BYTES,
     MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS,
     build_workflow_preflight,
+    normalize_preflight_input,
     build_workflow_release_preflight,
     build_workflow_release_target_review,
     WORKFLOW_RELEASE_TARGET_REVIEW_SCHEMA_VERSION,
@@ -2252,6 +2253,8 @@ def _handler_for(service: RuntimeService):
                     raise ValueError("workflow preflight request input must be an object")
                 if input_present and len(payload["input"]) > MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS:
                     raise ValueError("workflow preflight request input has too many properties")
+                if input_present:
+                    payload["input"] = normalize_preflight_input(payload["input"])
             except WebhookError as error:
                 self._send_json(error.status_code, {"error": str(error)})
                 return

@@ -90,6 +90,13 @@ edit fencing, current JSON recovery and the no-fetch-cancellation fallback.
 An older installed module that lacks the ownership behavior must fail this gate
 even when the source module passes; source markers are not qualification.
 
+The mandatory installed `scripts/preflight_input_boundary_smoke.py` journey
+compiles and publishes through the selected CLI, accepts exact-limit ASCII and
+multibyte input, rejects over-limit/expanded canonical input, checks Bundle
+parity and preserves run/audit inventory after refused work. An exact-limit
+trigger must reach its human gate. All eight checks must pass with source
+imports disabled; no help-marker or partial report qualifies this boundary.
+
 The mandatory installed `scripts/skill_version_smoke.py` drill requires ten
 actual path checks for source-declared Workflow versions: default/explicit CLI
 compilation, two verified authoring sets, backed-up repair with preview, Bundle

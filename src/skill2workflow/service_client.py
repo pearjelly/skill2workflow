@@ -65,6 +65,7 @@ from .explain import (
     WORKFLOW_EXPLANATION_SCHEMA_VERSION,
 )
 from .preflight import (
+    normalize_preflight_input,
     MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS,
     MAX_WORKFLOW_PREFLIGHT_ISSUES,
     MAX_WORKFLOW_PREFLIGHT_MAPPINGS,
@@ -569,7 +570,7 @@ def fetch_workflow_preflight(
         raise ValueError("preflight input must be a JSON object")
     if input_present and len(input_value) > MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS:
         raise ValueError("preflight input has too many properties")
-    body = {"input": input_value} if input_present else {}
+    body = {"input": normalize_preflight_input(input_value)} if input_present else {}
     payload = _post_json(
         service_url,
         token_file,

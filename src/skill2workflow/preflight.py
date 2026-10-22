@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Sequence
 
 from .compiler import validate_workflow_structured
 from .input_schema import InputSchemaValidationError, validate_trigger_input
+from .triggers import MAX_TRIGGER_INPUT_BYTES, normalize_trigger_input
 
 
 WORKFLOW_PREFLIGHT_SCHEMA_VERSION = "skill2workflow-workflow-preflight-0.1.0"
@@ -30,6 +31,18 @@ MAX_WORKFLOW_PREFLIGHT_NODES = 1000
 MAX_WORKFLOW_PREFLIGHT_MAPPINGS = 2000
 MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS = 128
 MAX_WORKFLOW_PREFLIGHT_ISSUES = 64
+
+
+def normalize_preflight_input(value: object) -> Dict[str, object]:
+    """Use trigger admission's canonical copy/bound, with finite JSON only."""
+    try:
+        json.dumps(value, ensure_ascii=False, allow_nan=False)
+        return normalize_trigger_input(value)
+    except (TypeError, ValueError, OverflowError, RecursionError):
+        raise ValueError(
+            "preflight input must be a finite JSON object of at most "
+            f"{MAX_TRIGGER_INPUT_BYTES} UTF-8 bytes"
+        ) from None
 
 
 def build_workflow_preflight(
@@ -66,10 +79,7 @@ def build_workflow_preflight(
             "preflight input must contain at most "
             f"{MAX_WORKFLOW_PREFLIGHT_INPUT_KEYS} top-level properties"
         )
-    try:
-        json.dumps(effective_input, ensure_ascii=False, allow_nan=False)
-    except (TypeError, ValueError, OverflowError, RecursionError) as error:
-        raise ValueError("preflight input must be finite JSON") from error
+    effective_input = normalize_preflight_input(effective_input)
 
     input_report = _input_report(workflow.get("input_schema"), effective_input, input_present)
     issues: List[Dict[str, object]] = []
