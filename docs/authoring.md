@@ -11,6 +11,9 @@ asset SHA-256 records live in `web/vendor/litegraph-0.7.18/` for review.
 
 ## Compile A Local SKILL.md
 
+For an approval → HTTP call → result-check journey without manual binding
+edits, see [Skill HTTP action declarations](skill-http-actions.md).
+
 When the editor is served by the installed `skill2workflow ui` command, choose
 one local `SKILL.md` and select **Compile SKILL**. The loopback UI process parses
 and compiles that one in-memory document into a draft Workflow DSL document,

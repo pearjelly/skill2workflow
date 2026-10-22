@@ -9,6 +9,11 @@ publication.
 
 This document defines the compatibility policy for Workflow DSL `0.1.0`.
 
+Explicit Skill `http` declarations emit the existing HTTP binding on newly
+compiled drafts. They default `response_mode` to `metadata`; an explicit `full`
+retains the existing opt-in response projection. Published DSL, unmarked Skill
+inference, request execution, and legacy retention defaults are unchanged.
+
 Skill `http_assert` declarations affect newly compiled drafts and emit the
 existing tool-call/connector contract. They do not reinterpret published DSL
 or infer endpoints from prose. Compile review includes these executable checks

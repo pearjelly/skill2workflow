@@ -1,0 +1,295 @@
+{
+  "schema_version": "0.1.0",
+  "workflow": {
+    "id": "workflow_http_action_flow",
+    "name": "http-action-flow",
+    "description": "Approve a reviewed HTTP action, submit trigger input, and verify the result before delivery.",
+    "version": "0.1.0",
+    "status": "draft"
+  },
+  "entry": "start",
+  "nodes": [
+    {
+      "id": "start",
+      "type": "start",
+      "title": "Start",
+      "description": "Workflow entry point.",
+      "on_success": "node_001_node"
+    },
+    {
+      "id": "node_001_node",
+      "type": "human_gate",
+      "title": "负责人审批",
+      "description": "负责人审批",
+      "requires": [],
+      "produces": [
+        "node_001_node_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "human_approval",
+        "prompt": "负责人审批"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/http-action-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 1,
+          "line": 18,
+          "section": "Steps"
+        }
+      },
+      "connector": {
+        "id": "manual",
+        "kind": "manual"
+      },
+      "on_success": "node_002_node",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_002_node",
+      "type": "tool_call",
+      "title": "提交请求",
+      "description": "提交请求",
+      "requires": [],
+      "produces": [
+        "node_002_node_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "tool_call",
+        "instruction": "提交请求"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/http-action-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 2,
+          "line": 19,
+          "section": "Steps"
+        }
+      },
+      "connector": {
+        "request": {
+          "method": "POST",
+          "url": "https://example.invalid/tasks",
+          "allowed_origins": [
+            "https://example.invalid"
+          ],
+          "body": {
+            "source": "skill2workflow"
+          },
+          "input_mapping": [
+            {
+              "from": "/input/record_id",
+              "to": "/body/id"
+            },
+            {
+              "from": "/input/title",
+              "to": "/body/title"
+            }
+          ],
+          "response_mode": "metadata"
+        },
+        "credentials": [
+          {
+            "target": "header",
+            "name": "Authorization",
+            "handle": "task_api_token"
+          }
+        ],
+        "id": "http",
+        "kind": "http"
+      },
+      "on_success": "node_003_node",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_003_node",
+      "type": "tool_call",
+      "title": "校验结果",
+      "description": "校验结果",
+      "requires": [],
+      "produces": [
+        "node_003_node_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "tool_call",
+        "instruction": "校验结果"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/http-action-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 3,
+          "line": 20,
+          "section": "Steps"
+        }
+      },
+      "connector": {
+        "request": {
+          "url": "https://example.invalid/tasks/status",
+          "allowed_origins": [
+            "https://example.invalid"
+          ],
+          "input_mapping": [
+            {
+              "from": "/input/record_id",
+              "to": "/query/id"
+            }
+          ]
+        },
+        "credentials": [
+          {
+            "target": "header",
+            "name": "Authorization",
+            "handle": "task_api_token"
+          }
+        ],
+        "assertions": [
+          {
+            "path": "/ready",
+            "equals": true
+          }
+        ],
+        "id": "http_assert",
+        "kind": "http_assert"
+      },
+      "on_success": "node_004_deliver_result",
+      "on_failure": "failure"
+    },
+    {
+      "id": "node_004_deliver_result",
+      "type": "step",
+      "title": "Deliver result",
+      "description": "Deliver result",
+      "requires": [],
+      "produces": [
+        "node_004_deliver_result_result"
+      ],
+      "guard": null,
+      "action": {
+        "kind": "agent_instruction",
+        "instruction": "Deliver result"
+      },
+      "retry": {
+        "max_attempts": 0
+      },
+      "metadata": {
+        "source": {
+          "file": "examples/skills/http-action-flow/SKILL.md",
+          "kind": "ordered_step",
+          "index": 4,
+          "line": 21,
+          "section": "Steps"
+        }
+      },
+      "on_success": "end",
+      "on_failure": "failure"
+    },
+    {
+      "id": "failure",
+      "type": "failure",
+      "title": "Failure",
+      "description": "Terminal failure node."
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "title": "End",
+      "description": "Workflow completed."
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_001_start_to_node_001_node",
+      "from": "start",
+      "to": "node_001_node",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_002_node_001_node_to_node_002_node",
+      "from": "node_001_node",
+      "to": "node_002_node",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_003_node_002_node_to_node_003_node",
+      "from": "node_002_node",
+      "to": "node_003_node",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_004_node_003_node_to_node_004_deliver_result",
+      "from": "node_003_node",
+      "to": "node_004_deliver_result",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_005_node_004_deliver_result_to_end",
+      "from": "node_004_deliver_result",
+      "to": "end",
+      "condition": null,
+      "label": "next"
+    },
+    {
+      "id": "edge_node_001_node_failure",
+      "from": "node_001_node",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_002_node_failure",
+      "from": "node_002_node",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_003_node_failure",
+      "from": "node_003_node",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    },
+    {
+      "id": "edge_node_004_deliver_result_failure",
+      "from": "node_004_deliver_result",
+      "to": "failure",
+      "condition": {
+        "expr": "node.status == 'failed'"
+      },
+      "label": "failure"
+    }
+  ],
+  "state_schema": {},
+  "guards": [],
+  "checkpoints": [],
+  "policies": {
+    "default_retry": {
+      "max_attempts": 0
+    },
+    "default_timeout_ms": 300000
+  }
+}

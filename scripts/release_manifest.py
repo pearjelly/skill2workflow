@@ -49,6 +49,8 @@ PACKAGED_UI_DATA_FILES = frozenset(
         "data/share/skill2workflow/examples/workflows/customer-service-escalation.workflow.json",
         "data/share/skill2workflow/examples/workflows/http-connector.litegraph.json",
         "data/share/skill2workflow/examples/workflows/http-connector.workflow.json",
+        "data/share/skill2workflow/examples/workflows/http-action-flow.litegraph.json",
+        "data/share/skill2workflow/examples/workflows/http-action-flow.workflow.json",
         "data/share/skill2workflow/examples/workflows/operations-analysis.litegraph.json",
         "data/share/skill2workflow/examples/workflows/operations-analysis.workflow.json",
         "data/share/skill2workflow/examples/workflows/risk-review.litegraph.json",

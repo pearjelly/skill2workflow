@@ -1,5 +1,8 @@
 # SKILL.md Input Boundary
 
+Explicit [HTTP action declarations](skill-http-actions.md) bind a reviewed
+request to a selected step without endpoint inference or compilation-time I/O.
+
 Loop 169 hardens the first step of the compile pipeline: the local `parse` and
 `compile` commands now read a user-provided `SKILL.md` through a bounded file
 boundary before applying parser heuristics.

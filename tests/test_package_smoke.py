@@ -373,7 +373,9 @@ class PackageSmokeTests(TestCase):
                 return_value=True,
             ) as qualify_installed_skill_compiles, patch(
                 "scripts.package_smoke._qualify_installed_http_assertions", return_value=True,
-            ) as qualify_installed_http_assertions:
+            ) as qualify_installed_http_assertions, patch(
+                "scripts.package_smoke._qualify_installed_skill_http_actions", return_value=True,
+            ) as qualify_installed_skill_http_actions:
                 result = run_package_smoke(repo, work)
 
         flattened = [part for command, _cwd in commands for part in command]
@@ -406,6 +408,7 @@ class PackageSmokeTests(TestCase):
         qualify_live_snapshot.assert_called_once()
         qualify_installed_ui.assert_called_once()
         qualify_installed_http_assertions.assert_called_once()
+        qualify_installed_skill_http_actions.assert_called_once()
         qualify_installed_skill_compiles.assert_called_once_with(
             Path(result["console_script"]), (work / "isolated").resolve()
         )

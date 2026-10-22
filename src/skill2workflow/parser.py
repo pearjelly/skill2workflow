@@ -8,6 +8,7 @@ import stat
 from pathlib import Path
 from typing import Dict, List, Tuple
 from .http_assertions import load_assertion_json, skill_http_assertion_binding
+from .skill_http import skill_http_action_binding
 
 
 SkillIR = Dict[str, object]
@@ -46,10 +47,10 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     sections = _parse_sections(body)
     declaration_lines = {
         step['line'] for step in checklist_details
-        if isinstance(step.get('connector'), dict) and step['connector'].get('id') == 'http_assert'
+        if isinstance(step.get('connector'), dict) and step['connector'].get('id') in {'http', 'http_assert'}
     }
     guidance_body = '\n'.join(
-        re.sub(r'[ \t]+<!-- skill2workflow: http_assert \{.*\} -->[ \t]*$', '', line)
+        re.sub(r'[ \t]+<!-- skill2workflow: (?:http|http_assert) \{.*\} -->[ \t]*$', '', line)
         if line_number in declaration_lines else line
         for line_number, line in enumerate(body.splitlines(), start=body_start_line)
     )
@@ -200,7 +201,7 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
         reserved = re.findall(r'<!--\s*skill2workflow\b', line, re.IGNORECASE)
         if not reserved:
             continue
-        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|http_assert (\{.*\})) -->[ \t]*$', line)
+        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|(?:http|http_assert) (\{.*\})) -->[ \t]*$', line)
         if len(reserved) != 1 or annotation is None or line_number not in selected:
             raise ValueError('Invalid Skill step annotation')
         content = re.sub(
@@ -218,7 +219,8 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
                 payload = annotation.group(2)
                 if '<!--' in payload or '-->' in payload:
                     raise ValueError('nested comment delimiter')
-                binding = skill_http_assertion_binding(load_assertion_json(payload))
+                factory = skill_http_action_binding if annotation.group(1).startswith('http ') else skill_http_assertion_binding
+                binding = factory(load_assertion_json(payload))
             except (ValueError, TypeError, RecursionError, OverflowError) as error:
                 raise ValueError('Invalid Skill step annotation') from error
             selected[line_number].update(node_type='tool_call', connector=binding)

@@ -8,12 +8,20 @@ from unittest import TestCase
 
 from scripts.release_manifest import (
     MANIFEST_SCHEMA_VERSION,
+    PACKAGED_UI_DATA_FILES,
     build_release_manifest,
     write_release_manifest,
 )
 
 
 class ReleaseManifestTests(TestCase):
+    def test_allowed_example_members_match_packaged_workflow_fixtures(self):
+        root = Path(__file__).resolve().parents[1]
+        prefix = 'data/share/skill2workflow/examples/workflows/'
+        expected = {prefix + path.name for path in (root / 'examples/workflows').glob('*.json')}
+        actual = {name for name in PACKAGED_UI_DATA_FILES if name.startswith(prefix)}
+        self.assertEqual(actual, expected)
+
     def test_manifest_contains_archive_and_sorted_member_hashes(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -21,6 +21,9 @@ Manual gates are not executed as outbound calls. They pause the run until a user
 ### HTTP
 
 The `http` connector is the default connector for `tool_call` nodes.
+Authors can also declare an explicit request directly on a Skill step; see
+[Skill HTTP actions](skill-http-actions.md). New declarations default to
+metadata-only response retention; existing DSL defaults remain unchanged.
 
 When a `tool_call` node includes `connector.request`, the local executor sends a minimal HTTP request using the Python standard library:
 

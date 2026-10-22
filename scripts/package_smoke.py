@@ -350,6 +350,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     ui_status = _qualify_installed_ui(console_script, isolated_dir)
     _qualify_installed_skill_compiles(console_script, isolated_dir)
     _qualify_installed_http_assertions(repo_root, console_script, isolated_dir)
+    _qualify_installed_skill_http_actions(repo_root, console_script, isolated_dir)
     validate_output = _run(
         [
             str(console_script),
@@ -999,6 +1000,16 @@ def _qualify_installed_http_assertions(repo_root: Path, console_script: Path, is
     ))
     if result != {"ok": True, "installed": True, "cases_verified": 2}:
         raise RuntimeError("installed HTTP assertion qualification failed")
+    return True
+
+
+def _qualify_installed_skill_http_actions(repo_root: Path, console_script: Path, isolated_dir: Path) -> bool:
+    result = json.loads(_run(
+        [sys.executable, str(repo_root / "scripts" / "skill_http_action_smoke.py"),
+         "--executable", str(console_script)], cwd=isolated_dir,
+    ))
+    if result != {"ok": True, "installed": True, "cases_verified": 4}:
+        raise RuntimeError("installed Skill HTTP action qualification failed")
     return True
 
 

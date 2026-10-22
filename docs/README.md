@@ -10,6 +10,7 @@ working on.
 - [Quickstart](quickstart.md) — install, bootstrap, run, approve, and trigger
 - [Installed UI](installed-ui.md) — serve the packaged editor and inspect one live service with readiness status
 - [Authoring](authoring.md) — compile Skills, edit the graph, and write back DSL
+- [Skill HTTP actions](skill-http-actions.md) — declare an API call, approve it, and verify the result
 - [Examples](examples.md) — scenario gallery and repeatable inspection commands
 - [Workflow DSL contract](workflow-dsl-contract.md) — execution truth and schema
 - [Workflow bundles](workflow-bundles.md) — deterministic shareable artifacts

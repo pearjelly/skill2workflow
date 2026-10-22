@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add explicit Skill HTTP action declarations with request bodies, input
+  mappings, credential handles, and metadata-only response retention by default;
+  qualify approval → POST → result check through the installed published-run CLI.
+
 - Add a read-only HTTP assertion inspector with typed comparisons, source-DSL
   destinations, and complete connector configuration; keep the desktop canvas
   bounded while scrolling node parameters and prevent hidden file-input overflow.

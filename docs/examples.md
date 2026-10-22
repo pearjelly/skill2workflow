@@ -12,6 +12,7 @@ The example pack shows how standard Agent `SKILL.md` files become controlled Wor
 | Risk review | `examples/skills/risk-review/SKILL.md` | `examples/workflows/risk-review.workflow.json` | `examples/workflows/risk-review.litegraph.json` | Policy check, analyst approval, disposition audit |
 | Operations analysis | `examples/skills/operations-analysis/SKILL.md` | `examples/workflows/operations-analysis.workflow.json` | `examples/workflows/operations-analysis.litegraph.json` | Metrics query, threshold check, owner confirmation |
 | HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request and body input-mapping fixture |
+| Skill HTTP action | `examples/skills/http-action-flow/SKILL.md` | `examples/workflows/http-action-flow.workflow.json` | `examples/workflows/http-action-flow.litegraph.json` | Explicit approval, mapped POST, credential handles, and executable result check |
 | Local external connector | `examples/connectors/local_echo_connector.py` | runtime-generated | n/a | Explicitly loaded external connector fixture with credential and audit redaction |
 | Lark/Feishu task connector | `examples/connectors/lark_task_connector.py` | runtime-generated | n/a | Explicitly loaded product-shaped dry-run connector package with compact audit metadata |
 | Lark/Feishu task pilot | `examples/connectors/lark_task_connector.py` | runtime-generated | runtime-generated | Sales renewal risk workflow with manual gate before dry-run owner task handoff |
@@ -69,6 +70,16 @@ This example starts with a metrics query command, checks threshold breaches, dra
 ### HTTP Connector
 
 This example demonstrates the built-in HTTP connector request metadata, including a bounded `input_mapping` that copies non-secret trigger input into the outbound request body at runtime. Query-parameter mappings use the same contract with `/query/<name>` targets.
+
+### Skill HTTP Action
+
+This source-first example compiles the approval, POST action, and GET/JSON result
+check without manual DSL binding edits. Replace its reserved endpoints/origins
+with a reviewed API, supply non-secret record ID/title trigger inputs, and use
+a separate credential provider for the header handle. It defaults action
+responses to metadata-only retention and adds no retries. See the
+[declaration and published-run guide](skill-http-actions.md); the installed-wheel
+qualification uses a real isolated loopback server, not a live provider.
 
 ### Local External Connector Prototype
 

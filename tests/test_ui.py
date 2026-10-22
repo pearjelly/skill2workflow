@@ -28,6 +28,18 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_skill_http_action_compiles_with_metadata_retention_and_fixed_refusal(self):
+        config = {'request': {'method': 'POST', 'url': 'https://example.invalid/tasks', 'body': {'source': 'workflow'}}}
+        status, raw = self._post_local_skill_compile('## Steps\n1. 提交 <!-- skill2workflow: http ' + json.dumps(config) + ' -->\n')
+        self.assertEqual(status, 200)
+        node = json.loads(raw)['workflow']['nodes'][1]
+        self.assertEqual(node['connector']['id'], 'http')
+        self.assertEqual(node['connector']['request']['response_mode'], 'metadata')
+        self.assertEqual(node['title'], '提交')
+        status, raw = self._post_local_skill_compile('## Steps\n1. private-source <!-- skill2workflow: http {} -->\n')
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw), {'error': 'skill compile rejected'})
+
     def test_http_assertion_inspector_is_wired_read_only_before_generic_fields(self):
         page = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
         app = (ROOT / "web" / "app.js").read_text(encoding="utf-8")

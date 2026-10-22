@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from .connectors import MAX_HTTP_ALLOWED_ORIGINS, MAX_HTTP_ORIGIN_BYTES, default_connector_binding
 from .input_schema import validate_input_schema_contract
 from .http_assertions import validate_http_assertion_binding, skill_http_assertion_binding
+from .skill_http import skill_http_action_binding
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -61,11 +62,13 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
         explicit_connector = step.get("connector")
         if explicit_connector is not None:
             if (explicit_type != "tool_call" or not isinstance(explicit_connector, dict)
-                    or explicit_connector.get("id") != "http_assert"
-                    or explicit_connector.get("kind") != "http_assert"):
+                    or not isinstance(explicit_connector.get("id"), str)
+                    or explicit_connector.get("id") not in {"http", "http_assert"}
+                    or explicit_connector.get("kind") != explicit_connector.get("id")):
                 raise ValueError("Invalid Skill step annotation")
             config = {k: v for k, v in explicit_connector.items() if k not in {"id", "kind"}}
-            skill_http_assertion_binding(config)
+            factory = skill_http_action_binding if explicit_connector["id"] == "http" else skill_http_assertion_binding
+            explicit_connector = factory(config)
             errors = []
             _validate_connector_binding({"id": node_id, "type": explicit_type, "connector": explicit_connector}, index, errors)
             if errors:

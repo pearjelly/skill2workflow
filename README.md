@@ -72,6 +72,10 @@ and JSON expectations; a mismatch follows the workflow failure path.
 Select that node in the editor to review its typed comparisons and source-DSL
 destinations without executing it or resolving credential handles.
 
+For ordinary API calls, [declare HTTP actions in the Skill](docs/skill-http-actions.md)
+and compile an approval → request → result-check journey without hand-editing
+bindings. New declarations default to metadata-only response retention.
+
 Skills can use the existing Checklist formats or a single numbered `Workflow`
 or `Steps` section. Append `<!-- skill2workflow: human_gate -->` to a step
 to require human approval, including for Chinese titles. See the
