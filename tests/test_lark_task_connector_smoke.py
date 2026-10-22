@@ -29,8 +29,8 @@ class LarkTaskConnectorSmokeTests(TestCase):
             audit_events = json.loads(audit_path.read_text(encoding="utf-8"))
 
         self.assertTrue(result["ok"])
-        self.assertEqual(result["default_connector_ids"], ["manual", "http"])
-        self.assertEqual(result["connector_ids"], ["manual", "http", "lark_task"])
+        self.assertEqual(result["default_connector_ids"], ["manual", "http", "http_assert"])
+        self.assertEqual(result["connector_ids"], ["manual", "http", "http_assert", "lark_task"])
         self.assertEqual(result["workflow_id"], "workflow_lark_task_connector_smoke")
         self.assertEqual(result["run_status"], "completed")
         self.assertEqual(result["connector_summary"]["connector_id"], "lark_task")
@@ -46,7 +46,7 @@ class LarkTaskConnectorSmokeTests(TestCase):
             ["assignee_open_id", "description", "due_at", "title"],
         )
         self.assertEqual(result["snapshot_summary"]["run_status_counts"], {"completed": 1})
-        self.assertEqual(result["snapshot_summary"]["connector_count"], 3)
+        self.assertEqual(result["snapshot_summary"]["connector_count"], 4)
 
         encoded_result = json.dumps(result, ensure_ascii=False)
         encoded_audit = json.dumps(audit_events, ensure_ascii=False)

@@ -496,7 +496,7 @@ name: authoring-publish
         self.assertEqual(exit_code, 0)
         self.assertEqual(
             [manifest["id"] for manifest in manifests],
-            ["manual", "http", "local_echo"],
+            ["manual", "http", "http_assert", "local_echo"],
         )
         local_echo = manifests[-1]
         self.assertEqual(local_echo["execution_contract"]["mode"], "external")

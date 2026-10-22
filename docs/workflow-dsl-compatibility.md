@@ -42,6 +42,11 @@ https://skill2workflow.dev/schemas/workflow-0.1.0.json
 
 ## Compatibility Commitments For 0.1.x
 
+`http_assert` is an additional explicit built-in connector for tool-call
+nodes. Its bounded JSON response assertions execute on supporting runtimes;
+older runtimes reject its unknown connector ID. Existing `http` and inferred
+`verification` node behavior is preserved. See [HTTP JSON assertions](http-json-assertions.md).
+
 Within the `0.1.x` release line:
 
 - `schema_version: "0.1.0"` remains readable.

@@ -1,5 +1,9 @@
 # Contributing to skill2workflow
 
+For executable HTTP result checks, see [HTTP JSON assertions](docs/http-json-assertions.md).
+The package smoke runs their real loopback CLI checks against the isolated
+wheel; keep that contract aligned when changing connector execution.
+
 Thank you for helping improve `skill2workflow`. The project is currently at
 Self-hosted Beta maturity, so the most valuable contributions are scoped,
 runnable, and easy to verify without overstating the production boundary.

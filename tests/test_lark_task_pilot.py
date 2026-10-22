@@ -75,8 +75,8 @@ class LarkTaskPilotTests(TestCase):
         self.assertEqual(result["scenario"]["id"], "sales_renewal_risk_followup")
         self.assertEqual(result["workflow_id"], "workflow_lark_task_pilot")
         self.assertEqual(result["run_status"], "completed")
-        self.assertEqual(result["default_connector_ids"], ["manual", "http"])
-        self.assertEqual(result["connector_ids"], ["manual", "http", "lark_task"])
+        self.assertEqual(result["default_connector_ids"], ["manual", "http", "http_assert"])
+        self.assertEqual(result["connector_ids"], ["manual", "http", "http_assert", "lark_task"])
 
         self.assertEqual(result["gate_summary"], {"node_id": "review_renewal_risk", "resumed": True, "approved": True})
         self.assertEqual(result["trigger_summary"]["source"], "local-webhook")
@@ -98,7 +98,7 @@ class LarkTaskPilotTests(TestCase):
         self.assertTrue(result["connector_summary"]["assignee_present"])
         self.assertTrue(result["connector_summary"]["due_at_present"])
         self.assertEqual(result["snapshot_summary"]["run_status_counts"], {"completed": 1})
-        self.assertEqual(result["snapshot_summary"]["connector_count"], 3)
+        self.assertEqual(result["snapshot_summary"]["connector_count"], 4)
 
         node_ids = [node["id"] for node in workflow["nodes"]]
         self.assertEqual(node_ids, ["start", "review_renewal_risk", "create_lark_task", "failure", "end"])

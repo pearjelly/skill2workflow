@@ -67,7 +67,7 @@ class ConnectorTests(TestCase):
     def test_connector_runtime_requires_explicit_external_registration(self):
         runtime = ConnectorRuntime()
 
-        self.assertEqual([manifest["id"] for manifest in runtime.list_connectors()], ["manual", "http"])
+        self.assertEqual([manifest["id"] for manifest in runtime.list_connectors()], ["manual", "http", "http_assert"])
 
         fixture = _load_local_echo_fixture()
         self.assertEqual(validate_connector_manifest(fixture.MANIFEST), [])
@@ -75,9 +75,9 @@ class ConnectorTests(TestCase):
 
         self.assertEqual(
             [manifest["id"] for manifest in external_runtime.list_connectors()],
-            ["manual", "http", "local_echo"],
+            ["manual", "http", "http_assert", "local_echo"],
         )
-        self.assertEqual([manifest["id"] for manifest in default_connectors()], ["manual", "http"])
+        self.assertEqual([manifest["id"] for manifest in default_connectors()], ["manual", "http", "http_assert"])
 
     def test_manifest_declared_metadata_policy_is_bounded_and_exposed(self):
         fixture = _load_local_echo_fixture()

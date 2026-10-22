@@ -27,10 +27,10 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
         self.assertIn("- Completed delivery loops: 1-265", roadmap)
-        self.assertIn("- Active loop: None; Loop 265 is complete with explicit human approval declarations", roadmap)
+        self.assertIn("- Active loop: Loop 266 — executable HTTP JSON assertions", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
-        self.assertIn("This rolling queue is ordered. Loop 265 is complete and there is no active delivery loop", roadmap)
+        self.assertIn("This rolling queue is ordered. Loop 266 is active", roadmap)
         self.assertIn("### Loop 264: Explicit Workflow And Steps Headings", roadmap)
         self.assertIn("| Loop 264: Explicit Workflow And Steps Headings | Complete |", roadmap)
         self.assertIn("docs/superpowers/plans/2026-10-22-workflow-step-headings.md", roadmap)
@@ -44,7 +44,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-265 complete, further loop numbers unassigned.",
+            "**Status:** Directional; Loops 44-265 complete, Loop 266 in progress.",
             roadmap,
         )
 

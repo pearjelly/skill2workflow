@@ -66,6 +66,10 @@ result also contains safe `operator_commands` argv arrays for those next
 steps, so integrations do not need to rebuild paths or interpolate shell
 input.
 
+For executable result checks, bind the explicit
+[`http_assert` connector](docs/http-json-assertions.md) to a reviewed GET endpoint
+and JSON expectations; a mismatch follows the workflow failure path.
+
 Skills can use the existing Checklist formats or a single numbered `Workflow`
 or `Steps` section. Append `<!-- skill2workflow: human_gate -->` to a step
 to require human approval, including for Chinese titles. See the

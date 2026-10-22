@@ -22,6 +22,6 @@ class SqliteWorkflowRecordBoundaryDocsTests(TestCase):
         self.assertIn("sqlite-workflow-record-boundary.md", stability)
         self.assertIn("Delivery Loops 1-265 are complete", readme)
         self.assertIn("sqlite-workflow-record-boundary.md", readme)
-        self.assertIn("Loop 265 is complete with explicit human approval declarations", roadmap)
+        self.assertIn("Loop 266 — executable HTTP JSON assertions", roadmap)
         self.assertIn("Loop 176: Bounded SQLite Workflow Registry Records", roadmap)
         self.assertIn("sqlite-workflow-record-boundary.md", changelog)

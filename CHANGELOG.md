@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add the explicit `http_assert` connector for bounded GET/JSON equality
+  checks, fixed response-free results, and ordinary success/failure transitions.
+
 - Add explicit `<!-- skill2workflow: human_gate -->` step declarations so
   authors can require durable human approval independently of title wording;
   reject invalid declarations and remove markers from compiled display text.

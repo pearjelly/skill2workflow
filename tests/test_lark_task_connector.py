@@ -34,10 +34,10 @@ class LarkTaskConnectorTests(TestCase):
             connector.manifest["execution_contract"]["entrypoint"],
             "examples/connectors/lark_task_connector.py:execute",
         )
-        self.assertEqual([manifest["id"] for manifest in ConnectorRuntime().list_connectors()], ["manual", "http"])
+        self.assertEqual([manifest["id"] for manifest in ConnectorRuntime().list_connectors()], ["manual", "http", "http_assert"])
         self.assertEqual(
             [manifest["id"] for manifest in ConnectorRuntime([connector]).list_connectors()],
-            ["manual", "http", "lark_task"],
+            ["manual", "http", "http_assert", "lark_task"],
         )
         self.assertEqual(
             connector.manifest["config_schema"]["properties"]["mode"]["enum"],

@@ -14,7 +14,7 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
 - Completed delivery loops: 1-265
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 265 is complete with explicit human approval declarations
+- Active loop: Loop 266 — executable HTTP JSON assertions
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing explicit approval compilation and runtime evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-265 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-265 complete, Loop 266 in progress.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -154,10 +154,9 @@ Production Baseline remains directional.
 
 ## Active Loop
 
-No delivery loop is currently active. The detailed entries below are retained
-as historical evidence for completed Production Baseline loops; the current
-completion point and next-selection rule are authoritative in “Status At A
-Glance” and “Rolling Loop Queue”.
+Loop 266 is active: an explicit HTTP assertion connector checks returned JSON
+before workflow progress. Scope and acceptance are recorded in
+`docs/superpowers/plans/2026-10-22-http-json-assertions.md`.
 
 ### Loop 56: Linux systemd Supervision
 
@@ -7049,7 +7048,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 265 is complete and there is no active delivery loop; select the next Production Baseline item after reviewing explicit approval compilation and runtime evidence.
+This rolling queue is ordered. Loop 266 is active; select another Production Baseline item after reviewing executable HTTP assertion evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 

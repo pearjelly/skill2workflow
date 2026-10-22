@@ -13,6 +13,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .credentials import CredentialResolutionError
+from .http_assertions import evaluate_http_assertions, validate_http_assertion_binding
 
 
 ConnectorBinding = Dict[str, object]
@@ -247,6 +248,18 @@ DEFAULT_CONNECTORS: List[Dict[str, object]] = [
     },
 ]
 
+_assert_manifest = copy.deepcopy(DEFAULT_CONNECTORS[1])
+_assert_manifest.update(
+    id="http_assert", name="HTTP JSON Assertion", kind="http_assert",
+    description="GET a bounded JSON response and require declared scalar assertions.",
+)
+_assert_manifest["config_schema"]["properties"]["assertions"] = {
+    "type": "array", "minItems": 1, "maxItems": 16,
+}
+_assert_manifest["config_schema"]["required"] = ["request", "assertions"]
+_assert_manifest["execution_contract"]["returns"] = ["status", "connector", "output", "error"]
+DEFAULT_CONNECTORS.append(_assert_manifest)
+
 BUILTIN_CONNECTOR_IDS = frozenset(str(manifest["id"]) for manifest in DEFAULT_CONNECTORS)
 
 
@@ -456,6 +469,25 @@ def execute_connector(
     ref = connector_ref(binding)
     if not ref["id"]:
         raise ConnectorExecutionError(f"{node.get('id', '<node>')} has no connector binding")
+    if ref["id"] == "http_assert":
+        error = validate_http_assertion_binding(binding)
+        if error:
+            raise ConnectorExecutionError(error)
+        response = _execute_http_connector(
+            binding, credential_provider=credential_provider, context=context,
+            service_allowed_origins=http_allowed_origins,
+        )
+        output = response.get("output", {})
+        error = ("http assertion request failed" if response["status"] != "completed"
+                 else evaluate_http_assertions(output.get("body"), binding["assertions"]))
+        result = {
+            "status": "failed" if error else "completed", "connector": ref,
+            "output": {"status_code": output.get("status_code"),
+                       "assertion_count": len(binding["assertions"]), "matched": error is None},
+        }
+        if error:
+            result["error"] = error
+        return result
     if ref["id"] == "http":
         return _execute_http_connector(
             binding,

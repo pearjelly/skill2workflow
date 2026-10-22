@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 from .connectors import MAX_HTTP_ALLOWED_ORIGINS, MAX_HTTP_ORIGIN_BYTES, default_connector_binding
 from .input_schema import validate_input_schema_contract
+from .http_assertions import validate_http_assertion_binding
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -459,8 +460,15 @@ def _validate_connector_binding(
                 ["nodes", index, "connector", "id"],
             )
         )
-    if connector.get("id") == "http":
+    if connector.get("id") in {"http", "http_assert"}:
         _validate_http_connector_request(node, index, connector, errors)
+    if connector.get("id") == "http_assert":
+        message = validate_http_assertion_binding(connector)
+        if node_type != "tool_call" or message:
+            errors.append(_validation_error(
+                "http_assertion_invalid", message or "http assertion requires a tool_call node",
+                ["nodes", index, "connector"],
+            ))
 
 
 def _validate_policies(policies: object, errors: List[ValidationError]) -> None:

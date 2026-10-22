@@ -188,7 +188,7 @@ class PackagingMetadataTests(TestCase):
         self.assertIn("value-free validation result", guide)
         self.assertIn("- Completed delivery loops: 1-265", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 265 is complete with explicit human approval declarations",
+            "- Active loop: Loop 266 — executable HTTP JSON assertions",
             roadmap,
         )
         self.assertIn("| Loop 50: Release Artifact Qualification | Complete |", roadmap)

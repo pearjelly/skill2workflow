@@ -7,6 +7,11 @@ Workflow DSL remains the execution truth source. Connector bindings live on work
 
 ## Built-In Connectors
 
+The explicit `http_assert` connector checks JSON response fields and follows
+failure transitions when they do not match. See
+[executable HTTP JSON assertions](http-json-assertions.md) for its GET-only
+contract, bounded comparisons, and response-discarding behavior.
+
 ### Manual
 
 The `manual` connector is the default connector for `human_gate` nodes.
