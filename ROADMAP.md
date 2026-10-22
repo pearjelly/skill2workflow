@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-278
+- Completed delivery loops: 1-279
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 278 is complete with shared baseline execution deadline
+- Active loop: None; Loop 279 is complete with actionable draft input explanations
 - Next maturity gate: Production Baseline
-- Next decision: review the installed visual-authoring handoff and remaining operational evidence before selecting the next Production Baseline delivery loop
+- Next decision: review the end-to-end Skill-to-controlled-run handoff and remaining service/recovery evidence before selecting the next first-value or Production Baseline delivery loop
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-278 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-279 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 278 is complete and there is no active delivery loop; review the installed visual-authoring handoff and remaining operational evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 278 plan closes observed shared-budget and process-supervision gaps without claiming the unique cause of a historical timeout, an absolute OS wall-clock guarantee or a maturity promotion. Installed-build variability and real service/recovery work remain part of qualification.
+This rolling queue is ordered. Loop 279 is complete and there is no active delivery loop; review the end-to-end Skill-to-controlled-run handoff and remaining service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 279 plan clarifies existing input rejection reasons without changing validation or execution. Its unchanged-CSS finish review does not qualify true 200% magnification or promote maturity. Installed-build variability and real service/recovery work remain part of qualification.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7556,6 +7556,35 @@ reap and preserved artifacts. All seven CI jobs and complete production-baseline
 release preflight passed on the first attempt. Exact remote qualification is recorded in
 `docs/superpowers/plans/2026-10-22-baseline-execution-deadline.md`.
 
+### Loop 279: Actionable Draft Input Explanations
+
+**Status:** Complete.
+
+**Prior basis:** The backend distinguishes missing fields, wrong JSON types,
+disallowed values and constraint failures, but the editor displayed only a
+generic rejection and wrapped report path. A real typed-example check reproduced
+the missing-field ambiguity before implementation.
+
+**Outcome:** Input issues now name the reason and a next edit using declared
+schema evidence, safe constraints and escaped payload-relative JSON pointers.
+Undeclared keys and rejected values are not echoed. Unknown evidence falls back
+to schema review; inconsistent reports fail safely. Raw JSON, stale-result
+protection, exports, mapping diagnostics and check-only behavior are unchanged.
+
+**Safety boundary:** No validation rule, DSL/report schema, connector request,
+credential, runtime dependency, layout or CSS change. The incumbent visual world
+was preserved; missing global design files remain pre-existing drift. True 200%
+magnification remains unqualified; 640px evidence is narrowed reflow only.
+
+**Evidence:** At `5c1782b`, 1,445 Python and 37 editor tests passed; a 94-member
+isolated wheel and all eight installed diagnostic reports passed. The artifact
+CI job additionally renders real installed reports through the served module.
+Desktop, actual-window, mobile and long-content captures received a fresh
+independent `ship` finish review and surface documentation. All seven CI jobs
+and complete production-baseline release preflight passed on the first attempt.
+Exact qualification is recorded in
+`docs/superpowers/plans/2026-10-22-input-check-explanations.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7798,6 +7827,7 @@ release preflight passed on the first attempt. Exact remote qualification is rec
 | Loop 276: Fixed UI Static Asset Boundary | Complete | Prevent the UI asset server from exposing surrounding files | Exact public inventory, shared GET/HEAD admission, descriptor-bound no-follow reads, fixed refusals, replacement-race tests and installed exclusion qualification |
 | Loop 277: Fast HTTP Test Fixture Teardown | Complete | Add release-gate headroom by removing unnecessary HTTP fixture waits | Shared test-only servers, preserved explicit intervals and real assertions, local package identity, complete timing comparison and unchanged production guards |
 | Loop 278: Shared Baseline Execution Deadline | Complete | Enforce the baseline execution budget and stop owned timed-out checks | Absolute shared deadline, capped waits, POSIX group supervision, bounded direct-child reap, fail-closed cleanup and unchanged evidence/check membership |
+| Loop 279: Actionable Draft Input Explanations | Complete | Explain blocked input with a safe next edit | Declared-evidence reason/type/bound hints, payload-relative pointers, private unknown keys, generic fallbacks, real installed module qualification and independent finish review |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

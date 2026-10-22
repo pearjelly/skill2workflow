@@ -95,7 +95,7 @@ scope. That reviewer decoded the required captures and independently passed
 all 15 input-review module tests.
 
 The main loop also reports 1,445 Python tests passed (100.778 seconds), 37 Node
-tests passed, 94 isolated-wheel checks passed, and a separate installed
+tests passed, isolated-wheel qualification passed with 94 members, and a separate installed
 `--browser-module-tests` run passing eight real backend reports and all module
 checks. The ordinary source real-report test body runs only when its fixture
 environment is supplied; the installed qualification supplies actual reports.

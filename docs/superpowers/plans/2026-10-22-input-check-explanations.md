@@ -73,3 +73,21 @@ remain pre-existing drift. The broader product's maturity is unchanged.
 Owned preview tab and loopback listener were closed. Secret hygiene and
 whitespace checks passed; no provider request, credential resolution, run or
 publication was performed by the new path.
+
+## Remote Feature Qualification
+
+Implementation `5c1782b490a3e58f8fd53a8dba09844ce4438892` passed all seven
+[CI jobs](https://github.com/pearjelly/skill2workflow/actions/runs/39791775349).
+The release-artifact job explicitly passed the new installed
+`--browser-module-tests` step, not just the source test suite. Both Python
+3.9/3.14, real authoring journeys, recovery/state safety, systemd and Docker
+also passed. The installed module, HTML and CSS were independently compared
+byte-for-byte with final source locally. The documenter then corrected the
+surface brief's wheel member count wording without changing any UI source.
+
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39791811615)
+qualified that exact implementation on attempt 1, with its complete
+production-baseline dry-run passing on Python 3.9. The dry-run job completed in
+6m16s. This is an observed duration, not a performance SLA or maturity promotion.
+No workflow was rerun, check skipped, deadline enlarged, release/tag created or
+package version changed to obtain qualification.
