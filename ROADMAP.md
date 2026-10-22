@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-276
+- Completed delivery loops: 1-277
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 276 is complete with fixed UI static asset serving
+- Active loop: None; Loop 277 is complete with fast HTTP test fixture teardown
 - Next maturity gate: Production Baseline
 - Next decision: review release-gate timing, the installed visual-authoring handoff and operator evidence before selecting the next Production Baseline delivery loop
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-276 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-277 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 276 is complete and there is no active delivery loop; review release-gate timing, the installed visual-authoring handoff and operator evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 276 plan records and closes the observed static file-serving boundary and preserves the first release attempt's unit-suite deadline failure without claiming a proven timing root cause, protection against a compromised installation or a maturity promotion.
+This rolling queue is ordered. Loop 277 is complete and there is no active delivery loop; review remaining release-gate timing, the installed visual-authoring handoff and operator evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 277 plan records measured test-fixture headroom without claiming the sole cause of the prior remote timeout, guaranteed CI timing or a maturity promotion. Installed-build variability and real service/recovery work remain part of qualification.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7496,6 +7496,37 @@ the latter required a same-code retry after a unit-suite deadline failure.
 Exact remote qualification is recorded in
 `docs/superpowers/plans/2026-10-22-ui-static-asset-boundary.md`.
 
+### Loop 277: Fast HTTP Test Fixture Teardown
+
+**Status:** Complete.
+
+**Prior basis:** Loop 276's first release attempt hit the 180-second unit-suite
+deadline, while the same-code retry passed. Timing investigation found repeated
+half-second idle shutdown waits in owned HTTP fixtures, alongside independent
+installed-build and real service/recovery costs.
+
+**Outcome:** Shared test-only HTTP server subclasses use 10 ms polling and
+preserve explicit intervals, real requests and normal shutdown/close semantics.
+Eleven modules use the helper; static-UI substitution stays inside its fixture
+context. An explicit local test package keeps discovery and named-module imports
+on the same support module.
+
+**Safety boundary:** No original test or assertion removed, no skipped real
+drill, build cache/reuse, production polling change or relaxed 180/600-second
+baseline guard. Runtime modules, Workflow DSL and execution authority are
+unchanged. This removes a measured avoidable cost, not every possible timing
+variance, and does not prove the sole cause of the prior failed run.
+
+**Evidence:** At `e33326f`, the complete local suite grew from 1,431 to 1,434
+tests and passed. Instrumented before/after observations were 132.606/98.273
+seconds; final-source standard discovery passed in 98.775 seconds. The half-second
+test band fell from 71 to 11, while installed quickstart and service/recovery
+drills remained. Thirty editor tests and a 94-member isolated wheel passed.
+All seven CI jobs passed, and complete production-baseline release preflight
+passed on its first attempt with unchanged check membership and deadlines.
+Exact remote qualification is recorded in
+`docs/superpowers/plans/2026-10-22-http-test-fixture-teardown.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7736,6 +7767,7 @@ Exact remote qualification is recorded in
 | Loop 274: Quickstart Readiness Preview | Complete | Preview local input/mapping readiness before workspace creation and approval | Shared bounded preflight, fixed refusals, read-only location checks, corrected-input retry, and mandatory installed preview qualification |
 | Loop 275: Draft Input Review In The Editor | Complete | Inspect Skill input contracts and check draft payloads inside visual authoring | Read-only contract, bounded pure local preflight, ephemeral input, stale-result invalidation, export isolation and installed qualification |
 | Loop 276: Fixed UI Static Asset Boundary | Complete | Prevent the UI asset server from exposing surrounding files | Exact public inventory, shared GET/HEAD admission, descriptor-bound no-follow reads, fixed refusals, replacement-race tests and installed exclusion qualification |
+| Loop 277: Fast HTTP Test Fixture Teardown | Complete | Add release-gate headroom by removing unnecessary HTTP fixture waits | Shared test-only servers, preserved explicit intervals and real assertions, local package identity, complete timing comparison and unchanged production guards |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

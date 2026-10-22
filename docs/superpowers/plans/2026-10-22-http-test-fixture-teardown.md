@@ -93,5 +93,20 @@ whitespace checks passed; all owned fixture processes/listeners were closed.
 
 ## Remote Qualification
 
-Pending exact feature-commit CI and complete production-baseline release
-preflight. Keep Self-hosted Beta and the overall project goal unchanged.
+Qualified implementation: `e33326fc63b1d5e52647e9b19d1fa8a8df260675`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39782588784)
+passed all seven jobs, including Python 3.9/3.14, unchanged installed qualification,
+real user journeys, editor regressions, Docker, systemd and recovery/state safety.
+The job logs report all 1,434 tests passing in 123.895 seconds on Python 3.9
+and 101.230 seconds on Python 3.14. These are observed runner timings, not a
+controlled cross-run comparison or a promised CI latency.
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39782634553)
+passed on its first attempt in 6m19s with Python 3.9.25. The terminal job log
+explicitly records `PASSED command:production_baseline`. All check membership
+and deadlines remain unchanged. A passing run is evidence for this commit,
+not proof that all future runner timing variance has been eliminated.
+
+Roadmap closure passed 109 focused feature/documentation tests in 0.684 seconds,
+plus repository secret hygiene and whitespace checks. No tag, package release,
+live-provider operation or maturity promotion was performed. The broad project
+goal remains active.

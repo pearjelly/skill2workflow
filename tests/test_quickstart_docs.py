@@ -47,7 +47,7 @@ class InstalledQuickstartDocumentationTests(TestCase):
         self.assertLess(quickstart, source_demo)
         self.assertIn("Installed wheel quickstart", readme)
         self.assertIn("Source-checkout contributor demo", readme)
-        self.assertIn("Delivery Loops 1-276 are complete", readme)
+        self.assertIn("Delivery Loops 1-277 are complete", readme)
         self.assertIn("installed controlled quickstart", readme)
         fastest = readme[readme.index('## Fastest Controlled Journey'):readme.index('For executable result checks')]
         first_command = fastest.split('```bash', 1)[1].split('```', 1)[0]
@@ -64,9 +64,9 @@ class InstalledQuickstartDocumentationTests(TestCase):
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-        self.assertIn("- Completed delivery loops: 1-276", roadmap)
+        self.assertIn("- Completed delivery loops: 1-277", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 276 is complete with fixed UI static asset serving",
+            "- Active loop: None; Loop 277 is complete with fast HTTP test fixture teardown",
             roadmap,
         )
         self.assertIn("| Loop 52: Installed Controlled Quickstart | Complete |", roadmap)
