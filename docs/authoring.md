@@ -36,6 +36,12 @@ proof of business safety or an execution policy. Review and edit the Workflow
 DSL before publication; the summary neither changes the draft nor authorizes a
 side effect.
 
+Selecting an explicit HTTP assertion node opens a read-only criteria panel
+above the ordinary fields. It shows the endpoint, typed expected values,
+source-DSL success/failure destinations, and expandable connector configuration.
+It does not execute the check or resolve credential handles. See
+[editor assertion review](http-json-assertions.md#review-in-the-editor).
+
 Numbered steps under an exact `Workflow` or `Steps` heading are also supported
 when no Checklist section is recognized. Multiple populated process sections
 must be consolidated before compilation. The [Skill input contract](skill-input-boundary.md#explicit-process-sections)

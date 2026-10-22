@@ -16,6 +16,10 @@ in `verification_node_count`; its existing fields and version are unchanged.
 
 The DSL is the execution truth source for `skill2workflow`. Visual graphs, editor state, run overlays, and generated artifacts must be converted back into Workflow DSL before execution or publication.
 
+The read-only HTTP assertion inspector presents stored connector configuration
+and source-DSL destinations without changing them. It adds no DSL fields,
+execution behavior, credential resolution, or write-back permissions.
+
 Parser support for explicit numbered `Workflow` and `Steps` sections changes
 only newly compiled drafts that lack a Checklist section. Existing Checklist
 extraction and committed example fixtures remain compatible; published Workflow

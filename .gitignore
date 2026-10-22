@@ -11,6 +11,7 @@ venv/
 .DS_Store
 .skill2workflow/
 .superpowers/
+.impeccable/review/
 
 # Local authorization, credential, and runtime artifacts.
 /*-auth.png

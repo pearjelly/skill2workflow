@@ -30,6 +30,15 @@ Run the full test suite:
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
+Editor renderer changes also run the dependency-free JavaScript behavior tests
+with Node.js (development only, not a Python runtime dependency):
+
+```bash
+node --test tests/test_assertion_inspector.cjs
+```
+
+The release artifact CI job runs these checks alongside wheel qualification.
+
 CI repeats the full release-relevant checks on Python 3.9 and 3.14, covering
 the supported floor and the primary runtime baseline. The Python 3.9 matrix
 entry and release preflight use Ubuntu 24.04 because `setup-python` does not

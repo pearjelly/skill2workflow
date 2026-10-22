@@ -69,6 +69,8 @@ input.
 For executable result checks, use an explicit Skill declaration or bind the
 [`http_assert` connector](docs/http-json-assertions.md) to a reviewed GET endpoint
 and JSON expectations; a mismatch follows the workflow failure path.
+Select that node in the editor to review its typed comparisons and source-DSL
+destinations without executing it or resolving credential handles.
 
 Skills can use the existing Checklist formats or a single numbered `Workflow`
 or `Steps` section. Append `<!-- skill2workflow: human_gate -->` to a step

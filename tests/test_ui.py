@@ -28,6 +28,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_http_assertion_inspector_is_wired_read_only_before_generic_fields(self):
+        page = (ROOT / "web" / "index.html").read_text(encoding="utf-8")
+        app = (ROOT / "web" / "app.js").read_text(encoding="utf-8")
+        self.assertLess(page.index('id="assertion-section"'), page.index('id="node-id"'))
+        self.assertIn('id="node-assertion-url" rows="2" readonly', page)
+        self.assertIn('id="node-assertion-config" rows="8" readonly', page)
+        self.assertIn('aria-label="Required comparisons"', page)
+        self.assertIn('aria-label="Source DSL destinations"', page)
+        self.assertIn('renderHttpAssertionReview(node, connector);', app)
+        self.assertIn('els.httpSection.hidden = !connector || connector.id !== "http";', app)
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+        self.assertIn('node --test tests/test_assertion_inspector.cjs', workflow)
+
     def test_skill_http_assertion_declaration_compiles_and_rejects_invalid_config(self):
         config = {'request': {'url': 'https://example.invalid/result'}, 'assertions': [{'path': '/ready', 'equals': True}]}
         status, raw = self._post_local_skill_compile('## Steps\n1. 校验 <!-- skill2workflow: http_assert ' + json.dumps(config) + ' -->\n')

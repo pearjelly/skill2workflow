@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add a read-only HTTP assertion inspector with typed comparisons, source-DSL
+  destinations, and complete connector configuration; keep the desktop canvas
+  bounded while scrolling node parameters and prevent hidden file-input overflow.
+
 - Add explicit HTTP assertion declarations in selected Skill steps, preserving
   clean titles, source mapping, and credential handles while generating the
   executable connector and failure transitions without manual DSL editing.

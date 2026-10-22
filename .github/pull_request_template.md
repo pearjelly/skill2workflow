@@ -24,5 +24,6 @@ follow `SECURITY.md` instead.
 - [ ] Workflow DSL remains authoritative over visual and runtime state.
 - [ ] Tests were added before parser, compiler, executor, storage, connector, or CLI behavior changed.
 - [ ] Documentation, schemas, examples, and compatibility notes are aligned.
+- [ ] Editor renderer changes pass `node --test tests/test_assertion_inspector.cjs`.
 - [ ] No secrets, credentials, or customer data are included.
 - [ ] `git diff --check` and the relevant verification commands pass.

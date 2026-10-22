@@ -129,6 +129,13 @@
     els.nodeHttpBody = document.getElementById("node-http-body");
     els.nodeHttpTimeout = document.getElementById("node-http-timeout");
     els.nodeSource = document.getElementById("node-source");
+    els.assertionSection = document.getElementById("assertion-section");
+    els.nodeAssertionMethod = document.getElementById("node-assertion-method");
+    els.nodeAssertionUrl = document.getElementById("node-assertion-url");
+    els.nodeAssertionRules = document.getElementById("node-assertion-rules");
+    els.nodeAssertionSuccess = document.getElementById("node-assertion-success");
+    els.nodeAssertionFailure = document.getElementById("node-assertion-failure");
+    els.nodeAssertionConfig = document.getElementById("node-assertion-config");
     els.validationList = document.getElementById("validation-list");
     els.skillReviewPanel = document.getElementById("skill-review-panel");
     els.skillReviewList = document.getElementById("skill-review-list");
@@ -718,6 +725,57 @@
     });
   }
 
+  function renderHttpAssertionReview(node, connector) {
+    els.assertionSection.hidden = !node || !connector || connector.id !== "http_assert";
+    els.nodeAssertionMethod.textContent = "";
+    els.nodeAssertionUrl.value = "";
+    els.nodeAssertionRules.replaceChildren();
+    els.nodeAssertionSuccess.textContent = "";
+    els.nodeAssertionFailure.textContent = "";
+    els.nodeAssertionConfig.value = "";
+    if (els.assertionSection.hidden) {
+      return;
+    }
+    const request = connector.request && typeof connector.request === "object" ? connector.request : {};
+    els.nodeAssertionMethod.textContent = request.method === undefined ? "GET"
+      : typeof request.method === "string" && request.method ? request.method : "Invalid method";
+    els.nodeAssertionUrl.value = typeof request.url === "string" ? request.url : "Not declared";
+    els.nodeAssertionConfig.value = JSON.stringify(connector, null, 2);
+    const assertions = Array.isArray(connector.assertions) ? connector.assertions : [];
+    if (!assertions.length) {
+      const item = document.createElement("li");
+      item.textContent = "No assertions declared. Review the source before running.";
+      els.nodeAssertionRules.appendChild(item);
+    }
+    assertions.forEach(function (check) {
+      const item = document.createElement("li");
+      if (!check || typeof check.path !== "string" || !Object.prototype.hasOwnProperty.call(check, "equals")) {
+        item.textContent = "Invalid assertion. Review the source before running.";
+      } else {
+        item.textContent = (check.path === "" ? "Response root" : check.path) + " equals " + JSON.stringify(check.equals);
+      }
+      els.nodeAssertionRules.appendChild(item);
+    });
+    const sourceNodes = currentWorkflowDsl && Array.isArray(currentWorkflowDsl.nodes) ? currentWorkflowDsl.nodes : [];
+    const sourceNode = sourceNodes.find(function (item) {
+      return item && item.id === (node.properties || {}).workflow_node_id;
+    });
+    function destination(key) {
+      if (!sourceNode) {
+        return "Source DSL unavailable";
+      }
+      const id = sourceNode[key];
+      if (typeof id !== "string" || !id) {
+        return "Not declared in source DSL";
+      }
+      const target = sourceNodes.find(function (item) { return item && item.id === id; });
+      const title = target && typeof target.title === "string" && target.title.trim() ? target.title : id;
+      return target ? title + " (" + id + ")" : id + " (missing node)";
+    }
+    els.nodeAssertionSuccess.textContent = destination("on_success");
+    els.nodeAssertionFailure.textContent = destination("on_failure");
+  }
+
   function renderInspector(node) {
     selectedNode = node;
     const hasNode = Boolean(node);
@@ -745,6 +803,7 @@
     els.nodeHttpBody.value = stringifyJsonInput(request.body === undefined ? {} : request.body);
     els.nodeHttpTimeout.value = request.timeout_ms !== undefined ? request.timeout_ms : "";
     els.nodeSource.value = hasNode ? JSON.stringify(props.source || {}, null, 2) : "";
+    renderHttpAssertionReview(node, connector);
     els.connectorSection.hidden = !connector;
     els.httpSection.hidden = !connector || connector.id !== "http";
     els.nodeTitle.disabled = !hasNode;

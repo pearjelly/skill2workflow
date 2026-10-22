@@ -42,6 +42,22 @@ Review and publish the resulting workflow through the existing handoff. During
 execution, the approval waits before the endpoint is called; rejection stops
 the run. An approved run delivers only if all response assertions match.
 
+## Review In The Editor
+
+Select the compiled `http_assert` node. Its **HTTP assertion** panel shows the
+method and endpoint, every typed JSON comparison, and the source DSL's
+**On match** / **On failure** destination names and IDs. For example, `true`
+and `"true"` remain visibly different values. Expand **Connector configuration**
+to inspect the complete stored binding, including request mappings and
+credential handle descriptors.
+
+The panel is read-only: selection makes no request and resolves no credentials.
+To change a check, update the Skill declaration or source DSL and reload it.
+Configured values remain visible; never embed secrets in expected values or
+literal headers. Existing allowlisted node edits and ordinary HTTP connector
+editing are unchanged. Save and validate the DSL before publication; the graph
+and review panel do not become execution authorities.
+
 ## Bind Directly In Workflow DSL
 
 Use the explicit `http_assert` connector on a `tool_call` node to fetch a

@@ -54,6 +54,28 @@
             <strong id="node-heading">No selection</strong>
           </div>
           <form id="node-form" class="node-form">
+            <section id="assertion-section" class="form-section assertion-review" aria-labelledby="assertion-heading" hidden>
+              <h2 id="assertion-heading">HTTP assertion</h2>
+              <p class="inspector-note">All comparisons must match to follow the success path.</p>
+              <p class="assertion-method"><span id="node-assertion-method"></span> request</p>
+              <label>
+                Endpoint
+                <textarea id="node-assertion-url" rows="2" readonly></textarea>
+              </label>
+              <ol id="node-assertion-rules" class="assertion-rules" aria-label="Required comparisons"></ol>
+              <dl class="assertion-transitions" aria-label="Source DSL destinations">
+                <div><dt>On match</dt><dd id="node-assertion-success"></dd></div>
+                <div><dt>On failure</dt><dd id="node-assertion-failure"></dd></div>
+              </dl>
+              <details class="assertion-details">
+                <summary>Connector configuration</summary>
+                <label>
+                  Request, assertions, and credential handles
+                  <textarea id="node-assertion-config" rows="8" readonly></textarea>
+                </label>
+              </details>
+              <p class="inspector-note">Read-only. Update the Skill or source DSL to change this check. No request is made here.</p>
+            </section>
             <label>
               Workflow ID
               <input id="node-id" type="text" readonly />
