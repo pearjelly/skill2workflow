@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-270
+- Completed delivery loops: 1-271
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 270 is complete with intent-preserving HTTP inspection
+- Active loop: None; Loop 271 is complete with write-back-ready graph exports
 - Next maturity gate: Production Baseline
 - Next decision: select the next Production Baseline loop after reviewing published HTTP action evidence
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-270 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-271 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 270 is complete and there is no active delivery loop; investigate the observed Save Graph default-title omission before selecting the next authoring delivery fix. Its evidence is recorded in the Loop 270 plan, not claimed resolved.
+This rolling queue is ordered. Loop 271 is complete and there is no active delivery loop; select the next Production Baseline item after reviewing the verified browser-to-CLI authoring handoff.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7311,7 +7311,8 @@ The incumbent editor layout and visual language are preserved.
 **Safety boundary:** No HTTP calls, credential access, runtime policy, topology,
 write-back allowlist, or backend deletion protocol is added. The browser still
 cannot edit assertion bindings. Body input mappings retain their runtime role.
-The separately observed default-title graph export issue remains open.
+The separately observed default-title graph export issue remained open at
+this loop's close; Loop 271 resolves that handoff.
 
 **Evidence:** At `7c189b8`, 1,376 Python tests, 14 executable editor tests,
 isolated-wheel qualification, all seven CI jobs, and complete production-baseline
@@ -7320,6 +7321,33 @@ equality and explicit null; mocked transport proves no body. Desktop, narrow,
 and actual-window checks preserve the existing surface. Contract:
 `docs/authoring.md#http-inspector-editing`. Scope and qualification:
 `docs/superpowers/plans/2026-10-22-http-inspector-roundtrip.md`.
+
+### Loop 271: Write-Back-Ready Graph Export
+
+**Status:** Complete.
+
+**Prior basis:** Real Save Graph downloads omitted registered default titles,
+so strict CLI write-back rejected ordinary unedited workflows. Serialization
+also preceded pending node-timeout/retry-backoff form synchronization.
+
+**Outcome:** The export includes actual live titles and synchronizes pending
+parameter edits before serialization in both DSL-backed and graph-only modes.
+Graph properties and embedded source DSL describe the same current edits.
+The existing badge reports Graph saved after preparing a valid download.
+This closes the separate export issue recorded during Loop 270.
+
+**Safety boundary:** The pinned vendor and Python write-back code are unchanged.
+No inferred title fallback, blank-title repair, topology or identity permission,
+runtime change, credential access, or endpoint request is added. Existing HTTP
+omission behavior and the incumbent editor's visual world are preserved.
+
+**Evidence:** At `a48146c`, 1,377 Python tests, 21 editor tests, isolated-wheel
+qualification, all seven CI jobs, and complete production-baseline release
+preflight passed. Seven new export cases use the real pinned LiteGraph and
+invoke the Python CLI; actual browser downloads through the installed CLI
+deep-equal the original or equivalently edited Save DSL and embedded DSL.
+Contract: `docs/authoring.md#browser-graph-export`. Scope and qualification:
+`docs/superpowers/plans/2026-10-22-graph-export-titles.md`.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -7555,6 +7583,7 @@ and actual-window checks preserve the existing surface. Contract:
 | Loop 268: HTTP Assertion Inspector | Complete | Review executable result checks at node selection | Readonly typed criteria, source-DSL destinations, complete config disclosure, guarded rendering, and responsive editor evidence |
 | Loop 269: Skill HTTP Action Declarations | Complete | Compile controlled business API calls without manual DSL binding edits | Typed requests, input mappings, handle boundaries, metadata retention, source-first fixtures, installed POST/assertion journey, and takeover activation barrier |
 | Loop 270: Intent-Preserving HTTP Inspector | Complete | Preserve operator intent through HTTP node inspection and save | Omitted-field fidelity, atomic request edits, explicit resets, typed JSON, actual browser exports, and installed asset qualification |
+| Loop 271: Write-Back-Ready Graph Export | Complete | Make actual browser graph downloads usable by strict CLI write-back | Explicit live titles, sync-before-serialize, graph/DSL parity, unchanged rejection boundaries, real LiteGraph regressions, and installed CLI handoff |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

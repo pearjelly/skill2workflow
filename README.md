@@ -129,6 +129,8 @@ The visual editor loads Workflow DSL, renders it as a LiteGraph-compatible graph
 HTTP inspection preserves omitted request fields on an unedited save; typed
 JSON and explicit reset values are documented in
 [HTTP inspector editing](docs/authoring.md#http-inspector-editing).
+Graph downloads include default node titles and pending parameter edits for
+[strict CLI write-back](docs/authoring.md#browser-graph-export).
 When a run-state file is provided, the editor also shows read-only node overlay evidence such as current node, status, connector outcome, attempts, retry/recovery markers, and compact trigger metadata.
 
 ### Local Control Plane And Audit Trail
@@ -974,7 +976,7 @@ ROADMAP.md        # Open-source delivery roadmap
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-270 are complete.
+Current maturity: Self-hosted Beta. The local-first harness covers all five approved architecture layers, and Delivery Loops 1-271 are complete.
 
 Loop 200 adds an optional service-wide `runtime.http_allowed_origins` upper
 bound for built-in HTTP execution, shared by direct triggers and recurring

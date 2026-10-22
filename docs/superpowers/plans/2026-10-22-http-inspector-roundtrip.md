@@ -100,3 +100,6 @@ serialization (`graph node start title must not be empty`). Save DSL retains
 the source titles and the verified HTTP behavior above. This existing graph
 export/default-title boundary is not claimed fixed here and should be the next
 authoring delivery investigation, with a regression before any correction.
+
+Subsequently resolved by [Loop 271](2026-10-22-graph-export-titles.md), which
+retains this failed probe as historical evidence rather than changing its result.

@@ -87,3 +87,13 @@ Its editor script matches the final source byte-for-byte. An earlier title-only
 wheel passed but was superseded after the pending-form regression; it is not
 the qualified final artifact. Repository secret hygiene and whitespace checks
 also pass.
+
+## Remote Qualification
+
+Qualified implementation: `a48146c285350aa1bfb95bf7c6fda6184bb661ac`.
+[CI](https://github.com/pearjelly/skill2workflow/actions/runs/39726479156)
+passed all seven jobs, including Python 3.9/3.14, the real LiteGraph/export and
+inspector suites, isolated artifacts, Docker, systemd, user journeys and recovery.
+[Release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39726487759)
+passed the complete production-baseline dry-run on Python 3.9.25. No tag,
+release, provider pilot or maturity promotion was performed.
