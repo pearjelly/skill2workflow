@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-268
+- Completed delivery loops: 1-269
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 268 is complete with the HTTP assertion inspector
+- Active loop: None; Loop 269 is complete with Skill HTTP action declarations
 - Next maturity gate: Production Baseline
-- Next decision: select the next Production Baseline loop after reviewing editor assertion-review evidence
+- Next decision: select the next Production Baseline loop after reviewing published HTTP action evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-268 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-269 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 268 is complete and there is no active delivery loop; select the next Production Baseline item after reviewing editor assertion-review evidence.
+This rolling queue is ordered. Loop 269 is complete and there is no active delivery loop; select the next Production Baseline item after reviewing published HTTP action evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7263,6 +7263,37 @@ independent review's listed coercion fix was scored resolved; documentation
 confirmed the extension preserves the incumbent system. Contract:
 `docs/http-json-assertions.md`. Scope and evidence:
 `docs/superpowers/plans/2026-10-22-http-assertion-inspector.md`.
+
+### Loop 269: Skill HTTP Action Declarations
+
+**Status:** Complete.
+
+**Prior basis:** Skill authors could declare approval and HTTP result checks,
+but ordinary HTTP business calls still needed hand-written DSL bindings.
+
+**Outcome:** Explicit Skill `http` declarations compile reviewed methods,
+JSON bodies, body/query input mappings, origin policy, timeout, and credential
+handles into existing tool-call bindings. New declarations default to metadata
+response retention, with explicit full retention available. A synchronized
+example and installed published-run journey prove approval → POST → GET/JSON
+check → delivery, including rejection, HTTP failure, and result mismatch.
+
+Qualification also exposed a separately reproducible standby activation race.
+Readiness and recurring dispatch now wait for takeover recovery/reconciliation,
+not lease acquisition alone. A blocked-recovery regression proves that ordering.
+
+**Safety boundary:** Compilation performs no credential resolution or network
+request. Configuration remains data; invalid declarations use fixed refusal
+without replacing existing output. Existing DSL/HTTP execution and unmarked
+inference retain their semantics. The declaration adds no approval or retry;
+the recovery correction adds no replay authority or state-layout change.
+
+**Evidence:** At `44e8f8e`, 1,375 local tests, isolated-wheel qualification,
+all seven CI jobs, and production-baseline release preflight passed. The initial
+aggregate interrupted-recovery failure and the independently proved ordering
+issue are recorded without claiming unavailable original failure details.
+Contract: `docs/skill-http-actions.md`. Scope and qualification:
+`docs/superpowers/plans/2026-10-22-skill-http-actions.md`.
 
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
@@ -7496,6 +7527,7 @@ confirmed the extension preserves the incumbent system. Contract:
 | Loop 266: Executable HTTP JSON Assertions | Complete | Make workflow progress depend on real bounded HTTP JSON comparisons | Explicit connector, strict JSON/pointers, response-discarding results, failure transitions, and installed real-HTTP qualification |
 | Loop 267: Skill HTTP Assertion Declarations | Complete | Compile author-declared result checks without manual DSL binding and transition edits | Typed binding IR, strict declarations, data-only configuration, accurate review counts, and installed Skill-to-HTTP execution |
 | Loop 268: HTTP Assertion Inspector | Complete | Review executable result checks at node selection | Readonly typed criteria, source-DSL destinations, complete config disclosure, guarded rendering, and responsive editor evidence |
+| Loop 269: Skill HTTP Action Declarations | Complete | Compile controlled business API calls without manual DSL binding edits | Typed requests, input mappings, handle boundaries, metadata retention, source-first fixtures, installed POST/assertion journey, and takeover activation barrier |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

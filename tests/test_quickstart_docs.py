@@ -29,7 +29,7 @@ class InstalledQuickstartDocumentationTests(TestCase):
         self.assertLess(quickstart, source_demo)
         self.assertIn("Installed wheel quickstart", readme)
         self.assertIn("Source-checkout contributor demo", readme)
-        self.assertIn("Delivery Loops 1-268 are complete", readme)
+        self.assertIn("Delivery Loops 1-269 are complete", readme)
         self.assertIn("installed controlled quickstart", readme)
 
     def test_roadmap_and_harness_record_completed_loop_52(self):
@@ -37,9 +37,9 @@ class InstalledQuickstartDocumentationTests(TestCase):
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 
-        self.assertIn("- Completed delivery loops: 1-268", roadmap)
+        self.assertIn("- Completed delivery loops: 1-269", roadmap)
         self.assertIn(
-            "- Active loop: None; Loop 268 is complete with the HTTP assertion inspector",
+            "- Active loop: None; Loop 269 is complete with Skill HTTP action declarations",
             roadmap,
         )
         self.assertIn("| Loop 52: Installed Controlled Quickstart | Complete |", roadmap)

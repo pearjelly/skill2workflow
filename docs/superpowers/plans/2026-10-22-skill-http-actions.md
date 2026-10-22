@@ -97,3 +97,21 @@ isolated wheel passed all gates (92 members) in
 `/tmp/skill2workflow-package-loop269-takeover-20261022`, SHA-256
 `a9979589fb2f48ad5f43e69a17141179503b055b1124788cc360ac8f118a21e8`.
 Its installed service module matched the corrected source byte-for-byte.
+
+## Verified Outcome
+
+Qualified source: `44e8f8ed6d1919f753ec600be92335976e85a624`, following feature
+commit `3eae43e601e3a3ad4e04e016b08bef062ab39505`.
+
+- Final local full suite: 1,375 tests passed; corrected wheel qualification
+  and the installed four-scenario HTTP action journey passed.
+- [Corrected CI](https://github.com/pearjelly/skill2workflow/actions/runs/39721467771):
+  all seven jobs passed, including Python 3.9/3.14, Docker, systemd, recovery,
+  user journeys, editor regressions, and release artifact verification.
+- [Corrected release preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39721480375):
+  complete production-baseline dry-run passed on Python 3.9.
+- [Initial failed preflight](https://github.com/pearjelly/skill2workflow/actions/runs/39720221151)
+  remains evidence of the qualification failure described above; it is not
+  presented as a successful run or a proven single-cause diagnosis.
+- Example and repository secret hygiene and whitespace checks passed. No tag,
+  release, live provider pilot, or maturity-gate promotion was performed.
