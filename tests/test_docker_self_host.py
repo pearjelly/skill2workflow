@@ -16,6 +16,13 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class DockerSelfHostTests(TestCase):
+    def test_update_stops_the_service_before_workspace_doctor(self):
+        guide = (ROOT / "docs/docker-self-host.md").read_text(encoding="utf-8")
+        update = guide.split("To update,", 1)[1].split("The Linux container smoke", 1)[0]
+        self.assertIn("disposable workspace", update)
+        self.assertLess(update.index("stop the old service"), update.index("one-off Doctor"))
+        self.assertIn("Doctor must report `ready` before removing the old container", update)
+
     def test_restored_service_uses_only_the_selected_state_mount(self):
         original = Path("/tmp/workspace")
         restored = Path("/tmp/restore/state")

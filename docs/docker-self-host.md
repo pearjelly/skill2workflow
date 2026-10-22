@@ -151,10 +151,15 @@ first; mount the restored `state/` at the same container path and re-run
 readiness and authenticated go-live checks. Never overwrite the current
 `state/` directory with a restore or start two containers on the same state.
 
-To update, first qualify the new image and workspace with a one-off Doctor,
-then stop and remove the old service container and start **one** new service
-container from the reviewed image. Keep the old image and a verified offline
-backup until readiness, authenticated go-live checks, and recovery checks pass.
+To update, build and qualify the new image with a separate disposable workspace
+first. Then stop the old service and take a verified offline backup before
+running a one-off Doctor from the new image against the actual mounted
+workspace. Doctor probes the configured port, so the old service must remain
+stopped during this check. Doctor must report `ready` before removing the old container
+and starting **one** new service container from the reviewed image. If Doctor
+fails, retain the stopped old container and review the failure before proceeding.
+Keep the old image and the verified offline backup until readiness,
+authenticated go-live checks, and recovery checks pass.
 Never start old and new images concurrently on the same workspace. The
 application does not promise exactly-once external effects, automatic
 reconciliation, or rollback of provider requests.
