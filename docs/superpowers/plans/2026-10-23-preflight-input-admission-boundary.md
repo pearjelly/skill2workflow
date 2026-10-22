@@ -61,5 +61,24 @@ module byte-matches source. The same current qualifier correctly rejected
 the previous installed wheel while the current source passed, proving no
 source substitution. Whole-repository secret hygiene passed.
 
-Exact feature CI, full production-baseline release preflight and roadmap
-closure remain required before delivery. No release or maturity promotion.
+## Remote Feature Qualification And Closure
+
+Feature commit `e8723d0ddc666c0b9f5920a825f6f72b2cc264a6` passed all seven
+completed jobs in [CI run 39825998518](https://github.com/pearjelly/skill2workflow/actions/runs/39825998518),
+attempt 1. Python 3.9 passed 1,490 tests in 122.626 seconds; Python 3.14 passed
+them in 119.821 seconds. Their package checks and the separate artifact job
+require the actual installed-CLI boundary qualifier, not source imports.
+
+[Release-preflight run 39826020053](https://github.com/pearjelly/skill2workflow/actions/runs/39826020053)
+completed with success on the same exact feature commit, attempt 1, using
+Python 3.9.25. Complete logs confirm unit tests, Python compilation, installed
+wheel, reproducible wheel and full `production_baseline` command passed. Only
+the documented dry-run git/tag availability checks were skipped. No rerun,
+cancellation or duplicate dispatch was needed.
+
+The documentation-only closure advances existing completed-loop assertions and
+adds the Loop 284 outcome; the new roadmap assertions first failed before the
+entry existed. All 1,490 local closure tests passed in 111.444 seconds and
+whole-repository secret hygiene passed. All seven exact pushed-commit CI jobs
+remain required before handoff. No UI/runtime follow-up, PR, release, tag,
+version or maturity promotion. The broad iterative goal remains active.
