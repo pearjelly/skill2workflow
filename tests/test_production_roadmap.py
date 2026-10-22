@@ -26,11 +26,14 @@ class ProductionRoadmapTests(TestCase):
 
         self.assertIn("self-hosted, single-tenant workflow runtime for one team", roadmap)
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
-        self.assertIn("- Completed delivery loops: 1-263", roadmap)
-        self.assertIn("- Active loop: Loop 264 — explicit Workflow and Steps headings", roadmap)
+        self.assertIn("- Completed delivery loops: 1-264", roadmap)
+        self.assertIn("- Active loop: None; Loop 264 is complete with explicit Workflow and Steps headings", roadmap)
         self.assertIn("- Next maturity gate: Production Baseline", roadmap)
         self.assertIn("docs/controlled-pilot-deferral-review.md", roadmap)
-        self.assertIn("This rolling queue is ordered. Loop 263 and its deployment CI evidence are", roadmap)
+        self.assertIn("This rolling queue is ordered. Loop 264 is complete and there is no active delivery loop", roadmap)
+        self.assertIn("### Loop 264: Explicit Workflow And Steps Headings", roadmap)
+        self.assertIn("| Loop 264: Explicit Workflow And Steps Headings | Complete |", roadmap)
+        self.assertIn("docs/superpowers/plans/2026-10-22-workflow-step-headings.md", roadmap)
 
         self.assertIn("### Local Evaluation", roadmap)
         self.assertIn("**Status:** Achieved.", roadmap)
@@ -41,7 +44,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("**Status:** Achieved.", roadmap)
         self.assertIn("### Production Baseline", roadmap)
         self.assertIn(
-            "**Status:** Directional; Loops 44-263 complete, Loop 264 in progress.",
+            "**Status:** Directional; Loops 44-264 complete, further loop numbers unassigned.",
             roadmap,
         )
 
@@ -395,7 +398,7 @@ class ProductionRoadmapTests(TestCase):
         readme = _read("README.md")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-263 are complete", readme)
+        self.assertIn("Delivery Loops 1-264 are complete", readme)
         self.assertIn("Loop 40", readme)
         self.assertIn("self-hosted, single-tenant runtime for one team", readme)
         self.assertIn("`ROADMAP.md`", readme)

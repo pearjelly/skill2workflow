@@ -12,11 +12,11 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-263
+- Completed delivery loops: 1-264
 - Current maturity: Self-hosted Beta
-- Active loop: Loop 264 — explicit Workflow and Steps headings
+- Active loop: None; Loop 264 is complete with explicit Workflow and Steps headings
 - Next maturity gate: Production Baseline
-- Next decision: review explicit process-step compilation evidence before selecting another Production Baseline loop
+- Next decision: select the next Production Baseline loop after reviewing explicit process-step compilation and compatibility evidence
 
 ## Production Readiness Path
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-263 complete, Loop 264 in progress.
+**Status:** Directional; Loops 44-264 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -154,14 +154,10 @@ Production Baseline remains directional.
 
 ## Active Loop
 
-Loop 264 is active: preserve explicit numbered processes beneath `Workflow`
-and `Steps` headings when no Checklist section is present. Existing Checklist
-precedence, published DSL, and runtime semantics remain unchanged. Scope,
-exclusions, and acceptance evidence are recorded in
-`docs/superpowers/plans/2026-10-22-workflow-step-headings.md`.
-
-The detailed entries below are retained as historical evidence for completed
-Production Baseline loops.
+No delivery loop is currently active. The detailed entries below are retained
+as historical evidence for completed Production Baseline loops; the current
+completion point and next-selection rule are authoritative in “Status At A
+Glance” and “Rolling Loop Queue”.
 
 ### Loop 56: Linux systemd Supervision
 
@@ -7053,9 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 263 and its deployment CI evidence are
-complete. Loop 264 is active; select another Production Baseline item only
-after reviewing explicit process-step compilation and compatibility evidence.
+This rolling queue is ordered. Loop 264 is complete and there is no active delivery loop; select the next Production Baseline item only after reviewing explicit process-step compilation and compatibility evidence.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7142,6 +7136,31 @@ Linux gate.
 **Evidence:** `Dockerfile`, `.dockerignore`,
 `scripts/docker_service_smoke.py`, dedicated Linux CI job, static contract
 tests, and `docs/docker-self-host.md`.
+
+### Loop 264: Explicit Workflow And Steps Headings
+
+**Status:** Complete.
+
+**Prior basis:** Explicit numbered processes under `Workflow` or `Steps`
+previously compiled into a generic review node when no Checklist was present,
+losing the source's ordered process structure.
+
+**Outcome:** One populated explicit process section now compiles into the
+existing DSL with step order, details, and source provenance preserved. CLI
+and local editor review share the same contract, and inferred human gates
+retain durable SQLite pause/resume behavior.
+
+**Safety boundary:** Legacy Checklist extraction and precedence remain
+unchanged, including empty Checklists. The fallback excludes fenced examples,
+nested lists, bullet inventories, and prose; multiple populated process
+sections are rejected. Published workflows are not reinterpreted, and this
+adds no arbitrary-command execution or new runtime semantics.
+
+**Evidence:** Parser, CLI, real loopback UI, durable approval, and isolated
+installed-wheel tests pass. At implementation commit `c68d871`, all seven CI
+jobs passed, including full Python 3.9/3.14 tests, artifact qualification,
+deployment, recovery, and user journeys. Scope and reproducible checks:
+`docs/superpowers/plans/2026-10-22-workflow-step-headings.md`.
 
 
 | Loop | Status | Goal | Exit artifact |
@@ -7371,6 +7390,7 @@ tests, and `docs/docker-self-host.md`.
 | Loop 261: Self-Hosted Feishu Tenant Credentials | Complete | Derive the approved live Feishu token in memory from a protected App Secret instead of a manually rotated static token | Explicit China-only descriptor, reserved secret handle, direct bounded exchange, service rotation, and redaction evidence |
 | Loop 262: Opt-In Feishu Credential Go-Live Preflight | Complete | Let operators include one explicit, value-free Feishu credential preflight in the composite deployment gate | Doctor-first opt-in check, provider-free default, Probe/token short-circuit, CLI/docs/tests, and wheel qualification |
 | Loop 263: Single-Service Docker Self-Hosting | Complete | Provide a reviewed one-container Linux deployment without weakening the existing loopback and SQLite boundaries | Wheel-built non-root image, private mounts, state-only runtime write, Docker CI backup/restore and restart/go-live drill, and operator runbook |
+| Loop 264: Explicit Workflow And Steps Headings | Complete | Preserve explicitly numbered Skill processes without requiring a Checklist rewrite | Legacy precedence, bounded grammar, ambiguity refusal, source provenance, durable approval, CLI/UI, and installed-wheel evidence |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

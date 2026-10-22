@@ -56,3 +56,24 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-loop264
 python3 scripts/secret_hygiene.py examples/workflows
 ```
+
+## Verified Outcome
+
+Completed at implementation commit `c68d871` on 2026-10-22:
+
+- Local Python 3.14 full suite: 1,333 tests passed. Independent final review
+  also passed 39 focused checks without a blocking finding.
+- Actual isolated-wheel smoke passed, including both headings through the
+  installed CLI and real local UI, source provenance, valid DSL, and fixed
+  ambiguity rejection. The smoke clears source import assistance.
+- Repository and example secret-hygiene scans passed; existing Checklist
+  fixtures remained unchanged.
+- [Implementation CI](https://github.com/pearjelly/skill2workflow/actions/runs/39708641121)
+  passed all seven jobs: Python 3.9, Python 3.14, Linux systemd, Linux Docker,
+  recovery/state safety, user journeys, and release artifacts. The Python
+  jobs include complete tests and installed-wheel qualification.
+
+The local Python 3.9 container could not start because its container-storage
+mount failed. It was not counted as evidence; successful Ubuntu 24.04 CI
+provides the Python 3.9 qualification. Production maturity remains Self-hosted
+Beta, with no DSL version or runtime-dependency change.
