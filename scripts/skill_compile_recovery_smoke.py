@@ -94,7 +94,8 @@ def qualify(executable=None, browser_module_tests=False):
             reports.write_text(json.dumps(fixtures), encoding='utf-8')
             node_environment = dict(environment, S2W_EDITOR_MODULE=str(directory / 'app.js'),
                                     S2W_EDITOR_VENDOR=str(directory / 'litegraph.js'), S2W_COMPILE_DIAGNOSTICS=str(reports))
-            subprocess.run(['node', '--test', str(root / 'tests/test_skill_compile_recovery.cjs')], cwd=str(directory), env=node_environment,
+            subprocess.run(['node', '--test', str(root / 'tests/test_skill_compile_recovery.cjs'),
+                            str(root / 'tests/test_draft_load_ownership.cjs')], cwd=str(directory), env=node_environment,
                            capture_output=True, check=True, timeout=20)
     result = {'ok': True, 'installed': executable is not None, 'cases_verified': verified,
               'diagnostic_cases_verified': diagnostics, 'legacy_cases_verified': legacy,

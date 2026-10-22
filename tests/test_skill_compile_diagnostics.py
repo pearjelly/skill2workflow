@@ -16,6 +16,24 @@ DUPLICATE = '---\nname: reviewed\ndescription: Synthetic example.\nname: private
 
 
 class SkillCompileDiagnosticTests(TestCase):
+    def test_installed_browser_module_flag_requires_recovery_and_draft_ownership_suites(self):
+        import subprocess
+        from scripts.skill_compile_recovery_smoke import qualify
+        original = subprocess.run
+        commands = []
+
+        def selected_run(command, **kwargs):
+            if command[0] == 'node':
+                commands.append(command)
+                return subprocess.CompletedProcess(command, 0, stdout=b'', stderr=b'')
+            return original(command, **kwargs)
+
+        with patch('scripts.skill_compile_recovery_smoke.subprocess.run', side_effect=selected_run):
+            self.assertTrue(qualify(browser_module_tests=True)['browser_module_verified'])
+        self.assertEqual(len(commands), 1)
+        self.assertIn(str(Path(__file__).resolve().parent / 'test_skill_compile_recovery.cjs'), commands[0])
+        self.assertIn(str(Path(__file__).resolve().parent / 'test_draft_load_ownership.cjs'), commands[0])
+
     def test_installed_gate_requires_complete_diagnostic_legacy_cli_and_module_evidence(self):
         from scripts import package_smoke
         complete = {'ok': True, 'installed': True, 'cases_verified': 10,

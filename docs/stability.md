@@ -179,6 +179,12 @@ These surfaces should remain compatible during the `0.1.x` line:
 - Browser-side `SKILL.md` staging reads bytes through strict UTF-8 decoding;
   malformed byte sequences are rejected before the loopback compiler route,
   rather than silently normalized into a different Skill document.
+- Local editor imports coordinate the current JSON/example/Skill intent.
+  Obsolete reads, responses, errors and embedded fallbacks cannot replace a
+  newer draft; form/connection edits and graph snapshots fence pending work.
+  Fixed current JSON read/parse recovery preserves separate graph validation.
+  This is not autosave or an unsaved-change confirmation boundary. See
+  [draft import ownership](authoring.md#keep-the-current-draft-during-imports).
 - Local Skill compilation returns a fixed source-free review schema containing
   inferred structural counts and a finite notice vocabulary. The editor
   validates that response before showing it; review guidance never mutates the

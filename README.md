@@ -150,6 +150,11 @@ editor, export, repair and custom quickstart preserve that version; omission
 keeps `0.1.0`. Compare and publish a new immutable version without editing
 generated JSON using [versioned Skill iteration](docs/skill-workflow-versions.md).
 
+The editor keeps newer drafts safe from late JSON reads, example responses and
+Skill work. Starting another import or editing retires obsolete results; a
+current JSON read/parse error offers recovery without invalidating the loaded
+graph. See [draft import ownership](docs/authoring.md#keep-the-current-draft-during-imports).
+
 Draft authors can open **Workflow input** to review the read-only input
 contract and check non-secret JSON against the current draft's schema and
 required mappings. Blocked results explain the reason and next edit using

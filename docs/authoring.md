@@ -85,6 +85,30 @@ See [versioned Skill iteration](skill-workflow-versions.md) for two-version
 review/publication without manually editing generated JSON. Omitting the
 declaration still produces `0.1.0`; publication remains explicit and immutable.
 
+## Keep The Current Draft During Imports
+
+Starting **Load Example**, choosing a JSON file or staging a Skill immediately
+retires older pending imports. A late response, file read, parse failure or
+embedded-example fallback cannot replace or repaint a newer selection. Editing
+node fields (including an uncommitted invalid edit) or connections also retires
+pending work; layout changes are checked against the current graph snapshot.
+Retry the intended import explicitly after editing. Cancellation is best-effort;
+revision/snapshot checks still protect the draft when a fetch cannot be aborted.
+
+A current JSON read/parse failure shows fixed correction/reselection guidance
+beside the toolbar without echoing parser text, private values or filenames.
+The loaded graph and its separate validation are retained. Choose a corrected
+Workflow DSL or LiteGraph JSON file to recover. Loading a document clears a
+previously staged Skill; choose the intended Skill again before compiling it.
+The existing embedded example remains a fallback only for the current unchanged
+example request.
+
+This does not add autosave, an unsaved-change dialog or browser persistence.
+A newly requested import may still replace the prior draft intentionally; the
+protection is against obsolete asynchronous work. Save the reviewed DSL/graph
+through the existing explicit downloads. Execution and publication remain
+separate actions.
+
 ## Check Draft Input In The Editor
 
 The inspector's **Workflow input** disclosure reviews the whole draft, not the

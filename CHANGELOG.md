@@ -88,6 +88,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Prevent obsolete JSON, example and Skill import work from replacing newer
+  drafts or repainting stale errors. Preserve edits, keep example fallbacks
+  current-intent-only and provide source-safe JSON read/parse recovery.
+
 - Make rejected Skill imports recoverable with safe frontmatter reasons,
   approximate source lines and explicit edit/reselect/recompile guidance;
   preserve the active draft and fence stale requests. Keep legacy API refusals

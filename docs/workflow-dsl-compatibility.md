@@ -1,5 +1,12 @@
 # Workflow DSL Compatibility
 
+The editor now coordinates asynchronous JSON/example/Skill imports so obsolete
+results cannot overwrite newer drafts or edits. Current JSON read/parse errors
+use fixed recovery text and retain active-graph validation; document replacement
+clears previously staged Skill text. This affects local UI ownership only, not
+source formats, DSL, exports, validation semantics, publication or execution.
+See [draft import ownership](authoring.md#keep-the-current-draft-during-imports).
+
 An explicit standalone Skill `workflow_version` declaration selects the existing
 `workflow.version` field for newly compiled drafts. No declaration retains
 `0.1.0`; ordinary metadata is not deployment intent. This bounded source grammar

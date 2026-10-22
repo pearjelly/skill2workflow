@@ -137,6 +137,16 @@ version-pinned runs plus quickstart/local-helper evidence, with no live provider
 Keep the no-declaration `0.1.0` output and original source lines unchanged;
 ordinary metadata must never become deployment version intent.
 
+Run `node --test tests/test_draft_load_ownership.cjs` for latest-intent import
+ownership, cross-source cancellation, edit/snapshot fencing, fallback suppression
+and fixed JSON recovery. The existing installed
+`scripts/skill_compile_recovery_smoke.py --executable … --browser-module-tests`
+qualification now requires both recovery and ownership suites against the actual
+served app/vendor modules. That flag remains mandatory in artifact CI; Node is
+development-only and ordinary Python installation remains unchanged. The Python
+gate test verifies both suites are required without adding Node to the unit-suite
+requirements.
+
 A separate Python 3.14 CI job also runs the local end-user journeys: the
 customer-support Pilot, the three-scenario Pilot pack, explicit external
 connector loading, and the installed-wheel quickstart. These drills use local

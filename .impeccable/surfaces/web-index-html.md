@@ -7,6 +7,122 @@ related_targets: ["web/app.js","web/input-review.js","web/styles.css"]
 
 # Workflow Editor — Operate
 
+## Current hardening (Loop 283)
+
+Coordinate JSON reads, example responses/fallbacks and Skill staging/compilation
+so only the latest unchanged authoring intent may replace or repaint the draft.
+The optional scope question has no reply; retain the incumbent world and follow
+`docs/superpowers/plans/2026-10-23-current-draft-load-ownership.md`.
+
+## Direction contract (Loop 283)
+
+THESIS: The draft on screen belongs to the author's latest action, not the
+slowest old request. Preserve newer work and discard obsolete results.
+
+OWN-WORLD: Keep the white/neutral, blue-accent system-sans editor, native
+controls, semantic status pill and existing wrapping inline feedback.
+
+STORY: Choose JSON, an example or a Skill; change your mind or edit while it
+loads. The newer choice/edit wins. Correct a current JSON error and retry.
+
+FIRST VIEWPORT: Toolbar above the existing graph/sidebar. Reuse the normally
+hidden inline feedback beneath it for current JSON recovery; keep active graph
+validation separate. No new panel, control, layout, CSS or source preview.
+
+FORM: Code-led local hardening; seed key not applicable, no comp/new world,
+imagery or motion. Signature behavior is cross-source current-intent ownership.
+
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+Absent global design documents are pre-existing drift, not permission to repair.
+
+### Completed-hardening evidence (Loop 283)
+
+The implemented change in `web/app.js` coordinates JSON reads, example fetches
+and response-body parsing, and Skill staging/compilation under current authoring
+intent. `web/index.html` associates Load JSON and Load Example with the existing
+inline feedback. `web/styles.css`, the toolbar/canvas/inspector composition,
+native controls and visual vocabulary are unchanged. This is a local hardening
+of the incumbent Operate surface, not a new visual world or execution capability.
+
+Keep these surface-local ownership and recovery rules:
+
+- **Latest choice owns immediately:** a JSON, example or Skill selection takes
+  ownership before its bytes arrive. Revision and operation-identity guards
+  discard obsolete success, failure, body parsing and embedded-example fallback
+  results. Abort obsolete example/compile work when supported; revision fencing
+  still protects example loading when `AbortController` is unavailable. Only the
+  owning unavailable example may install the existing embedded fallback.
+- **Edits and snapshots outrank imports:** even an uncommitted inspector input
+  invalidates pending work. Connection changes invalidate it too; serialized
+  graph/DSL snapshots detect layout and other changes before a result can
+  replace the draft. A direct document replacement also abandons pending work.
+  Discarding an obsolete result must not repaint status, feedback or validation.
+- **Stage, then explicitly compile:** choosing a Skill abandons earlier JSON or
+  example work without compiling it. Choosing another document immediately
+  cancels an older compile, including while the new file is still being read.
+  New selections and document replacement clear staged Skill text, so an older
+  source cannot silently remain available for compilation. Explicit Compile
+  SKILL and the existing compile-review/diagnostic boundary remain intact.
+- **Current failure, adjacent recovery:** a current JSON read or parse failure
+  keeps the active graph and its validation list, while the existing status pill
+  says “JSON load failed”. Reuse the normally hidden, atomic alert beneath the
+  toolbar for the fixed instruction: “Could not load JSON. Choose a valid
+  Workflow DSL or LiteGraph JSON file and try again.” Choosing a valid corrected
+  document clears the message; JSON and example controls join the existing
+  Skill controls' `aria-describedby` association.
+- **No source echo or visual expansion:** feedback uses `textContent`, not raw
+  parser/network errors, private source excerpts, selected filenames or response
+  bodies. The existing red supporting text, 75ch measure, anywhere wrapping and
+  canvas resizing accommodate recovery. Preserve the white/neutral, blue-accent
+  frame, 340px desktop inspector, 900px stacked breakpoint and local horizontal
+  toolbar scrolling. No panel, control, CSS, motion, image or global token is
+  added. DSL authority, export, validation, runtime, publication and credentials
+  retain their existing boundaries.
+
+The real delayed loopback example check started its old request at
+`1792689065.329822`, loaded the newer JSON at `1792689066.114` and finished the
+old response at `1792689077.341155`; the newer graph remained on screen. Visual
+evidence under `.impeccable/review/loop283/` is `race-current.jpg` (actual
+1280 × 720 viewport after the race), `current-error.jpg` (actual viewport,
+current JSON failure), `desktop-error.jpg` (1440 × 1000),
+`mobile-error-full.jpg` (390px, retained valid graph), `mobile-long-full.jpg`
+(390px, long synthetic filename not echoed and visible Fit keyboard focus),
+`reflow-640-full.jpg` (640px, narrow reflow and focus), and
+`recovered-desktop.jpg` (1440 × 1000, corrected import with feedback gone).
+The builder, fresh finish reviewer and this fresh documenter independently
+opened all seven captures. They preserve the desktop/sidebar and narrow/stacked
+layout, with wrapping recovery separate from active-graph validation. These are
+synthetic review captures, not shipping raster assets; no concept comp, new
+imagery or raster provenance obligation is introduced.
+
+True 200% browser/text magnification remains **unqualified**. The attempted
+shortcut left actual viewport, device-pixel ratio and feedback font size
+unchanged; the 640px capture demonstrates reflow only. The fresh independent
+finish reviewer, `loop283_finish_reviewer`, returned **SHIP** in the required
+five sections, with no material fixes, explicitly treating this qualification
+gap as non-blocking for unchanged CSS and the bounded incumbent feedback row.
+The reviewer independently passed all 27 recovery/ownership checks.
+
+The main loop reports the final source gates passed: 1,483 Python tests
+(107.576 seconds), 64 Node tests and whole-repository secret hygiene. The fresh
+isolated wheel passed with 96 members (SHA-256
+`4f87962fcd948821c6c4f7eb234ee9bce1e5da8bbaf42a2ca1df6065d24ef27f`).
+The installed editor's `app.js` and `index.html` byte-matched final source. A
+separate installed qualifier served that actual editor/vendor and passed all
+27 mandatory `--browser-module-tests` checks (12 recovery plus 15 ownership),
+alongside ten compile cases, four diagnostic cases, two legacy-helper cases and
+two CLI cases. The latest ownership suite also rejected the old installed
+pre-optional-cancellation editor as a negative control, demonstrating that the
+served-module check does not substitute current source. These are local
+qualification gates only; remote feature CI, release preflight and loop-closure
+CI are not claimed complete here.
+
+The detector ran once. Its inherited Inter finding and actual graph-canvas grid
+advisory are not introduced or canonized by this hardening. `PRODUCT.md`,
+`DESIGN.md` and `.impeccable/design.json` remain absent and untouched as
+pre-existing drift; the finish wording does not authorize global design repair.
+
 ## Current clarification (Loop 281)
 
 Explain safe compile refusals with a known reason, original line when available

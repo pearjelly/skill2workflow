@@ -51,6 +51,14 @@ content and do not place private artifacts in its served directory.
 
 ### Local authoring helpers
 
+The editor coordinates JSON, example and Skill imports as one current authoring
+intent. A newer import, document replacement or form edit retires pending old
+reads/responses/errors/fallbacks; graph snapshots also protect intervening layout
+edits. Current JSON read/parse failures offer fixed adjacent recovery copy while
+retaining the graph's independent validation. Loading a document clears an old
+staged Skill. See [current draft ownership](authoring.md#keep-the-current-draft-during-imports).
+No browser persistence, automatic execution or publication is introduced.
+
 The editor's **Compile SKILL** action is a local authoring helper: it
 accepts one bounded 2 MiB `SKILL.md` in memory and returns a draft Workflow DSL
 document without writing, publishing, executing, or contacting the service.

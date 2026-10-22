@@ -82,6 +82,14 @@ to render all four actual installed reports through the served editor and
 pinned vendor modules. No source-backend substitution or silent skip qualifies
 that installed path; Node remains development tooling only.
 
+The same mandatory installed `--browser-module-tests` flag also executes
+`tests/test_draft_load_ownership.cjs` against those actual served app/vendor
+bytes. It requires latest JSON/example/Skill intent, late body/error/fallback
+suppression, immediate cross-source invalidation, uncommitted-form and layout
+edit fencing, current JSON recovery and the no-fetch-cancellation fallback.
+An older installed module that lacks the ownership behavior must fail this gate
+even when the source module passes; source markers are not qualification.
+
 The mandatory installed `scripts/skill_version_smoke.py` drill requires ten
 actual path checks for source-declared Workflow versions: default/explicit CLI
 compilation, two verified authoring sets, backed-up repair with preview, Bundle

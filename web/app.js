@@ -59,6 +59,9 @@
   let skillSelectionRevision = 0;
   let skillCompileRevision = 0;
   let skillCompileController = null;
+  let draftLoadRevision = 0;
+  let pendingDraftLoad = null;
+  let exampleLoadController = null;
   let inputReview = null;
 
   const els = {};
@@ -106,10 +109,6 @@
         status: document.getElementById("input-preflight-status"), issues: document.getElementById("input-preflight-issues"),
       }, getWorkflow: workflowFromEditor,
     });
-    document.getElementById("node-form").addEventListener("input", function () {
-      inputReview.invalidate();
-      if (skillCompileLoading) cancelSkillCompile();
-    });
     resizeCanvas();
     graph.start();
     loadSample();
@@ -122,8 +121,8 @@
     els.fileInput = document.getElementById("file-input");
     els.skillInput = document.getElementById("skill-input");
     els.compileSkill = document.getElementById("compile-skill");
-    els.skillInput = document.getElementById("skill-input");
     els.skillCompileFeedback = document.getElementById("skill-compile-feedback");
+    els.nodeForm = document.getElementById("node-form");
     els.fitView = document.getElementById("fit-view");
     els.validateGraph = document.getElementById("validate-graph");
     els.saveWorkflow = document.getElementById("save-workflow");
@@ -172,6 +171,12 @@
     els.fileInput.addEventListener("change", loadSelectedFile);
     els.skillInput.addEventListener("change", stageSelectedSkill);
     els.compileSkill.addEventListener("click", compileStagedSkill);
+    els.nodeForm.addEventListener("input", function () {
+      if (inputReview) inputReview.invalidate();
+      const wasPending = pendingDraftLoad !== null || skillCompileLoading;
+      invalidateDraftLoads(false);
+      if (wasPending) setStatus("Draft changed", "idle");
+    });
     els.nodeTitle.addEventListener("input", updateSelectedNode);
     els.nodeDescription.addEventListener("input", updateSelectedNode);
     els.nodeAction.addEventListener("input", updateSelectedNode);
@@ -210,7 +215,9 @@
       WorkflowNode.prototype.onDrawForeground = drawNodeOverlay;
       WorkflowNode.prototype.onConnectionsChange = function () {
         if (inputReview) inputReview.invalidate();
-        if (skillCompileLoading) cancelSkillCompile();
+        const wasPending = pendingDraftLoad !== null || skillCompileLoading;
+        invalidateDraftLoads(false);
+        if (wasPending) setStatus("Draft changed", "idle");
         window.requestAnimationFrame(validateGraph);
       };
       WorkflowNode.prototype.onConnectOutput = function (slot, type, input, targetNode) {
@@ -259,18 +266,58 @@
     ctx.quadraticCurveTo(x, y, x + radius, y);
   }
 
+  function invalidateDraftLoads(clearSkill) {
+    draftLoadRevision++;
+    pendingDraftLoad = null;
+    if (exampleLoadController) exampleLoadController.abort();
+    exampleLoadController = null;
+    skillSelectionRevision++;
+    cancelSkillCompile();
+    if (clearSkill) {
+      stagedSkillMarkdown = null;
+      if (els.skillInput) els.skillInput.value = "";
+      updateSkillCompileControls();
+    }
+  }
+
+  function beginDraftLoad() {
+    invalidateDraftLoads(true);
+    const operation = { revision: draftLoadRevision, snapshot: compileDraftSnapshot() };
+    pendingDraftLoad = operation;
+    return operation;
+  }
+
+  function ownsDraftLoad(operation) {
+    if (pendingDraftLoad !== operation || operation.revision !== draftLoadRevision) return false;
+    if (compileDraftSnapshot() !== operation.snapshot) {
+      invalidateDraftLoads(false);
+      setStatus("Draft changed", "idle");
+      return false;
+    }
+    return true;
+  }
+
   async function loadSample() {
+    const operation = beginDraftLoad();
+    const controller = typeof AbortController === "function" ? new AbortController() : null;
+    exampleLoadController = controller;
     setStatus("Loading", "idle");
     const exampleName = els.exampleSelect && els.exampleSelect.value ? els.exampleSelect.value : "approval-flow.workflow.json";
     const exampleUrl = EXAMPLES[exampleName] || EXAMPLES["approval-flow.workflow.json"];
     try {
-      const response = await fetch(exampleUrl, { cache: "no-store" });
+      const response = await fetch(exampleUrl, { cache: "no-store", credentials: "omit", signal: controller ? controller.signal : undefined });
+      if (!ownsDraftLoad(operation)) return;
       if (!response.ok) {
         throw new Error("example workflow unavailable");
       }
-      loadDocument(await response.json(), exampleName);
+      const documentJson = await response.json();
+      if (!ownsDraftLoad(operation)) return;
+      loadDocument(documentJson, exampleName);
     } catch (error) {
-      loadDocument(defaultWorkflow(), "embedded-example");
+      if (ownsDraftLoad(operation)) loadDocument(defaultWorkflow(), "embedded-example");
+    } finally {
+      if (pendingDraftLoad === operation) pendingDraftLoad = null;
+      if (exampleLoadController === controller) exampleLoadController = null;
     }
   }
 
@@ -279,24 +326,27 @@
     if (!file) {
       return;
     }
+    const operation = beginDraftLoad();
+    event.target.value = "";
+    setStatus("Loading JSON", "idle");
     try {
       const documentJson = JSON.parse(await file.text());
+      if (!ownsDraftLoad(operation)) return;
       loadDocument(documentJson, file.name);
     } catch (error) {
-      renderValidation(["Could not load JSON: " + error.message], new Set());
-      setStatus("Invalid JSON", "invalid");
+      if (!ownsDraftLoad(operation)) return;
+      setSkillCompileFeedback("Could not load JSON. Choose a valid Workflow DSL or LiteGraph JSON file and try again.");
+      setStatus("JSON load failed", "invalid");
     } finally {
-      event.target.value = "";
+      if (pendingDraftLoad === operation) pendingDraftLoad = null;
     }
   }
 
   async function stageSelectedSkill(event) {
     const file = event.target.files && event.target.files[0];
-    const selection = ++skillSelectionRevision;
-    cancelSkillCompile();
-    stagedSkillMarkdown = null;
-    updateSkillCompileControls();
     if (!file) return;
+    const operation = beginDraftLoad();
+    event.target.value = "";
     try {
       if (typeof file.size !== "number" || file.size < 1 || file.size > MAX_SKILL_INPUT_BYTES) {
         throw new Error("SKILL.md is outside the 2 MiB limit");
@@ -305,7 +355,7 @@
         throw new Error("this browser cannot verify UTF-8 SKILL.md input");
       }
       const bytes = await file.arrayBuffer();
-      if (selection !== skillSelectionRevision) return;
+      if (!ownsDraftLoad(operation)) return;
       const markdown = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
       if (!markdown || new TextEncoder().encode(markdown).length > MAX_SKILL_INPUT_BYTES) {
         throw new Error("SKILL.md is outside the 2 MiB limit");
@@ -314,12 +364,12 @@
       validateGraph();
       setStatus("SKILL staged", "idle");
     } catch (error) {
-      if (selection !== skillSelectionRevision) return;
+      if (!ownsDraftLoad(operation)) return;
       setSkillCompileFeedback("Could not read SKILL.md. Choose a UTF-8 file between 1 byte and 2 MiB.");
       setStatus("SKILL rejected", "invalid");
     } finally {
-      if (selection === skillSelectionRevision) {
-        event.target.value = "";
+      if (pendingDraftLoad === operation) {
+        pendingDraftLoad = null;
         updateSkillCompileControls();
       }
     }
@@ -393,6 +443,7 @@
   async function compileStagedSkill() {
     if (!stagedSkillMarkdown || skillCompileLoading) return;
     const markdown = stagedSkillMarkdown;
+    invalidateDraftLoads(false);
     const selection = skillSelectionRevision;
     const revision = ++skillCompileRevision;
     let snapshot;
@@ -442,9 +493,8 @@
   }
 
   function loadDocument(documentJson, label, skillCompileReview) {
-    skillSelectionRevision++;
-    if (els.skillInput) els.skillInput.value = "";
-    cancelSkillCompile();
+    invalidateDraftLoads(true);
+    if (els.fileInput) els.fileInput.value = "";
     try {
       const normalized = normalizeDocument(documentJson);
       const graphJson = normalized.graphJson;
