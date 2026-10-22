@@ -69,8 +69,8 @@ class DraftInputPreflightTests(TestCase):
 
     def test_installed_gate_requires_all_case_and_module_evidence(self):
         from scripts import package_smoke
-        complete = {'ok': True, 'installed': True, 'cases_verified': 5, 'module_served': True}
-        for value in (complete, {}, dict(complete, cases_verified=4), dict(complete, module_served=False)):
+        complete = {'ok': True, 'installed': True, 'cases_verified': 13, 'module_served': True, 'diagnostics_verified': 8}
+        for value in (complete, {}, dict(complete, cases_verified=5), dict(complete, module_served=False), dict(complete, diagnostics_verified=0)):
             with patch('scripts.package_smoke._run', return_value=json.dumps(value)):
                 if value == complete:
                     self.assertTrue(package_smoke._qualify_installed_draft_input_ui(Path('/repo'), Path('/bin/cli'), Path('/isolated')))

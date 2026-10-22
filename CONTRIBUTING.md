@@ -72,7 +72,16 @@ PYTHONPATH=src python3 scripts/draft_input_ui_smoke.py
 ```
 
 Package qualification also runs it through the isolated installed CLI with
-source imports disabled. Keep new browser modules in both the wheel data list
+source imports disabled, including all eight existing schema rejection reasons.
+The release-artifact job additionally requires the actual served module to
+render those real reports through the Node regression suite:
+
+```bash
+python3 scripts/draft_input_ui_smoke.py --executable /path/to/installed/skill2workflow --browser-module-tests
+```
+
+This optional local flag is mandatory in that CI job; Node remains development
+tooling only. Keep new browser modules in both the wheel data list
 and the release artifact's strict public-member allowlist.
 
 CI repeats the full release-relevant checks on Python 3.9 and 3.14, covering

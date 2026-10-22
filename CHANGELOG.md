@@ -84,6 +84,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Explain editor input-check failures with declared types, missing required
+  fields and safe length/range hints instead of a generic path-only error;
+  preserve check-only behavior and avoid echoing rejected values or unknown keys.
+
 - Enforce the production-baseline bundle's shared remaining execution budget;
   stop owned POSIX check process groups on timeout and preserve artifacts when
   cleanup cannot be confirmed, without changing its 19 checks or evidence schema.

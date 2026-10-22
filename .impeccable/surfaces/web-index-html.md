@@ -7,7 +7,108 @@ related_targets: ["web/app.js","web/input-review.js","web/styles.css"]
 
 # Workflow Editor — Operate
 
-## Current extension (Loop 275)
+## Current clarification (Loop 279)
+
+Explain the existing backend input rejection reasons beside Test input JSON.
+Use payload-relative paths, declared types and safe schema constraints; never
+repeat rejected values or undeclared input keys. Unknown evidence stays generic.
+Preserve all current layout, check-only boundaries, stale-result invalidation
+and exports. No preference reply has arrived; use this narrow non-mutating scope.
+Acceptance: `docs/superpowers/plans/2026-10-22-input-check-explanations.md`.
+
+THESIS: Turn a blocked input check into a specific, safe next edit.
+
+OWN-WORLD: Preserve the incumbent white/neutral, blue-accent system-sans editor,
+native disclosures and existing semantic feedback colors.
+
+STORY: Check a payload, read the reason and declared location, correct JSON,
+then explicitly recheck; readiness still never means execution or authorization.
+
+FIRST VIEWPORT: Keep the existing canvas/sidebar and narrow stacked layout.
+Explanations wrap in the existing issue list immediately below Check input.
+
+FORM: Code-led copy clarification, seed key not applicable. No new world,
+controls, layout, images or motion; current source is the visual authority.
+
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+
+Preserve missing global PRODUCT.md/DESIGN.md as pre-existing drift, not new work.
+
+### Completed-clarification evidence (Loop 279)
+
+The shipped change is confined to explanation and report-evidence handling in
+`web/input-review.js`; `web/index.html`, `web/styles.css`, the graph/sidebar
+composition and the existing controls are unchanged. The issue list below
+Check input now turns supported backend schema reasons into a next edit instead
+of showing the old undifferentiated `input / field` rejection. This is an
+ordinary refinement of the incumbent Operate surface, not a new visual system.
+
+Keep these surface-local explanation rules:
+
+- **Declared evidence, specific edit:** required-field guidance is backed by
+  the declared parent's `required` list; type guidance uses fixed JSON-type
+  language from the declared schema. String-length and numeric bounds appear
+  only for compatible types and finite, safely representable constraints.
+  Enum failures direct the author to Full input schema without copying values.
+- **Payload-relative location:** omit the report's leading `input` segment and
+  show a quoted JSON pointer, escaping `~` as `~0` and `/` as `~1`; root guidance
+  names the input object. Nested properties and array items resolve through the
+  declared contract, not through submitted values.
+- **Unknown keys stay private:** undeclared-property guidance names only its
+  declared parent object, never the rejected key. Rejected values, arbitrary
+  backend messages and unknown reason codes are not repeated. Missing,
+  unsupported or inconsistent explanation evidence uses the fixed fallback:
+  “Input does not match the contract. Review Full input schema.” Malformed or
+  internally inconsistent reports are rejected by the existing safe-error path.
+- **Check, correct, explicitly recheck:** the raw-JSON request, ephemeral test
+  input, stale-result invalidation, abort/revision/snapshot protections and
+  existing mapping diagnostics retain their contracts. The change does not
+  run or publish a workflow, resolve credentials, alter exports or establish
+  provider availability. Ready still means schema/mapping readiness only.
+- **Text within the existing frame:** explanations use `textContent` and the
+  existing wrapping issue-list rules. Preserve the current white/neutral
+  inspector, blue action, semantic red/green feedback, 6px controls, 12px
+  supporting text, monospace JSON and native disclosures; no markup, CSS,
+  raster, motion or token vocabulary is added.
+
+Visual evidence under `.impeccable/review/loop279/` includes
+`desktop-top.jpg` (1440 × 1000, primary desktop header and diagnostic),
+`current-full.png` (actual 1280 × 720 viewport), `mobile-full.png`
+(390 × 2358), `mobile-long-full.png` (390 × 2604, long declared field), and
+`reflow-640-full.png` (640 × 2445, narrow reflow). `desktop-full.png` and
+`desktop.jpg` are earlier scrolled supplemental desktop views, not substitutes
+for the top-of-page evidence. The builder opened all captures; this
+documentation pass independently opened the primary desktop, actual viewport,
+long mobile and 640px views. They retain the desktop sidebar and narrow stacked
+layout, with the new diagnostic wrapping beside the existing check boundary.
+These synthetic-input captures are review evidence, not shipping raster assets;
+no new asset provenance is required. The scoped code-led refinement did not
+introduce a concept comp or a new QUALITY BAR artifact.
+
+True 200% browser/text magnification remains **unqualified**: the attempted
+native Super-plus shortcut had no observed effect. The 640px capture proves
+narrow reflow only and must not be described as magnification evidence. The
+fresh independent finish reviewer, `loop279_finish_reviewer`, returned **SHIP**
+in the required five-section review with no material fixes, explicitly treating
+this qualification gap as non-blocking for the unchanged-CSS, JavaScript-copy-only
+scope. That reviewer decoded the required captures and independently passed
+all 15 input-review module tests.
+
+The main loop also reports 1,445 Python tests passed (100.778 seconds), 37 Node
+tests passed, 94 isolated-wheel checks passed, and a separate installed
+`--browser-module-tests` run passing eight real backend reports and all module
+checks. The ordinary source real-report test body runs only when its fixture
+environment is supplied; the installed qualification supplies actual reports.
+These are local gates, not a claim that remote feature/release or roadmap-closure
+CI has completed.
+
+The once-run `detector.json` reports inherited Inter use and an advisory for the
+actual graph canvas grid; neither is newly introduced or canonized as a rule.
+`PRODUCT.md`, `DESIGN.md` and `.impeccable/design.json` remain absent and untouched
+as pre-existing documentation drift. The finish wording above does not authorize
+inventing global design artifacts or repairing that drift during this refinement.
+
+## Prior extension (Loop 275)
 
 Add workflow-level input review and a local draft preflight before the existing
 node parameters. Preserve the canvas, node editing, HTTP inspection, download

@@ -83,8 +83,16 @@ The installed `skill2workflow ui` helper runs the existing
 [input/mapping preflight](workflow-preflight.md) against the current draft,
 including allowlisted node edits. No live service configuration is required.
 
-Blocked results identify the invalid field path or required mapping source and
-its node. Correct the JSON and check again. Ready means the input contract and
+Blocked results explain missing required fields, expected JSON types, disallowed
+enum values, text length and numeric bounds using the existing backend verdict
+and declared schema. Input locations are JSON pointers relative to the payload:
+`/record_id` means the top-level field, not an extra `input` wrapper; nested
+array items include their index, and `~1`/`~0` escape `/`/`~` in field names.
+Undeclared fields get a removal hint without repeating their names. Rejected
+values and arbitrary backend messages are never displayed. Unknown or
+unsupported reason evidence gets a generic schema-review hint; contradictory
+reports fail the check. Required mapping issues still identify their source and
+node. Correct the JSON and check again. Ready means the input contract and
 required mapping sources passed, not that credentials, query conversion,
 provider availability or future execution are proven. A check never publishes,
 starts or resumes a run, resolves credentials, or sends the workflow's HTTP
@@ -106,6 +114,13 @@ remain 1,000 nodes, 128 top-level input properties, 2,000 mappings per node and
 64 issues. Duplicate keys, nonfinite values and malformed UTF-8/JSON are refused.
 Reports may contain workflow/node identities and field paths; review names
 before sharing them. No new Workflow DSL or report schema is introduced.
+
+Developer qualification keeps Python-only installation unchanged. Package smoke
+requires all eight existing schema-reason reports from the installed helper;
+the release-artifact CI job additionally runs `scripts/draft_input_ui_smoke.py
+--executable /path/to/installed/skill2workflow --browser-module-tests` with Node
+against the actual served module and real installed reports. Node is a
+development test tool, not an application runtime dependency.
 
 ## Export A Reviewable Local Authoring Set
 

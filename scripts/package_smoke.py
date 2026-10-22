@@ -1046,7 +1046,7 @@ def _qualify_installed_draft_input_ui(repo_root: Path, console_script: Path, iso
         [sys.executable, str(repo_root / 'scripts' / 'draft_input_ui_smoke.py'), '--executable', str(console_script)],
         cwd=isolated_dir,
     ))
-    if result != {'ok': True, 'installed': True, 'cases_verified': 5, 'module_served': True}:
+    if result != {'ok': True, 'installed': True, 'cases_verified': 13, 'module_served': True, 'diagnostics_verified': 8}:
         raise RuntimeError('installed draft input UI qualification failed')
     return True
 

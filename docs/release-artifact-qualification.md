@@ -73,6 +73,13 @@ redirects, and removes the neighbor afterward. The selected installed CLI runs
 outside the checkout with source imports disabled. Incomplete refusal evidence
 fails the package gate.
 
+The installed draft-input drill requires all eight schema-reason codes and
+paths alongside its original five input/module cases. In the release-artifact
+CI job, `--browser-module-tests` additionally requires Node regressions against
+the installed helper's served `input-review.js` and its real reports. A source
+module marker alone cannot qualify the error explanations. Node is development
+qualification tooling; ordinary Python-only installation remains unchanged.
+
 The qualification also starts the installed `ui` with
 the source checkout unavailable, fetches `/web/index.html`, and checks that the
 static editor, interactive control script, and example assets were carried into

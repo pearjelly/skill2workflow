@@ -138,7 +138,9 @@ workflow payload.
 
 Draft authors can open **Workflow input** to review the read-only input
 contract and check non-secret JSON against the current draft's schema and
-required mappings. The result is local and value-free; it never runs or
+required mappings. Blocked results explain the reason and next edit using
+payload-relative field paths, without echoing rejected values or unknown keys.
+The result is local and value-free; it never runs or
 publishes the workflow. Test input is cleared on document replacement and is
 excluded from DSL/graph exports. See
 [draft input review](docs/authoring.md#check-draft-input-in-the-editor).

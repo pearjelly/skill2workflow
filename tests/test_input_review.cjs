@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const test = require('node:test');
-const file = path.join(__dirname, '../web/input-review.js');
+const file = process.env.S2W_INPUT_REVIEW_MODULE || path.join(__dirname, '../web/input-review.js');
 
 class Element {
   constructor() { this.children = []; this.textContent = ''; this.value = ''; this.disabled = false; this.hidden = false; this.open = false; this.dataset = {}; this.events = {}; }
@@ -22,7 +22,7 @@ function draft() {
 }
 function report(workflow, ready = true) {
   return { schema_version: 'skill2workflow-workflow-preflight-0.1.0', workflow: workflow.workflow, ready,
-    input: { status: 'valid' }, summary: { node_count: 1, connector_node_count: 1,
+    input: { status: 'valid', error_code: null, error_path: null }, summary: { node_count: 1, connector_node_count: 1,
       side_effecting_node_count: 1, mapping_count: 1, blocked_node_count: ready ? 0 : 1, issue_count: ready ? 0 : 1 },
     nodes: [{}], issues: ready ? [] : [{ code: 'required_mapping_input_missing', severity: 'error', node_id: 'submit', path: ['connector', 'request', 'input_mapping', 0, 'from'] }],
     safety: { side_effect_free: true, connector_calls: false, credentials_resolved: false, raw_values_included: false } };
@@ -31,6 +31,12 @@ function response(payload, status = 200) {
   const bytes = new TextEncoder().encode(JSON.stringify(payload));
   return { ok: status >= 200 && status < 300, status,
     headers: { get: () => String(bytes.length) }, body: new ReadableStream({ start(c) { c.enqueue(bytes); c.close(); } }) };
+}
+function invalid(workflow, code, errorPath) {
+  const result = report(workflow, false);
+  result.input = { status: 'invalid', error_code: code, error_path: errorPath };
+  result.issues = [{ code: 'input_invalid', severity: 'error', node_id: null, path: errorPath }];
+  return result;
 }
 function setup(fetcher) {
   const elements = Object.fromEntries(['panel', 'summary', 'fields', 'schema', 'schemaDetails', 'input', 'check', 'clear', 'status', 'issues'].map(key => [key, new Element()]));
@@ -94,6 +100,109 @@ test('blocked mappings identify their source and node, not submitted values', as
   assert.match(text(elements.issues), /\/input\/id/);
   assert.match(text(elements.issues), /Submit/);
   assert.ok(!text(elements.issues).includes('input-value-canary'));
+});
+
+test('schema failures explain each existing reason using declared contract evidence', async () => {
+  const cases = [
+    ['input_required', ['input', 'id'], /Add required field "\/id"/],
+    ['input_type', ['input', 'id'], /Use a JSON string.*"\/id"/],
+    ['input_enum', ['input', 'id'], /not allowed.*Full input schema/],
+    ['input_string_too_short', ['input', 'id'], /too short.*at least 1 character/],
+    ['input_string_too_long', ['input', 'title'], /too long.*at most 4 characters/],
+    ['input_number_too_small', ['input', 'amount'], /too small.*at least 2/],
+    ['input_number_too_large', ['input', 'amount'], /too large.*at most 10/],
+    ['input_unknown_property', ['input', 'rejected-key-canary'], /Remove undeclared fields from the input object/],
+  ];
+  for (const [code, errorPath, expected] of cases) {
+    const {context, elements, review} = setup(async () => response(invalid(context.workflow, code, errorPath)));
+    Object.assign(context.workflow.input_schema.properties, {title: {type:'string', maxLength:4}, amount:{type:'number', minimum:2, maximum:10}});
+    context.workflow.input_schema.properties.id.enum = ['private-enum-canary'];
+    elements.input.value = '{"id":"rejected-value-canary"}';
+    const before = JSON.stringify(context.workflow);
+    await review.check();
+    assert.equal(elements.status.dataset.state, 'blocked', code);
+    assert.match(text(elements.issues), expected, code);
+    assert.doesNotMatch(text(elements.issues), /rejected-key-canary|rejected-value-canary|private-enum-canary|input_required/);
+    assert.equal(JSON.stringify(context.workflow), before);
+  }
+});
+
+test('type guidance and nested JSON pointers are precise without wrapping input', async () => {
+  for (const type of ['string','integer','number','boolean','object','array','null']) {
+    const {context, elements, review} = setup(async () => response(invalid(context.workflow, 'input_type', ['input','rows',0,'a/b~c'])));
+    context.workflow.input_schema.properties.rows = {type:'array', items:{type:'object', properties:{'a/b~c':{type}}}};
+    await review.check();
+    assert.match(text(elements.issues), /"\/rows\/0\/a~1b~0c"/);
+    assert.doesNotMatch(text(elements.issues), /\/input\//);
+    assert.ok(text(elements.issues).includes({string:'JSON string',integer:'whole number',number:'number',boolean:'true or false',object:'JSON object',array:'JSON array',null:'null'}[type]));
+  }
+});
+
+test('unrecognized or unsupported diagnostics use a fixed fallback without invented causes', async () => {
+  for (const [code, errorPath] of [
+    ['future_private_code_canary',['input','id']], ['input_type',['input','unknown-key-canary']],
+    ['input_required',['input','nested']], ['input_string_too_long',['input','id']],
+    ['input_number_too_small',['input','id']], ['input_enum',['input','nested']],
+    ['input_unknown_property',['input','unknown-parent-canary','unknown-key-canary']],
+  ]) {
+    const {context, elements, review} = setup(async () => response(invalid(context.workflow, code, errorPath)));
+    await review.check();
+    assert.equal(text(elements.issues).trim(), 'Input does not match the contract. Review Full input schema.');
+  }
+});
+
+test('unknown input keys stay private at nested declared locations', async () => {
+  const {context, elements, review} = setup(async () => response(invalid(context.workflow, 'input_unknown_property', ['input','nested','private-key-canary'])));
+  context.workflow.input_schema.properties.nested.additionalProperties = false;
+  await review.check();
+  assert.match(text(elements.issues), /Remove undeclared fields.*"\/nested"/);
+  assert.doesNotMatch(text(elements.issues), /private-key-canary/);
+});
+
+test('unsafe bounds and hostile declared names remain safe and literal', async () => {
+  const name = '<img>"\n/~';
+  const {context, elements, review} = setup(async () => response(invalid(context.workflow,'input_type',['input',name])));
+  context.workflow.input_schema.properties[name] = {type:'boolean'};
+  await review.check();
+  assert.ok(text(elements.issues).includes(JSON.stringify('/' + name.replace(/~/g,'~0').replace(/\//g,'~1'))));
+  assert.match(text(elements.issues), /true or false/);
+  for (const bound of [Infinity, 9007199254740992, 'private-bound-canary']) {
+    context.workflow.input_schema.properties.id = {type:'string', maxLength:bound};
+    context.fetch = async () => response(invalid(context.workflow,'input_string_too_long',['input','id']));
+    await review.check();
+    assert.match(text(elements.issues), /^ Input does not match the contract\. Review Full input schema\.$/);
+  }
+});
+
+test('malformed or contradictory reason evidence cannot become a specific rejection', async () => {
+  for (const mutate of [
+    r => {delete r.input.error_code;}, r => {r.input.error_path=['elsewhere','id'];},
+    r => {r.input.error_code='<script>private-code-canary</script>';},
+    r => {r.issues[0].path=['input','nested'];}, r => {r.input.status='valid';},
+    r => {r.issues[0].node_id='submit';}, r => {r.input.error_path=['input',-1];},
+  ]) {
+    const {context, elements, review} = setup(async () => {const r=invalid(context.workflow,'input_required',['input','id']); mutate(r); return response(r);});
+    await review.check();
+    assert.equal(elements.status.dataset.state, 'error');
+    assert.equal(elements.issues.children.length, 0);
+    assert.doesNotMatch(elements.status.textContent, /private-code-canary/);
+  }
+});
+
+test('served module explains all real installed backend reasons when qualification fixtures are supplied', async () => {
+  if (!process.env.S2W_INPUT_REVIEW_DIAGNOSTICS) return; // Ordinary source suite; installed CI requires this fixture.
+  const fixtures = JSON.parse(fs.readFileSync(process.env.S2W_INPUT_REVIEW_DIAGNOSTICS, 'utf8'));
+  assert.equal(fixtures.length, 8);
+  const expected = [/Add required field/, /JSON string/, /not allowed/, /too short/, /too long/, /too small/, /too large/, /Remove undeclared fields/];
+  for (const [index, fixture] of fixtures.entries()) {
+    const {context, elements, review} = setup(async () => response(fixture.report));
+    context.workflow = fixture.workflow;
+    review.reset(context.workflow);
+    await review.check();
+    assert.equal(elements.status.dataset.state, 'blocked');
+    assert.match(text(elements.issues), expected[index]);
+    assert.doesNotMatch(text(elements.issues), /private-key-canary|private-smoke-input-canary/);
+  }
 });
 
 test('input edits and document replacement invalidate pending ready responses', async () => {

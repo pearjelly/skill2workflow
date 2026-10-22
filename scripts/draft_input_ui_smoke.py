@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Qualify the draft-input UI using only the selected CLI and owned loopback."""
 import argparse
+import copy
 import http.client
 import json
 import os
@@ -12,7 +13,7 @@ import tempfile
 import time
 
 
-def qualify(executable=None):
+def qualify(executable=None, browser_module_tests=False):
     command = [str(executable)] if executable else [sys.executable, '-m', 'skill2workflow.cli']
     environment = dict(os.environ)
     if executable:
@@ -50,6 +51,30 @@ def qualify(executable=None):
                 'side_effect_free': True, 'connector_calls': False, 'credentials_resolved': False, 'raw_values_included': False
             }:
                 raise RuntimeError('draft input UI response boundary failed')
+        diagnostics = []
+        reason_cases = [
+            ('input_required', {}, {}), ('input_type', {}, {'id': 12}),
+            ('input_enum', {'enum': ['allowed']}, {'id': 'private-smoke-input-canary'}),
+            ('input_string_too_short', {}, {'id': ''}),
+            ('input_string_too_long', {'maxLength': 2}, {'id': 'private-smoke-input-canary'}),
+            ('input_number_too_small', {'type': 'number', 'minimum': 2}, {'id': 1}),
+            ('input_number_too_large', {'type': 'number', 'maximum': 2}, {'id': 3}),
+            ('input_unknown_property', {}, {'id': 'valid', 'private-key-canary': True}),
+        ]
+        for code, constraints, supplied in reason_cases:
+            candidate = copy.deepcopy(workflow)
+            candidate['input_schema']['properties']['id'] = dict({'type': 'string', 'minLength': 1}, **constraints)
+            if constraints.get('type') == 'number':
+                candidate['input_schema']['properties']['id'].pop('minLength')
+            status, _, raw = request(command, environment, directory, 'POST', '/api/v1/draft-input-preflights',
+                                     json.dumps({'workflow': candidate, 'input': supplied}).encode())
+            result = json.loads(raw)
+            expected_path = ['input', 'private-key-canary' if code == 'input_unknown_property' else 'id']
+            if status != 200 or result.get('ready') is not False or result['input']['error_code'] != code or result['input']['error_path'] != expected_path:
+                raise RuntimeError('draft input diagnostic qualification failed')
+            if b'private-smoke-input-canary' in raw:
+                raise RuntimeError('draft input diagnostic value boundary failed')
+            diagnostics.append({'workflow': candidate, 'report': result})
         status, _, raw = request(command, environment, directory, 'POST', '/api/v1/draft-input-preflights',
                                   b'{"workflow":{},"workflow":{}}')
         if status != 400 or json.loads(raw) != {'error': 'draft input preflight rejected'}:
@@ -59,7 +84,18 @@ def qualify(executable=None):
             raise RuntimeError('draft input UI module missing')
         if set(directory.iterdir()) != {skill}:
             raise RuntimeError('draft input UI created unexpected state')
-    return {'ok': True, 'installed': executable is not None, 'cases_verified': 5, 'module_served': True}
+        if browser_module_tests:
+            module = directory / 'input-review.js'
+            fixture = directory / 'diagnostics.json'
+            module.write_bytes(raw)
+            fixture.write_text(json.dumps(diagnostics), encoding='utf-8')
+            node_environment = dict(environment, S2W_INPUT_REVIEW_MODULE=str(module), S2W_INPUT_REVIEW_DIAGNOSTICS=str(fixture))
+            subprocess.run(['node', '--test', str(Path(__file__).resolve().parents[1] / 'tests/test_input_review.cjs')],
+                           cwd=str(directory), env=node_environment, capture_output=True, check=True, timeout=20)
+    result = {'ok': True, 'installed': executable is not None, 'cases_verified': 13, 'module_served': True, 'diagnostics_verified': 8}
+    if browser_module_tests:
+        result['browser_module_verified'] = True
+    return result
 
 
 def request(command, environment, directory, method, path, body=None):
@@ -98,5 +134,6 @@ def request(command, environment, directory, method, path, body=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--executable', type=Path)
+    parser.add_argument('--browser-module-tests', action='store_true', help='Require Node tests against the served module and real reports (development qualification only).')
     arguments = parser.parse_args()
-    print(json.dumps(qualify(arguments.executable)))
+    print(json.dumps(qualify(arguments.executable, arguments.browser_module_tests)))
