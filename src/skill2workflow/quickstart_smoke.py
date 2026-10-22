@@ -309,6 +309,34 @@ def _qualify_input_quickstart(console: Path, isolated: Path, environment: Dict[s
             refused.append(completed.returncode == 1 and not rejected_root.exists()
                            and 'invalid-input-canary' not in completed.stdout + completed.stderr)
         input_file.write_text(json.dumps(payload), encoding='utf-8')
+        preview, preview_raw = _run_json(base + ['--input', str(input_file), '--dry-run'], isolated, environment)
+        preview_ok = (preview.get('ready') is True and not rejected_root.exists() and not requests
+                      and payload['customer_id'] not in preview_raw and str(input_file) not in preview_raw
+                      and str(source) not in preview_raw and str(rejected_root) not in preview_raw)
+        mapping_action = {'request': dict(action['request'], input_mapping=[
+            {'from': '/input/customer/id', 'to': '/body/id'}])}
+        mapping_source = directory / 'mapping.SKILL.md'
+        mapping_source.write_text('---\nname: mapping-quickstart\n---\n## Steps\n1. ' + approval
+                                  + '\n2. Submit <!-- skill2workflow: http ' + json.dumps(mapping_action)
+                                  + ' -->\n3. Deliver\n', encoding='utf-8')
+        mapping_base = [str(console), 'quickstart', '--root', str(rejected_root),
+                        '--skill', str(mapping_source), '--port', '0', '--input', str(input_file)]
+        blocked_preview = subprocess.run(mapping_base + ['--dry-run'], cwd=str(isolated), env=environment,
+                                         capture_output=True, text=True, timeout=10)
+        blocked = json.loads(blocked_preview.stdout)
+        mapping_refusal = subprocess.run(mapping_base, cwd=str(isolated), env=environment,
+                                         capture_output=True, text=True, timeout=10)
+        mapping_refused = (blocked_preview.returncode == 1 and blocked.get('ready') is False
+                           and any(issue.get('code') == 'required_mapping_input_missing'
+                                   for issue in blocked.get('issues', []))
+                           and mapping_refusal.returncode == 1
+                           and 'required connector mappings' in mapping_refusal.stderr
+                           and not rejected_root.exists() and not requests)
+        input_file.write_text(json.dumps({'customer': {'id': payload['customer_id']}}), encoding='utf-8')
+        corrected, corrected_raw = _run_json(mapping_base + ['--dry-run'], isolated, environment)
+        preview_ok = (preview_ok and corrected.get('ready') is True and not rejected_root.exists()
+                      and not requests and payload['customer_id'] not in corrected_raw)
+        input_file.write_text(json.dumps(payload), encoding='utf-8')
         unsafe = directory / 'unsafe.SKILL.md'
         unsafe.write_text(markdown([submit, approval, 'Deliver']), encoding='utf-8')
         unsafe_root = directory / 'unsafe'
@@ -335,6 +363,8 @@ def _qualify_input_quickstart(console: Path, isolated: Path, environment: Dict[s
                 and requests == [{'source': 'quickstart', 'id': payload['customer_id'], 'count': 2}]
                 and 'quickstart-response-canary' not in raw_resume),
             'custom_input_compact_result': compact,
+            'quickstart_preview_no_workspace': preview_ok,
+            'required_mapping_no_workspace': mapping_refused,
         }
         if not all(checks.values()):
             raise RuntimeError('installed input-aware quickstart qualification failed')

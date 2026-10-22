@@ -11,8 +11,9 @@ from typing import Callable, Dict, Optional
 from .compiler import compile_ir_to_workflow, validate_workflow
 from .control_plane import LocalControlPlane
 from .parser import parse_skill_text, read_skill_text
-from .service_bootstrap import initialize_service_workspace
+from .service_bootstrap import initialize_service_workspace, validate_service_workspace_location
 from .input_schema import validate_trigger_input
+from .preflight import build_workflow_preflight
 from .triggers import MAX_TRIGGER_INPUT_BYTES, normalize_trigger_input
 
 
@@ -52,8 +53,9 @@ def initialize_quickstart_workspace(
     token_factory: Optional[Callable[[], str]] = None,
     skill_path: Optional[Path] = None,
     trigger_input: Optional[Dict[str, object]] = None,
+    dry_run: bool = False,
 ) -> Dict[str, object]:
-    """Create a secure service workspace and one waiting controlled workflow."""
+    """Create a controlled workspace, or preview readiness without creating it."""
 
     skill_text = QUICKSTART_SKILL
     if skill_path is not None:
@@ -73,7 +75,17 @@ def initialize_quickstart_workspace(
         raise ValueError(
             f"quickstart input must be a finite JSON object of at most {MAX_TRIGGER_INPUT_BYTES} UTF-8 bytes"
         ) from error
-    validate_trigger_input(workflow.get('input_schema'), normalized_input)
+    if not dry_run:
+        # Preserve existing value-free contract diagnostics for real admission.
+        validate_trigger_input(workflow.get('input_schema'), normalized_input)
+    readiness = build_workflow_preflight(
+        workflow, normalized_input, input_present=trigger_input is not None
+    )
+    validate_service_workspace_location(root, host=host, port=port)
+    if dry_run:
+        return readiness
+    if not readiness['ready']:
+        raise ValueError("quickstart input does not satisfy required connector mappings")
 
     bootstrap = initialize_service_workspace(
         root,

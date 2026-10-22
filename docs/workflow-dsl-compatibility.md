@@ -17,6 +17,15 @@ admission; omitted valid empty input retains legacy first-run context. The
 quickstart result schema, Workflow DSL, general executor and other direct-run
 semantics are unchanged. See [input-aware quickstart](quickstart.md#provide-business-input).
 
+Quickstart now requires the existing bounded input/mapping preflight to be
+ready before bootstrap, including required mapping sources not enforced by an
+input schema. Optional `--dry-run` / Python `dry_run=True` returns the existing
+workflow-preflight report without creating a workspace or run. Normal quickstart
+result and preflight schemas remain unchanged. This stricter onboarding boundary
+does not change general trigger or executor semantics; provider/credential health
+and query scalar conversion remain execution-time checks. See
+[readiness preview](quickstart.md#preview-before-creating-a-workspace).
+
 Explicit [Skill trigger input declarations](skill-input-contracts.md) emit the
 existing top-level `input_schema` on newly compiled drafts. Skills without the
 declaration and published artifacts keep their prior behavior. Trigger admission

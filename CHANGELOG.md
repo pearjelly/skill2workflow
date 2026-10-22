@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add a read-only quickstart readiness preview using the existing value-free
+  input/mapping preflight report; check the unused workspace location without
+  generating a token, publishing or running.
+
 - Add optional quickstart business input, validated before initialization and
   retained through normal trigger admission for approval and connector mapping.
 
@@ -75,6 +79,9 @@ release; Roadmap loop completion alone does not publish a new version.
   existing immutable publication transaction remains authoritative.
 
 ### Fixed
+
+- Refuse quickstart initialization when a required HTTP input mapping source is
+  missing, even when the declared input schema accepts the supplied object.
 
 - Reject custom quickstart Skills with a non-manual connector before their
   first human gate, rather than running that connector during initialization.

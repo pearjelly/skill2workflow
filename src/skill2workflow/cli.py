@@ -573,6 +573,7 @@ def _main(argv=None) -> int:
         help="Optional local SKILL.md to compile into the new controlled workspace",
     )
     quickstart_cmd.add_argument("--input", type=Path, help="Non-secret JSON object for the initial controlled run")
+    quickstart_cmd.add_argument("--dry-run", action="store_true", help="Preview input and mapping readiness without creating a workspace")
 
     backup_cmd = subparsers.add_parser(
         "backup",
@@ -1626,7 +1627,9 @@ def _main(argv=None) -> int:
                 port=args.port,
                 skill_path=args.skill,
                 trigger_input=_load_trigger_input(args.input) if args.input is not None else None,
-            )
+                dry_run=args.dry_run,
+            ),
+            readiness=args.dry_run,
         )
 
     if args.command == "backup":
@@ -2361,10 +2364,11 @@ def _service_bootstrap_action(callback) -> int:
         return 1
 
 
-def _quickstart_action(callback) -> int:
+def _quickstart_action(callback, *, readiness: bool = False) -> int:
     try:
-        _print_json(callback())
-        return 0
+        result = callback()
+        _print_json(result)
+        return 0 if not readiness or result['ready'] else 1
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1

@@ -113,6 +113,48 @@ when resumed and can cause their declared effects only after approval; the
 generated command does not invent that credential setup. Review endpoints,
 origins and response retention before approving.
 
+## Preview Before Creating A Workspace
+
+Add `--dry-run` to the same quickstart command to review input readiness without
+creating the workspace:
+
+```bash
+skill2workflow quickstart \
+  --root /srv/skill2workflow/customer-review \
+  --skill /srv/customer-workflows/review/SKILL.md \
+  --input /srv/customer-workflows/review/input.json --dry-run
+```
+
+This compiles the selected Skill, checks its initial human-gate boundary and
+the unused absolute root, existing parent, loopback host and port range. It
+returns the existing value-free
+[`workflow-preflight` report](workflow-preflight.md), not a quickstart result:
+`ready: true` exits zero; invalid typed input or missing required mapping sources
+returns `ready: false` and exits one. Malformed files, unsafe pre-approval
+connectors and invalid workspace locations are refusals with no report.
+
+No workspace, ingress token, publication, run, audit, credential lookup or HTTP
+request is created. The report omits input values, request URLs/bodies, local
+source/input/destination paths and generated operator commands. Correct the
+input and preview again using the same unused root, then remove `--dry-run` to
+explicitly initialize. Python callers can pass `dry_run=True`.
+
+Real initialization now performs the same preflight before bootstrap. Required
+mapping sources must be present even without an `input_schema`, or when that
+schema permits an object lacking a mapped nested field. JSON Pointer escapes,
+array indexes and explicit null retain their existing meaning; optional missing
+mappings remain allowed. Refusal uses the fixed error `quickstart input does
+not satisfy required connector mappings` without echoing values.
+
+The shared readiness bounds are 1,000 nodes, 128 top-level input properties,
+2,000 mappings per node, 64 reported issues and a 64 KiB report, in addition to
+the Skill/input byte bounds above. This conservative quickstart check is not a
+change to general trigger/runtime admission. It checks source presence, not
+query scalar conversion, provider availability, credentials, port availability,
+filesystem write access or future workflow success. It neither reserves the
+root nor authorizes an effect; initialization rechecks the location and approval
+remains explicit. Review property names and issue paths before sharing reports.
+
 ## Inspect And Approve
 
 Copy `run_id` and `state_dir` from the command result. Inspect the waiting run:
@@ -183,3 +225,6 @@ It also qualifies typed initial input, invalid-input rejection before workspace
 creation, rejection of network-before-approval Skills, and approval to a real
 owned loopback HTTP receiver. The same input checks are mandatory in isolated
 wheel package qualification; no live SaaS endpoint is contacted.
+The full drill requires 20 passing checks, including ready and blocked
+read-only previews, corrected input under the same unused root, and real
+initialization refusal on a missing required mapping without an input schema.

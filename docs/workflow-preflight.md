@@ -26,6 +26,15 @@ Without `--input`, preflight validates an empty object and reports
 report remains safe to share with an operator because it contains counts,
 stable issue codes, and paths only.
 
+## Quickstart source preview
+
+For an uncompiled local Skill, `quickstart --skill SKILL.md --input input.json
+--root /absolute/unused-root --dry-run` returns this same report after checking
+the quickstart approval and location boundaries. It creates no workspace and
+does not start a run. Real quickstart initialization also requires ready input
+and mappings; general trigger admission is unchanged. See
+[quickstart preview](quickstart.md#preview-before-creating-a-workspace).
+
 ## Published service check
 
 The authenticated client calls:

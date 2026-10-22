@@ -6,6 +6,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstalledQuickstartDocumentationTests(TestCase):
+    def test_preview_and_real_admission_share_a_bounded_non_effectful_contract(self):
+        guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
+        for phrase in ('--dry-run', 'dry_run=True', 'ready: false', 'same preflight',
+                       'required mapping sources', '1,000 nodes', '128 top-level',
+                       'not a', 'neither reserves', '20 passing checks'):
+            self.assertIn(phrase, guide)
+        self.assertIn('--dry-run', (ROOT / 'README.md').read_text(encoding='utf-8'))
+
     def test_input_aware_first_run_has_clear_admission_and_approval_boundaries(self):
         guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
         for phrase in ('--input', '1 MiB', 'before workspace', 'finite JSON',

@@ -7,7 +7,7 @@ working on.
 ## Start here
 
 - [README](../README.md) — product boundary and the fastest controlled journey
-- [Quickstart](quickstart.md) — install, validate first-run inputs, bootstrap, approve, and trigger
+- [Quickstart](quickstart.md) — install, preview input/mapping readiness, bootstrap, approve, and trigger
 - [Installed UI](installed-ui.md) — serve the packaged editor and inspect one live service with readiness status
 - [Authoring](authoring.md) — compile Skills, edit the graph, and write back DSL
 - [Skill HTTP actions](skill-http-actions.md) — declare an API call, approve it, and verify the result

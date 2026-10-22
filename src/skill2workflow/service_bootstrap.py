@@ -24,6 +24,31 @@ SERVICE_TOKEN_ROTATION_RESULT_SCHEMA_VERSION = (
 _LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
+def validate_service_workspace_location(
+    root: Path, *, host: str = "127.0.0.1", port: int = 8080
+) -> Path:
+    """Check bootstrap location/configuration without reserving or creating it."""
+    requested_root = Path(root)
+    if not requested_root.is_absolute():
+        raise ValueError("service bootstrap root must be an absolute path")
+    if host not in _LOOPBACK_HOSTS:
+        raise ValueError("service bootstrap host must be an explicit loopback address")
+    if isinstance(port, bool) or not isinstance(port, int) or not 0 <= port <= 65535:
+        raise ValueError("service bootstrap port must be an integer from 0 through 65535")
+    if requested_root.exists() or requested_root.is_symlink():
+        raise ValueError("service bootstrap root must not already exist")
+    try:
+        parent = requested_root.parent.resolve(strict=True)
+    except OSError as error:
+        raise ValueError("service bootstrap root parent must already exist") from error
+    if not parent.is_dir():
+        raise ValueError("service bootstrap root parent must be a directory")
+    workspace = parent / requested_root.name
+    if workspace.exists() or workspace.is_symlink():
+        raise ValueError("service bootstrap root must not already exist")
+    return workspace
+
+
 def initialize_service_workspace(
     root: Path,
     *,
@@ -51,25 +76,7 @@ def initialize_service_workspace(
             app_id=lark_app_id,
             app_secret_handle=lark_app_secret_handle,
         )
-    requested_root = Path(root)
-    if not requested_root.is_absolute():
-        raise ValueError("service bootstrap root must be an absolute path")
-    if host not in _LOOPBACK_HOSTS:
-        raise ValueError("service bootstrap host must be an explicit loopback address")
-    if isinstance(port, bool) or not isinstance(port, int) or not 0 <= port <= 65535:
-        raise ValueError("service bootstrap port must be an integer from 0 through 65535")
-    if requested_root.exists() or requested_root.is_symlink():
-        raise ValueError("service bootstrap root must not already exist")
-
-    try:
-        parent = requested_root.parent.resolve(strict=True)
-    except OSError as error:
-        raise ValueError("service bootstrap root parent must already exist") from error
-    if not parent.is_dir():
-        raise ValueError("service bootstrap root parent must be a directory")
-    workspace = parent / requested_root.name
-    if workspace.exists() or workspace.is_symlink():
-        raise ValueError("service bootstrap root must not already exist")
+    workspace = validate_service_workspace_location(root, host=host, port=port)
 
     token = (token_factory or _new_ingress_token)()
     _validate_token(token)

@@ -70,7 +70,9 @@ skill2workflow quickstart \
 A supplied local Skill must compile to a valid workflow with
 an explicit human gate before any non-manual connector on its initial success
 path. Omit `--input` only when the Skill's input contract accepts `{}`; input
-is validated before creating the workspace. Follow the
+and required HTTP mapping sources are validated before creating the workspace.
+Add `--dry-run` to preview readiness without creating files or starting a run;
+remove it to explicitly initialize. Follow the
 [installed quickstart guide](docs/quickstart.md) to inspect and approve that
 run, start the authenticated service, and submit a second trigger. Its JSON
 result also contains safe `operator_commands` argv arrays for those next

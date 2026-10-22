@@ -225,6 +225,7 @@ Do not execute before a designated reviewer approves.
         self.assertEqual(evidence["status"], "passed")
         self.assertTrue(all(evidence["checks"].values()))
         for check in ('custom_input_waiting', 'invalid_input_no_workspace',
-                      'network_prefix_refused', 'custom_input_approved_http', 'custom_input_compact_result'):
+                      'network_prefix_refused', 'custom_input_approved_http', 'custom_input_compact_result',
+                      'quickstart_preview_no_workspace', 'required_mapping_no_workspace'):
             self.assertTrue(evidence['checks'][check])
         self.assertNotIn("secret", json.dumps(evidence).lower())
