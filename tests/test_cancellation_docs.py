@@ -54,9 +54,9 @@ class CancellationDocumentationTests(TestCase):
         service = (ROOT / "docs/service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs/stability.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-284 are complete", readme)
+        self.assertIn("Delivery Loops 1-285 are complete", readme)
         assert_guide_reachable(self, 'docs/cancellation.md')
-        self.assertIn("- Completed delivery loops: 1-284", roadmap)
+        self.assertIn("- Completed delivery loops: 1-285", roadmap)
         self.assertIn("Loop 48: Durable Cooperative Run Cancellation", roadmap)
         self.assertIn("Current maturity remains Self-hosted Beta", roadmap)
         self.assertIn("/runs/{run_id}/cancel", service)

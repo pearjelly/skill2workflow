@@ -71,6 +71,33 @@ passed its complete controlled and input-aware installed journeys.
 All 1,500 Python tests passed in 114.752 seconds, and all 64 editor tests and
 whole-repository secret hygiene passed. The focused migration keeps specialist
 contracts while replacing README repetition with actual bounded link routes.
-Rendered README review, exact feature CI, complete release preflight and
-roadmap closure remain required before delivery. No runtime/frontend/spec/
-schema/fixture or maturity change.
+The immutable feature README was reviewed in GitHub's actual rendered preview:
+the first-run commands, approval boundary and custom preview are readable.
+Two real link clicks reached the complete reference and then the SQLite trigger
+ledger boundary guide; its title and 64 KiB contract remained visible. A local
+review capture was retained, not added as a shipping asset. The owned preview
+tab was closed. No runtime/frontend/spec/schema/fixture or maturity change.
+
+## Remote Qualification
+
+Feature commit `e19c9380652fe3c475d42433a88244da7cc505ad` is the exact target of
+[CI run 39830011540](https://github.com/pearjelly/skill2workflow/actions/runs/39830011540),
+attempt 1. Python 3.9 passed 1,500 tests in 135.412 seconds; Python 3.14 passed
+them in 128.545 seconds. All seven jobs and the aggregate run are now terminal
+success. Python 3.14 job 120003343629 temporarily retained in-progress metadata
+after every execution step succeeded. The original job was left unchanged;
+its final completed/success response was confirmed on 2026-10-23 before
+committing the completion record. No rerun or cancellation was used.
+
+[Release-preflight run 39830045785](https://github.com/pearjelly/skill2workflow/actions/runs/39830045785)
+completed with success on that exact feature commit, attempt 1, using Python
+3.9.25. Full logs confirm unit tests, compilation, installed wheel, reproducible
+wheel and the full `production_baseline` command passed. Only documented dry-run
+git/tag checks were skipped. No duplicate dispatch, cancellation or rerun.
+
+The local documentation-closure draft passed all 1,500 Python tests in 114.590
+seconds, documentation navigation/budget checks and whole-repository secret
+hygiene. Its new roadmap assertions first failed before the entry existed.
+The feature-job reconciliation gate is satisfied. All seven final exact
+pushed-commit CI jobs remain the handoff gate for the completion record.
+The broad project objective remains unfinished; maturity stays Self-hosted Beta.

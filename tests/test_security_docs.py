@@ -58,7 +58,7 @@ class SecurityBoundaryDocumentationTests(TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-284 are complete", readme)
+        self.assertIn("Delivery Loops 1-285 are complete", readme)
         assert_guide_reachable(self, 'docs/security-boundary.md')
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("| Loop 42: Authenticated Ingress And Production Credentials | Complete |", roadmap)

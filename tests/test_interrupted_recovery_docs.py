@@ -55,10 +55,10 @@ class InterruptedRecoveryDocumentationTests(TestCase):
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
 
-        self.assertIn("Delivery Loops 1-284 are complete", readme)
+        self.assertIn("Delivery Loops 1-285 are complete", readme)
         assert_guide_reachable(self, 'docs/interrupted-recovery.md')
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("- Completed delivery loops: 1-284", roadmap)
+        self.assertIn("- Completed delivery loops: 1-285", roadmap)
         self.assertIn("Loop 49: Interrupted Run Recovery", roadmap)
         self.assertIn("Current maturity remains Self-hosted Beta", roadmap)
         command = "python3 scripts/interrupted_recovery_smoke.py"

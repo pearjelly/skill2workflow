@@ -191,7 +191,7 @@ ROADMAP.md           Readiness gates and delivery history
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. Delivery Loops 1-284 are complete.
+Current maturity: Self-hosted Beta. Delivery Loops 1-285 are complete.
 Production Baseline remains directional; passing an individual drill does not
 promote maturity. Loop 40 completed a paid assisted Pilot under one scoped
 Lark/Feishu `create_task` boundary, not general live SaaS readiness.

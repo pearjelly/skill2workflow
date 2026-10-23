@@ -12,9 +12,9 @@ Workflow DSL remains the authoritative execution source of truth. LiteGraph and 
 
 - Published release: `v0.1.0`
 - Workflow DSL compatibility line: `0.1.x` artifacts using `schema_version: "0.1.0"`
-- Completed delivery loops: 1-284
+- Completed delivery loops: 1-285
 - Current maturity: Self-hosted Beta
-- Active loop: None; Loop 284 is complete with preflight input admission parity
+- Active loop: None; Loop 285 is complete with reader-focused documentation entrypoints
 - Next maturity gate: Production Baseline
 - Next decision: review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery loop
 
@@ -52,7 +52,7 @@ SQLite is the minimum production persistence baseline for Self-hosted Beta. JSON
 
 ### Production Baseline
 
-**Status:** Directional; Loops 44-284 complete, further loop numbers unassigned.
+**Status:** Directional; Loops 44-285 complete, further loop numbers unassigned.
 
 Loop 91 adds bounded remote Workflow inventory after the remote-deprecation
 evidence. Loop 92 adds policy-bound remote retention readiness after the
@@ -7049,7 +7049,7 @@ disabled actions, explicit refresh message, and installed script inclusion.
 
 ## Rolling Loop Queue
 
-This rolling queue is ordered. Loop 284 is complete and there is no active delivery loop; review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 284 plan aligns preflight with canonical trigger input admission so over-limit input cannot receive a misleading ready verdict, with fixed service refusals and actual installed-CLI qualification. Installed-build variability and sustained real service/recovery evidence remain part of qualification; maturity is unchanged.
+This rolling queue is ordered. Loop 285 is complete and there is no active delivery loop; review the remaining first-use handoff and real service/recovery evidence before selecting the next first-value or Production Baseline delivery fix. The Loop 285 plan restores a short first-use README, a task-oriented documentation hub and a complete linked reference, with bounded navigation and link/anchor checks instead of repeated capability/history prose. Installed-build variability and sustained real service/recovery evidence remain part of qualification; maturity is unchanged.
 
 ### Loop 261: Self-Hosted Feishu Tenant Credentials
 
@@ -7733,6 +7733,36 @@ feature CI jobs and full production-baseline release preflight passed on the
 first attempt. Exact evidence is recorded in
 `docs/superpowers/plans/2026-10-23-preflight-input-admission-boundary.md`.
 
+### Loop 285: Reader Focused Documentation Entrypoints
+
+**Status:** Complete.
+
+**Prior basis:** README grew to 2,101 lines with duplicate quickstart material,
+a long command cookbook and more than 1,000 lines of per-loop history, contrary
+to the approved compact-entrypoint direction. Historical tests encouraged
+duplicating detailed contracts in README instead of testing their discovery.
+
+**Outcome:** A 207-line README leads with one controlled first run, custom input
+preview and clear approval/safety boundaries. The existing task hub links a
+complete reference; all 102 public top-level documents are reachable within two
+links. A stdlib check enforces entrypoint budgets, reference membership and valid
+local links/anchors without fetching external URLs. Specialist tests retain
+their contract assertions and verify actual navigation routes.
+
+**Safety boundary:** No discarded technical guide, replacement history dump,
+runtime/frontend/spec/schema/fixture change, new dependency, release, version
+or maturity promotion. The contributor demo's automatic resume/reset behavior
+is explicitly distinguished from the operator approval journey. Detailed
+contracts and historical evidence stay in their guides and this roadmap.
+
+**Evidence:** At `e19c938`, 1,500 Python and 64 editor tests, a 96-member isolated
+wheel, matching installed README metadata and source-isolated reader commands
+passed. Actual quickstart and inspection remained waiting; custom preview
+created no workspace. GitHub rendered preview and a real two-click route to a
+specialist boundary were reviewed. Complete production-baseline release
+preflight passed. Exact CI and final closure qualification are recorded in
+`docs/superpowers/plans/2026-10-23-reader-focused-documentation-entrypoints.md`.
+
 | Loop | Status | Goal | Exit artifact |
 | --- | --- | --- | --- |
 | Loop 39: Scoped Live Lark Task Connector | Complete | Explicit live `create_task` opt-in, fake-transport coverage, native provider idempotency, redaction and rollback boundaries, and one redacted real-validation evidence note |
@@ -7981,6 +8011,7 @@ first attempt. Exact evidence is recorded in
 | Loop 282: Versioned Skill Iteration | Complete | Release a reviewed Skill revision without editing generated JSON | Explicit source version across authoring paths, unchanged defaults, two-version Bundle/publication review and installed pinned-run/conflict evidence |
 | Loop 283: Current Draft Load Ownership | Complete | Keep newer drafts and edits safe from obsolete imports | Cross-source current-intent guards, fixed JSON recovery, real delayed-response evidence and mandatory actual installed-editor checks |
 | Loop 284: Preflight Input Admission Boundary | Complete | Stop reporting unadmittable input as ready | Shared canonical input normalization, fixed remote refusals, real service and mandatory installed-CLI boundary evidence |
+| Loop 285: Reader Focused Documentation Entrypoints | Complete | Let readers find first-use, deployment and recovery paths without reading delivery history | Short README, complete task/reference navigation, local link/anchor checks and retained specialist contracts |
 
 Loop 40 is complete. Any future Pilot must begin under a new authorization boundary and still produce reproducible controlled live-pilot evidence, explicit failure and rollback exercises, and a decision to continue, harden, or defer broader live integration work. The repository must not commit live credentials or raw live payload evidence.
 

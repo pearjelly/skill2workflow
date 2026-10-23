@@ -44,4 +44,4 @@ class ServiceProbeDocumentationTests(TestCase):
         assert_guide_reachable(self, 'docs/service-probe.md')
         self.assertIn("service-probe", service)
         self.assertIn("Loop 95: Deployment Service Probe", roadmap)
-        self.assertIn("Loops 44-284 complete", roadmap)
+        self.assertIn("Loops 44-285 complete", roadmap)

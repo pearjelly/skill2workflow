@@ -117,7 +117,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
-        self.assertIn("Delivery Loops 1-284 are complete", readme)
+        self.assertIn("Delivery Loops 1-285 are complete", readme)
         assert_guide_reachable(self, 'docs/published-artifact-read-boundary.md')
         assert_guide_reachable(self, 'docs/recurring-scheduling.md')
         self.assertIn("- Current maturity: Self-hosted Beta", roadmap)
