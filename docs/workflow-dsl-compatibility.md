@@ -401,6 +401,12 @@ existing DSL contract. Clearing a declared form control does not request field
 deletion; CLI partial-graph write-back behavior and allowlists are unchanged.
 See [HTTP inspector editing](authoring.md#http-inspector-editing).
 
+The editor's live HTTP request status reflects the current draft, including
+existing workflows and incomplete form edits. It checks for a missing or
+incomplete HTTP(S) URL; it does not validate a request or contact its endpoint.
+The status does not change Workflow DSL, runtime behavior, publication, or
+the existing write-back allowlist.
+
 Consumers should:
 
 - Branch on structured validation error `code` and `path`, not message text.

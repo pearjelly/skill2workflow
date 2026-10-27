@@ -110,7 +110,8 @@ def qualify(executable=None, browser_module_tests=False):
         if list(directory.iterdir()):
             raise RuntimeError('Skill compile requests created unexpected state')
         modules = {}
-        for name, url in [('app.js', '/web/app.js'), ('litegraph.js', '/web/vendor/litegraph-0.7.18/litegraph.min.js')]:
+        for name, url in [('app.js', '/web/app.js'), ('index.html', '/web/'),
+                          ('litegraph.js', '/web/vendor/litegraph-0.7.18/litegraph.min.js')]:
             status, _, raw = request(command, environment, directory, 'GET', url)
             if status != 200 or not raw:
                 raise RuntimeError('Skill compile editor module unavailable')
@@ -138,7 +139,7 @@ def qualify(executable=None, browser_module_tests=False):
             action_report.write_text(json.dumps({'source': INFERRED_ACTION, 'reply': action_reply}), encoding='utf-8')
             node_environment = dict(environment, S2W_EDITOR_MODULE=str(directory / 'app.js'),
                                     S2W_EDITOR_VENDOR=str(directory / 'litegraph.js'), S2W_COMPILE_DIAGNOSTICS=str(reports),
-                                    S2W_COMPILE_ACTION=str(action_report))
+                                    S2W_COMPILE_ACTION=str(action_report), S2W_EDITOR_INDEX=str(directory / 'index.html'))
             subprocess.run(['node', '--test', str(root / 'tests/test_skill_compile_recovery.cjs'),
                             str(root / 'tests/test_draft_load_ownership.cjs')], cwd=str(directory), env=node_environment,
                            capture_output=True, check=True, timeout=20)

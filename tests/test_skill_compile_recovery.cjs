@@ -7,12 +7,14 @@ const {spawnSync} = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const source = fs.readFileSync(process.env.S2W_EDITOR_MODULE || path.join(root, 'web/app.js'), 'utf8');
 const vendor = fs.readFileSync(process.env.S2W_EDITOR_VENDOR || path.join(root, 'web/vendor/litegraph-0.7.18/litegraph.min.js'), 'utf8');
+const editorHtml = fs.readFileSync(process.env.S2W_EDITOR_INDEX || path.join(root, 'web/index.html'), 'utf8');
 const fixture = JSON.parse(fs.readFileSync(path.join(root, 'examples/workflows/approval-flow.workflow.json'), 'utf8'));
 const markdown = '---\nname: reviewed\ndescription: Synthetic example.\nname: private-value-canary\n---\n## Steps\n1. Review\n';
 const version = 'skill2workflow-skill-compile-diagnostic-0.1.0';
 const rejected = (code='frontmatter_duplicate_key', line=4) => ({error:'skill compile rejected', diagnostic:{schema_version:version, code, line}});
 class Element {
   constructor() {this.value='';this.textContent='';this.children=[];this.classList={add(){}};}
+  setAttribute(name,value) {this[name]=value;}
   appendChild(child) {this.children.push(child);}
   replaceChildren(...children) {this.children=children;this.textContent='';}
   set innerHTML(value) {assert.equal(value,'');this.children=[];}
@@ -22,15 +24,15 @@ function response(payload, status=400, raw=JSON.stringify(payload)) {
   return {ok:status>=200 && status<300,status,headers:{get:()=>String(bytes.length)},json:async()=>payload,
     body:new ReadableStream({start(c){c.enqueue(bytes);c.close();}})};
 }
-function setup(fetcher) {
+function setup(fetcher, missingStatus=false) {
   const elements=new Map();
   const context=vm.createContext({console:{log(){},warn(){},error(){}},setTimeout,clearTimeout,TextEncoder,TextDecoder,AbortController,fetch:fetcher});
   vm.runInContext(vendor,context);
   context.window={addEventListener(){},requestAnimationFrame(){}};
-  context.document={getElementById(id){if(!elements.has(id))elements.set(id,new Element());return elements.get(id);},createElement(){return new Element();}};
-  const expose=`window.recoveryTest={cacheElements,registerNodeTypes,stageSelectedSkill,compileStagedSkill,loadDocument,
+  context.document={getElementById(id){if(missingStatus && id==='http-draft-notice')return null;if(!elements.has(id))elements.set(id,new Element());return elements.get(id);},createElement(){return new Element();}};
+  const expose=`window.recoveryTest={cacheElements,registerNodeTypes,stageSelectedSkill,compileStagedSkill,loadDocument,renderInspector,updateSelectedNode,workflowDslFromGraph,bindDraftGraphChanges,
     get graph(){return graph;},get source(){return currentWorkflowDsl;},
-    load(workflow){graph=new LGraph();loadDocument(workflow,'Loaded test draft');}};`;
+    load(workflow){graph=new LGraph();bindDraftGraphChanges();loadDocument(workflow,'Loaded test draft');}};`;
   vm.runInContext(source.replace(/\}\)\(\);\s*$/,expose+'\n})();'),context);
   const api=context.window.recoveryTest;
   api.cacheElements();api.registerNodeTypes();api.load(JSON.parse(JSON.stringify(fixture)));
@@ -38,15 +40,118 @@ function setup(fetcher) {
     async stage(text=markdown){const bytes=new TextEncoder().encode(text);await api.stageSelectedSkill({target:{value:'',files:[{size:bytes.length,arrayBuffer:async()=>bytes.buffer}]}});}};
 }
 function compiled() {return {workflow:JSON.parse(JSON.stringify(fixture)),review:{schema_version:'skill2workflow-skill-compile-review-0.1.0',ordered_step_count:4,executable_node_count:4,human_gate_count:1,verification_node_count:0,hard_gate_count:1,notices:[]}};}
+test('HTTP draft feedback has a persistent accessible status region',()=>{
+  if(process.env.S2W_EDITOR_MODULE)assert.ok(process.env.S2W_EDITOR_INDEX,'Served-module qualification requires the served editor HTML');
+  const tag=editorHtml.match(/<li\b[^>]*id="http-draft-notice"[^>]*>/);
+  assert.ok(tag);assert.match(tag[0],/role="status"/);assert.match(tag[0],/aria-live="polite"/);
+  assert.match(tag[0],/aria-atomic="true"/);assert.match(tag[0],/\bhidden\b/);
+});
+const visibleReview = ui => [
+  ...ui.elements.get('skill-review-list').children.filter(item=>!item.hidden).map(item=>item.textContent),
+  ...(!ui.elements.get('http-draft-notice').hidden ? [ui.elements.get('http-draft-notice').textContent] : []),
+].join(' ');
+
+test('HTTP request warning follows current edits across multiple nodes without mutating source DSL',async()=>{
+  const result=compiled();const changed=result.workflow.nodes.filter(item=>item.type==='step').slice(0,2);
+  for(const node of changed){node.type='tool_call';node.connector={id:'http',kind:'http'};}
+  const original=JSON.stringify(result.workflow);let calls=0;const ui=setup(async()=>{calls++;return response(result,200);});
+  await ui.stage();await ui.api.compileStagedSkill();
+  const nodes=changed.map(item=>ui.api.graph._nodes.find(n=>n.properties.workflow_node_id===item.id));
+  assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  const notice=ui.elements.get('http-draft-notice');
+  assert.ok(notice);
+  ui.api.renderInspector(nodes[0]);ui.elements.get('node-http-url').value='https://example.invalid/one';ui.api.updateSelectedNode();
+  assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  ui.api.renderInspector(nodes[1]);ui.elements.get('node-http-url').value='https://example.invalid/two';ui.api.updateSelectedNode();
+  assert.doesNotMatch(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  assert.match(visibleReview(ui),/no missing.*http.*url/i);
+  const exported=JSON.parse(JSON.stringify(ui.api.workflowDslFromGraph()));
+  const expected=JSON.parse(original);
+  expected.nodes.find(n=>n.id===changed[0].id).connector.request={url:'https://example.invalid/one'};
+  expected.nodes.find(n=>n.id===changed[1].id).connector.request={url:'https://example.invalid/two'};
+  assert.deepEqual(exported,expected);
+  assert.equal(JSON.stringify(ui.api.source),original);assert.equal(calls,1);
+  ui.elements.get('node-http-url').value='';ui.api.updateSelectedNode();
+  assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  assert.doesNotMatch(visibleReview(ui),/example\.invalid|private-/i);
+  ui.api.renderInspector(nodes[0]);assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  ui.api.renderInspector(nodes[1]);ui.elements.get('node-http-url').value='https://example.invalid/two';ui.api.updateSelectedNode();
+  assert.match(visibleReview(ui),/no missing.*http.*url/i);
+  ui.api.loadDocument(fixture,'Another draft');assert.equal(ui.elements.get('skill-review-panel').hidden,true);
+});
+
+test('imported Workflow DSL receives the same live HTTP warning without a compile review',()=>{
+  const workflow=compiled().workflow;const node=workflow.nodes.find(item=>item.type==='step');
+  node.type='tool_call';node.connector={id:'http',kind:'http'};
+  const original=JSON.stringify(workflow);const ui=setup(async()=>{throw new Error('No network expected');});
+  ui.api.loadDocument(workflow,'Imported draft');
+  assert.equal(ui.elements.get('skill-review-panel').hidden,true);
+  assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  const graphNode=ui.api.graph._nodes.find(n=>n.properties.workflow_node_id===node.id);ui.api.renderInspector(graphNode);
+  ui.elements.get('node-http-url').value='https://example.invalid/imported';ui.api.updateSelectedNode();
+  assert.match(visibleReview(ui),/no missing.*http.*url/i);
+  assert.equal(JSON.stringify(ui.api.source),original);
+  const exported=JSON.parse(JSON.stringify(ui.api.workflowDslFromGraph()));const expected=JSON.parse(original);
+  expected.nodes.find(item=>item.id===node.id).connector.request={url:'https://example.invalid/imported'};
+  assert.deepEqual(exported,expected);
+});
+
+test('an older editor shell without the status region can still load a draft',async()=>{
+  const result=compiled();const ui=setup(async()=>response(result,200),true);
+  await ui.stage();await ui.api.compileStagedSkill();
+  assert.equal(ui.elements.get('status-pill').textContent,'Compiled SKILL.md');
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.api.source)),result.workflow);
+});
+
+test('partial URL and invalid form edits never report an incomplete HTTP request as resolved',async()=>{
+  const result=compiled();const node=result.workflow.nodes.find(item=>item.type==='step');
+  node.type='tool_call';node.connector={id:'http',kind:'http'};
+  const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
+  const graphNode=ui.api.graph._nodes.find(n=>n.properties.workflow_node_id===node.id);ui.api.renderInspector(graphNode);
+  for(const value of ['','  ','https://','private-canary']){ui.elements.get('node-http-url').value=value;ui.api.updateSelectedNode();assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);}
+  ui.elements.get('node-http-url').value='https://example.invalid/ok';ui.elements.get('node-http-headers').value='{';ui.api.updateSelectedNode();
+  assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);assert.doesNotMatch(visibleReview(ui),/private-canary/);
+  ui.elements.get('node-http-headers').value='{}';ui.api.updateSelectedNode();assert.match(visibleReview(ui),/no missing.*http.*url/i);
+});
+
+test('clearing an existing URL reports pending invalid input without overwriting its source',async()=>{
+  const result=compiled();const node=result.workflow.nodes.find(item=>item.type==='step');
+  node.type='tool_call';node.connector={id:'http',kind:'http',request:{url:'https://example.invalid/original'}};
+  const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
+  const graphNode=ui.api.graph._nodes.find(n=>n.properties.workflow_node_id===node.id);ui.api.renderInspector(graphNode);
+  assert.doesNotMatch(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  ui.elements.get('node-http-url').value='';ui.api.updateSelectedNode();
+  assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  assert.equal(graphNode.properties.connector.request.url,'https://example.invalid/original');
+  ui.api.renderInspector(null);assert.match(visibleReview(ui),/no missing.*http.*url/i);
+  assert.equal(ui.api.source.nodes.find(item=>item.id===node.id).connector.request.url,'https://example.invalid/original');
+});
+
+test('untrimmed stored URLs are not presented as configured',async()=>{
+  const result=compiled();const node=result.workflow.nodes.find(item=>item.type==='step');
+  node.type='tool_call';node.connector={id:'http',kind:'http',request:{url:'  https://example.invalid/'}};
+  const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
+  assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);
+});
+
+test('removing or adding HTTP nodes refreshes the current warning without changing the source',async()=>{
+  const result=compiled();const node=result.workflow.nodes.find(item=>item.type==='step');
+  node.type='tool_call';node.connector={id:'http',kind:'http'};
+  const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
+  const target=ui.api.graph._nodes.find(n=>n.properties.workflow_node_id===node.id);const sourceBefore=JSON.stringify(ui.api.source);
+  ui.api.graph.remove(target);assert.match(visibleReview(ui),/no missing.*http.*url/i);
+  ui.api.graph.add(target);assert.match(visibleReview(ui),/http.*request.*(missing|needs)/i);
+  assert.equal(JSON.stringify(ui.api.source),sourceBefore);
+});
 
 test('compile review flags a missing HTTP request without exposing the source or changing the draft',async()=>{
   const result=compiled();const node=result.workflow.nodes.find(item=>item.type==='step');
   node.type='tool_call';node.connector={id:'http',kind:'http'};node.title='private-command-canary';
   const original=JSON.stringify(result.workflow);const ui=setup(async()=>response(result,200));
   await ui.stage();await ui.api.compileStagedSkill();
-  const text=ui.elements.get('skill-review-list').children.map(item=>item.textContent).join(' ');
-  assert.match(text,/at compilation.*http.*no request/i);assert.match(text,/fail.*if reached/i);
-  assert.match(text,/review.*compilation.*not.*later edits/i);
+  const text=visibleReview(ui);
+  assert.match(text,/http.*request.*(missing|needs)/i);assert.match(text,/fail.*if reached/i);
+  assert.match(text,/counts.*compilation.*not.*later edits/i);
   assert.match(text,/configure.*request|request.*configure/i);assert.match(text,/shell commands.*not executed/i);
   assert.doesNotMatch(text,/private-command-canary/);assert.equal(JSON.stringify(ui.api.source),original);
   ui.api.loadDocument(fixture,'Another draft');assert.equal(ui.elements.get('skill-review-panel').hidden,true);
@@ -56,8 +161,8 @@ test('compile review does not flag a configured HTTP action as missing its reque
   const result=compiled();const node=result.workflow.nodes.find(item=>item.type==='step');
   node.type='tool_call';node.connector={id:'http',kind:'http',request:{url:'https://example.invalid'}};
   const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
-  const text=ui.elements.get('skill-review-list').children.map(item=>item.textContent).join(' ');
-  assert.doesNotMatch(text,/http.*no request/i);
+  const text=visibleReview(ui);
+  assert.doesNotMatch(text,/http.*request.*(missing|needs)/i);
 });
 
 test('a real compiled inferred action produces the missing-request warning',async()=>{
@@ -72,8 +177,8 @@ test('a real compiled inferred action produces the missing-request warning',asyn
     if(child.error)throw child.error;assert.equal(child.status,0,child.stderr);compiledFixture=JSON.parse(child.stdout);
   }
   const ui=setup(async()=>response(compiledFixture.reply,200));await ui.stage(compiledFixture.source);await ui.api.compileStagedSkill();
-  const text=ui.elements.get('skill-review-list').children.map(item=>item.textContent).join(' ');
-  assert.match(text,/at compilation.*http.*no request/i);assert.doesNotMatch(text,/private-command-canary/);
+  const text=visibleReview(ui);
+  assert.match(text,/http.*request.*(missing|needs)/i);assert.doesNotMatch(text,/private-command-canary/);
   assert.deepEqual(JSON.parse(JSON.stringify(ui.api.source)),compiledFixture.reply.workflow);
 });
 

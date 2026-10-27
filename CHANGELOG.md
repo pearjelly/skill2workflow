@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Update the editor's missing HTTP request warning as the current draft
+  changes, including imported workflows, without modifying Workflow DSL or
+  executing a request.
+
 - Flag compiled HTTP tool nodes without requests in the editor's source-free
   compile review, with a clear distinction between the original compilation
   and later draft edits.

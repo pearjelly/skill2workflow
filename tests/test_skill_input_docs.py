@@ -9,9 +9,16 @@ ROOT = Path(__file__).resolve().parents[1]
 class SkillInputDocumentationTests(TestCase):
     def test_compile_review_documents_unconfigured_actions_and_snapshot_scope(self):
         text = ' '.join((ROOT / 'docs/authoring.md').read_text(encoding='utf-8').lower().split())
-        self.assertIn('http tool node with no request', text)
-        self.assertIn('original compilation, not later edits', text)
+        self.assertIn('http connector', text)
+        self.assertIn('updates as the draft changes', text)
+        self.assertIn('counts and inferred notices', text)
         self.assertIn('shell commands are not executed', text)
+
+    def test_live_http_warning_keeps_workflow_compatibility(self):
+        text = ' '.join((ROOT / 'docs/workflow-dsl-compatibility.md').read_text(encoding='utf-8').lower().split())
+        self.assertIn('live http request status', text)
+        self.assertIn('existing workflows', text)
+        self.assertIn('does not change workflow dsl', text)
 
     def test_first_use_explains_description_versus_runtime_execution(self):
         for name in ('README.md', 'docs/quickstart.md', 'docs/authoring.md', 'docs/skill-input-boundary.md'):

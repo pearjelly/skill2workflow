@@ -412,6 +412,10 @@ textarea {
   color: var(--danger);
 }
 
+#http-draft-notice:not([hidden]) {
+  margin-top: 8px;
+}
+
 .skill-review-panel[hidden] {
   display: none;
 }

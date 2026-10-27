@@ -63,6 +63,8 @@
   let pendingDraftLoad = null;
   let exampleLoadController = null;
   let inputReview = null;
+  let httpDraftNoticeWasShown = false;
+  let replacingDraft = false;
 
   const els = {};
 
@@ -77,6 +79,7 @@
 
     registerNodeTypes();
     graph = new LGraph();
+    bindDraftGraphChanges();
     canvas = new LGraphCanvas(els.canvas, graph);
     canvas.background_image = "";
     canvas.render_canvas_border = false;
@@ -157,6 +160,7 @@
     els.nodeAssertionFailure = document.getElementById("node-assertion-failure");
     els.nodeAssertionConfig = document.getElementById("node-assertion-config");
     els.validationList = document.getElementById("validation-list");
+    els.httpDraftNotice = document.getElementById("http-draft-notice");
     els.skillReviewPanel = document.getElementById("skill-review-panel");
     els.skillReviewList = document.getElementById("skill-review-list");
   }
@@ -176,6 +180,7 @@
       const wasPending = pendingDraftLoad !== null || skillCompileLoading;
       invalidateDraftLoads(false);
       if (wasPending) setStatus("Draft changed", "idle");
+      refreshHttpDraftNotice();
     });
     els.nodeTitle.addEventListener("input", updateSelectedNode);
     els.nodeDescription.addEventListener("input", updateSelectedNode);
@@ -218,6 +223,7 @@
         const wasPending = pendingDraftLoad !== null || skillCompileLoading;
         invalidateDraftLoads(false);
         if (wasPending) setStatus("Draft changed", "idle");
+        refreshHttpDraftNotice();
         window.requestAnimationFrame(validateGraph);
       };
       WorkflowNode.prototype.onConnectOutput = function (slot, type, input, targetNode) {
@@ -226,6 +232,11 @@
 
       LiteGraph.registerNodeType("skill2workflow/" + nodeType, WorkflowNode);
     });
+  }
+
+  function bindDraftGraphChanges() {
+    graph.onNodeAdded = refreshHttpDraftNotice;
+    graph.onNodeRemoved = refreshHttpDraftNotice;
   }
 
   function drawNodeOverlay(ctx) {
@@ -522,6 +533,13 @@
     try {
       const normalized = normalizeDocument(documentJson);
       const graphJson = normalized.graphJson;
+      replacingDraft = true;
+      httpDraftNoticeWasShown = false;
+      if (els.httpDraftNotice) {
+        els.httpDraftNotice.hidden = true;
+        els.httpDraftNotice.textContent = "";
+      }
+      renderSkillCompileReview(null);
       graph.clear();
       graph.configure(graphJson);
       currentWorkflow = graphJson.workflow || {};
@@ -537,6 +555,9 @@
       renderSkillCompileReview(null);
       renderValidation([error.message], new Set());
       setStatus("Load failed", "invalid");
+    } finally {
+      replacingDraft = false;
+      refreshHttpDraftNotice();
     }
   }
 
@@ -906,21 +927,11 @@
     summary.textContent = "Compiler inferred " + review.executable_node_count + " process node(s), "
       + review.human_gate_count + " human gate(s), "
       + review.verification_node_count + " verification node(s), and "
-      + review.hard_gate_count + " hard-gate declaration(s). This review reflects compilation, not later edits.";
+      + review.hard_gate_count + " hard-gate declaration(s). Counts and inferred notices reflect compilation, not later edits.";
     els.skillReviewList.appendChild(summary);
     const executionBoundary = document.createElement("li");
     executionBoundary.textContent = "Ordinary steps and text-only verification nodes record progress; they do not perform the described work or check results. Use an explicit connector for executable checks.";
     els.skillReviewList.appendChild(executionBoundary);
-    const compiledNodes = currentWorkflowDsl && Array.isArray(currentWorkflowDsl.nodes) ? currentWorkflowDsl.nodes : [];
-    const missingHttpRequest = compiledNodes.some(function (node) {
-      return plainObject(node) && node.type === "tool_call" && plainObject(node.connector)
-        && node.connector.id === "http" && !plainObject(node.connector.request);
-    });
-    if (missingHttpRequest) {
-      const actionBoundary = document.createElement("li");
-      actionBoundary.textContent = "At compilation, an HTTP tool node had no request. It will fail if reached without configuration. Configure its request in the draft or update and recompile the Skill; shell commands are not executed.";
-      els.skillReviewList.appendChild(actionBoundary);
-    }
     if (review.hard_gate_count > 0) {
       const gateBoundary = document.createElement("li");
       gateBoundary.textContent = "A hard-gate declaration does not pause the run. Add a human gate where approval is needed.";
@@ -931,6 +942,39 @@
       item.textContent = SKILL_COMPILE_REVIEW_NOTICES[notice];
       els.skillReviewList.appendChild(item);
     });
+  }
+
+  function refreshHttpDraftNotice() {
+    const notice = els.httpDraftNotice;
+    if (!notice || replacingDraft || !graph || !Array.isArray(graph._nodes)) return;
+    const missing = graph._nodes.some(function (node) {
+      const props = node && node.properties;
+      const connector = props && props.connector;
+      if (!props || props.node_type !== "tool_call" || !plainObject(connector) || connector.id !== "http") return false;
+      if (node === selectedNode && httpInspectorSnapshot && httpInspectorSnapshot.node === node
+          && els.nodeHttpUrl.value !== httpInspectorSnapshot.values.url
+          && !httpUrlPresent(els.nodeHttpUrl.value.trim())) return true;
+      return !plainObject(connector.request) || !httpUrlPresent(connector.request.url);
+    });
+    if (missing) {
+      httpDraftNoticeWasShown = true;
+      const message = "An HTTP tool request needs an HTTP(S) URL. It will fail if reached without configuration. Configure the request in the draft; shell commands are not executed.";
+      if (notice.textContent !== message) notice.textContent = message;
+      notice.className = "";
+      notice.hidden = false;
+    } else if (httpDraftNoticeWasShown) {
+      const message = "No missing HTTP request URL detected in the current draft. This does not validate the request or execute it.";
+      if (notice.textContent !== message) notice.textContent = message;
+      notice.className = "ok";
+      notice.hidden = false;
+    } else {
+      notice.hidden = true;
+      notice.textContent = "";
+    }
+  }
+
+  function httpUrlPresent(value) {
+    return typeof value === "string" && /^https?:\/\/[^/?#\s]+/.test(value);
   }
 
   function renderHttpAssertionReview(node, connector) {
@@ -1031,6 +1075,7 @@
       request: connector.request === undefined ? undefined : deepClone(connector.request),
       values: httpInspectorValues(),
     } : null;
+    refreshHttpDraftNotice();
   }
 
   function httpInspectorValues() {
@@ -1049,6 +1094,7 @@
     if (!syncResult.ok) {
       renderValidation([syncResult.error]);
       setStatus("Invalid input", "invalid");
+      refreshHttpDraftNotice();
       return;
     }
     selectedNode.title = els.nodeTitle.value;
@@ -1056,6 +1102,7 @@
     selectedNode.setDirtyCanvas(true, true);
     els.nodeHeading.textContent = selectedNode.title;
     validateGraph();
+    refreshHttpDraftNotice();
   }
 
   function syncInspectorToSelectedNode(strict) {
