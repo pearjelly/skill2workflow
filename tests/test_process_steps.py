@@ -1,6 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
+from unittest.mock import patch
 
 from skill2workflow.compiler import compile_ir_to_workflow, summarize_skill_compile, validate_workflow
 from skill2workflow.executor import LocalExecutor
@@ -14,6 +15,83 @@ AMBIGUOUS_PROCESS = (
 
 
 class ProcessStepTests(TestCase):
+    def test_checklist_fences_exclude_example_steps_and_preserve_real_source_lines(self):
+        for opening, wrong in (("~~~~", "```"), ("````", "```"), ("```", "~~~")):
+            with self.subTest(opening=opening):
+                text = ("## Checklist\n1. Prepare output\n" + opening + "markdown\n"
+                        + wrong + "\n2. Run private example\n" + opening
+                        + "\n2. Ask user for approval\n3. Deliver output\n")
+                ir = parse_skill_text(text)
+                self.assertEqual(ir['ordered_steps'], [
+                    'Prepare output', 'Ask user for approval', 'Deliver output'])
+                self.assertEqual([step['line'] for step in ir['ordered_step_details']], [2, 7, 8])
+                workflow = compile_ir_to_workflow(ir)
+                self.assertEqual([node['type'] for node in workflow['nodes']],
+                                 ['start', 'step', 'human_gate', 'step', 'failure', 'end'])
+                self.assertNotIn('private example', str(workflow))
+
+    def test_fenced_checklist_heading_does_not_override_real_workflow(self):
+        text = ('~~~~markdown\n## Checklist\n1. Fenced example\n~~~~\n'
+                '## Workflow\n1. Prepare output\n2. Ask user for approval\n')
+        ir = parse_skill_text(text)
+        self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Ask user for approval'])
+        self.assertEqual(ir['ordered_step_details'][0]['line'], 6)
+
+    def test_fenced_guidance_does_not_create_gates_or_hints(self):
+        text = ('## Checklist\n1. Prepare output\n~~~~markdown\n'
+                '<HARD-GATE>Private example approval</HARD-GATE>\n'
+                'Run: private example tool; verify private example\n~~~~\n'
+                '2. Deliver output\n')
+        ir = parse_skill_text(text)
+        self.assertEqual(ir['hard_gates'], [])
+        self.assertEqual(ir['tool_hints'], [])
+        self.assertEqual(ir['human_gates'], [])
+        self.assertEqual(ir['verification_rules'], [])
+        workflow = compile_ir_to_workflow(ir)
+        self.assertEqual(workflow['guards'], [])
+        self.assertNotIn('private example', str(workflow))
+
+    def test_unclosed_checklist_fence_cannot_add_steps_or_hints(self):
+        ir = parse_skill_text('## Checklist\n1. Prepare output\n~~~markdown\n'
+                              '2. Ask user for approval\nRun: private example\n')
+        self.assertEqual(ir['ordered_steps'], ['Prepare output'])
+        self.assertEqual(ir['human_gates'], [])
+        self.assertEqual(ir['tool_hints'], [])
+
+    def test_invalid_backtick_info_does_not_hide_checklist_steps(self):
+        ir = parse_skill_text('## Checklist\n1. Prepare output\n```example```\n'
+                              '2. Ask user for approval\n')
+        self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Ask user for approval'])
+
+    def test_fenced_checklist_annotations_never_become_runtime_steps(self):
+        text = ('## Checklist\n1. Prepare output\n~~~~markdown\n'
+                '2. Send <!-- skill2workflow: http {"request":{"method":"POST",'
+                '"url":"https://example.invalid/private"}} -->\n'
+                '<HARD-GATE>Example only</HARD-GATE>\n~~~~\n'
+                '2. Review <!-- skill2workflow: human_gate -->\n3. Deliver output\n')
+        with TemporaryDirectory() as temporary, patch('skill2workflow.connectors._open_http_request') as transport:
+            ir = parse_skill_text(text)
+            workflow = compile_ir_to_workflow(ir)
+            self.assertEqual(validate_workflow(workflow), [])
+            self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Review', 'Deliver output'])
+            self.assertEqual(workflow['guards'], [])
+            self.assertNotIn('example.invalid', str(workflow))
+            executor = LocalExecutor(Path(temporary) / 'state', storage='sqlite')
+            waiting = executor.run(workflow)
+            self.assertEqual(waiting['status'], 'waiting')
+            transport.assert_not_called()
+            completed = executor.resume(waiting['run_id'], approved=True)
+            self.assertEqual(completed['status'], 'completed')
+            transport.assert_not_called()
+
+    def test_sections_keep_fenced_content_without_creating_fenced_headings(self):
+        text = ('## Checklist\n1. Prepare\n~~~~markdown\n## Fenced heading\n'
+                '1. Example\n~~~~\n2. Deliver\n')
+        ir = parse_skill_text(text)
+        self.assertNotIn('Fenced heading', ir['sections'])
+        self.assertIn('## Fenced heading\n1. Example', ir['sections']['Checklist'])
+        self.assertEqual(ir['ordered_steps'], ['Prepare', 'Deliver'])
+
     def test_exact_process_headings_preserve_numbered_steps_and_source_details(self):
         for heading in ("Workflow", "Steps", "wOrKfLoW", "STEPS"):
             with self.subTest(heading=heading):

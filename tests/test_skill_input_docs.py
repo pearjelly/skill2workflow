@@ -7,6 +7,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SkillInputDocumentationTests(TestCase):
+    def test_fenced_examples_are_excluded_across_process_and_guidance(self):
+        guide = (ROOT / 'docs/skill-input-boundary.md').read_text(encoding='utf-8')
+        self.assertIn('Checklist, Workflow and Steps', guide)
+        self.assertIn('hard-gate', guide)
+        self.assertIn('unclosed fence', guide)
+        self.assertIn('newly compiled', guide)
+        self.assertIn('published artifacts', guide)
+        self.assertNotIn('Legacy Checklist parsing is unchanged', guide)
+
     def test_explicit_process_sections_document_precedence_and_compatibility(self):
         guide = (ROOT / "docs/skill-input-boundary.md").read_text(encoding="utf-8")
         compatibility = (ROOT / "docs/workflow-dsl-compatibility.md").read_text(encoding="utf-8")

@@ -1096,9 +1096,9 @@ def _qualify_installed_skill_versions(repo_root: Path, console_script: Path, iso
 
 
 def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) -> bool:
-    """Qualify process headings through only the installed CLI and local UI."""
+    """Qualify process headings and fenced examples through installed CLI and UI."""
 
-    for section in ("Workflow", "Steps"):
+    for section in ("Workflow", "Steps", "Checklist"):
         fixture_dir = isolated_dir / f"skill-compile-{section.lower()}"
         fixture_dir.mkdir(parents=True, exist_ok=True)
         source = fixture_dir / "SKILL.md"
@@ -1111,6 +1111,10 @@ def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) 
             "1. Prepare output\n"
             "2. 等待负责人审核 <!-- skill2workflow: human_gate -->\n"
             "3. Verify completion\n"
+            "~~~~markdown\n"
+            "4. Run private fenced example\n"
+            "<HARD-GATE>private fenced example</HARD-GATE>\n"
+            "~~~~\n"
         )
         source.write_text(markdown, encoding="utf-8")
         compiled = json.loads(
@@ -1157,6 +1161,8 @@ def _require_installed_process_compile(compiled, section: str, source_file: str,
     if not isinstance(compiled, dict) or compiled.get("review") != expected_review:
         raise RuntimeError("installed Skill compile did not preserve process step counts and gates")
     workflow = compiled.get("workflow")
+    if not isinstance(workflow, dict) or workflow.get('guards') != [] or 'private fenced example' in json.dumps(workflow):
+        raise RuntimeError('installed Skill compile included a fenced example')
     identity = workflow.get('workflow') if isinstance(workflow, dict) else None
     if not isinstance(identity, dict) or identity.get('id') != 'workflow_installed_process' or identity.get('name') != 'installed-process' or identity.get('description') != 'Compile reviewed input. Keep the intended identity.':
         raise RuntimeError('installed Skill compile did not preserve frontmatter identity and text')

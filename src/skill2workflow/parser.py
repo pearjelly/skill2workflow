@@ -56,9 +56,11 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
         if isinstance(step.get('connector'), dict) and step['connector'].get('id') in {'http', 'http_assert'}
     }
     guidance_body = '\n'.join(
-        re.sub(r'[ \t]+<!-- skill2workflow: (?:http|http_assert) \{.*\} -->[ \t]*$', '', line)
-        if line_number in declaration_lines else line
-        for line_number, line in enumerate(body.splitlines(), start=body_start_line)
+        '' if fenced else (
+            re.sub(r'[ \t]+<!-- skill2workflow: (?:http|http_assert) \{.*\} -->[ \t]*$', '', line)
+            if line_number in declaration_lines else line
+        )
+        for line_number, line, fenced in _fence_aware_lines(body, body_start_line)
     )
 
     ir = {
@@ -92,20 +94,30 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     return ir
 
 
-def _extract_workflow_version_declaration(body: str):
-    """Read one explicit standalone version without shifting source lines."""
-    lines = body.splitlines()
-    version = None
+def _fence_aware_lines(body: str, start_line: int):
+    """Yield source lines with consistent Markdown fence classification."""
     fence_char, fence_length = '', 0
-    for index, line in enumerate(lines):
+    for line_number, line in enumerate(body.splitlines(), start=start_line):
         if fence_char:
             closing = re.match(r'^ {0,3}([`~]{3,})[ \t]*$', line)
             if closing and set(closing.group(1)) == {fence_char} and len(closing.group(1)) >= fence_length:
                 fence_char = ''
+            yield line_number, line, True
             continue
         opening = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
         if opening and not (opening.group(1)[0] == '`' and '`' in opening.group(2)):
             fence_char, fence_length = opening.group(1)[0], len(opening.group(1))
+            yield line_number, line, True
+        else:
+            yield line_number, line, False
+
+
+def _extract_workflow_version_declaration(body: str):
+    """Read one explicit standalone version without shifting source lines."""
+    lines = body.splitlines()
+    version = None
+    for index, line, fenced in _fence_aware_lines(body, 0):
+        if fenced:
             continue
         if not re.search(r'<!--\s*skill2workflow\s*:\s*workflow_version\b', line, re.IGNORECASE):
             continue
@@ -121,16 +133,8 @@ def _extract_input_schema_declaration(body: str):
     """Remove one active data declaration without shifting any source lines."""
     lines = body.splitlines()
     schema = None
-    fence_char, fence_length = '', 0
-    for index, line in enumerate(lines):
-        if fence_char:
-            closing = re.match(r'^ {0,3}([`~]{3,})[ \t]*$', line)
-            if closing and set(closing.group(1)) == {fence_char} and len(closing.group(1)) >= fence_length:
-                fence_char = ''
-            continue
-        opening = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
-        if opening and not (opening.group(1)[0] == '`' and '`' in opening.group(2)):
-            fence_char, fence_length = opening.group(1)[0], len(opening.group(1))
+    for index, line, fenced in _fence_aware_lines(body, 0):
+        if fenced:
             continue
         if not re.search(r'<!--\s*skill2workflow\s*:\s*input_schema\b', line, re.IGNORECASE):
             continue
@@ -204,8 +208,8 @@ def _parse_sections(body: str) -> Dict[str, str]:
     current = "_root"
     sections[current] = []
 
-    for line in body.splitlines():
-        heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
+    for _, line, fenced in _fence_aware_lines(body, 1):
+        heading = None if fenced else re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
         if heading:
             current = heading.group(2).strip()
             sections.setdefault(current, [])
@@ -233,17 +237,8 @@ def _extract_ordered_step_details(body: str, start_line: int) -> List[Dict[str, 
 
 def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, object]]) -> None:
     selected = {step['line']: step for step in steps}
-    fence_char = ''
-    fence_length = 0
-    for line_number, line in enumerate(body.splitlines(), start=start_line):
-        if fence_char:
-            closing = re.match(r'^ {0,3}([`~]{3,})[ \t]*$', line)
-            if closing and set(closing.group(1)) == {fence_char} and len(closing.group(1)) >= fence_length:
-                fence_char = ''
-            continue
-        opening = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
-        if opening and not (opening.group(1)[0] == '`' and '`' in opening.group(2)):
-            fence_char, fence_length = opening.group(1)[0], len(opening.group(1))
+    for line_number, line, fenced in _fence_aware_lines(body, start_line):
+        if fenced:
             continue
         reserved = re.findall(r'<!--\s*skill2workflow\b', line, re.IGNORECASE)
         if not reserved:
@@ -271,8 +266,7 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
             except (ValueError, TypeError, RecursionError, OverflowError) as error:
                 raise ValueError('Invalid Skill step annotation') from error
             selected[line_number].update(node_type='tool_call', connector=binding)
-    # Legacy Checklist extraction has its own fence grammar. Never let a
-    # declaration it extracted inside a fence fall through to keyword inference.
+    # Never let an unrecognized reserved declaration fall through to inference.
     for step in steps:
         if 'node_type' not in step and re.search(
             r'<!--\s*skill2workflow\b', str(step['title']) + str(step['detail']), re.IGNORECASE
@@ -283,19 +277,14 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
 def _extract_checklist_details(
     body: str, start_line: int
 ) -> Tuple[List[Dict[str, object]], bool]:
-    """Retain the legacy Checklist grammar, including empty-section precedence."""
+    """Read Checklist items with existing list and empty-section precedence."""
 
     items: List[Dict[str, object]] = []
     current_section = "_root"
-    in_fence = False
     has_checklist = False
 
-    for line_number, raw_line in enumerate(body.splitlines(), start=start_line):
-        stripped = raw_line.strip()
-        if stripped.startswith("```"):
-            in_fence = not in_fence
-            continue
-        if in_fence:
+    for line_number, raw_line, fenced in _fence_aware_lines(body, start_line):
+        if fenced:
             continue
 
         heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", raw_line)
@@ -334,22 +323,8 @@ def _extract_process_step_details(body: str, start_line: int) -> List[Dict[str, 
     sections = []
     current = None
     current_section = ""
-    fence_char = ""
-    fence_length = 0
-    for line_number, raw_line in enumerate(body.splitlines(), start=start_line):
-        if fence_char:
-            closing = re.match(r"^ {0,3}([`~]{3,})[ \t]*$", raw_line)
-            if (
-                closing
-                and set(closing.group(1)) == {fence_char}
-                and len(closing.group(1)) >= fence_length
-            ):
-                fence_char = ""
-            continue
-        opening = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", raw_line)
-        if opening and not (opening.group(1)[0] == "`" and "`" in opening.group(2)):
-            fence_char = opening.group(1)[0]
-            fence_length = len(opening.group(1))
+    for line_number, raw_line, fenced in _fence_aware_lines(body, start_line):
+        if fenced:
             continue
 
         heading = re.match(r"^ {0,3}#{1,6}(?:[ \t]+(.*?))?[ \t]*$", raw_line)
@@ -435,16 +410,7 @@ def _find_lines(
     lowered_skip_sections = tuple(term.lower() for term in skip_section_terms)
     matches = []
     current_section = "_root"
-    in_fence = False
-
     for raw_line in body.splitlines():
-        stripped = raw_line.strip()
-        if stripped.startswith("```"):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            continue
-
         heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", raw_line)
         if heading:
             current_section = heading.group(2).strip()

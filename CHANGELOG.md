@@ -88,6 +88,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Apply the same backtick and tilde fence rules to Checklist extraction and
+  guidance hints as to explicit Workflow/Steps sections. Supported fenced examples no
+  longer become newly compiled steps or hard gates; review changed drafts before
+  publication. Existing published Workflow DSL is unchanged.
+
 - Warn on standard error when failed service initialization or quickstart
   cannot confirm workspace cleanup. The fixed warning includes no path or
   secret and preserves the original error and exit status.

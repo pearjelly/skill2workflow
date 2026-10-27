@@ -105,9 +105,10 @@ and source-DSL destinations without changing them. It adds no DSL fields,
 execution behavior, credential resolution, or write-back permissions.
 
 Parser support for explicit numbered `Workflow` and `Steps` sections changes
-only newly compiled drafts that lack a Checklist section. Existing Checklist
-extraction and committed example fixtures remain compatible; published Workflow
-DSL artifacts are not recompiled or reinterpreted. The DSL schema and execution
+only newly compiled drafts that lack a Checklist section. Checklist precedence
+and list formats are unchanged, but examples in supported fences no longer become steps or
+guidance in newly compiled drafts. Published Workflow DSL
+artifacts are not recompiled or reinterpreted. The DSL schema and execution
 semantics are unchanged. Authors should review newly recognized nodes before
 publication, especially inferred tool calls and human gates. Multiple populated
 fallback process sections now fail compilation instead of producing a generic

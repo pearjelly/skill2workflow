@@ -474,7 +474,9 @@ class PackageSmokeTests(TestCase):
                     source = Path(command[2])
                     markdown = source.read_text(encoding="utf-8")
                     self.assertIn('等待负责人审核 <!-- skill2workflow: human_gate -->', markdown)
-                    section = "Workflow" if "## Workflow" in markdown else "Steps"
+                    self.assertIn('~~~~markdown', markdown)
+                    self.assertIn('private fenced example', markdown)
+                    section = next(name for name in ('Checklist', 'Workflow', 'Steps') if '## ' + name in markdown)
                     return json.dumps(_process_compile_result(section, str(source)))
                 self.assertEqual(command[1], "validate")
                 self.assertTrue(Path(command[2]).is_file())
@@ -487,7 +489,7 @@ class PackageSmokeTests(TestCase):
                 requests.append(markdown)
                 if "## Workflow" in markdown and "## Steps" in markdown:
                     return 400, {"error": "skill compile rejected"}
-                section = "Workflow" if "## Workflow" in markdown else "Steps"
+                section = next(name for name in ('Checklist', 'Workflow', 'Steps') if '## ' + name in markdown)
                 return 200, _process_compile_result(section, "SKILL.md")
 
             with patch("scripts.package_smoke._run", side_effect=fake_run), patch(
@@ -496,12 +498,12 @@ class PackageSmokeTests(TestCase):
             ):
                 self.assertTrue(package_smoke._qualify_installed_skill_compiles(console, isolated))
 
-        self.assertEqual([command[1] for command in commands].count("compile"), 2)
-        self.assertEqual([command[1] for command in commands].count("validate"), 4)
-        self.assertEqual(len(requests), 3)
+        self.assertEqual([command[1] for command in commands].count("compile"), 3)
+        self.assertEqual([command[1] for command in commands].count("validate"), 6)
+        self.assertEqual(len(requests), 4)
 
     def test_installed_skill_compiles_reject_fallback_missing_gates_and_bad_sources(self):
-        for defect in ("fallback", "human_gate", "verification", "section", "line", "identity", "description"):
+        for defect in ("fallback", "human_gate", "verification", "section", "line", "identity", "description", "fenced_guard"):
             with self.subTest(defect=defect), TemporaryDirectory() as temporary:
                 isolated = Path(temporary)
 
@@ -519,6 +521,8 @@ class PackageSmokeTests(TestCase):
                         result["workflow"]["nodes"][1]["metadata"]["source"]["section"] = "Checklist"
                     elif defect in ("identity", "description"):
                         result['workflow']['workflow']['id' if defect == 'identity' else 'description'] = 'private-metadata-canary'
+                    elif defect == 'fenced_guard':
+                        result['workflow']['guards'] = [{'description': 'private fenced example'}]
                     else:
                         result["workflow"]["nodes"][1]["metadata"]["source"]["line"] = 99
                     return json.dumps(result)
@@ -537,7 +541,8 @@ class PackageSmokeTests(TestCase):
                 def fake_run(command, cwd):
                     if command[1] == "compile":
                         source = Path(command[2])
-                        section = "Workflow" if "## Workflow" in source.read_text() else "Steps"
+                        markdown = source.read_text()
+                        section = next(name for name in ('Checklist', 'Workflow', 'Steps') if '## ' + name in markdown)
                         return json.dumps(_process_compile_result(section, str(source)))
                     return json.dumps({"valid": defect != "invalid_dsl"})
 
@@ -547,7 +552,7 @@ class PackageSmokeTests(TestCase):
                         if defect == "accepted_ambiguity":
                             return 200, _process_compile_result("Workflow", "SKILL.md")
                         return 400, {"error": markdown}
-                    section = "Workflow" if "## Workflow" in markdown else "Steps"
+                    section = next(name for name in ('Checklist', 'Workflow', 'Steps') if '## ' + name in markdown)
                     return 200, _process_compile_result(section, "SKILL.md")
 
                 with patch("scripts.package_smoke._run", side_effect=fake_run), patch(
@@ -670,6 +675,7 @@ def _process_compile_result(section, source_file):
         "workflow": {
             "workflow": {'id': 'workflow_installed_process', 'name': 'installed-process',
                          'description': 'Compile reviewed input. Keep the intended identity.'},
+            "guards": [],
             "nodes": [{"type": "start"}] + [
                 {
                     "type": node_type,

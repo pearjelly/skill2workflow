@@ -171,9 +171,8 @@ The separately documented standalone `input_schema` and `workflow_version`
 declarations are explicit exceptions to selected-step placement and have their
 own fixed refusal messages.
 This includes a declaration in a process excluded by Checklist precedence.
-Fenced examples do not declare approvals. If legacy Checklist parsing extracts
-an annotated item inside a fence, compilation is refused to prevent accidental
-keyword inference. Unmarked items retain their historical inference rules.
+Examples inside supported fences do not declare approvals or become process
+steps. Unmarked items outside fences retain their historical inference rules.
 This changes newly compiled drafts only; published workflows retain their DSL.
 
 ## Explicit Process Sections
@@ -206,9 +205,11 @@ source-section metadata. The fallback rules are deliberately explicit:
   the top level. Deeper numbered items, bullet inventories, indented code,
   and prose do not become steps. A numbered sublist beneath `- Notes` is not
   promoted into a process.
-- Backtick and tilde fences are ignored in the fallback. A closing fence must
-  use the same character and at least the opening length; an unclosed fence
-  excludes the remaining text. Legacy Checklist parsing is unchanged.
+- Backtick and tilde fences are ignored in Checklist, Workflow and Steps
+  extraction. A closing fence must use the same character and at least the
+  opening length; an unclosed fence excludes the remaining text. Fences may
+  have up to three leading spaces. A backtick fence's info string cannot
+  contain a backtick.
 - Empty candidate sections are ignored. More than one populated `Workflow`
   or `Steps` section is rejected with a fixed error; consolidate the intended
   process into one section or use an explicit Checklist. Separate procedures
@@ -220,6 +221,16 @@ draft for review; this grammar neither executes prose nor makes standalone
 hard-gate declarations executable. Existing node typing and human-gate behavior
 are unchanged. Newly recognized steps can therefore introduce existing tool or
 approval nodes: review the generated DSL before publishing or running it.
+
+The same supported fence rules exclude examples from tool, approval, verification and
+hard-gate hints. Fenced text remains visible within its containing IR section,
+but its headings do not create sections. Newly compiled Skills that previously
+treated fenced examples as real steps or hints may generate a different draft;
+compare and review it before publishing. Existing published artifacts are not
+recompiled or changed. Fences indented by four or more spaces and fences inside
+Markdown container syntax are not recognized by this bounded subset; their
+contents may be interpreted as steps or guidance. Move examples to a supported
+top-level fence before compiling.
 
 ## Verification
 

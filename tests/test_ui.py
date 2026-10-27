@@ -29,6 +29,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class UiTests(TestCase):
+    def test_ui_compile_excludes_fenced_checklist_examples(self):
+        markdown = ('## Checklist\n1. Prepare output\n~~~~markdown\n'
+                    '2. Run private example\n<HARD-GATE>private example</HARD-GATE>\n~~~~\n'
+                    '2. Review <!-- skill2workflow: human_gate -->\n3. Deliver output\n')
+        status, raw = self._post_local_skill_compile(markdown)
+        self.assertEqual(status, 200)
+        compiled = json.loads(raw)
+        self.assertEqual([node['type'] for node in compiled['workflow']['nodes']],
+                         ['start', 'step', 'human_gate', 'step', 'failure', 'end'])
+        self.assertEqual(compiled['review']['ordered_step_count'], 3)
+        self.assertEqual(compiled['review']['hard_gate_count'], 0)
+        self.assertNotIn(b'private example', raw)
+
     def test_ui_compile_preserves_frontmatter_scope_and_refuses_duplicate_identity(self):
         status, raw = self._post_local_skill_compile('---\nname: intended-name\ndescription: >-\n  First sentence.\n  Next sentence.\nmetadata:\n  name: private-metadata-canary\n---\n## Steps\n1. Review\n')
         self.assertEqual(status, 200)

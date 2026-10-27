@@ -64,7 +64,6 @@ class ExplicitApprovalTests(TestCase):
             f'## Notes\n等待 {MARKER}\n',
             f'## Workflow\n1. 等待\n   1. 嵌套 {MARKER}\n',
             f'## Workflow\n1. 等待 {MARKER}\n## Checklist\n',
-            f'## Checklist\n~~~\n1. 示例 {MARKER}\n~~~\n',
             '## Steps\n1. 等待 <!-- Skill2Workflow: human_gate -->\n',
         ]
         for text in cases:
@@ -75,6 +74,12 @@ class ExplicitApprovalTests(TestCase):
         ir = parse_skill_text(f'```markdown\n1. 示例 {MARKER}\n```\n## Steps\n1. 等待负责人审核\n')
         self.assertNotIn('node_type', ir['ordered_step_details'][0])
         self.assertEqual(compile_ir_to_workflow(ir)['nodes'][1]['type'], 'step')
+        ir = parse_skill_text(f'## Checklist\n~~~\n1. 示例 {MARKER}\n~~~\n')
+        self.assertEqual(ir['ordered_steps'], [])
+        self.assertEqual(ir['human_gates'], [])
+        workflow = compile_ir_to_workflow(ir)
+        self.assertEqual(workflow['nodes'][1]['title'], 'Review skill guidance')
+        self.assertFalse(any(node['type'] == 'human_gate' for node in workflow['nodes']))
 
     def test_explicit_ir_type_precedes_keywords_and_rejects_unknown_types(self):
         ir = parse_skill_text(f'## Steps\n1. Verify output {MARKER}\n')
