@@ -476,6 +476,7 @@ class PackageSmokeTests(TestCase):
                     self.assertIn('等待负责人审核 <!-- skill2workflow: human_gate -->', markdown)
                     self.assertIn('~~~~markdown', markdown)
                     self.assertIn('private fenced example', markdown)
+                    self.assertIn('private nested example', markdown)
                     section = next(name for name in ('Checklist', 'Workflow', 'Steps') if '## ' + name in markdown)
                     return json.dumps(_process_compile_result(section, str(source)))
                 self.assertEqual(command[1], "validate")
@@ -503,7 +504,7 @@ class PackageSmokeTests(TestCase):
         self.assertEqual(len(requests), 4)
 
     def test_installed_skill_compiles_reject_fallback_missing_gates_and_bad_sources(self):
-        for defect in ("fallback", "human_gate", "verification", "section", "line", "identity", "description", "fenced_guard"):
+        for defect in ("fallback", "human_gate", "verification", "section", "line", "identity", "description", "fenced_guard", "nested_example"):
             with self.subTest(defect=defect), TemporaryDirectory() as temporary:
                 isolated = Path(temporary)
 
@@ -523,6 +524,8 @@ class PackageSmokeTests(TestCase):
                         result['workflow']['workflow']['id' if defect == 'identity' else 'description'] = 'private-metadata-canary'
                     elif defect == 'fenced_guard':
                         result['workflow']['guards'] = [{'description': 'private fenced example'}]
+                    elif defect == 'nested_example':
+                        result['workflow']['guards'] = [{'description': 'private nested example'}]
                     else:
                         result["workflow"]["nodes"][1]["metadata"]["source"]["line"] = 99
                     return json.dumps(result)

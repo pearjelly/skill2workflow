@@ -15,6 +15,99 @@ AMBIGUOUS_PROCESS = (
 
 
 class ProcessStepTests(TestCase):
+    def test_indented_fenced_checklist_examples_are_not_steps(self):
+        for fence in ('    ~~~', '    ```', '\t~~~'):
+            with self.subTest(fence=fence):
+                text = ('## Checklist\n1. Prepare output\n' + fence + 'markdown\n'
+                        '    2. Run private example\n' + fence + '\n'
+                        '2. Ask user for approval\n3. Deliver output\n')
+                ir = parse_skill_text(text)
+                self.assertEqual(ir['ordered_steps'],
+                                 ['Prepare output', 'Ask user for approval', 'Deliver output'])
+                self.assertEqual([step['line'] for step in ir['ordered_step_details']], [2, 6, 7])
+                self.assertNotIn('private example', str(compile_ir_to_workflow(ir)))
+
+    def test_blockquote_fenced_checklist_does_not_override_real_process(self):
+        text = ('> ```markdown\n> ## Checklist\n> 1. Run private example\n'
+                '> <HARD-GATE>private example</HARD-GATE>\n> ```\n'
+                '## Workflow\n1. Prepare output\n2. Ask user for approval\n')
+        ir = parse_skill_text(text)
+        self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Ask user for approval'])
+        self.assertEqual(ir['tool_hints'], [])
+        self.assertEqual(ir['hard_gates'], [])
+        self.assertNotIn('private example', str(compile_ir_to_workflow(ir)))
+
+    def test_list_contained_fences_exclude_example_declarations_and_hints(self):
+        text = ('## Checklist\n1. Prepare output\n- ```markdown\n'
+                '  1. Run private example <!-- skill2workflow: human_gate -->\n'
+                '  <!-- skill2workflow: workflow_version private-example -->\n'
+                '  <!-- skill2workflow: input_schema {"private":"example"} -->\n'
+                '  <HARD-GATE>private example</HARD-GATE>\n  ```\n'
+                '2. Review <!-- skill2workflow: human_gate -->\n3. Deliver output\n')
+        ir = parse_skill_text(text)
+        self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Review', 'Deliver output'])
+        self.assertEqual(ir['hard_gates'], [])
+        self.assertEqual(ir['tool_hints'], [])
+        self.assertNotIn('input_schema', ir)
+        self.assertNotIn('workflow_version', ir)
+        workflow = compile_ir_to_workflow(ir)
+        self.assertEqual([node['type'] for node in workflow['nodes']],
+                         ['start', 'step', 'human_gate', 'step', 'failure', 'end'])
+        self.assertNotIn('private example', str(workflow))
+
+    def test_unclosed_nested_fence_excludes_the_remainder(self):
+        ir = parse_skill_text('## Checklist\n1. Prepare output\n    ~~~markdown\n'
+                              '    2. Run private example\n2. Deliver output\n')
+        self.assertEqual(ir['ordered_steps'], ['Prepare output'])
+        self.assertEqual(ir['tool_hints'], [])
+
+    def test_nested_closers_cannot_end_a_top_level_fence(self):
+        text = ('## Checklist\n1. Prepare output\n~~~markdown\n'
+                '    ~~~\n2. Run private example\n~~~\n2. Deliver output\n')
+        ir = parse_skill_text(text)
+        self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Deliver output'])
+        self.assertNotIn('private example', str(compile_ir_to_workflow(ir)))
+
+    def test_wrong_container_cannot_close_a_fenced_example(self):
+        text = ('## Checklist\n1. Prepare output\n> ~~~markdown\n'
+                '~~~\n2. Run private example\n> ~~~\n2. Deliver output\n')
+        ir = parse_skill_text(text)
+        self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Deliver output'])
+        self.assertNotIn('private example', str(compile_ir_to_workflow(ir)))
+
+    def test_wrong_nested_indent_and_quote_position_cannot_close_a_fence(self):
+        for opening, wrong, closing in (
+            ('    ~~~', '  ~~~', '    ~~~'),
+            ('> ~~~', '  > ~~~', '> ~~~'),
+            ('- > ~~~', '> ~~~', '  > ~~~'),
+        ):
+            with self.subTest(opening=opening):
+                text = ('## Checklist\n1. Prepare output\n' + opening + 'markdown\n'
+                        + wrong + '\n2. Run private example\n' + closing
+                        + '\n2. Deliver output\n')
+                ir = parse_skill_text(text)
+                self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Deliver output'])
+                self.assertNotIn('private example', str(compile_ir_to_workflow(ir)))
+
+    def test_nested_http_example_never_runs_before_or_after_real_approval(self):
+        text = ('## Checklist\n1. Prepare output\n    ~~~~markdown\n'
+                '    2. Send <!-- skill2workflow: http {"request":{"method":"POST",'
+                '"url":"https://example.invalid/private"}} -->\n    ~~~~\n'
+                '2. Review <!-- skill2workflow: human_gate -->\n3. Deliver output\n')
+        with TemporaryDirectory() as temporary, patch('skill2workflow.connectors._open_http_request') as transport:
+            ir = parse_skill_text(text)
+            workflow = compile_ir_to_workflow(ir)
+            self.assertEqual(validate_workflow(workflow), [])
+            self.assertEqual(ir['ordered_steps'], ['Prepare output', 'Review', 'Deliver output'])
+            self.assertNotIn('example.invalid', str(workflow))
+            executor = LocalExecutor(Path(temporary) / 'state', storage='sqlite')
+            waiting = executor.run(workflow)
+            self.assertEqual(waiting['status'], 'waiting')
+            transport.assert_not_called()
+            completed = executor.resume(waiting['run_id'], approved=True)
+            self.assertEqual(completed['status'], 'completed')
+            transport.assert_not_called()
+
     def test_checklist_fences_exclude_example_steps_and_preserve_real_source_lines(self):
         for opening, wrong in (("~~~~", "```"), ("````", "```"), ("```", "~~~")):
             with self.subTest(opening=opening):

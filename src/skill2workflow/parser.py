@@ -94,19 +94,64 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     return ir
 
 
+def _fence_content(line: str, *, allow_list_marker: bool):
+    """Return content and conservative container position in linear work."""
+    index = 0
+    size = len(line)
+    column = 0
+    quotes = []
+    list_marker = False
+    while index < size:
+        while index < size and line[index] in ' \t':
+            column = column + 1 if line[index] == ' ' else (column // 4 + 1) * 4
+            index += 1
+        if index < size and line[index] == '>':
+            quotes.append(column)
+            index += 1
+            if index < size and line[index] == ' ':
+                index += 1
+            column = 0
+            continue
+        if allow_list_marker and index + 1 < size:
+            if line[index] in '-+*' and line[index + 1] in ' \t':
+                list_marker = True
+                column += 1
+                index += 1
+                continue
+            end = index
+            while end < size and end - index < 9 and '0' <= line[end] <= '9':
+                end += 1
+            if (end > index and end + 1 < size and line[end] in '.)'
+                    and line[end + 1] in ' \t'):
+                list_marker = True
+                column += end + 1 - index
+                index = end + 1
+                continue
+        break
+    return line[index:], tuple(quotes), column, list_marker
+
+
 def _fence_aware_lines(body: str, start_line: int):
-    """Yield source lines with consistent Markdown fence classification."""
+    """Conservatively classify top-level and simple nested fenced examples."""
     fence_char, fence_length = '', 0
+    fence_quotes, fence_indent = (), 0
     for line_number, line in enumerate(body.splitlines(), start=start_line):
         if fence_char:
-            closing = re.match(r'^ {0,3}([`~]{3,})[ \t]*$', line)
-            if closing and set(closing.group(1)) == {fence_char} and len(closing.group(1)) >= fence_length:
+            content, quotes, indent, _ = _fence_content(line, allow_list_marker=False)
+            closing = re.fullmatch(r'([`~]{3,})[ \t]*', content)
+            if (closing and quotes == fence_quotes
+                    and fence_indent <= indent <= fence_indent + 3
+                    and set(closing.group(1)) == {fence_char}
+                    and len(closing.group(1)) >= fence_length):
                 fence_char = ''
             yield line_number, line, True
             continue
-        opening = re.match(r'^ {0,3}(`{3,}|~{3,})(.*)$', line)
+        content, quotes, indent, has_list = _fence_content(line, allow_list_marker=True)
+        opening = re.match(r'^(`{3,}|~{3,})(.*)$', content)
         if opening and not (opening.group(1)[0] == '`' and '`' in opening.group(2)):
             fence_char, fence_length = opening.group(1)[0], len(opening.group(1))
+            fence_quotes = quotes
+            fence_indent = indent if has_list or indent >= 4 else 0
             yield line_number, line, True
         else:
             yield line_number, line, False

@@ -88,6 +88,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Recognize indented and simple list/blockquote fenced examples during Skill
+  compilation. Conservative container and indentation matching keeps an
+  unclosed example from becoming executable; review the generated draft if
+  later steps are excluded. Published workflows remain unchanged.
+
 - Apply the same backtick and tilde fence rules to Checklist extraction and
   guidance hints as to explicit Workflow/Steps sections. Supported fenced examples no
   longer become newly compiled steps or hard gates; review changed drafts before

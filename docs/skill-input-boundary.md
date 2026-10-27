@@ -206,10 +206,11 @@ source-section metadata. The fallback rules are deliberately explicit:
   and prose do not become steps. A numbered sublist beneath `- Notes` is not
   promoted into a process.
 - Backtick and tilde fences are ignored in Checklist, Workflow and Steps
-  extraction. A closing fence must use the same character and at least the
-  opening length; an unclosed fence excludes the remaining text. Fences may
-  have up to three leading spaces. A backtick fence's info string cannot
-  contain a backtick.
+  extraction. Indented fences and simple list or blockquote containers are
+  also recognized. A closing fence must use the same character and at least
+  the opening length, with matching blockquote positions and a compatible
+  indentation. An unclosed fence excludes the remaining text. A backtick
+  fence's info string cannot contain a backtick.
 - Empty candidate sections are ignored. More than one populated `Workflow`
   or `Steps` section is rejected with a fixed error; consolidate the intended
   process into one section or use an explicit Checklist. Separate procedures
@@ -227,10 +228,11 @@ hard-gate hints. Fenced text remains visible within its containing IR section,
 but its headings do not create sections. Newly compiled Skills that previously
 treated fenced examples as real steps or hints may generate a different draft;
 compare and review it before publishing. Existing published artifacts are not
-recompiled or changed. Fences indented by four or more spaces and fences inside
-Markdown container syntax are not recognized by this bounded subset; their
-contents may be interpreted as steps or guidance. Move examples to a supported
-top-level fence before compiling.
+recompiled or changed. This is a conservative fence subset, not a complete
+Markdown parser: container and indentation matching can retain a fence through
+the end of the Skill when the author intended it to close. If expected steps
+are missing, use a clearly matched top-level fence and compile again. Always
+review the generated workflow and approval nodes before publication.
 
 ## Verification
 

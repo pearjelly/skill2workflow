@@ -1115,6 +1115,10 @@ def _qualify_installed_skill_compiles(console_script: Path, isolated_dir: Path) 
             "4. Run private fenced example\n"
             "<HARD-GATE>private fenced example</HARD-GATE>\n"
             "~~~~\n"
+            "    ~~~~markdown\n"
+            "    4. Run private nested example\n"
+            "    <HARD-GATE>private nested example</HARD-GATE>\n"
+            "    ~~~~\n"
         )
         source.write_text(markdown, encoding="utf-8")
         compiled = json.loads(
@@ -1161,7 +1165,8 @@ def _require_installed_process_compile(compiled, section: str, source_file: str,
     if not isinstance(compiled, dict) or compiled.get("review") != expected_review:
         raise RuntimeError("installed Skill compile did not preserve process step counts and gates")
     workflow = compiled.get("workflow")
-    if not isinstance(workflow, dict) or workflow.get('guards') != [] or 'private fenced example' in json.dumps(workflow):
+    if (not isinstance(workflow, dict) or workflow.get('guards') != []
+            or any(value in json.dumps(workflow) for value in ('private fenced example', 'private nested example'))):
         raise RuntimeError('installed Skill compile included a fenced example')
     identity = workflow.get('workflow') if isinstance(workflow, dict) else None
     if not isinstance(identity, dict) or identity.get('id') != 'workflow_installed_process' or identity.get('name') != 'installed-process' or identity.get('description') != 'Compile reviewed input. Keep the intended identity.':

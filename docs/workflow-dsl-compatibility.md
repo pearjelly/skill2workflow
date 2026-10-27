@@ -107,7 +107,9 @@ execution behavior, credential resolution, or write-back permissions.
 Parser support for explicit numbered `Workflow` and `Steps` sections changes
 only newly compiled drafts that lack a Checklist section. Checklist precedence
 and list formats are unchanged, but examples in supported fences no longer become steps or
-guidance in newly compiled drafts. Published Workflow DSL
+guidance in newly compiled drafts, including recognized indented and simple
+list/blockquote fences. Conservative matching can exclude later steps when a
+fence does not have a matching close. Published Workflow DSL
 artifacts are not recompiled or reinterpreted. The DSL schema and execution
 semantics are unchanged. Authors should review newly recognized nodes before
 publication, especially inferred tool calls and human gates. Multiple populated

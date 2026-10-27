@@ -12,9 +12,13 @@ class SkillInputDocumentationTests(TestCase):
         self.assertIn('Checklist, Workflow and Steps', guide)
         self.assertIn('hard-gate', guide)
         self.assertIn('unclosed fence', guide)
+        self.assertIn('blockquote', guide)
+        self.assertIn('indented', guide)
+        self.assertIn('conservative', guide)
         self.assertIn('newly compiled', guide)
         self.assertIn('published artifacts', guide)
         self.assertNotIn('Legacy Checklist parsing is unchanged', guide)
+        self.assertNotIn('Fences indented by four or more spaces', guide)
 
     def test_explicit_process_sections_document_precedence_and_compatibility(self):
         guide = (ROOT / "docs/skill-input-boundary.md").read_text(encoding="utf-8")
