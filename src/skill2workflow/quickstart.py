@@ -11,7 +11,7 @@ from .compiler import compile_ir_to_workflow, validate_workflow
 from .control_plane import LocalControlPlane
 from .parser import parse_skill_text, read_skill_text
 from .service_bootstrap import (
-    _cleanup_workspace, _pin_workspace, initialize_service_workspace,
+    _cleanup_workspace, _mark_cleanup_unconfirmed, _pin_workspace, initialize_service_workspace,
     validate_service_workspace_location,
 )
 from .input_schema import validate_trigger_input
@@ -131,8 +131,9 @@ def initialize_quickstart_workspace(
             run = control.get_run(str(triggered['run_id']))
         if str(run.get("status", "")) != "waiting":
             raise ValueError("quickstart run did not stop at its human gate")
-    except Exception:
-        _cleanup_workspace(workspace, workspace_fd)
+    except Exception as error:
+        if not _cleanup_workspace(workspace, workspace_fd):
+            _mark_cleanup_unconfirmed(error)
         raise
     finally:
         if workspace_fd is not None:

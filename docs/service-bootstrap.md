@@ -78,6 +78,13 @@ remove it manually only after confirming ownership; choose an unused root for
 the next attempt. Never delete a replacement path merely because it has the
 same name.
 
+When cleanup cannot be confirmed, the CLI keeps the original failure status and
+adds the fixed warning `workspace cleanup could not be confirmed`. The warning
+does not print a path or secret, and it cannot locate a moved workspace. Python
+callers can check `workspace_cleanup_unconfirmed` on exceptions that support
+attributes. This is a best-effort signal, not a substitute for the trusted,
+stable-parent requirement.
+
 ## Start And Verify
 
 Run the generated configuration through the read-only Doctor before startup:

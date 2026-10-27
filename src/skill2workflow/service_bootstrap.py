@@ -127,9 +127,9 @@ def initialize_service_workspace(
         )
         os.replace(temporary_config, config_file)
         os.chmod(config_file, 0o600)
-    except Exception:
-        if created:
-            _cleanup_workspace(workspace, workspace_fd)
+    except Exception as error:
+        if created and not _cleanup_workspace(workspace, workspace_fd):
+            _mark_cleanup_unconfirmed(error)
         raise
     finally:
         if workspace_fd is not None:
@@ -168,23 +168,37 @@ def _pin_workspace(path: Path) -> Optional[int]:
         return None
 
 
-def _cleanup_workspace(path: Path, descriptor: Optional[int]) -> None:
+def _cleanup_workspace(path: Path, descriptor: Optional[int]) -> bool:
     """Skip cleanup if the original directory cannot be identified.
 
     This check is not atomic with rmtree. The parent and workspace must remain
     trusted and stable throughout initialization and cleanup.
     """
     if descriptor is None:
-        return
+        return False
     try:
         opened = os.fstat(descriptor)
         current = path.lstat()
         if (not stat.S_ISDIR(current.st_mode)
                 or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)):
-            return
-        shutil.rmtree(path, ignore_errors=True)
-    except OSError:
-        return
+            return False
+        shutil.rmtree(path)
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def _mark_cleanup_unconfirmed(error: Exception) -> None:
+    """Keep the original exception while signaling a potentially retained root."""
+    try:
+        error.workspace_cleanup_unconfirmed = True
+    except Exception:
+        # An unusual exception may refuse attributes; never replace the failure.
+        pass
 
 
 def rotate_service_token(

@@ -45,8 +45,10 @@ cannot be verified or the path has already been replaced. This check and
 removal are not atomic and do not defend against concurrent path replacement.
 A partial or moved workspace can remain with an ingress secret: locate and
 protect it, verify ownership before manual removal, and use a new unused root
-for another attempt. See [service bootstrap](service-bootstrap.md) for the
-same boundary.
+for another attempt. When cleanup cannot be confirmed, the CLI adds the fixed
+warning `workspace cleanup could not be confirmed` without printing the path
+or secret. The warning does not identify where a moved workspace went. See
+[service bootstrap](service-bootstrap.md) for the same boundary.
 
 ## Use Your Own Skill
 

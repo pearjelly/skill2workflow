@@ -2359,9 +2359,11 @@ def _service_bootstrap_action(callback) -> int:
         return 0
     except ValueError as error:
         print(str(error), file=sys.stderr)
+        _warn_unconfirmed_workspace_cleanup(error)
         return 1
-    except OSError:
+    except OSError as error:
         print("service bootstrap operation failed", file=sys.stderr)
+        _warn_unconfirmed_workspace_cleanup(error)
         return 1
 
 
@@ -2372,10 +2374,22 @@ def _quickstart_action(callback, *, readiness: bool = False) -> int:
         return 0 if not readiness or result['ready'] else 1
     except ValueError as error:
         print(str(error), file=sys.stderr)
+        _warn_unconfirmed_workspace_cleanup(error)
         return 1
-    except OSError:
+    except OSError as error:
         print("quickstart operation failed", file=sys.stderr)
+        _warn_unconfirmed_workspace_cleanup(error)
         return 1
+
+
+def _warn_unconfirmed_workspace_cleanup(error: Exception) -> None:
+    if getattr(error, 'workspace_cleanup_unconfirmed', False) is True:
+        print(
+            'Warning: workspace cleanup could not be confirmed; a partial or moved '
+            'workspace may contain an ingress secret. Check ownership and secure '
+            'it before retrying.',
+            file=sys.stderr,
+        )
 
 
 def _trigger_workflow(args):

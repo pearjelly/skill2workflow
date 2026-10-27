@@ -88,6 +88,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Warn on standard error when failed service initialization or quickstart
+  cannot confirm workspace cleanup. The fixed warning includes no path or
+  secret and preserves the original error and exit status.
+
 - On failed service initialization or quickstart, skip best-effort workspace
   cleanup if a pinned directory identity is unavailable or the target has
   already been replaced. Cleanup still requires a trusted, stable parent; its

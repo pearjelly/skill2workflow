@@ -23,6 +23,97 @@ from skill2workflow.service_bootstrap import (
 
 
 class ServiceBootstrapTests(TestCase):
+    def test_service_init_warns_when_cleanup_cannot_be_confirmed(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'private-path-canary'
+            stdout, stderr = StringIO(), StringIO()
+            with patch('skill2workflow.service_bootstrap._pin_workspace', return_value=None), \
+                 patch('skill2workflow.service_bootstrap.os.replace', side_effect=OSError('private-error-canary')), \
+                 redirect_stdout(stdout), redirect_stderr(stderr):
+                status = main(['service-init', '--root', str(root)])
+            self.assertEqual(status, 1)
+            self.assertEqual(stdout.getvalue(), '')
+            self.assertIn('service bootstrap operation failed', stderr.getvalue())
+            self.assertIn('workspace cleanup could not be confirmed', stderr.getvalue())
+            self.assertIn('ingress secret', stderr.getvalue())
+            self.assertNotIn('private-path-canary', stderr.getvalue())
+            self.assertNotIn('private-error-canary', stderr.getvalue())
+            self.assertTrue((root / 'secrets' / 'ingress-token').is_file())
+
+    def test_initialization_preserves_exception_type_and_marks_uncertain_cleanup(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'runtime'
+            with patch('skill2workflow.service_bootstrap._pin_workspace', return_value=None), \
+                 patch('skill2workflow.service_bootstrap.os.replace', side_effect=OSError('failure')):
+                with self.assertRaises(OSError) as failure:
+                    initialize_service_workspace(root, token_factory=lambda: 't' * 48)
+            self.assertTrue(getattr(failure.exception, 'workspace_cleanup_unconfirmed', False))
+
+    def test_cleanup_failure_marks_uncertainty_without_masking_original_error(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'runtime'
+            with patch('skill2workflow.service_bootstrap.os.replace', side_effect=OSError('original')), \
+                 patch('skill2workflow.service_bootstrap._cleanup_workspace', return_value=False):
+                with self.assertRaisesRegex(OSError, 'original') as failure:
+                    initialize_service_workspace(root, token_factory=lambda: 't' * 48)
+            self.assertTrue(getattr(failure.exception, 'workspace_cleanup_unconfirmed', False))
+
+    def test_cleanup_result_distinguishes_removed_and_retained_workspace(self):
+        from skill2workflow.service_bootstrap import _cleanup_workspace, _pin_workspace
+        with TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            for fail in (None, OSError('private cleanup error'), RuntimeError('private cleanup error')):
+                root = parent / ('removed' if fail is None else type(fail).__name__)
+                root.mkdir()
+                (root / 'keep.txt').write_text('keep', encoding='utf-8')
+                descriptor = _pin_workspace(root)
+                if descriptor is None:
+                    self.skipTest('safe directory descriptors unavailable')
+                try:
+                    if fail is not None:
+                        with patch('skill2workflow.service_bootstrap.shutil.rmtree',
+                                   side_effect=fail):
+                            self.assertFalse(_cleanup_workspace(root, descriptor))
+                        self.assertTrue(root.exists())
+                    else:
+                        self.assertTrue(_cleanup_workspace(root, descriptor))
+                        self.assertFalse(root.exists())
+                finally:
+                    os.close(descriptor)
+
+    def test_cleanup_does_not_confirm_if_path_still_exists(self):
+        from skill2workflow.service_bootstrap import _cleanup_workspace, _pin_workspace
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'runtime'
+            root.mkdir()
+            descriptor = _pin_workspace(root)
+            if descriptor is None:
+                self.skipTest('safe directory descriptors unavailable')
+            try:
+                with patch('skill2workflow.service_bootstrap.shutil.rmtree', return_value=None):
+                    self.assertFalse(_cleanup_workspace(root, descriptor))
+                self.assertTrue(root.exists())
+            finally:
+                os.close(descriptor)
+
+    def test_cleaned_initialization_failure_does_not_report_uncertainty(self):
+        from skill2workflow.service_bootstrap import _pin_workspace
+        with TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            probe = parent / 'probe'
+            probe.mkdir()
+            descriptor = _pin_workspace(probe)
+            if descriptor is None:
+                self.skipTest('safe directory descriptors unavailable')
+            os.close(descriptor)
+            root = parent / 'runtime'
+            with patch('skill2workflow.service_bootstrap.os.replace', side_effect=OSError('failure')):
+                with self.assertRaises(OSError) as failure:
+                    initialize_service_workspace(root, token_factory=lambda: 't' * 48)
+            self.assertFalse(getattr(failure.exception, 'workspace_cleanup_unconfirmed', False))
+            self.assertFalse(root.exists())
+
+
     def test_workspace_identity_descriptor_is_closed_on_success_and_failure(self):
         from skill2workflow.service_bootstrap import _pin_workspace
         for fail in (False, True):

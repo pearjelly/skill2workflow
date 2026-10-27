@@ -15,6 +15,7 @@ class InstalledQuickstartDocumentationTests(TestCase):
             self.assertIn('not atomic', text)
             self.assertIn('secret', text)
             self.assertIn('manual', text)
+            self.assertIn('workspace cleanup could not be confirmed', text)
 
     def test_first_decision_has_both_paths_and_private_inspection_guidance(self):
         guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')

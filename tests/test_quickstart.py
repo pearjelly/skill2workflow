@@ -16,6 +16,61 @@ from skill2workflow.quickstart import initialize_quickstart_workspace
 
 
 class InstalledQuickstartTests(TestCase):
+    def test_quickstart_warns_when_cleanup_cannot_be_confirmed(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'private-path-canary'
+            stdout, stderr = StringIO(), StringIO()
+            with patch('skill2workflow.quickstart._pin_workspace', return_value=None), \
+                 patch('skill2workflow.quickstart.LocalControlPlane.publish_workflow',
+                       side_effect=OSError('private-error-canary')), \
+                 redirect_stdout(stdout), redirect_stderr(stderr):
+                status = main(['quickstart', '--root', str(root)])
+            self.assertEqual(status, 1)
+            self.assertEqual(stdout.getvalue(), '')
+            self.assertIn('quickstart operation failed', stderr.getvalue())
+            self.assertIn('workspace cleanup could not be confirmed', stderr.getvalue())
+            self.assertIn('ingress secret', stderr.getvalue())
+            self.assertNotIn('private-path-canary', stderr.getvalue())
+            self.assertNotIn('private-error-canary', stderr.getvalue())
+            self.assertTrue((root / 'secrets' / 'ingress-token').is_file())
+
+    def test_quickstart_reports_unconfirmed_bootstrap_cleanup(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'private-path-canary'
+            stdout, stderr = StringIO(), StringIO()
+            with patch('skill2workflow.service_bootstrap._pin_workspace', return_value=None), \
+                 patch('skill2workflow.service_bootstrap.os.replace', side_effect=OSError('private-error-canary')), \
+                 redirect_stdout(stdout), redirect_stderr(stderr):
+                status = main(['quickstart', '--root', str(root)])
+            self.assertEqual(status, 1)
+            self.assertIn('workspace cleanup could not be confirmed', stderr.getvalue())
+            self.assertNotIn('private-path-canary', stderr.getvalue())
+            self.assertNotIn('private-error-canary', stderr.getvalue())
+            self.assertTrue((root / 'secrets' / 'ingress-token').exists())
+
+    def test_quickstart_preinitialization_refusal_has_no_cleanup_warning(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'existing'
+            root.mkdir()
+            stdout, stderr = StringIO(), StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                status = main(['quickstart', '--root', str(root)])
+            self.assertEqual(status, 1)
+            self.assertNotIn('workspace cleanup could not be confirmed', stderr.getvalue())
+
+    def test_quickstart_value_error_keeps_message_and_warns_about_residual_workspace(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'workspace'
+            stdout, stderr = StringIO(), StringIO()
+            with patch('skill2workflow.quickstart._pin_workspace', return_value=None), \
+                 patch('skill2workflow.quickstart.LocalControlPlane.publish_workflow',
+                       side_effect=ValueError('publication refused')), \
+                 redirect_stdout(stdout), redirect_stderr(stderr):
+                status = main(['quickstart', '--root', str(root)])
+            self.assertEqual(status, 1)
+            self.assertTrue(stderr.getvalue().startswith('publication refused\n'))
+            self.assertIn('workspace cleanup could not be confirmed', stderr.getvalue())
+
     def test_quickstart_closes_workspace_identity_on_success_and_failure(self):
         from skill2workflow.quickstart import _pin_workspace
         for fail in (False, True):
