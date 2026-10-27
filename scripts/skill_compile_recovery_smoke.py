@@ -21,6 +21,8 @@ CORRECTED = '---\nname: reviewed\ndescription: Synthetic example.\n---\n## Steps
 UNCLOSED = ('---\nname: reviewed\n---\n## Checklist\n1. Ask for approval\n2. Verify draft\n'
             '    ~~~markdown\n    private-value-canary\n~~~\n3. Deliver output\n')
 CLOSED = UNCLOSED.replace('\n~~~\n', '\n    ~~~\n')
+INFERRED_ACTION = ('## Steps\n1. Review <!-- skill2workflow: human_gate -->\n'
+                   '2. Run private-command-canary\n')
 
 
 def qualify(executable=None, browser_module_tests=False):
@@ -95,6 +97,16 @@ def qualify(executable=None, browser_module_tests=False):
                 if [node['title'] for node in steps] != ['Ask for approval', 'Verify draft', 'Deliver output'] or [node['metadata']['source']['line'] for node in steps] != [5, 6, 10]:
                     raise RuntimeError('Fence compile correction lost steps')
             verified += 1
+        status, headers, raw = request(command, environment, directory, 'POST', '/api/v1/skill-compiles',
+                                       json.dumps({'skill_markdown': INFERRED_ACTION, 'diagnostics': True}).encode())
+        action_reply = json.loads(raw)
+        if status != 200 or headers.get('Cache-Control') != 'no-store' or set(action_reply) != {'workflow', 'review'}:
+            raise RuntimeError('Inferred action compile qualification failed')
+        nodes = action_reply['workflow']['nodes']
+        if (sum(node.get('type') == 'tool_call' and node.get('connector') == {'id': 'http', 'kind': 'http'}
+                for node in nodes) != 1 or 'private-command-canary' in json.dumps(action_reply['review'])):
+            raise RuntimeError('Inferred action compile contract failed')
+        verified += 1
         if list(directory.iterdir()):
             raise RuntimeError('Skill compile requests created unexpected state')
         modules = {}
@@ -122,8 +134,11 @@ def qualify(executable=None, browser_module_tests=False):
                 (directory / name).write_bytes(raw)
             reports = directory / 'diagnostics.json'
             reports.write_text(json.dumps(fixtures), encoding='utf-8')
+            action_report = directory / 'inferred-action.json'
+            action_report.write_text(json.dumps({'source': INFERRED_ACTION, 'reply': action_reply}), encoding='utf-8')
             node_environment = dict(environment, S2W_EDITOR_MODULE=str(directory / 'app.js'),
-                                    S2W_EDITOR_VENDOR=str(directory / 'litegraph.js'), S2W_COMPILE_DIAGNOSTICS=str(reports))
+                                    S2W_EDITOR_VENDOR=str(directory / 'litegraph.js'), S2W_COMPILE_DIAGNOSTICS=str(reports),
+                                    S2W_COMPILE_ACTION=str(action_report))
             subprocess.run(['node', '--test', str(root / 'tests/test_skill_compile_recovery.cjs'),
                             str(root / 'tests/test_draft_load_ownership.cjs')], cwd=str(directory), env=node_environment,
                            capture_output=True, check=True, timeout=20)

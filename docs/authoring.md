@@ -57,6 +57,12 @@ proof of business safety or an execution policy. Review and edit the Workflow
 DSL before publication; the summary neither changes the draft nor authorizes a
 side effect.
 
+The review also flags a compiled HTTP tool node with no request. If reached
+unchanged, that node fails; inferred shell commands are not executed. Configure
+the HTTP request in the draft when an HTTP call is intended, or revise the Skill
+and compile it again. The review describes the original compilation, not later
+edits, and does not validate endpoint availability or credentials.
+
 Selecting an explicit HTTP assertion node opens a read-only criteria panel
 above the ordinary fields. It shows the endpoint, typed expected values,
 source-DSL success/failure destinations, and expandable connector configuration.

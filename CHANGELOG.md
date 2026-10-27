@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Flag compiled HTTP tool nodes without requests in the editor's source-free
+  compile review, with a clear distinction between the original compilation
+  and later draft edits.
+
 - Refuse unconfigured inferred HTTP actions in Quickstart previews and new
   workspaces before token generation or execution; preserve general DSL
   validation and existing published workflows.

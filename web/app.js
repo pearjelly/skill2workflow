@@ -906,11 +906,21 @@
     summary.textContent = "Compiler inferred " + review.executable_node_count + " process node(s), "
       + review.human_gate_count + " human gate(s), "
       + review.verification_node_count + " verification node(s), and "
-      + review.hard_gate_count + " hard-gate declaration(s).";
+      + review.hard_gate_count + " hard-gate declaration(s). This review reflects compilation, not later edits.";
     els.skillReviewList.appendChild(summary);
     const executionBoundary = document.createElement("li");
     executionBoundary.textContent = "Ordinary steps and text-only verification nodes record progress; they do not perform the described work or check results. Use an explicit connector for executable checks.";
     els.skillReviewList.appendChild(executionBoundary);
+    const compiledNodes = currentWorkflowDsl && Array.isArray(currentWorkflowDsl.nodes) ? currentWorkflowDsl.nodes : [];
+    const missingHttpRequest = compiledNodes.some(function (node) {
+      return plainObject(node) && node.type === "tool_call" && plainObject(node.connector)
+        && node.connector.id === "http" && !plainObject(node.connector.request);
+    });
+    if (missingHttpRequest) {
+      const actionBoundary = document.createElement("li");
+      actionBoundary.textContent = "At compilation, an HTTP tool node had no request. It will fail if reached without configuration. Configure its request in the draft or update and recompile the Skill; shell commands are not executed.";
+      els.skillReviewList.appendChild(actionBoundary);
+    }
     if (review.hard_gate_count > 0) {
       const gateBoundary = document.createElement("li");
       gateBoundary.textContent = "A hard-gate declaration does not pause the run. Add a human gate where approval is needed.";

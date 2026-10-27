@@ -105,10 +105,10 @@ class SkillCompileDiagnosticTests(TestCase):
 
     def test_installed_gate_requires_complete_diagnostic_legacy_cli_and_module_evidence(self):
         from scripts import package_smoke
-        complete = {'ok': True, 'installed': True, 'cases_verified': 14,
+        complete = {'ok': True, 'installed': True, 'cases_verified': 15,
                     'diagnostic_cases_verified': 6, 'legacy_cases_verified': 2,
                     'cli_cases_verified': 3, 'module_served': True}
-        for result in (complete, {}, dict(complete, cases_verified=13), dict(complete, diagnostic_cases_verified=5),
+        for result in (complete, {}, dict(complete, cases_verified=14), dict(complete, diagnostic_cases_verified=5),
                        dict(complete, legacy_cases_verified=0), dict(complete, cli_cases_verified=0), dict(complete, module_served=False),
                        dict(complete, module_served=1), dict(complete, installed=1), dict(complete, ok=1)):
             with patch('scripts.package_smoke._run', return_value=json.dumps(result)):

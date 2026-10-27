@@ -39,6 +39,44 @@ function setup(fetcher) {
 }
 function compiled() {return {workflow:JSON.parse(JSON.stringify(fixture)),review:{schema_version:'skill2workflow-skill-compile-review-0.1.0',ordered_step_count:4,executable_node_count:4,human_gate_count:1,verification_node_count:0,hard_gate_count:1,notices:[]}};}
 
+test('compile review flags a missing HTTP request without exposing the source or changing the draft',async()=>{
+  const result=compiled();const node=result.workflow.nodes.find(item=>item.type==='step');
+  node.type='tool_call';node.connector={id:'http',kind:'http'};node.title='private-command-canary';
+  const original=JSON.stringify(result.workflow);const ui=setup(async()=>response(result,200));
+  await ui.stage();await ui.api.compileStagedSkill();
+  const text=ui.elements.get('skill-review-list').children.map(item=>item.textContent).join(' ');
+  assert.match(text,/at compilation.*http.*no request/i);assert.match(text,/fail.*if reached/i);
+  assert.match(text,/review.*compilation.*not.*later edits/i);
+  assert.match(text,/configure.*request|request.*configure/i);assert.match(text,/shell commands.*not executed/i);
+  assert.doesNotMatch(text,/private-command-canary/);assert.equal(JSON.stringify(ui.api.source),original);
+  ui.api.loadDocument(fixture,'Another draft');assert.equal(ui.elements.get('skill-review-panel').hidden,true);
+});
+
+test('compile review does not flag a configured HTTP action as missing its request',async()=>{
+  const result=compiled();const node=result.workflow.nodes.find(item=>item.type==='step');
+  node.type='tool_call';node.connector={id:'http',kind:'http',request:{url:'https://example.invalid'}};
+  const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
+  const text=ui.elements.get('skill-review-list').children.map(item=>item.textContent).join(' ');
+  assert.doesNotMatch(text,/http.*no request/i);
+});
+
+test('a real compiled inferred action produces the missing-request warning',async()=>{
+  let compiledFixture;
+  if(process.env.S2W_EDITOR_MODULE){
+    assert.ok(process.env.S2W_COMPILE_ACTION,'Served-module qualification requires a real compile response');
+    compiledFixture=JSON.parse(fs.readFileSync(process.env.S2W_COMPILE_ACTION,'utf8'));
+  }else{
+    const input='## Steps\n1. Review <!-- skill2workflow: human_gate -->\n2. Run private-command-canary\n';
+    const code='import json,sys\nfrom skill2workflow.parser import parse_skill_text\nfrom skill2workflow.compiler import compile_ir_to_workflow,summarize_skill_compile\ns=sys.stdin.read()\nir=parse_skill_text(s)\nw=compile_ir_to_workflow(ir)\nprint(json.dumps({"source":s,"reply":{"workflow":w,"review":summarize_skill_compile(ir,w)}}))';
+    const child=spawnSync(process.env.SKILL2WORKFLOW_TEST_PYTHON||'python3',['-c',code],{cwd:root,env:{...process.env,PYTHONPATH:path.join(root,'src')},input,encoding:'utf8',timeout:5000});
+    if(child.error)throw child.error;assert.equal(child.status,0,child.stderr);compiledFixture=JSON.parse(child.stdout);
+  }
+  const ui=setup(async()=>response(compiledFixture.reply,200));await ui.stage(compiledFixture.source);await ui.api.compileStagedSkill();
+  const text=ui.elements.get('skill-review-list').children.map(item=>item.textContent).join(' ');
+  assert.match(text,/at compilation.*http.*no request/i);assert.doesNotMatch(text,/private-command-canary/);
+  assert.deepEqual(JSON.parse(JSON.stringify(ui.api.source)),compiledFixture.reply.workflow);
+});
+
 test('compile review distinguishes recorded progress from executed work and enforced gates',async()=>{
   const result=compiled();result.review.notices=['verification_not_inferred'];
   const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
