@@ -445,7 +445,7 @@ class UiTests(TestCase):
         self.assertEqual(json.loads(raw.decode("utf-8")), {"error": "skill compile rejected"})
         self.assertNotIn(marker.encode("utf-8"), raw)
 
-    def _post_local_skill_compile(self, markdown, diagnostics=None):
+    def _post_local_skill_compile(self, markdown, diagnostics=None, diagnostic_version=None):
         observed = {}
         ready_event = threading.Event()
 
@@ -465,6 +465,8 @@ class UiTests(TestCase):
             payload = {"skill_markdown": markdown}
             if diagnostics is not None:
                 payload['diagnostics'] = diagnostics
+            if diagnostic_version is not None:
+                payload['diagnostic_version'] = diagnostic_version
             request = urllib.request.Request(
                 f"http://127.0.0.1:{observed['port']}/api/v1/skill-compiles",
                 data=json.dumps(payload).encode("utf-8"),

@@ -11,7 +11,7 @@ from .http_assertions import load_assertion_json, skill_http_assertion_binding
 from .skill_http import skill_http_action_binding
 from .input_schema import INPUT_SCHEMA_MAX_BYTES
 from .skill_input import SKILL_INPUT_SCHEMA_ERROR, skill_input_schema_contract
-from .frontmatter import parse_frontmatter
+from .frontmatter import SkillFenceError, parse_frontmatter
 from .skill_version import SKILL_WORKFLOW_VERSION_ERROR, skill_workflow_version
 
 
@@ -46,7 +46,7 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     if len(encoded) > MAX_SKILL_FILE_BYTES:
         raise ValueError(f"SKILL.md exceeds {MAX_SKILL_FILE_BYTES} bytes")
     metadata, body, body_start_line = _parse_frontmatter(text)
-    body, input_schema = _extract_input_schema_declaration(body)
+    body, input_schema = _extract_input_schema_declaration(body, body_start_line)
     body, workflow_version = _extract_workflow_version_declaration(body)
     checklist_details = _extract_ordered_step_details(body, body_start_line)
     checklist = [_format_step_detail(step) for step in checklist_details]
@@ -135,6 +135,7 @@ def _fence_aware_lines(body: str, start_line: int):
     """Conservatively classify top-level and simple nested fenced examples."""
     fence_char, fence_length = '', 0
     fence_quotes, fence_indent = (), 0
+    fence_start = None
     for line_number, line in enumerate(body.splitlines(), start=start_line):
         if fence_char:
             content, quotes, indent, _ = _fence_content(line, allow_list_marker=False)
@@ -152,9 +153,12 @@ def _fence_aware_lines(body: str, start_line: int):
             fence_char, fence_length = opening.group(1)[0], len(opening.group(1))
             fence_quotes = quotes
             fence_indent = indent if has_list or indent >= 4 else 0
+            fence_start = line_number
             yield line_number, line, True
         else:
             yield line_number, line, False
+    if fence_char:
+        raise SkillFenceError(fence_start)
 
 
 def _extract_workflow_version_declaration(body: str):
@@ -174,11 +178,11 @@ def _extract_workflow_version_declaration(body: str):
     return ('\n'.join(lines), version) if version is not None else (body, None)
 
 
-def _extract_input_schema_declaration(body: str):
+def _extract_input_schema_declaration(body: str, start_line: int):
     """Remove one active data declaration without shifting any source lines."""
     lines = body.splitlines()
     schema = None
-    for index, line, fenced in _fence_aware_lines(body, 0):
+    for line_number, line, fenced in _fence_aware_lines(body, start_line):
         if fenced:
             continue
         if not re.search(r'<!--\s*skill2workflow\s*:\s*input_schema\b', line, re.IGNORECASE):
@@ -193,7 +197,7 @@ def _extract_input_schema_declaration(body: str):
             schema = skill_input_schema_contract(load_assertion_json(payload))
         except (ValueError, TypeError, OverflowError, RecursionError) as error:
             raise ValueError(SKILL_INPUT_SCHEMA_ERROR) from error
-        lines[index] = ''
+        lines[line_number - start_line] = ''
     return ('\n'.join(lines), schema) if schema is not None else (body, None)
 
 

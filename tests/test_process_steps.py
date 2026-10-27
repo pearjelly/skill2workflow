@@ -55,11 +55,10 @@ class ProcessStepTests(TestCase):
                          ['start', 'step', 'human_gate', 'step', 'failure', 'end'])
         self.assertNotIn('private example', str(workflow))
 
-    def test_unclosed_nested_fence_excludes_the_remainder(self):
-        ir = parse_skill_text('## Checklist\n1. Prepare output\n    ~~~markdown\n'
-                              '    2. Run private example\n2. Deliver output\n')
-        self.assertEqual(ir['ordered_steps'], ['Prepare output'])
-        self.assertEqual(ir['tool_hints'], [])
+    def test_unclosed_nested_fence_refuses_instead_of_excluding_the_remainder(self):
+        with self.assertRaisesRegex(ValueError, 'unclosed.*line 3'):
+            parse_skill_text('## Checklist\n1. Prepare output\n    ~~~markdown\n'
+                             '    2. Run private example\n2. Deliver output\n')
 
     def test_nested_closers_cannot_end_a_top_level_fence(self):
         text = ('## Checklist\n1. Prepare output\n~~~markdown\n'
@@ -145,11 +144,9 @@ class ProcessStepTests(TestCase):
         self.assertNotIn('private example', str(workflow))
 
     def test_unclosed_checklist_fence_cannot_add_steps_or_hints(self):
-        ir = parse_skill_text('## Checklist\n1. Prepare output\n~~~markdown\n'
-                              '2. Ask user for approval\nRun: private example\n')
-        self.assertEqual(ir['ordered_steps'], ['Prepare output'])
-        self.assertEqual(ir['human_gates'], [])
-        self.assertEqual(ir['tool_hints'], [])
+        with self.assertRaisesRegex(ValueError, 'unclosed.*line 3'):
+            parse_skill_text('## Checklist\n1. Prepare output\n~~~markdown\n'
+                             '2. Ask user for approval\nRun: private example\n')
 
     def test_invalid_backtick_info_does_not_hide_checklist_steps(self):
         ir = parse_skill_text('## Checklist\n1. Prepare output\n```example```\n'
@@ -263,8 +260,9 @@ class ProcessStepTests(TestCase):
                 )
                 self.assertEqual(parse_skill_text(text)["ordered_steps"], ["Prepare output"])
 
-    def test_unclosed_fence_remains_non_executable_through_end_of_input(self):
-        self.assertEqual(parse_skill_text("~~~markdown\n## Workflow\n1. Fenced example\n")["ordered_steps"], [])
+    def test_unclosed_fence_refuses_before_any_draft_is_created(self):
+        with self.assertRaisesRegex(ValueError, 'unclosed.*line 1'):
+            parse_skill_text("~~~markdown\n## Workflow\n1. Fenced example\n")
 
     def test_multiple_populated_process_sections_are_rejected_without_source_text(self):
         for second in ("Workflow", "Steps"):

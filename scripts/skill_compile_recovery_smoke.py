@@ -15,8 +15,12 @@ except ImportError:
 
 
 VERSION = 'skill2workflow-skill-compile-diagnostic-0.1.0'
+EXTENDED_VERSION = 'skill2workflow-skill-compile-diagnostic-0.2.0'
 DUPLICATE = '---\nname: reviewed\ndescription: Synthetic example.\nname: private-value-canary\n---\n## Steps\n1. Review\n'
 CORRECTED = '---\nname: reviewed\ndescription: Synthetic example.\n---\n## Steps\n1. Review\n'
+UNCLOSED = ('---\nname: reviewed\n---\n## Checklist\n1. Ask for approval\n2. Verify draft\n'
+            '    ~~~markdown\n    private-value-canary\n~~~\n3. Deliver output\n')
+CLOSED = UNCLOSED.replace('\n~~~\n', '\n    ~~~\n')
 
 
 def qualify(executable=None, browser_module_tests=False):
@@ -66,6 +70,31 @@ def qualify(executable=None, browser_module_tests=False):
             elif status != 200 or set(reply) != {'workflow', 'review'} or reply['workflow']['workflow']['id'] != 'workflow_reviewed':
                 raise RuntimeError('Skill compile correction failed')
             verified += 1
+        for source, version in ((UNCLOSED, None), (UNCLOSED, '0.2.0'), (CLOSED, '0.2.0')):
+            payload = {'skill_markdown': source, 'diagnostics': True}
+            if version:
+                payload['diagnostic_version'] = version
+            status, headers, raw = request(command, environment, directory, 'POST', '/api/v1/skill-compiles', json.dumps(payload).encode())
+            reply = json.loads(raw)
+            if headers.get('Cache-Control') != 'no-store':
+                raise RuntimeError('Fence compile cache boundary failed')
+            if source == UNCLOSED:
+                expected = {'error': 'skill compile rejected', 'diagnostic': {
+                    'schema_version': EXTENDED_VERSION if version else VERSION,
+                    'code': 'unclosed_fence' if version else 'skill_invalid', 'line': 7 if version else None}}
+                if status != 400 or reply != expected or len(raw) > 1024 or any(value in raw for value in
+                        (b'private-value-canary', str(directory).encode(), b'Traceback')):
+                    raise RuntimeError('Fence compile refusal boundary failed')
+                diagnostics += 1
+                if version:
+                    fixtures.append({'source': source, 'reply': reply})
+            else:
+                if status != 200 or set(reply) != {'workflow', 'review'} or b'private-value-canary' in raw:
+                    raise RuntimeError('Fence compile correction failed')
+                steps = [node for node in reply['workflow']['nodes'] if node.get('metadata', {}).get('source', {}).get('kind') == 'ordered_step']
+                if [node['title'] for node in steps] != ['Ask for approval', 'Verify draft', 'Deliver output'] or [node['metadata']['source']['line'] for node in steps] != [5, 6, 10]:
+                    raise RuntimeError('Fence compile correction lost steps')
+            verified += 1
         if list(directory.iterdir()):
             raise RuntimeError('Skill compile requests created unexpected state')
         modules = {}
@@ -74,14 +103,15 @@ def qualify(executable=None, browser_module_tests=False):
             if status != 200 or not raw:
                 raise RuntimeError('Skill compile editor module unavailable')
             modules[name] = raw
-        for name, source, expected_status in [('invalid-SKILL.md', DUPLICATE, 1), ('corrected-SKILL.md', CORRECTED, 0)]:
+        for name, source, expected_status in [('invalid-SKILL.md', DUPLICATE, 1), ('corrected-SKILL.md', CORRECTED, 0), ('unclosed-SKILL.md', UNCLOSED, 1)]:
             path = directory / name
             path.write_text(source, encoding='utf-8')
             result = subprocess.run(command + ['compile', str(path)], cwd=str(directory), env=environment, capture_output=True, text=True, timeout=10)
             if result.returncode != expected_status:
                 raise RuntimeError('Skill compile CLI recovery failed')
             if expected_status:
-                if result.stdout or 'line 4' not in result.stderr or 'one declaration' not in result.stderr or 'private-value-canary' in result.stderr or str(directory) in result.stderr:
+                expected_message = ('line 7', 'unclosed') if source == UNCLOSED else ('line 4', 'one declaration')
+                if result.stdout or any(item not in result.stderr for item in expected_message) or 'private-value-canary' in result.stderr or str(directory) in result.stderr:
                     raise RuntimeError('Skill compile CLI refusal boundary failed')
             elif json.loads(result.stdout)['workflow']['id'] != 'workflow_reviewed':
                 raise RuntimeError('Skill compile CLI correction failed')

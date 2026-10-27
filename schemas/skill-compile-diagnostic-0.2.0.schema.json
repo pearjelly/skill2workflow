@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://skill2workflow.dev/schemas/skill-compile-diagnostic-0.2.0.json",
+  "title": "Extended source-free Skill compile failure diagnostic",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "code", "line"],
+  "properties": {
+    "schema_version": {"const": "skill2workflow-skill-compile-diagnostic-0.2.0"},
+    "code": {"enum": ["frontmatter_duplicate_key", "frontmatter_invalid", "frontmatter_unsupported", "skill_invalid", "unclosed_fence"]},
+    "line": {"type": ["integer", "null"], "minimum": 1, "maximum": 2097153}
+  }
+}

@@ -163,6 +163,9 @@ These surfaces should remain compatible during the `0.1.x` line:
   reference to `SKILL.md`.
 - Compile refusal diagnostics are explicit opt-in, finite reason/line evidence;
   the default API refusal and library frontmatter error text remain compatible.
+  The existing 0.1.0 diagnostic stays unchanged; explicit 0.2.0 requests can
+  identify an unclosed fence. Such Skills now fail before draft creation rather
+  than silently omitting later steps; existing published workflows are unchanged.
   CLI/editor repair wording does not echo source values or exception messages,
   replace the active graph after failure, or grant execution authority. Pending
   results are invalidated by selection/draft changes. See

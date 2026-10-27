@@ -395,7 +395,7 @@
     return JSON.stringify({ workflow: currentWorkflowDsl, graph: graph ? graph.serialize() : null });
   }
 
-  async function skillCompileFailure(response, markdown) {
+  async function skillCompileFailure(response, markdown, evidence, extended) {
     const fallback = "SKILL.md was rejected. Review its frontmatter, process sections and step declarations; choose the corrected file and compile again.";
     if (response.status === 404 || response.status === 405 || response.status === 501) {
       return "Use skill2workflow ui instead of a static HTTP server to compile SKILL.md.";
@@ -427,12 +427,18 @@
       if (!plainObject(payload) || payload.error !== "skill compile rejected" || Object.keys(payload).length !== 2
         || !plainObject(payload.diagnostic)) return fallback;
       const diagnostic = payload.diagnostic;
-      if (Object.keys(diagnostic).length !== 3 || diagnostic.schema_version !== "skill2workflow-skill-compile-diagnostic-0.1.0"
+      const expectedVersion = extended ? "skill2workflow-skill-compile-diagnostic-0.2.0" : "skill2workflow-skill-compile-diagnostic-0.1.0";
+      if (Object.keys(diagnostic).length !== 3 || diagnostic.schema_version !== expectedVersion
         || !Object.prototype.hasOwnProperty.call(diagnostic, "line") || typeof diagnostic.code !== "string"
         || diagnostic.line !== null && (!Number.isSafeInteger(diagnostic.line) || diagnostic.line < 1
           || diagnostic.line > markdown.split(/\r\n|[\n\r\v\f\x1c-\x1e\x85\u2028\u2029]/).length)) return fallback;
       const location = diagnostic.line === null ? "" : " near line " + diagnostic.line;
       const recovery = " Choose the corrected SKILL.md and compile again.";
+      if (!extended && diagnostic.code === "skill_invalid" && diagnostic.line === null) evidence.generic = true;
+      if (extended && diagnostic.code === "unclosed_fence" && diagnostic.line !== null) {
+        evidence.unclosed = true;
+        return "A code fence is unclosed" + location + ". Close it with a matching fence and container." + recovery;
+      }
       if (diagnostic.code === "frontmatter_duplicate_key") return "A frontmatter field is repeated" + location + ". Keep one declaration per field." + recovery;
       if (diagnostic.code === "frontmatter_invalid") return "Invalid frontmatter" + location + ". Check quoting, indentation and text-block headers." + recovery;
       if (diagnostic.code === "frontmatter_unsupported") return "Unsupported frontmatter form" + location + ". Use supported strings, | or > text blocks, or a flat metadata map." + recovery;
@@ -465,7 +471,25 @@
       });
       if (revision !== skillCompileRevision || selection !== skillSelectionRevision) return;
       if (!response.ok) {
-        failure = await skillCompileFailure(response, markdown);
+        const evidence = {};
+        failure = await skillCompileFailure(response, markdown, evidence, false);
+        if (revision !== skillCompileRevision || selection !== skillSelectionRevision) return;
+        if (evidence.generic) {
+          try {
+            const extended = await fetch(SKILL_COMPILE_URL, {
+              method: "POST", cache: "no-store", credentials: "omit",
+              signal: skillCompileController.signal,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ skill_markdown: markdown, diagnostics: true, diagnostic_version: "0.2.0" }),
+            });
+            if (revision !== skillCompileRevision || selection !== skillSelectionRevision) return;
+            if (!extended.ok) {
+              const extra = {};
+              const message = await skillCompileFailure(extended, markdown, extra, true);
+              if (extra.unclosed) failure = message;
+            }
+          } catch (_error) { /* Older or unavailable helpers retain the generic refusal. */ }
+        }
         throw new Error("compile rejected");
       }
       failure = "The helper returned an invalid compiled draft. Retry with skill2workflow ui or use the CLI compile command.";

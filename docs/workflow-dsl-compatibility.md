@@ -108,8 +108,10 @@ Parser support for explicit numbered `Workflow` and `Steps` sections changes
 only newly compiled drafts that lack a Checklist section. Checklist precedence
 and list formats are unchanged, but examples in supported fences no longer become steps or
 guidance in newly compiled drafts, including recognized indented and simple
-list/blockquote fences. Conservative matching can exclude later steps when a
-fence does not have a matching close. Published Workflow DSL
+list/blockquote fences. Conservative matching now refuses Skills with an
+unclosed or mismatched fence instead of silently excluding later steps. Some
+Markdown documents that previously compiled, including valid unclosed fences,
+must be corrected before a new draft can be compiled. Published Workflow DSL
 artifacts are not recompiled or reinterpreted. The DSL schema and execution
 semantics are unchanged. Authors should review newly recognized nodes before
 publication, especially inferred tool calls and human gates. Multiple populated

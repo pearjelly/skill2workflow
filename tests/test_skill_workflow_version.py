@@ -106,11 +106,13 @@ class SkillWorkflowVersionTests(TestCase):
 
     def test_fenced_declarations_are_examples_not_deployment_intent(self):
         marker = '<!-- skill2workflow: workflow_version 9.9.9 -->'
-        for opening, closing in [('```markdown', '```'), ('~~~~', '~~~~'), ('```', '')]:
+        for opening, closing in [('```markdown', '```'), ('~~~~', '~~~~')]:
             text = '---\nname: review\n---\n## Steps\n1. Review\n\n' + opening + '\n' + marker + '\n' + closing
             ir = parse_skill_text(text)
             self.assertNotIn('workflow_version', ir)
             self.assertEqual(compile_ir_to_workflow(ir)['workflow']['version'], '0.1.0')
+        with self.assertRaisesRegex(ValueError, 'unclosed.*line 7'):
+            parse_skill_text('---\nname: review\n---\n## Steps\n1. Review\n\n```\n' + marker + '\n')
 
     def test_compiler_revalidates_untrusted_explicit_ir_without_coercion(self):
         baseline = parse_skill_text('## Steps\n1. Review\n')

@@ -53,6 +53,42 @@ test('compile refusal gives a safe location and recovery without replacing the a
   assert.equal(ui.elements.get('validation-list').children[0].textContent,'Graph structure is valid.');
 });
 
+test('unclosed fence gets a versioned, source-free location and preserves the draft',async()=>{
+  const seen=[];const source='## Checklist\n1. Review\n~~~markdown\nprivate-source-canary\n';
+  const ui=setup(async(_url,options)=>{seen.push(JSON.parse(options.body));
+    if(seen.length===1)return response(rejected('skill_invalid',null));
+    return response({error:'skill compile rejected',diagnostic:{schema_version:'skill2workflow-skill-compile-diagnostic-0.2.0',code:'unclosed_fence',line:3}});});
+  const before=JSON.stringify(ui.api.source);await ui.stage(source);await ui.api.compileStagedSkill();
+  assert.equal(seen.length,2);assert.equal(seen[1].diagnostic_version,'0.2.0');
+  assert.match(ui.issues(),/fence.*line 3/i);assert.match(ui.issues(),/close.*compile again/i);
+  assert.doesNotMatch(ui.issues(),/private-source-canary|unclosed_fence/);assert.equal(JSON.stringify(ui.api.source),before);
+});
+
+test('an older helper can reject extended diagnostics without losing the generic error',async()=>{
+  let count=0;const ui=setup(async()=>++count===1?response(rejected('skill_invalid',null)):response({error:'skill compile body is malformed'}));
+  await ui.stage();await ui.api.compileStagedSkill();assert.equal(count,2);assert.match(ui.issues(),/rejected.*Review/i);
+});
+
+test('invalid extended evidence never fabricates a fence diagnosis or exposes private data',async()=>{
+  const bad=[{schema_version:'skill2workflow-skill-compile-diagnostic-0.2.0',code:'unclosed_fence',line:9999},
+    {schema_version:'skill2workflow-skill-compile-diagnostic-0.2.0',code:'unclosed_fence',line:null},
+    {schema_version:'skill2workflow-skill-compile-diagnostic-0.2.0',code:'private-code-canary',line:3},
+    {schema_version:'private-version-canary',code:'unclosed_fence',line:3}];
+  for(const diagnostic of bad){let count=0;const ui=setup(async()=>++count===1?response(rejected('skill_invalid',null)):response({error:'skill compile rejected',diagnostic}));
+    await ui.stage('## Checklist\n1. Review\n~~~markdown\nprivate-source-canary\n');await ui.api.compileStagedSkill();
+    assert.match(ui.issues(),/rejected.*Review/i);assert.doesNotMatch(ui.issues(),/fence|private-|9999/i);}
+});
+
+test('late extended diagnostics cannot repaint a newer Skill selection',async()=>{
+  let count=0,resolve;const ui=setup(async()=>++count===1?response(rejected('skill_invalid',null)):new Promise(done=>{resolve=done;}));
+  await ui.stage('## Checklist\n1. Review\n~~~markdown\nprivate-source-canary\n');
+  const pending=ui.api.compileStagedSkill();for(let i=0;i<100 && !resolve;i++)await new Promise(done=>setTimeout(done,0));
+  assert.ok(resolve,'extended diagnostic request was not made');
+  await ui.stage('## Steps\n1. Current draft\n');
+  resolve(response({error:'skill compile rejected',diagnostic:{schema_version:'skill2workflow-skill-compile-diagnostic-0.2.0',code:'unclosed_fence',line:3}}));
+  await pending;assert.doesNotMatch(ui.issues(),/fence|line 3|private-source-canary/i);
+});
+
 test('oversized and invalid UTF-8 diagnostics are bounded and never displayed',async()=>{
   for(const declared of [true,false]){
     let canceled=false;const r=response({private:'private-value-canary'.repeat(200)});
@@ -138,15 +174,16 @@ test('actual backend diagnostics render through the real editor module',async()=
     fixtures=JSON.parse(fs.readFileSync(process.env.S2W_COMPILE_DIAGNOSTICS,'utf8'));
   }else{
     const inputs=[markdown,'---\nname: reviewed\ndescription: "private-value-canary\n---',
-      '---\nname: reviewed\ndescription: *private-value-canary\n---','## Workflow\n1. Review\n## Steps\n1. Deliver\n'];
-    const code='import json,sys\nfrom skill2workflow.parser import parse_skill_text\nfrom skill2workflow.frontmatter import skill_compile_diagnostic\nrows=[]\nfor text in json.load(sys.stdin):\n try: parse_skill_text(text)\n except ValueError as error: rows.append({"source":text,"reply":{"error":"skill compile rejected","diagnostic":skill_compile_diagnostic(error)}})\nprint(json.dumps(rows))';
+      '---\nname: reviewed\ndescription: *private-value-canary\n---','## Workflow\n1. Review\n## Steps\n1. Deliver\n',
+      '---\nname: reviewed\n---\n## Checklist\n1. Ask for approval\n2. Verify draft\n    ~~~markdown\n    private-value-canary\n~~~\n3. Deliver output\n'];
+    const code='import json,sys\nfrom skill2workflow.parser import parse_skill_text\nfrom skill2workflow.frontmatter import skill_compile_diagnostic\nrows=[]\nfor index,text in enumerate(json.load(sys.stdin)):\n try: parse_skill_text(text)\n except ValueError as error: rows.append({"source":text,"reply":{"error":"skill compile rejected","diagnostic":skill_compile_diagnostic(error,extended=(index==4))}})\nprint(json.dumps(rows))';
     const child=spawnSync(process.env.SKILL2WORKFLOW_TEST_PYTHON||'python3',['-c',code],{cwd:root,env:{...process.env,PYTHONPATH:path.join(root,'src')},input:JSON.stringify(inputs),encoding:'utf8',timeout:5000});
     if(child.error)throw child.error;assert.equal(child.status,0,child.stderr);fixtures=JSON.parse(child.stdout);
   }
-  assert.equal(fixtures.length,4);
-  const expected=[/one declaration/i,/quoting.*indentation/i,/supported.*strings|flat metadata/i,/was rejected.*Review/];
+  assert.equal(fixtures.length,5);
+  const expected=[/one declaration/i,/quoting.*indentation/i,/supported.*strings|flat metadata/i,/was rejected.*Review/,/fence.*line 7/i];
   for(const [index,fixture] of fixtures.entries()){
-    const ui=setup(async()=>response(fixture.reply));await ui.stage(fixture.source);await ui.api.compileStagedSkill();
+    let calls=0;const ui=setup(async()=>response(index===4 && ++calls===1 ? rejected('skill_invalid',null) : fixture.reply));await ui.stage(fixture.source);await ui.api.compileStagedSkill();
     assert.match(ui.issues(),expected[index]);assert.doesNotMatch(ui.issues(),/private-|frontmatter_duplicate_key|skill_invalid/);
   }
 });

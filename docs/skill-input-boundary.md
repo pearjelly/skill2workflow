@@ -121,6 +121,14 @@ malformed character. It includes no source text, keys, values, paths, or raw
 exception messages. This is repair evidence, not full YAML validation or a new
 Workflow DSL/execution contract.
 
+To opt into the [extended diagnostic schema](../schemas/skill-compile-diagnostic-0.2.0.schema.json),
+send both `diagnostics: true` and `diagnostic_version: "0.2.0"`. It retains the
+existing reasons and adds `unclosed_fence`, with the opening line. Without this
+explicit version, an unclosed fence remains generic `skill_invalid` with a null
+line. The editor first requests the existing format and, only for its generic
+refusal, requests the extended format. An older helper that does not support it
+keeps the original generic guidance. Neither response includes source content.
+
 The editor consumes at most 1 KiB of strict UTF-8 error evidence, accepts only
 the known version/shape and source-bounded line, and maps it to fixed copy.
 Unknown, malformed, oversized and older-helper responses use safe fixed
@@ -209,7 +217,8 @@ source-section metadata. The fallback rules are deliberately explicit:
   extraction. Indented fences and simple list or blockquote containers are
   also recognized. A closing fence must use the same character and at least
   the opening length, with matching blockquote positions and a compatible
-  indentation. An unclosed fence excludes the remaining text. A backtick
+  indentation. An unclosed fence refuses parsing and compilation before a draft
+  is written. A backtick
   fence's info string cannot contain a backtick.
 - Empty candidate sections are ignored. More than one populated `Workflow`
   or `Steps` section is rejected with a fixed error; consolidate the intended
@@ -229,9 +238,11 @@ but its headings do not create sections. Newly compiled Skills that previously
 treated fenced examples as real steps or hints may generate a different draft;
 compare and review it before publishing. Existing published artifacts are not
 recompiled or changed. This is a conservative fence subset, not a complete
-Markdown parser: container and indentation matching can retain a fence through
-the end of the Skill when the author intended it to close. If expected steps
-are missing, use a clearly matched top-level fence and compile again. Always
+Markdown parser: container and indentation matching can reject a closing fence
+the author intended to use. Even an unclosed fence allowed by Markdown is
+refused here so later steps cannot silently disappear. Close the fence using a
+matching character, length, indentation and container, or use a clearly matched
+top-level fence, then compile again. Always
 review the generated workflow and approval nodes before publication.
 
 ## Verification

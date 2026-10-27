@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple
 
 ERROR = "Invalid SKILL.md frontmatter"
 DIAGNOSTIC_VERSION = 'skill2workflow-skill-compile-diagnostic-0.1.0'
+EXTENDED_DIAGNOSTIC_VERSION = 'skill2workflow-skill-compile-diagnostic-0.2.0'
 _DIAGNOSTIC_CODES = frozenset({'frontmatter_duplicate_key', 'frontmatter_invalid', 'frontmatter_unsupported'})
 _BLOCK = re.compile(r'^([|>])([1-9][+-]?|[+-][1-9]?|)$')
 
@@ -22,13 +23,25 @@ class FrontmatterError(ValueError):
         self.line = line
 
 
-def skill_compile_diagnostic(error: Exception) -> Dict[str, object]:
+class SkillFenceError(ValueError):
+    """Report an unmatched fence without exposing source text."""
+
+    def __init__(self, line: int):
+        super().__init__(f'SKILL.md has an unclosed code fence near line {line}. Close it with a matching fence and container.')
+        self.line = line
+
+
+def skill_compile_diagnostic(error: Exception, *, extended: bool = False) -> Dict[str, object]:
     code, line = 'skill_invalid', None
     if isinstance(error, FrontmatterError) and type(error.code) is str and error.code in _DIAGNOSTIC_CODES:
         code = error.code
         if type(error.line) is int and 1 <= error.line <= 2 * 1024 * 1024 + 1:
             line = error.line
-    return {'schema_version': DIAGNOSTIC_VERSION, 'code': code, 'line': line}
+    elif extended and isinstance(error, SkillFenceError):
+        if type(error.line) is int and 1 <= error.line <= 2 * 1024 * 1024 + 1:
+            code, line = 'unclosed_fence', error.line
+    return {'schema_version': EXTENDED_DIAGNOSTIC_VERSION if extended else DIAGNOSTIC_VERSION,
+            'code': code, 'line': line}
 
 
 def format_frontmatter_error(error: FrontmatterError) -> str:

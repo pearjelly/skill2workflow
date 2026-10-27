@@ -1072,9 +1072,9 @@ def _qualify_installed_skill_compile_recovery(repo_root: Path, console_script: P
         [sys.executable, str(repo_root / 'scripts' / 'skill_compile_recovery_smoke.py'), '--executable', str(console_script)],
         cwd=isolated_dir,
     ))
-    if result != {'ok': True, 'installed': True, 'cases_verified': 10,
-                  'diagnostic_cases_verified': 4, 'legacy_cases_verified': 2,
-                  'cli_cases_verified': 2, 'module_served': True} or any(
+    if result != {'ok': True, 'installed': True, 'cases_verified': 14,
+                  'diagnostic_cases_verified': 6, 'legacy_cases_verified': 2,
+                  'cli_cases_verified': 3, 'module_served': True} or any(
                       result.get(key) is not True for key in ('ok', 'installed', 'module_served')):
         raise RuntimeError('installed Skill compile recovery qualification failed')
     return True

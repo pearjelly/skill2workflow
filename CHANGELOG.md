@@ -6,6 +6,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ## [Unreleased]
 
+### Changed
+
+- Refuse unclosed or mismatched Skill code fences before creating a draft, and
+  offer an opt-in source-free diagnostic with the opening line. Existing 0.1.0
+  diagnostic requests and published workflows remain unchanged.
+
 ### Added
 
 - Declare `workflow_version` once in a Skill to compile, export, repair and

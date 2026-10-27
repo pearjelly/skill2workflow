@@ -12,10 +12,79 @@ from tests import test_ui as ui_tests
 
 
 VERSION = 'skill2workflow-skill-compile-diagnostic-0.1.0'
+EXTENDED_VERSION = 'skill2workflow-skill-compile-diagnostic-0.2.0'
 DUPLICATE = '---\nname: reviewed\ndescription: Synthetic example.\nname: private-value-canary\n---\n## Steps\n1. Review\n'
 
 
 class SkillCompileDiagnosticTests(TestCase):
+    def test_extended_schema_keeps_legacy_codes_and_adds_only_the_fence_reason(self):
+        root = Path(__file__).resolve().parents[1] / 'schemas'
+        old = json.loads((root / 'skill-compile-diagnostic-0.1.0.schema.json').read_text())
+        new = json.loads((root / 'skill-compile-diagnostic-0.2.0.schema.json').read_text())
+        self.assertEqual(new['properties']['schema_version']['const'], EXTENDED_VERSION)
+        self.assertEqual(set(new['properties']['code']['enum']),
+                         set(old['properties']['code']['enum']) | {'unclosed_fence'})
+        self.assertFalse(new['additionalProperties'])
+        self.assertEqual(new['required'], old['required'])
+
+    def test_unclosed_fence_refuses_instead_of_silently_dropping_steps(self):
+        source = ('---\nname: reviewed\n---\n## Checklist\n1. Ask for approval\n'
+                  '2. Verify draft\n    ~~~markdown\n    private-source-canary\n'
+                  '~~~\n3. Deliver output\n')
+        with self.assertRaises(ValueError) as failure:
+            parse_skill_text(source)
+        self.assertIn('unclosed', str(failure.exception).lower())
+        self.assertIn('line 7', str(failure.exception))
+        self.assertNotIn('private-source-canary', str(failure.exception))
+
+    def test_extended_fence_diagnostic_is_opt_in_and_legacy_stays_generic(self):
+        source = '## Checklist\n1. Review\n~~~markdown\nprivate-source-canary\n'
+        status, raw = self.post(source, True)
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw)['diagnostic'],
+                         {'schema_version': VERSION, 'code': 'skill_invalid', 'line': None})
+        status, raw = self.post(source, True, '0.2.0')
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(raw)['diagnostic'],
+                         {'schema_version': EXTENDED_VERSION, 'code': 'unclosed_fence', 'line': 3})
+        self.assertNotIn(b'private-source-canary', raw)
+
+    def test_unclosed_fence_cli_reports_line_without_replacing_existing_output(self):
+        with TemporaryDirectory() as directory:
+            source = Path(directory) / 'SKILL.md'
+            output = Path(directory) / 'workflow.json'
+            source.write_text('## Checklist\n1. Review\n~~~markdown\nprivate-source-canary\n', encoding='utf-8')
+            output.write_text('existing artifact', encoding='utf-8')
+            stdout, stderr = StringIO(), StringIO()
+            with redirect_stdout(stdout), redirect_stderr(stderr):
+                self.assertEqual(main(['compile', str(source), '-o', str(output)]), 1)
+            self.assertEqual(output.read_text(encoding='utf-8'), 'existing artifact')
+            self.assertEqual(stdout.getvalue(), '')
+            self.assertIn('unclosed', stderr.getvalue().lower())
+            self.assertIn('line 3', stderr.getvalue())
+            self.assertNotIn('private-source-canary', stderr.getvalue())
+            self.assertNotIn(directory, stderr.getvalue())
+
+    def test_extended_diagnostic_request_is_strict_and_success_is_unchanged(self):
+        source = '## Steps\n1. Review\n'
+        baseline = self.post(source)
+        self.assertEqual(self.post(source, True, '0.2.0'), baseline)
+        for flag, version in ((False, '0.2.0'), (None, '0.2.0'), (True, '0.3.0'),
+                              (True, ['private-version-canary']), (True, True)):
+            with self.subTest(flag=flag, version=version):
+                status, raw = self.post(source, flag, version)
+                self.assertEqual(status, 400)
+                self.assertEqual(json.loads(raw), {'error': 'skill compile body is malformed'})
+                self.assertNotIn(b'private-version-canary', raw)
+
+    def test_correcting_the_fence_preserves_later_steps_and_original_lines(self):
+        source = ('---\nname: reviewed\n---\n## Checklist\n1. Ask for approval\n'
+                  '2. Verify draft\n    ~~~markdown\n    private-source-canary\n'
+                  '    ~~~\n3. Deliver output\n')
+        ir = parse_skill_text(source)
+        self.assertEqual(ir['ordered_steps'], ['Ask for approval', 'Verify draft', 'Deliver output'])
+        self.assertEqual([step['line'] for step in ir['ordered_step_details']], [5, 6, 10])
+
     def test_installed_browser_module_flag_requires_recovery_and_draft_ownership_suites(self):
         import subprocess
         from scripts.skill_compile_recovery_smoke import qualify
@@ -36,10 +105,10 @@ class SkillCompileDiagnosticTests(TestCase):
 
     def test_installed_gate_requires_complete_diagnostic_legacy_cli_and_module_evidence(self):
         from scripts import package_smoke
-        complete = {'ok': True, 'installed': True, 'cases_verified': 10,
-                    'diagnostic_cases_verified': 4, 'legacy_cases_verified': 2,
-                    'cli_cases_verified': 2, 'module_served': True}
-        for result in (complete, {}, dict(complete, cases_verified=9), dict(complete, diagnostic_cases_verified=3),
+        complete = {'ok': True, 'installed': True, 'cases_verified': 14,
+                    'diagnostic_cases_verified': 6, 'legacy_cases_verified': 2,
+                    'cli_cases_verified': 3, 'module_served': True}
+        for result in (complete, {}, dict(complete, cases_verified=13), dict(complete, diagnostic_cases_verified=5),
                        dict(complete, legacy_cases_verified=0), dict(complete, cli_cases_verified=0), dict(complete, module_served=False),
                        dict(complete, module_served=1), dict(complete, installed=1), dict(complete, ok=1)):
             with patch('scripts.package_smoke._run', return_value=json.dumps(result)):
@@ -81,8 +150,8 @@ class SkillCompileDiagnosticTests(TestCase):
             self.assertNotIn('private-value-canary', stderr.getvalue())
             self.assertNotIn(directory, stderr.getvalue())
 
-    def post(self, text, diagnostics=None):
-        return ui_tests.UiTests._post_local_skill_compile(self, text, diagnostics)
+    def post(self, text, diagnostics=None, diagnostic_version=None):
+        return ui_tests.UiTests._post_local_skill_compile(self, text, diagnostics, diagnostic_version)
 
     def test_api_diagnostic_is_explicit_opt_in_and_legacy_error_is_unchanged(self):
         for flag in (None, False):

@@ -1159,9 +1159,12 @@ def serve_ui(
                 payload = None
             if (
                 not isinstance(payload, dict)
-                or set(payload) not in ({"skill_markdown"}, {"skill_markdown", "diagnostics"})
+                or set(payload) not in ({"skill_markdown"}, {"skill_markdown", "diagnostics"},
+                                        {"skill_markdown", "diagnostics", "diagnostic_version"})
                 or not isinstance(payload.get("skill_markdown"), str)
                 or not isinstance(payload.get('diagnostics', False), bool)
+                or ('diagnostic_version' in payload and
+                    (payload.get('diagnostics') is not True or payload['diagnostic_version'] != '0.2.0'))
             ):
                 self._write_json(400, {"error": "skill compile body is malformed"})
                 return
@@ -1183,7 +1186,8 @@ def serve_ui(
             except (TypeError, ValueError, UnicodeEncodeError) as error:
                 rejected = {"error": "skill compile rejected"}
                 if payload.get('diagnostics') is True:
-                    rejected['diagnostic'] = skill_compile_diagnostic(error)
+                    rejected['diagnostic'] = skill_compile_diagnostic(
+                        error, extended=payload.get('diagnostic_version') == '0.2.0')
                 self._write_json(400, rejected)
                 return
             self._write_json(200, response_body, content_type="application/json")

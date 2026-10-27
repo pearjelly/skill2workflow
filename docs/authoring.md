@@ -28,7 +28,8 @@ and compiles that one in-memory document into a draft Workflow DSL document,
 then loads the result into the normal editor for review and allowlisted edits.
 
 If compilation is refused, the inline message identifies a supported safe reason
-and approximate source line when available. Correct the local file, choose it
+and approximate source line when available. An unclosed or mismatched code
+fence must be closed with a matching fence and container. Correct the local file, choose it
 again and compile explicitly. The active draft and its validation are preserved;
 changing the selection or draft discards pending compile results. No source
 values or exception text are displayed. See [compile recovery](skill-input-boundary.md#recover-from-a-compile-refusal).
