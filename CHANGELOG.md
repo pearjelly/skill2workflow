@@ -88,6 +88,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- On failed service initialization or quickstart, skip best-effort workspace
+  cleanup if a pinned directory identity is unavailable or the target has
+  already been replaced. Cleanup still requires a trusted, stable parent; its
+  identity check and removal are not atomic. Document manual handling of any
+  remaining workspace and ingress secret.
+
 - Document both first-run approval and rejection, the rejection result status,
   and the unredacted local inspection boundary. Installed-wheel qualification
   now verifies that rejecting an input-aware Skill records the decision without

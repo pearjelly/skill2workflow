@@ -7,8 +7,9 @@ hand-assemble absolute paths or file permissions.
 
 ## Initialize
 
-Choose an absolute path whose parent already exists. The target itself must not
-already exist:
+Choose an absolute path whose trusted parent already exists. Keep the parent
+and workspace stable and exclude concurrent modification throughout
+initialization and cleanup. The target itself must not already exist:
 
 ```bash
 skill2workflow service-init \
@@ -67,8 +68,15 @@ boundary intentionally permits the legacy unrestricted behavior.
 Initialization is fail-closed. A relative root, non-loopback host, invalid port,
 missing parent, symlink target, weak generated secret, or existing target is
 rejected. The target must not already exist, and there is no force or overwrite
-mode. If configuration publication fails, the partially created workspace is
-removed.
+mode. On failure, cleanup is best-effort: it checks a held directory identity
+and skips recursive removal if that identity cannot be verified or the path has
+already been replaced. The identity check and removal are not atomic; they do
+not protect against a concurrent path replacement. Use a trusted, stable parent.
+If cleanup is skipped or fails, a partial workspace or a moved original may
+remain, including an ingress secret. Locate and protect it, then inspect and
+remove it manually only after confirming ownership; choose an unused root for
+the next attempt. Never delete a replacement path merely because it has the
+same name.
 
 ## Start And Verify
 

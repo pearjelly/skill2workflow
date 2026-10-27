@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 from contextlib import redirect_stderr, redirect_stdout
@@ -15,6 +16,81 @@ from skill2workflow.quickstart import initialize_quickstart_workspace
 
 
 class InstalledQuickstartTests(TestCase):
+    def test_quickstart_closes_workspace_identity_on_success_and_failure(self):
+        from skill2workflow.quickstart import _pin_workspace
+        for fail in (False, True):
+            with self.subTest(fail=fail), TemporaryDirectory() as temporary:
+                root = Path(temporary) / 'quickstart'
+                descriptors = []
+
+                def pin(path):
+                    descriptor = _pin_workspace(path)
+                    descriptors.append(descriptor)
+                    return descriptor
+
+                with patch('skill2workflow.quickstart._pin_workspace', side_effect=pin):
+                    if fail:
+                        with patch('skill2workflow.quickstart.LocalControlPlane.publish_workflow',
+                                   side_effect=ValueError('failure')):
+                            with self.assertRaisesRegex(ValueError, 'failure'):
+                                initialize_quickstart_workspace(root, token_factory=lambda: 'q' * 48)
+                    else:
+                        initialize_quickstart_workspace(root, token_factory=lambda: 'q' * 48)
+                self.assertEqual(len(descriptors), 1)
+                if descriptors[0] is not None:
+                    with self.assertRaises(OSError):
+                        os.fstat(descriptors[0])
+
+    def test_failed_quickstart_does_not_delete_a_replacement_workspace(self):
+        with TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root = parent / 'quickstart'
+            moved = parent / 'original-quickstart'
+
+            def replace_during_publication(*args):
+                root.rename(moved)
+                root.mkdir()
+                (root / 'keep.txt').write_text('keep', encoding='utf-8')
+                raise ValueError('simulated publication failure')
+
+            with patch('skill2workflow.quickstart.LocalControlPlane.publish_workflow',
+                       side_effect=replace_during_publication):
+                with self.assertRaisesRegex(ValueError, 'simulated publication failure'):
+                    initialize_quickstart_workspace(root, token_factory=lambda: 'q' * 48)
+            self.assertEqual((root / 'keep.txt').read_text(encoding='utf-8'), 'keep')
+            self.assertTrue(moved.is_dir())
+
+    def test_failed_quickstart_preserves_workspace_if_identity_is_unavailable(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'quickstart'
+            with patch('skill2workflow.quickstart._pin_workspace', return_value=None), \
+                 patch('skill2workflow.quickstart.LocalControlPlane.publish_workflow',
+                       side_effect=ValueError('simulated publication failure')):
+                with self.assertRaisesRegex(ValueError, 'simulated publication failure'):
+                    initialize_quickstart_workspace(root, token_factory=lambda: 'q' * 48)
+            self.assertTrue((root / 'secrets' / 'ingress-token').is_file())
+
+    def test_failed_quickstart_leaves_a_replacement_symlink_untouched(self):
+        with TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root = parent / 'quickstart'
+            moved = parent / 'original-quickstart'
+            other = parent / 'other'
+            other.mkdir()
+            (other / 'keep.txt').write_text('keep', encoding='utf-8')
+
+            def replace_during_publication(*args):
+                root.rename(moved)
+                root.symlink_to(other, target_is_directory=True)
+                raise ValueError('simulated publication failure')
+
+            with patch('skill2workflow.quickstart.LocalControlPlane.publish_workflow',
+                       side_effect=replace_during_publication):
+                with self.assertRaisesRegex(ValueError, 'simulated publication failure'):
+                    initialize_quickstart_workspace(root, token_factory=lambda: 'q' * 48)
+            self.assertTrue(root.is_symlink())
+            self.assertEqual((other / 'keep.txt').read_text(encoding='utf-8'), 'keep')
+
     def test_quickstart_compiles_publishes_and_waits_at_a_real_human_gate(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / "quickstart"
@@ -146,7 +222,9 @@ Do not execute before a designated reviewer approves.
                         root, token_factory=lambda: "q" * 48
                     )
 
-            self.assertFalse(root.exists())
+            supports_cleanup = (hasattr(os, 'O_DIRECTORY') and hasattr(os, 'O_NOFOLLOW')
+                                and getattr(shutil.rmtree, 'avoids_symlink_attacks', False))
+            self.assertEqual(root.exists(), not supports_cleanup)
 
     def test_quickstart_cli_output_is_compact_and_secret_free(self):
         with TemporaryDirectory() as temporary:

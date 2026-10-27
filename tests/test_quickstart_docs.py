@@ -6,6 +6,16 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstalledQuickstartDocumentationTests(TestCase):
+    def test_failure_cleanup_requires_a_stable_trusted_parent(self):
+        guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
+        bootstrap = (ROOT / 'docs/service-bootstrap.md').read_text(encoding='utf-8')
+        for text in (guide, bootstrap):
+            self.assertIn('trusted', text)
+            self.assertIn('concurrent', text)
+            self.assertIn('not atomic', text)
+            self.assertIn('secret', text)
+            self.assertIn('manual', text)
+
     def test_first_decision_has_both_paths_and_private_inspection_guidance(self):
         guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
         decision = guide[guide.index('## Inspect And Approve'):guide.index('## Start The Service')]

@@ -82,9 +82,11 @@ def initialize_service_workspace(
     _validate_token(token)
 
     created = False
+    workspace_fd = None
     try:
         workspace.mkdir(mode=0o700)
         created = True
+        workspace_fd = _pin_workspace(workspace)
         _owner_only_directory(workspace)
         config_dir = _private_directory(workspace / "config")
         state_dir = _private_directory(workspace / "state")
@@ -127,8 +129,11 @@ def initialize_service_workspace(
         os.chmod(config_file, 0o600)
     except Exception:
         if created:
-            shutil.rmtree(workspace, ignore_errors=True)
+            _cleanup_workspace(workspace, workspace_fd)
         raise
+    finally:
+        if workspace_fd is not None:
+            os.close(workspace_fd)
 
     return {
         "schema_version": SERVICE_BOOTSTRAP_RESULT_SCHEMA_VERSION,
@@ -140,6 +145,46 @@ def initialize_service_workspace(
         "token_file": str(token_file),
         "credential_directory": str(credential_dir),
     }
+
+
+def _pin_workspace(path: Path) -> Optional[int]:
+    """Hold a no-follow directory descriptor for best-effort failure cleanup."""
+    if not (hasattr(os, 'O_DIRECTORY') and hasattr(os, 'O_NOFOLLOW')
+            and getattr(shutil.rmtree, 'avoids_symlink_attacks', False)):
+        return None
+    descriptor = None
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        opened = os.fstat(descriptor)
+        current = path.lstat()
+        if not stat.S_ISDIR(opened.st_mode) or not stat.S_ISDIR(current.st_mode):
+            raise OSError('workspace is not a directory')
+        if (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino):
+            raise OSError('workspace changed during initialization')
+        return descriptor
+    except OSError:
+        if descriptor is not None:
+            os.close(descriptor)
+        return None
+
+
+def _cleanup_workspace(path: Path, descriptor: Optional[int]) -> None:
+    """Skip cleanup if the original directory cannot be identified.
+
+    This check is not atomic with rmtree. The parent and workspace must remain
+    trusted and stable throughout initialization and cleanup.
+    """
+    if descriptor is None:
+        return
+    try:
+        opened = os.fstat(descriptor)
+        current = path.lstat()
+        if (not stat.S_ISDIR(current.st_mode)
+                or (opened.st_dev, opened.st_ino) != (current.st_dev, current.st_ino)):
+            return
+        shutil.rmtree(path, ignore_errors=True)
+    except OSError:
+        return
 
 
 def rotate_service_token(

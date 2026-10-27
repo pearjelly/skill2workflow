@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -22,6 +23,81 @@ from skill2workflow.service_bootstrap import (
 
 
 class ServiceBootstrapTests(TestCase):
+    def test_workspace_identity_descriptor_is_closed_on_success_and_failure(self):
+        from skill2workflow.service_bootstrap import _pin_workspace
+        for fail in (False, True):
+            with self.subTest(fail=fail), TemporaryDirectory() as temporary:
+                root = Path(temporary) / 'runtime'
+                descriptors = []
+
+                def pin(path):
+                    descriptor = _pin_workspace(path)
+                    descriptors.append(descriptor)
+                    return descriptor
+
+                with patch('skill2workflow.service_bootstrap._pin_workspace', side_effect=pin):
+                    if fail:
+                        with patch('skill2workflow.service_bootstrap.os.replace', side_effect=OSError('failure')):
+                            with self.assertRaises(OSError):
+                                initialize_service_workspace(root, token_factory=lambda: 't' * 48)
+                    else:
+                        initialize_service_workspace(root, token_factory=lambda: 't' * 48)
+                self.assertEqual(len(descriptors), 1)
+                if descriptors[0] is not None:
+                    with self.assertRaises(OSError):
+                        os.fstat(descriptors[0])
+
+    def test_failed_initialization_does_not_delete_a_replacement_workspace(self):
+        with TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root = parent / 'runtime'
+            moved = parent / 'original-runtime'
+
+            def replace_during_publication(*args):
+                root.rename(moved)
+                root.mkdir()
+                (root / 'keep.txt').write_text('keep', encoding='utf-8')
+                raise ValueError('simulated publication failure')
+
+            with patch('skill2workflow.service_bootstrap.os.replace',
+                       side_effect=replace_during_publication):
+                with self.assertRaisesRegex(ValueError, 'simulated publication failure'):
+                    initialize_service_workspace(root, token_factory=lambda: 't' * 48)
+            self.assertEqual((root / 'keep.txt').read_text(encoding='utf-8'), 'keep')
+            self.assertTrue(moved.is_dir())
+
+    def test_failed_initialization_leaves_a_replacement_symlink_untouched(self):
+        with TemporaryDirectory() as temporary:
+            parent = Path(temporary)
+            root = parent / 'runtime'
+            moved = parent / 'original-runtime'
+            other = parent / 'other'
+            other.mkdir()
+            (other / 'keep.txt').write_text('keep', encoding='utf-8')
+
+            def replace_during_publication(*args):
+                root.rename(moved)
+                root.symlink_to(other, target_is_directory=True)
+                raise ValueError('simulated publication failure')
+
+            with patch('skill2workflow.service_bootstrap.os.replace',
+                       side_effect=replace_during_publication):
+                with self.assertRaisesRegex(ValueError, 'simulated publication failure'):
+                    initialize_service_workspace(root, token_factory=lambda: 't' * 48)
+            self.assertTrue(root.is_symlink())
+            self.assertEqual((other / 'keep.txt').read_text(encoding='utf-8'), 'keep')
+
+    def test_failed_initialization_preserves_workspace_if_identity_is_unavailable(self):
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary) / 'runtime'
+            with patch('skill2workflow.service_bootstrap._pin_workspace', return_value=None), \
+                 patch('skill2workflow.service_bootstrap.os.replace', side_effect=OSError('failure')):
+                with self.assertRaises(OSError):
+                    initialize_service_workspace(root, token_factory=lambda: 't' * 48)
+            self.assertTrue(root.is_dir())
+            self.assertTrue((root / 'secrets' / 'ingress-token').is_file())
+
+
     def test_initialize_creates_a_complete_owner_only_workspace_without_exposing_token(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary) / "runtime"
@@ -285,7 +361,9 @@ class ServiceBootstrapTests(TestCase):
                         root, token_factory=lambda: "t" * 48
                     )
 
-            self.assertFalse(root.exists())
+            supports_cleanup = (hasattr(os, 'O_DIRECTORY') and hasattr(os, 'O_NOFOLLOW')
+                                and getattr(shutil.rmtree, 'avoids_symlink_attacks', False))
+            self.assertEqual(root.exists(), not supports_cleanup)
 
     def test_service_init_cli_prints_only_compact_paths(self):
         with TemporaryDirectory() as temporary:

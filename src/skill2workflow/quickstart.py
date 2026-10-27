@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
 from .compiler import compile_ir_to_workflow, validate_workflow
 from .control_plane import LocalControlPlane
 from .parser import parse_skill_text, read_skill_text
-from .service_bootstrap import initialize_service_workspace, validate_service_workspace_location
+from .service_bootstrap import (
+    _cleanup_workspace, _pin_workspace, initialize_service_workspace,
+    validate_service_workspace_location,
+)
 from .input_schema import validate_trigger_input
 from .preflight import build_workflow_preflight
 from .triggers import MAX_TRIGGER_INPUT_BYTES, normalize_trigger_input
@@ -94,6 +96,7 @@ def initialize_quickstart_workspace(
         token_factory=token_factory,
     )
     workspace = Path(str(bootstrap["root"]))
+    workspace_fd = _pin_workspace(workspace)
     try:
         example_dir = workspace / "example"
         example_dir.mkdir(mode=0o700)
@@ -129,8 +132,11 @@ def initialize_quickstart_workspace(
         if str(run.get("status", "")) != "waiting":
             raise ValueError("quickstart run did not stop at its human gate")
     except Exception:
-        shutil.rmtree(workspace, ignore_errors=True)
+        _cleanup_workspace(workspace, workspace_fd)
         raise
+    finally:
+        if workspace_fd is not None:
+            os.close(workspace_fd)
 
     run_id = str(run["run_id"])
     state_dir = str(bootstrap["state_dir"])

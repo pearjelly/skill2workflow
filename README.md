@@ -36,9 +36,10 @@ skill2workflow quickstart \
   --port 8080
 ```
 
-The bundled example is compiled, published into SQLite and **stops at a human
-gate**. It makes no external connector call. The command never overwrites an
-existing root and never prints the generated ingress secret.
+Use a trusted parent and keep the workspace path stable during setup and
+failure cleanup. The bundled example is compiled, published into SQLite and
+**stops at a human gate**. It makes no external connector call. The command
+never overwrites an existing root and never prints the generated ingress secret.
 
 The JSON result contains `run_id`, `state_dir` and secret-free
 `operator_commands` arrays. Inspect the waiting run before making an explicit

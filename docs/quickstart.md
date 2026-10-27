@@ -7,7 +7,9 @@ SQLite, starts a run, and stops at a real human gate.
 
 ## Create The Workspace
 
-Choose a new absolute path. Its parent must exist. The target must not already exist:
+Choose a new absolute path under an existing trusted parent. Keep the parent
+and workspace stable and exclude concurrent modification during initialization
+and cleanup. The target must not already exist:
 
 ```bash
 skill2workflow quickstart \
@@ -36,9 +38,15 @@ example/                 0700
 ```
 
 Unlike the source-checkout contributor demo, quickstart has no reset or force
-mode. It never deletes or replaces an existing path. If compilation,
-validation, publication, or the initial run fails, it removes only the new
-workspace it created.
+mode. It never deliberately overwrites an existing path. If compilation,
+validation, publication, or the initial run fails, workspace cleanup is
+best-effort. It skips recursive removal when the original directory identity
+cannot be verified or the path has already been replaced. This check and
+removal are not atomic and do not defend against concurrent path replacement.
+A partial or moved workspace can remain with an ingress secret: locate and
+protect it, verify ownership before manual removal, and use a new unused root
+for another attempt. See [service bootstrap](service-bootstrap.md) for the
+same boundary.
 
 ## Use Your Own Skill
 
