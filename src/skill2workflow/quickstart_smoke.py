@@ -345,6 +345,20 @@ def _qualify_input_quickstart(console: Path, isolated: Path, environment: Dict[s
                                  cwd=str(isolated), env=environment, capture_output=True, text=True, timeout=10)
         prefix_refused = (rejected.returncode == 1 and not unsafe_root.exists() and not requests
                           and 'before the first human gate' in rejected.stderr)
+        unconfigured = directory / 'unconfigured.SKILL.md'
+        unconfigured.write_text('## Steps\n1. ' + approval + '\n2. Run private-command-canary\n', encoding='utf-8')
+        unconfigured_root = directory / 'unconfigured'
+        unconfigured_base = [str(console), 'quickstart', '--root', str(unconfigured_root),
+                             '--skill', str(unconfigured), '--port', '0']
+        unconfigured_refusals = []
+        for extra in ([], ['--dry-run']):
+            result = subprocess.run(unconfigured_base + extra, cwd=str(isolated), env=environment,
+                                    capture_output=True, text=True, timeout=10)
+            unconfigured_refusals.append(
+                result.returncode == 1 and not result.stdout and 'unconfigured HTTP action' in result.stderr
+                and 'shell commands' in result.stderr and 'private-command-canary' not in result.stderr
+                and str(unconfigured) not in result.stderr and str(unconfigured_root) not in result.stderr
+                and not unconfigured_root.exists() and not requests)
         decision_root = directory / 'decision-rejected'
         decision, _ = _run_json([str(console), 'quickstart', '--root', str(decision_root),
                                  '--skill', str(source), '--input', str(input_file), '--port', '0'],
@@ -374,6 +388,7 @@ def _qualify_input_quickstart(console: Path, isolated: Path, environment: Dict[s
             'custom_input_waiting': waiting_ok,
             'invalid_input_no_workspace': all(refused),
             'network_prefix_refused': prefix_refused,
+            'unconfigured_action_refused': all(unconfigured_refusals),
             'custom_input_approved_http': (completed.get('status') == 'completed'
                 and requests == [{'source': 'quickstart', 'id': payload['customer_id'], 'count': 2}]
                 and 'quickstart-response-canary' not in raw_resume),

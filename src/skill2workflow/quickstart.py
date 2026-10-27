@@ -70,6 +70,7 @@ def initialize_quickstart_workspace(
             "quickstart SKILL must compile to a valid workflow with a human gate"
         )
     _require_pre_effect_gate(workflow)
+    _require_configured_http_actions(workflow)
     try:
         normalized_input = normalize_trigger_input({} if trigger_input is None else trigger_input)
         json.dumps(normalized_input, ensure_ascii=False, allow_nan=False)
@@ -228,3 +229,16 @@ def _require_pre_effect_gate(workflow: Dict[str, object]) -> None:
             raise ValueError('quickstart SKILL cannot execute a non-manual connector before the first human gate')
         current = node.get('on_success')
     raise ValueError('quickstart SKILL must reach a human gate on its initial success path')
+
+
+def _require_configured_http_actions(workflow: Dict[str, object]) -> None:
+    """Refuse compiler-inferred HTTP placeholders before creating a workspace."""
+    for node in workflow['nodes']:
+        connector = node.get('connector')
+        if (node.get('type') == 'tool_call' and isinstance(connector, dict)
+                and connector.get('id') == 'http'
+                and not isinstance(connector.get('request'), dict)):
+            raise ValueError(
+                'quickstart SKILL contains an unconfigured HTTP action; use an explicit HTTP declaration. '
+                'Inferred shell commands are not executed.'
+            )

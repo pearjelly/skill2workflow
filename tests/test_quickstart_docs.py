@@ -6,6 +6,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstalledQuickstartDocumentationTests(TestCase):
+    def test_unconfigured_inferred_action_is_documented_at_preview_and_runtime_boundary(self):
+        guide = ' '.join((ROOT / 'docs/quickstart.md').read_text(encoding='utf-8').lower().split())
+        compatibility = ' '.join((ROOT / 'docs/workflow-dsl-compatibility.md').read_text(encoding='utf-8').lower().split())
+        self.assertIn('unconfigured http', guide)
+        self.assertIn('shell commands', guide)
+        self.assertIn('before workspace', guide)
+        self.assertIn('unconfigured http', compatibility)
+        self.assertIn('published', compatibility)
+
     def test_failure_cleanup_requires_a_stable_trusted_parent(self):
         guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
         bootstrap = (ROOT / 'docs/service-bootstrap.md').read_text(encoding='utf-8')
@@ -31,7 +40,7 @@ class InstalledQuickstartDocumentationTests(TestCase):
         guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
         for phrase in ('--dry-run', 'dry_run=True', 'ready: false', 'same preflight',
                        'required mapping sources', '1,000 nodes', '128 top-level',
-                       'not a', 'neither reserves', '21 passing checks'):
+                       'not a', 'neither reserves', '22 passing checks'):
             self.assertIn(phrase, guide)
         self.assertIn('--dry-run', (ROOT / 'README.md').read_text(encoding='utf-8'))
 

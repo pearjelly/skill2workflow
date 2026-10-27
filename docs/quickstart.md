@@ -94,6 +94,15 @@ the gate, but the runtime does not perform that preparation.
 This conservative onboarding check does not change the general executor or
 insert a gate into the Skill.
 
+Quickstart also refuses an unconfigured HTTP action before workspace creation,
+including during `--dry-run`. A prose step such as “Run a command” can be
+inferred as an HTTP tool node without a request; shell commands are not executed.
+Replace it with a reviewed [explicit HTTP action](skill-http-actions.md) when
+an HTTP request is intended, or revise the Skill to describe the real supported
+workflow. A descriptive step alone does not execute the work. This check applies
+to new Quickstart workspaces, not to existing published workflows or general
+Workflow DSL validation.
+
 ## Provide Business Input
 
 For a Skill with a [typed input contract](skill-input-contracts.md), prepare a
@@ -268,7 +277,8 @@ It also qualifies typed initial input, invalid-input rejection before workspace
 creation, rejection of network-before-approval Skills, and approval to a real
 owned loopback HTTP receiver. The same input checks are mandatory in isolated
 wheel package qualification; no live SaaS endpoint is contacted.
-The full drill requires 21 passing checks, including a rejected input-aware run
+The full drill requires 22 passing checks, including refusal of unconfigured
+actions without a workspace, and a rejected input-aware run
 that makes no HTTP request, ready and blocked
 read-only previews, corrected input under the same unused root, and real
 initialization refusal on a missing required mapping without an input schema.

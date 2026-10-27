@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Refuse unconfigured inferred HTTP actions in Quickstart previews and new
+  workspaces before token generation or execution; preserve general DSL
+  validation and existing published workflows.
+
 - Clarify in first-use guidance and compile review that descriptive steps,
   verification nodes and hard-gate declarations do not execute the described
   work or replace an explicit human gate or executable connector.

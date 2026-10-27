@@ -104,6 +104,12 @@ The read-only HTTP assertion inspector presents stored connector configuration
 and source-DSL destinations without changing them. It adds no DSL fields,
 execution behavior, credential resolution, or write-back permissions.
 
+Quickstart preview and initialization now reject newly compiled Skills with an
+unconfigured HTTP tool action, including tool nodes inferred from prose. This
+avoids creating a workspace that reaches an action certain to fail for lack of
+a request. General Workflow DSL validation, existing published workflows and
+execution semantics are unchanged. See [Quickstart](quickstart.md#use-your-own-skill).
+
 Parser support for explicit numbered `Workflow` and `Steps` sections changes
 only newly compiled drafts that lack a Checklist section. Checklist precedence
 and list formats are unchanged, but examples in supported fences no longer become steps or

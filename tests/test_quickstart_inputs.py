@@ -48,9 +48,10 @@ class QuickstartInputTests(TestCase):
         checks = {name: True for name in ('custom_input_waiting', 'invalid_input_no_workspace',
                   'network_prefix_refused', 'custom_input_approved_http', 'custom_input_compact_result',
                   'quickstart_preview_no_workspace', 'required_mapping_no_workspace',
-                  'custom_input_rejected_without_http')}
+                  'custom_input_rejected_without_http', 'unconfigured_action_refused')}
         for result in (checks, dict(checks, network_prefix_refused=False),
                        dict(checks, custom_input_rejected_without_http=False),
+                       dict(checks, unconfigured_action_refused=False),
                        {key: value for key, value in checks.items()
                         if key != 'custom_input_rejected_without_http'},
                        {'custom_input_waiting': True}):
@@ -73,6 +74,60 @@ class QuickstartInputTests(TestCase):
                 initialize_quickstart_workspace(root, skill_path=source, token_factory=token)
             token.assert_not_called()
             self.assertFalse(root.exists())
+
+    def test_unconfigured_inferred_action_is_refused_before_initialization_or_preview(self):
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run), TemporaryDirectory() as temporary, patch(
+                    'skill2workflow.connectors._open_http_request') as transport:
+                parent = Path(temporary)
+                source = parent / 'private-source-canary.md'
+                source.write_text('## Steps\n1. Review <!-- skill2workflow: human_gate -->\n'
+                                  '2. Run private-command-canary\n', encoding='utf-8')
+                root = parent / 'workspace'
+                token = Mock(return_value='q' * 48)
+                with self.assertRaisesRegex(ValueError, 'unconfigured HTTP action') as failure:
+                    initialize_quickstart_workspace(root, skill_path=source, token_factory=token, dry_run=dry_run)
+                self.assertNotIn('private-command-canary', str(failure.exception))
+                self.assertNotIn(str(source), str(failure.exception))
+                self.assertFalse(root.exists())
+                token.assert_not_called()
+                transport.assert_not_called()
+
+    def test_cli_refuses_unconfigured_action_without_source_or_workspace(self):
+        for dry_run in (False, True):
+            with self.subTest(dry_run=dry_run), TemporaryDirectory() as temporary:
+                parent = Path(temporary)
+                source = parent / 'private-source-canary.md'
+                source.write_text('## Steps\n1. Review <!-- skill2workflow: human_gate -->\n'
+                                  '2. Run private-command-canary\n', encoding='utf-8')
+                root = parent / 'private-workspace-canary'
+                stdout, stderr = StringIO(), StringIO()
+                with redirect_stdout(stdout), redirect_stderr(stderr):
+                    status = main(['quickstart', '--root', str(root), '--skill', str(source)]
+                                  + (['--dry-run'] if dry_run else []))
+                self.assertEqual(status, 1)
+                self.assertEqual(stdout.getvalue(), '')
+                self.assertIn('unconfigured HTTP action', stderr.getvalue())
+                self.assertIn('shell commands', stderr.getvalue())
+                self.assertNotIn('private-', stderr.getvalue())
+                self.assertFalse(root.exists())
+
+    def test_general_dsl_validation_remains_compatible_with_inferred_placeholders(self):
+        from skill2workflow.compiler import compile_ir_to_workflow, validate_workflow
+        from skill2workflow.executor import LocalExecutor
+        from skill2workflow.parser import parse_skill_text
+        workflow = compile_ir_to_workflow(parse_skill_text(
+            '## Steps\n1. Review <!-- skill2workflow: human_gate -->\n2. Run a command\n'))
+        self.assertEqual(validate_workflow(workflow), [])
+        self.assertEqual(workflow['nodes'][2]['connector'], {'id': 'http', 'kind': 'http'})
+        with TemporaryDirectory() as temporary, patch('skill2workflow.connectors._open_http_request') as transport:
+            executor = LocalExecutor(Path(temporary))
+            waiting = executor.run(workflow)
+            self.assertEqual(waiting['status'], 'waiting')
+            failed = executor.resume(waiting['run_id'])
+            self.assertEqual(failed['status'], 'failed')
+            self.assertIn('requires connector.request', str(failed['node_results']))
+            transport.assert_not_called()
 
     def test_valid_input_reaches_approval_without_http_and_survives_resume(self):
         class Response(BytesIO):
