@@ -174,7 +174,15 @@ skill2workflow control-run <run_id> \
   --storage sqlite
 ```
 
-The run is `waiting` at the example human gate. Approve it once:
+Local `control-run` returns the full stored run, including business input and
+potentially retained connector results; it is not redacted. Inspect it in a
+private environment and protect any saved output. The remote
+[`service-show`](run-detail.md) view is redacted and does not show the input,
+so review the business request through an appropriately protected channel too.
+
+The run is `waiting` at the example human gate. After reviewing the input,
+workflow and any intended external effects, choose exactly one decision. To
+approve:
 
 ```bash
 skill2workflow resume-published <run_id> \
@@ -182,9 +190,21 @@ skill2workflow resume-published <run_id> \
   --storage sqlite
 ```
 
-The bundled example's resumed run completes and preserves the gate and
-completion audit trail. Custom workflows depend on their reviewed input,
-connector configuration and provider outcomes.
+To reject instead, use the same run and state directory:
+
+```bash
+skill2workflow resume-published <run_id> --reject \
+  --state-dir /srv/skill2workflow/quickstart/state \
+  --storage sqlite
+```
+
+The bundled and custom Skills compiled by quickstart route rejection to their
+`on_failure` terminal, so the run ends `failed` without executing later steps.
+The command's zero exit status means the decision was processed, not that the
+run succeeded. Inspect the returned status and gate decision. Other Workflow
+DSL artifacts can define a different `on_failure` path; review it before
+deciding. The bundled example completes after approval. Custom workflows depend
+on their reviewed input, connector configuration and provider outcomes.
 
 ## Start The Service
 
@@ -231,6 +251,7 @@ It also qualifies typed initial input, invalid-input rejection before workspace
 creation, rejection of network-before-approval Skills, and approval to a real
 owned loopback HTTP receiver. The same input checks are mandatory in isolated
 wheel package qualification; no live SaaS endpoint is contacted.
-The full drill requires 20 passing checks, including ready and blocked
+The full drill requires 21 passing checks, including a rejected input-aware run
+that makes no HTTP request, ready and blocked
 read-only previews, corrected input under the same unused root, and real
 initialization refusal on a missing required mapping without an input schema.

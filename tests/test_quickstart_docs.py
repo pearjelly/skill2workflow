@@ -6,11 +6,21 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InstalledQuickstartDocumentationTests(TestCase):
+    def test_first_decision_has_both_paths_and_private_inspection_guidance(self):
+        guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
+        decision = guide[guide.index('## Inspect And Approve'):guide.index('## Start The Service')]
+        self.assertIn('resume-published <run_id> --reject', decision)
+        self.assertIn('failed', decision)
+        self.assertIn('exit status', decision)
+        self.assertIn('business input', decision)
+        self.assertIn('not redacted', decision)
+        self.assertIn('on_failure', decision)
+
     def test_preview_and_real_admission_share_a_bounded_non_effectful_contract(self):
         guide = (ROOT / 'docs/quickstart.md').read_text(encoding='utf-8')
         for phrase in ('--dry-run', 'dry_run=True', 'ready: false', 'same preflight',
                        'required mapping sources', '1,000 nodes', '128 top-level',
-                       'not a', 'neither reserves', '20 passing checks'):
+                       'not a', 'neither reserves', '21 passing checks'):
             self.assertIn(phrase, guide)
         self.assertIn('--dry-run', (ROOT / 'README.md').read_text(encoding='utf-8'))
 

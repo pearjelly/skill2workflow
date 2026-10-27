@@ -44,6 +44,8 @@ The JSON result contains `run_id`, `state_dir` and secret-free
 `operator_commands` arrays. Inspect the waiting run before making an explicit
 approve/reject decision. The [installed controlled quickstart](docs/quickstart.md)
 shows the exact inspection, approval and service-start commands.
+It also shows how to reject. Local inspection can display business input, so
+protect its output; the remote service view is redacted.
 
 To preview your own controlled Skill and non-secret business input, use
 another unused absolute root:

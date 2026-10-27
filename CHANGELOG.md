@@ -88,6 +88,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Fixed
 
+- Document both first-run approval and rejection, the rejection result status,
+  and the unredacted local inspection boundary. Installed-wheel qualification
+  now verifies that rejecting an input-aware Skill records the decision without
+  sending its later HTTP request; the quickstart result contract is unchanged.
+
 - Restore a short, task-oriented README and a complete public-guide reference;
   check local links, section anchors and bounded guide reachability without
   duplicating detailed contracts or delivery history in the product entrypoint.

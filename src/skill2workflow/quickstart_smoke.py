@@ -345,6 +345,21 @@ def _qualify_input_quickstart(console: Path, isolated: Path, environment: Dict[s
                                  cwd=str(isolated), env=environment, capture_output=True, text=True, timeout=10)
         prefix_refused = (rejected.returncode == 1 and not unsafe_root.exists() and not requests
                           and 'before the first human gate' in rejected.stderr)
+        decision_root = directory / 'decision-rejected'
+        decision, _ = _run_json([str(console), 'quickstart', '--root', str(decision_root),
+                                 '--skill', str(source), '--input', str(input_file), '--port', '0'],
+                                isolated, environment)
+        decision_common = ['--state-dir', str(decision['state_dir']), '--storage', 'sqlite']
+        rejected_run, _ = _run_json([str(console), 'resume-published', decision['run_id'], '--reject']
+                                    + decision_common, isolated, environment)
+        inspected, _ = _run_json([str(console), 'control-run', decision['run_id']]
+                                 + decision_common, isolated, environment)
+        rejected_without_http = (rejected_run.get('status') == 'failed'
+                                 and inspected.get('status') == 'failed'
+                                 and any(event.get('type') == 'human_gate_resumed'
+                                         and event.get('approved') is False
+                                         for event in inspected.get('events', []))
+                                 and not requests)
         accepted_root = directory / 'accepted'
         initialized, raw = _run_json([str(console), 'quickstart', '--root', str(accepted_root),
                                       '--skill', str(source), '--input', str(input_file), '--port', '0'], isolated, environment)
@@ -365,6 +380,7 @@ def _qualify_input_quickstart(console: Path, isolated: Path, environment: Dict[s
             'custom_input_compact_result': compact,
             'quickstart_preview_no_workspace': preview_ok,
             'required_mapping_no_workspace': mapping_refused,
+            'custom_input_rejected_without_http': rejected_without_http,
         }
         if not all(checks.values()):
             raise RuntimeError('installed input-aware quickstart qualification failed')

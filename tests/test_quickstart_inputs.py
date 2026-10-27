@@ -47,8 +47,13 @@ class QuickstartInputTests(TestCase):
         from scripts import package_smoke
         checks = {name: True for name in ('custom_input_waiting', 'invalid_input_no_workspace',
                   'network_prefix_refused', 'custom_input_approved_http', 'custom_input_compact_result',
-                  'quickstart_preview_no_workspace', 'required_mapping_no_workspace')}
-        for result in (checks, dict(checks, network_prefix_refused=False), {'custom_input_waiting': True}):
+                  'quickstart_preview_no_workspace', 'required_mapping_no_workspace',
+                  'custom_input_rejected_without_http')}
+        for result in (checks, dict(checks, network_prefix_refused=False),
+                       dict(checks, custom_input_rejected_without_http=False),
+                       {key: value for key, value in checks.items()
+                        if key != 'custom_input_rejected_without_http'},
+                       {'custom_input_waiting': True}):
             with self.subTest(check_count=len(result)), patch('scripts.package_smoke._run', return_value=json.dumps(result)):
                 if result == checks:
                     self.assertTrue(package_smoke._qualify_installed_quickstart_inputs(
