@@ -44,12 +44,15 @@ after its normal local validation. Use the CLI `compile` command when you need
 a durable JSON artifact in a specified filesystem location.
 
 After a successful compile, the editor shows a source-free **SKILL Compile
-Review**: inferred executable, human-gate, verification, and hard-gate
+Review**: inferred process, human-gate, verification, and hard-gate
 declaration counts, plus fixed notices when a checklist, approval node, or
 verification node was not inferred. Explicit
 [Skill HTTP assertions](http-json-assertions.md#declare-a-check-in-skillmd) count
 as verification nodes even though their executable DSL type is `tool_call`.
-This is a conservative review aid, not a
+Ordinary steps and text-only verification nodes record progress; they do not
+execute their described work or check results. A hard-gate declaration alone
+does not pause a run: use a human gate for approval and an explicit connector
+for an automated action or check. This is a conservative review aid, not a
 proof of business safety or an execution policy. Review and edit the Workflow
 DSL before publication; the summary neither changes the draft nor authorizes a
 side effect.

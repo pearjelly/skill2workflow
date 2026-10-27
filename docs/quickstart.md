@@ -5,6 +5,12 @@ without requiring the source checkout or an external connector. One command
 creates a secure service workspace, compiles Workflow DSL, publishes it into
 SQLite, starts a run, and stops at a real human gate.
 
+Ordinary steps and text-only verification nodes record progress; they do not
+execute the described work or check results. A hard-gate declaration alone
+does not pause a run: use a human gate for approval and an explicit connector
+for an automated action or check. Completion records workflow progress, not
+proof that the described business work was performed.
+
 ## Create The Workspace
 
 Choose a new absolute path under an existing trusted parent. Keep the parent
@@ -83,7 +89,8 @@ new workspace; it never upgrades or replaces an existing one.
 
 Quickstart refuses a non-manual connector before the first human gate on the
 compiled initial success path. HTTP actions and HTTP assertions before approval
-are rejected before initialization. Manual preparation steps remain supported.
+are rejected before initialization. Descriptive preparation steps can precede
+the gate, but the runtime does not perform that preparation.
 This conservative onboarding check does not change the general executor or
 insert a gate into the Skill.
 

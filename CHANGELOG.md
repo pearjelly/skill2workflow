@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Clarify in first-use guidance and compile review that descriptive steps,
+  verification nodes and hard-gate declarations do not execute the described
+  work or replace an explicit human gate or executable connector.
+
 - Refuse unclosed or mismatched Skill code fences before creating a draft, and
   offer an opt-in source-free diagnostic with the opening line. Existing 0.1.0
   diagnostic requests and published workflows remain unchanged.

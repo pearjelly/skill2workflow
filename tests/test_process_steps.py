@@ -15,6 +15,22 @@ AMBIGUOUS_PROCESS = (
 
 
 class ProcessStepTests(TestCase):
+    def test_descriptive_steps_and_hard_gate_are_not_executed_or_enforced(self):
+        text = ('<HARD-GATE>Require approval before proceeding.</HARD-GATE>\n'
+                '## Checklist\n1. Prepare report\n2. Verify report\n3. Ask user for approval\n')
+        ir = parse_skill_text(text)
+        workflow = compile_ir_to_workflow(ir)
+        self.assertEqual([node['type'] for node in workflow['nodes']],
+                         ['start', 'step', 'verification', 'human_gate', 'failure', 'end'])
+        self.assertEqual(len(workflow['guards']), 1)
+        with TemporaryDirectory() as temporary, patch('skill2workflow.connectors._open_http_request') as transport:
+            waiting = LocalExecutor(Path(temporary), storage='sqlite').run(workflow)
+            self.assertEqual(waiting['status'], 'waiting')
+            self.assertEqual(waiting['current_node'], workflow['nodes'][3]['id'])
+            for node in workflow['nodes'][1:3]:
+                self.assertEqual(waiting['node_results'][node['id']]['status'], 'completed')
+            transport.assert_not_called()
+
     def test_indented_fenced_checklist_examples_are_not_steps(self):
         for fence in ('    ~~~', '    ```', '\t~~~'):
             with self.subTest(fence=fence):

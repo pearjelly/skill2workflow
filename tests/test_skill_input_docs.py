@@ -7,6 +7,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class SkillInputDocumentationTests(TestCase):
+    def test_first_use_explains_description_versus_runtime_execution(self):
+        for name in ('README.md', 'docs/quickstart.md', 'docs/authoring.md', 'docs/skill-input-boundary.md'):
+            with self.subTest(name=name):
+                text = ' '.join((ROOT / name).read_text(encoding='utf-8').lower().split())
+                self.assertIn('do not execute', text)
+                self.assertIn('human gate', text)
+                self.assertIn('verification', text)
+
     def test_fenced_examples_are_excluded_across_process_and_guidance(self):
         guide = (ROOT / 'docs/skill-input-boundary.md').read_text(encoding='utf-8')
         self.assertIn('Checklist, Workflow and Steps', guide)

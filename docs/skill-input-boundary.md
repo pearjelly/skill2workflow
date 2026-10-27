@@ -273,6 +273,10 @@ The review contains only inferred structural counts and the finite notices
 `checklist_not_found`, `human_gate_not_inferred`, and
 `verification_not_inferred`. It does not include Skill text, local paths,
 credentials, validation of business intent, or authorization to publish/run.
+The historical `executable_node_count` includes ordinary steps and text-only
+verification nodes that record progress but do not execute the described work
+or check results. A hard-gate declaration alone does not pause a run; use a
+human gate for approval and an explicit connector for an automated check.
 The historical `checklist_not_found` code means that no supported ordered steps
 were found, including the `Workflow`/`Steps` fallback; its schema and spelling
 remain unchanged.

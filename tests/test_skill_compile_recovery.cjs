@@ -39,6 +39,33 @@ function setup(fetcher) {
 }
 function compiled() {return {workflow:JSON.parse(JSON.stringify(fixture)),review:{schema_version:'skill2workflow-skill-compile-review-0.1.0',ordered_step_count:4,executable_node_count:4,human_gate_count:1,verification_node_count:0,hard_gate_count:1,notices:[]}};}
 
+test('compile review distinguishes recorded progress from executed work and enforced gates',async()=>{
+  const result=compiled();result.review.notices=['verification_not_inferred'];
+  const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
+  const panel=ui.elements.get('skill-review-panel');const items=ui.elements.get('skill-review-list').children.map(item=>item.textContent);
+  assert.equal(panel.hidden,false);assert.match(items[0],/process node/i);assert.doesNotMatch(items[0],/executable node/i);
+  assert.match(items.join(' '),/steps.*verification.*do not.*(perform|execute|check)/i);
+  assert.match(items.join(' '),/hard.gate.*(does not|do not|not).*pause/i);
+  assert.match(items.join(' '),/explicit.*(check|assertion)/i);
+  assert.doesNotMatch(items.join(' '),/private-value-canary/);
+  ui.api.loadDocument(fixture,'Another draft');assert.equal(panel.hidden,true);
+});
+
+test('compile review does not claim a hard-gate declaration when none was inferred',async()=>{
+  const result=compiled();result.review.hard_gate_count=0;result.review.verification_node_count=1;
+  const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
+  const text=ui.elements.get('skill-review-list').children.map(item=>item.textContent).join(' ');
+  assert.match(text,/text-only verification.*do not perform/i);
+  assert.doesNotMatch(text,/A hard-gate declaration does not pause/i);
+});
+
+test('missing human approval guidance names a pausing gate',async()=>{
+  const result=compiled();result.review.human_gate_count=0;result.review.notices=['human_gate_not_inferred'];
+  const ui=setup(async()=>response(result,200));await ui.stage();await ui.api.compileStagedSkill();
+  const text=ui.elements.get('skill-review-list').children.map(item=>item.textContent).join(' ');
+  assert.match(text,/no human approval node.*add.*human gate/i);
+});
+
 test('compile refusal gives a safe location and recovery without replacing the active draft',async()=>{
   let observed;
   const ui=setup(async(url,options)=>{observed={url,options};return response(rejected());});

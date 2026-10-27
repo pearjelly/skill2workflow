@@ -41,6 +41,12 @@ failure cleanup. The bundled example is compiled, published into SQLite and
 **stops at a human gate**. It makes no external connector call. The command
 never overwrites an existing root and never prints the generated ingress secret.
 
+Ordinary steps and text-only verification nodes record progress; they do not
+execute the described work or check results. A hard-gate declaration is also
+descriptive: use a human gate to pause for approval and an explicit connector
+for an automated action or check. A completed run alone does not prove that
+the described business work was done.
+
 The JSON result contains `run_id`, `state_dir` and secret-free
 `operator_commands` arrays. Inspect the waiting run before making an explicit
 approve/reject decision. The [installed controlled quickstart](docs/quickstart.md)

@@ -11,8 +11,8 @@
   const MAX_WORKFLOW_VALIDATION_NODE_INDEX = 100000;
   const SKILL_COMPILE_REVIEW_NOTICES = {
     checklist_not_found: "No supported ordered steps were found. This draft uses the compiler's generic review step.",
-    human_gate_not_inferred: "No human approval node was inferred. Add an explicit review before real-world effects.",
-    verification_not_inferred: "No verification node was inferred. Add a confirmation or validation step before relying on the result.",
+    human_gate_not_inferred: "No human approval node was inferred. Add a human gate before real-world effects when approval is required.",
+    verification_not_inferred: "No verification node was inferred. Use an explicit executable check, such as an HTTP assertion, to check results automatically.",
   };
   const NODE_TYPES = ["start", "step", "human_gate", "tool_call", "verification", "instruction", "failure", "end"];
   const TYPE_THEME = {
@@ -903,11 +903,19 @@
 
     const summary = document.createElement("li");
     summary.className = "ok";
-    summary.textContent = "Compiler inferred " + review.executable_node_count + " executable node(s), "
+    summary.textContent = "Compiler inferred " + review.executable_node_count + " process node(s), "
       + review.human_gate_count + " human gate(s), "
       + review.verification_node_count + " verification node(s), and "
       + review.hard_gate_count + " hard-gate declaration(s).";
     els.skillReviewList.appendChild(summary);
+    const executionBoundary = document.createElement("li");
+    executionBoundary.textContent = "Ordinary steps and text-only verification nodes record progress; they do not perform the described work or check results. Use an explicit connector for executable checks.";
+    els.skillReviewList.appendChild(executionBoundary);
+    if (review.hard_gate_count > 0) {
+      const gateBoundary = document.createElement("li");
+      gateBoundary.textContent = "A hard-gate declaration does not pause the run. Add a human gate where approval is needed.";
+      els.skillReviewList.appendChild(gateBoundary);
+    }
     review.notices.forEach(function (notice) {
       const item = document.createElement("li");
       item.textContent = SKILL_COMPILE_REVIEW_NOTICES[notice];
