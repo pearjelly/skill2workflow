@@ -7,9 +7,9 @@ standard-library-only runtime remain requirements.
 
 | Task | Deliverable and acceptance evidence | Status |
 | --- | --- | --- |
-| T0 | umask-independent package fixture; ensurepip-aware quickstart test; full suites under 0002 and 0022 | In progress |
-| T1 | whole-word/Chinese inference, explicit HTTP actions, inference provenance and review notices; example regeneration | Pending |
-| T2 | validation/publication reject HTTP bindings without requests | Pending |
+| T0 | umask-independent package fixture; ensurepip-aware quickstart test; full suites under 0002 and 0022 | Complete |
+| T1 | whole-word/Chinese inference, explicit HTTP actions, inference provenance and review notices; example regeneration | Complete |
+| T2 | validation/publication reject HTTP bindings without requests | Complete |
 | T13 | 20–50 original licensed Skills, type expectations, benchmark and CI thresholds | Pending |
 | T3 | descriptive/enforced results and audit, CLI/UI run detail | Pending |
 | T4 | reviewed decision/data design, DSL 0.2, compiler/runtime/editor/write-back, risk-routing example and both paths | Pending |
@@ -29,4 +29,14 @@ branch update. Evidence below is updated only after a check finishes.
 
 ## Evidence
 
-Implementation in progress.
+- T0: 1,552 tests passed with umask `0002`; after T1/T2, 1,556 tests passed
+  with umask `0022`. The quickstart test checks ensurepip availability before
+  its isolated-venv journey.
+- T1: whole-word, Chinese, provenance, explicit-action and source-free notice
+  regressions pass; 82 JavaScript tests pass. Regenerated approval-flow and
+  http-action-flow fixtures add provenance. The four enterprise fixtures retain
+  node types through explicit reserved-endpoint HTTP declarations; their graph
+  fixtures are regenerated from DSL. Example sync and secret hygiene pass.
+- T2: missing/non-object requests for both HTTP connectors fail library/CLI
+  validation and publication; no workflow is published. Full suite: 1,556 tests
+  passed (111.559 s).

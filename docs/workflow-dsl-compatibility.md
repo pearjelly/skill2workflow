@@ -1,5 +1,11 @@
 # Workflow DSL Compatibility
 
+Validation now rejects `http` and `http_assert` bindings without an object
+`connector.request`, using `connector_request_missing`. Publication rejects
+the same invalid drafts. This tightens 0.1.x validation: historical artifacts
+with this defect already failed at execution and need correction and a new
+version, rather than a state migration. Immutable stored bytes are preserved.
+
 Skill inference now uses English whole words and explicit approval phrases,
 plus Chinese approval and verification terms. `human-readable`, `latest`,
 `contest`, `confirmation email` and `rerun` no longer invent control nodes.

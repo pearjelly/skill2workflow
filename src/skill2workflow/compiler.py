@@ -619,6 +619,11 @@ def _validate_http_connector_request(
 ) -> None:
     request = connector.get("request")
     if not isinstance(request, dict):
+        errors.append(_validation_error(
+            "connector_request_missing",
+            f"{node.get('id')} {connector.get('id')} connector requires connector.request",
+            ["nodes", index, "connector", "request"],
+        ))
         return
     if "allowed_origins" in request:
         _validate_http_allowed_origins(node, index, request.get("allowed_origins"), errors)

@@ -1,5 +1,10 @@
 # Stability Boundaries
 
+HTTP and HTTP-assertion bindings require an object `connector.request` at
+validation/publication time. The structured diagnostic is
+`connector_request_missing`; previously accepted unconfigured bindings always
+failed if reached. Fix such a draft and publish a new immutable version.
+
 Skill prose inference is conservative authoring guidance: English whole words,
 Chinese control terms and explicit approval phrases. It cannot bind HTTP
 actions. Review each `inferred_node` notice and source `matched_term` before

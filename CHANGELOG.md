@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Reject HTTP and HTTP-assertion nodes without a request object during DSL
+  validation and publication, with structured `connector_request_missing`
+  diagnostics instead of a predictable execution-time failure.
+
 - Tighten Skill inference to English whole words and explicit approval phrases,
   with Chinese approval/check vocabulary and per-step inference provenance.
   Prose commands compile as descriptive steps; only explicit declarations bind
