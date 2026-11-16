@@ -2889,7 +2889,7 @@ name: authoring-publish
 
             from skill2workflow.control_plane import LocalControlPlane
 
-            control = LocalControlPlane(state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
             workflow_records = control.list_workflows()
             run_summary = control.list_runs()[0]
 
@@ -3028,7 +3028,7 @@ name: authoring-publish
             from skill2workflow.control_plane import LocalControlPlane
 
             detail = json.loads(detail_stdout.getvalue())
-            audit_events = LocalControlPlane(state_dir).list_audit_events(run_id=result["run_id"])
+            audit_events = LocalControlPlane(state_dir, storage="sqlite").list_audit_events(run_id=result["run_id"])
 
         self.assertEqual(publish_exit, 0)
         self.assertEqual(trigger_exit, 0)
@@ -3247,7 +3247,7 @@ name: authoring-publish
 
             from skill2workflow.control_plane import LocalControlPlane
 
-            control = LocalControlPlane(state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
             detail = control.get_run(result["runs"][0]["run_id"])
             audit_events = control.list_audit_events(run_id=result["runs"][0]["run_id"])
 

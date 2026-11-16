@@ -8,6 +8,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Default CLI state storage to SQLite for all commands exposing `--storage`.
+  Pass `--storage json` explicitly for existing JSON workspaces and examples.
+  JSON run files are not migrated; Python library defaults and the existing
+  JSON registry/audit import behavior remain unchanged.
+
 - Move checkout demo, pilot and smoke helpers to
   `scripts/skill2workflow_testing`, excluding them from runtime wheels. Existing
   `scripts/*.py` entry points remain available; installed qualification drives

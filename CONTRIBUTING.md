@@ -1,5 +1,9 @@
 # Contributing to skill2workflow
 
+Local CLI state defaults to SQLite. Use `--storage json` explicitly when testing
+the JSON backend or inspecting JSON state created by a library fixture; Python
+library defaults remain unchanged. Do not mix backends in one workspace.
+
 Demo, pilot and smoke orchestration lives in `scripts/skill2workflow_testing`.
 Run it through the existing `python3 scripts/<name>.py` entry points from a
 source checkout. Tests import `scripts.skill2workflow_testing`; these helpers

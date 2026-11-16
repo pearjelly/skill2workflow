@@ -185,7 +185,7 @@ def _main(argv=None) -> int:
         "--state-dir", type=Path, default=Path(".skill2workflow")
     )
     authoring_publish_cmd.add_argument(
-        "--storage", choices=["json", "sqlite"], default="json"
+        "--storage", choices=["json", "sqlite"], default="sqlite"
     )
 
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
@@ -231,7 +231,7 @@ def _main(argv=None) -> int:
     )
     bundle_publish_cmd.add_argument("bundle", type=Path)
     bundle_publish_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    bundle_publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    bundle_publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     bundle_diff_cmd = subparsers.add_parser(
         "bundle-diff",
@@ -254,7 +254,7 @@ def _main(argv=None) -> int:
     )
     bundle_run_cmd.add_argument("bundle", type=Path)
     bundle_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    bundle_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    bundle_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     bundle_run_cmd.add_argument("--input", type=Path)
     bundle_run_cmd.add_argument(
         "--allow-side-effects",
@@ -292,7 +292,7 @@ def _main(argv=None) -> int:
     run_cmd = subparsers.add_parser("run", help="Run a Workflow DSL JSON file")
     run_cmd.add_argument("workflow", type=Path)
     run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     run_cmd.add_argument("--credential-file", type=Path)
     run_cmd.add_argument(
         "--connector-fixture",
@@ -303,7 +303,7 @@ def _main(argv=None) -> int:
     resume_cmd = subparsers.add_parser("resume", help="Resume a waiting run")
     resume_cmd.add_argument("run_id")
     resume_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    resume_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     resume_cmd.add_argument("--credential-file", type=Path)
     resume_cmd.add_argument("--reject", action="store_true")
     resume_cmd.add_argument(
@@ -314,24 +314,24 @@ def _main(argv=None) -> int:
 
     runs_cmd = subparsers.add_parser("runs", help="List local runs")
     runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     runs_cmd.add_argument("--limit", type=int, help="Return the newest bounded run window (1-1000)")
 
     show_cmd = subparsers.add_parser("show", help="Show a local run detail")
     show_cmd.add_argument("run_id")
     show_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    show_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    show_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     publish_cmd = subparsers.add_parser("publish", help="Publish an immutable Workflow DSL version")
     publish_cmd.add_argument("workflow", type=Path)
     publish_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     deprecate_cmd = subparsers.add_parser("deprecate", help="Deprecate a published workflow version")
     deprecate_cmd.add_argument("workflow_id")
     deprecate_cmd.add_argument("--version", required=True)
     deprecate_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    deprecate_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    deprecate_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     promote_cmd = subparsers.add_parser(
         "promote", help="Point a stable alias at a published workflow version"
@@ -345,11 +345,11 @@ def _main(argv=None) -> int:
         help="Require the alias to still point at this version before promotion",
     )
     promote_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    promote_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    promote_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     workflows_cmd = subparsers.add_parser("workflows", help="List published workflow versions")
     workflows_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    workflows_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    workflows_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     workflows_cmd.add_argument(
         "--limit",
         type=int,
@@ -364,14 +364,14 @@ def _main(argv=None) -> int:
         "--state-dir", type=Path, default=Path(".skill2workflow")
     )
     workflow_artifacts_cmd.add_argument(
-        "--storage", choices=["json", "sqlite"], default="json"
+        "--storage", choices=["json", "sqlite"], default="sqlite"
     )
 
     workflow_cmd = subparsers.add_parser("workflow", help="Show a published workflow version")
     workflow_cmd.add_argument("workflow_id")
     workflow_cmd.add_argument("--version", required=True)
     workflow_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    workflow_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    workflow_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     workflow_diff_cmd = subparsers.add_parser(
         "workflow-diff", help="Compare two published workflow versions without printing values"
@@ -380,20 +380,20 @@ def _main(argv=None) -> int:
     workflow_diff_cmd.add_argument("--from-version", required=True)
     workflow_diff_cmd.add_argument("--to-version", required=True)
     workflow_diff_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    workflow_diff_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    workflow_diff_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     run_published_cmd = subparsers.add_parser("run-published", help="Run a published workflow version")
     run_published_cmd.add_argument("workflow_id")
     run_published_cmd.add_argument("--version", required=True)
     run_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     run_published_cmd.add_argument("--credential-file", type=Path)
 
     trigger_cmd = subparsers.add_parser("trigger", help="Trigger a published workflow through the local API")
     trigger_cmd.add_argument("workflow_id")
     trigger_cmd.add_argument("--version", required=True)
     trigger_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    trigger_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    trigger_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     trigger_cmd.add_argument("--source", default="local-cli")
     trigger_cmd.add_argument("--idempotency-key", default="")
     trigger_cmd.add_argument("--input", type=Path, help="JSON object with trigger input metadata")
@@ -402,11 +402,11 @@ def _main(argv=None) -> int:
     schedule_add_cmd = subparsers.add_parser("schedule-add", help="Add or replace a local schedule definition")
     schedule_add_cmd.add_argument("schedule", type=Path)
     schedule_add_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    schedule_add_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedule_add_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     schedules_cmd = subparsers.add_parser("schedules", help="List local schedule definitions")
     schedules_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    schedules_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedules_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     schedules_cmd.add_argument("--limit", type=int, help="Return a compact newest window (1-1000)")
 
     schedule_dispatches_cmd = subparsers.add_parser(
@@ -454,7 +454,7 @@ def _main(argv=None) -> int:
         help="Run due local schedules through the trigger boundary",
     )
     schedule_run_due_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    schedule_run_due_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedule_run_due_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     schedule_run_due_cmd.add_argument("--now", required=True, help="ISO-8601 timestamp used for deterministic due checks")
     schedule_run_due_cmd.add_argument(
         "--max-items",
@@ -470,7 +470,7 @@ def _main(argv=None) -> int:
     webhook_server_cmd.add_argument("--host", default="127.0.0.1")
     webhook_server_cmd.add_argument("--port", type=int, default=8080)
     webhook_server_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    webhook_server_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    webhook_server_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     webhook_server_cmd.add_argument("--credential-file", type=Path)
     webhook_server_cmd.add_argument("--once", action="store_true", help="Handle one request and then exit")
 
@@ -653,7 +653,7 @@ def _main(argv=None) -> int:
     resume_published_cmd = subparsers.add_parser("resume-published", help="Resume a waiting published run")
     resume_published_cmd.add_argument("run_id")
     resume_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    resume_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     resume_published_cmd.add_argument("--credential-file", type=Path)
     resume_published_cmd.add_argument("--reject", action="store_true")
 
@@ -1095,17 +1095,17 @@ def _main(argv=None) -> int:
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    control_runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     control_runs_cmd.add_argument("--limit", type=int, help="Return the newest bounded run window (1-1000)")
 
     control_run_cmd = subparsers.add_parser("control-run", help="Show a control-plane run detail")
     control_run_cmd.add_argument("run_id")
     control_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    control_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     audit_cmd = subparsers.add_parser("audit", help="List control plane audit events")
     audit_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    audit_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    audit_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     audit_cmd.add_argument("--workflow-id", default="")
     audit_cmd.add_argument("--version", default="")
     audit_cmd.add_argument("--run-id", default="")
@@ -1122,7 +1122,7 @@ def _main(argv=None) -> int:
         help="Compare durable run state with control-plane audit evidence",
     )
     audit_consistency_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    audit_consistency_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    audit_consistency_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     audit_consistency_cmd.add_argument("--run-id", default="")
 
     audit_verify_cmd = subparsers.add_parser(
@@ -1163,7 +1163,7 @@ def _main(argv=None) -> int:
         help="Export a read-only control-plane snapshot for the local UI",
     )
     control_snapshot_cmd.add_argument("--state-dir", type=Path)
-    control_snapshot_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_snapshot_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     control_snapshot_cmd.add_argument("--service-url")
     control_snapshot_cmd.add_argument("--auth-token-file", type=Path)
     control_snapshot_cmd.add_argument(

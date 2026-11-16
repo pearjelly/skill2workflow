@@ -498,7 +498,7 @@ Implemented:
   - checks edges are declared by node transitions
   - requires `tool_call` nodes to declare `connector.id`
 - Durable local executor
-  - supports JSON file run storage by default
+  - defaults CLI state storage to SQLite; JSON file storage uses `--storage json`
   - supports opt-in SQLite run storage through `--storage sqlite`
   - stores queryable run event rows in SQLite
   - records terminal node results

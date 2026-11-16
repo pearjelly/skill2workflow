@@ -1,5 +1,12 @@
 # Stability Boundaries
 
+CLI commands with `--storage` now default to `sqlite`, aligning local commands
+with the self-hosted production persistence baseline. Use `--storage json` on
+every command accessing an existing JSON workspace. JSON run files are not
+migrated; the existing SQLite control-store import of a JSON registry/audit
+tail remains unchanged. JSON stays supported for examples and evaluation.
+Python library storage defaults remain compatible.
+
 Contributor demo, pilot and qualification helpers are checkout-only under
 `scripts/skill2workflow_testing`; their Python module paths are not runtime API.
 The wheel contains production modules and installed UI/example assets. Package
@@ -279,7 +286,7 @@ These surfaces should remain compatible during the `0.1.x` line:
   committed SQLite state mutation with missing control-plane audit evidence
   without replaying workflow execution or a human decision; this is a retry
   recovery contract, not a distributed transaction or provider compensation
-- JSON storage as the dependency-light default
+- JSON storage as an explicitly selected local backend (`--storage json`)
 - Local JSON run-state documents use the fixed 8 MiB regular-file/no-follow,
   device/inode-bound read and write contract documented in
   [`json-run-state-boundary.md`](json-run-state-boundary.md); the JSON state
@@ -288,7 +295,7 @@ These surfaces should remain compatible during the `0.1.x` line:
   no-follow, device/inode-bound read and write contract documented in
   [`json-control-index-boundary.md`](json-control-index-boundary.md); registry
   shape and the JSON-to-SQLite import path remain compatible
-- SQLite storage as an opt-in local persistence mode
+- SQLite storage as the default CLI persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
 - Built-in HTTP connector request/response payloads are bounded to 1 MiB with fixed overflow and invalid-UTF-8 failures, as documented in `docs/connectors.md`
 - Built-in HTTP `response_mode` accepts `full` or `metadata`; metadata mode retains only status and bounded size facts after reading, while `full` preserves the legacy headers/body projection

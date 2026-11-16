@@ -20,7 +20,7 @@ standard-library-only runtime remain requirements.
 | T9 | development-only Ruff/mypy CI and typed IR/DSL/state contracts | Complete |
 | T12 | JSON Schema/validator agreement for examples and invalid cases; versioned 0.2 schema | Complete |
 | T10 | testing/demo/pilot modules excluded from runtime wheel; smoke entry points preserved | Complete |
-| T11 | SQLite CLI default; explicit JSON compatibility and documentation | Pending |
+| T11 | SQLite CLI default; explicit JSON compatibility and documentation | Complete |
 | T14 | one-page roadmap, archived loop history, consolidated API reference, short agent notes and command reference | Pending |
 
 Completion also requires the full Python and JavaScript suites, example and
@@ -113,3 +113,11 @@ branch update. Evidence below is updated only after a check finishes.
   A stale local build cache was detected by that gate and cleared before the
   successful clean build. Ruff/mypy, 83 JavaScript tests, corpus, example sync
   and repository/example secret hygiene pass.
+
+- T11: all 33 CLI storage selectors now default to SQLite (26 defaults changed).
+  New tests check every selector plus publish/trigger/gate resume/inspection in
+  default SQLite and explicit JSON workspaces. Existing CLI integration readers
+  select the matching SQLite backend. Full development suite: 1,586 tests passed
+  (114.294 s). Installed package and Agent drills pass; Ruff/mypy, 83 JavaScript
+  tests, corpus, example sync and secret hygiene pass. Library defaults, JSON run
+  files and the existing registry/audit import behavior remain unchanged.

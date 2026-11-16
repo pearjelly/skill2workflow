@@ -1,5 +1,13 @@
 # Workflow DSL Compatibility
 
+CLI storage selection now defaults to SQLite. Existing JSON workspaces remain
+compatible with explicit `--storage json` on each command. JSON run files are
+not migrated. Selecting SQLite retains the existing one-time JSON registry/audit
+import into an empty control store. Python library defaults and DSL artifacts
+are unchanged.
+SQLite layout upgrades use the separate [state upgrade procedure](upgrade-migration.md);
+changing this CLI default does not convert a JSON workspace.
+
 Checkout demo/pilot/smoke Python imports have moved from `skill2workflow.*` to
 `scripts.skill2workflow_testing.*`. They are contributor tools, excluded from
 the wheel; their `scripts/*.py` entry points are unchanged. This packaging
