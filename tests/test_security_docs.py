@@ -56,7 +56,7 @@ class SecurityBoundaryDocumentationTests(TestCase):
 
     def test_readme_and_roadmap_preserve_loop_42_with_completed_beta_gate(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
 
         self.assertIn("Delivery Loops 1-285 are complete", readme)
         assert_guide_reachable(self, 'docs/security-boundary.md')

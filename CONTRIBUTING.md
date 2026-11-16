@@ -28,7 +28,8 @@ Keep README focused on a safe first run and a short product boundary, not a
 per-loop changelog or command catalogue. Put detailed contracts in their topic
 guides, link every public top-level guide from [the reference](docs/reference.md),
 and keep the [task guide](docs/README.md) useful for authoring, deployment and
-recovery. Record delivery history in ROADMAP and changes in CHANGELOG.
+recovery. Keep current priorities in ROADMAP, completed delivery history in
+`docs/loops/history.md`, and user-visible changes in CHANGELOG.
 
 Run `python3 scripts/documentation_check.py` after documentation changes. The
 ordinary Python suite requires the same check: README at most 300 lines, a

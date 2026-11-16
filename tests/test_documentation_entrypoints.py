@@ -26,7 +26,7 @@ class DocumentationEntrypointTests(TestCase):
         from scripts.documentation_check import check_documentation
         report = check_documentation(ROOT)
         self.assertTrue(report['ok'], report['errors'])
-        self.assertGreaterEqual(report['public_guides'], 100)
+        self.assertGreaterEqual(report['public_guides'], 75)
         self.assertLessEqual(report['max_guide_hops'], 3)
 
     def test_link_check_does_not_accept_missing_files_or_anchors(self):
@@ -54,6 +54,16 @@ class DocumentationEntrypointTests(TestCase):
                                           '[c](guide.md#repeat-1)\n')
             (root / 'guide.md').write_text('# Use `SKILL.md`\n## 恢复 草稿\n## Repeat\n## Repeat\n', encoding='utf-8')
             self.assertEqual(check_links(root, Path('README.md')), [])
+
+    def test_link_check_supports_explicit_api_anchors_outside_code_fences(self):
+        from scripts.documentation_check import check_links
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'README.md').write_text('[resource](guide.md#remote-trigger)\n')
+            (root / 'guide.md').write_text('<a id="remote-trigger"></a>\n## Trigger\n')
+            self.assertEqual(check_links(root, Path('README.md')), [])
+            (root / 'guide.md').write_text('```html\n<a id="remote-trigger"></a>\n```\n')
+            self.assertEqual(check_links(root, Path('README.md'))[0]['code'], 'missing_anchor')
 
     def test_link_check_refuses_repository_escape(self):
         from scripts.documentation_check import check_links

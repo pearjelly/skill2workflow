@@ -51,8 +51,8 @@ class InterruptedRecoveryDocumentationTests(TestCase):
 
     def test_readme_roadmap_and_operator_commands_record_loop_49_without_overclaim(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
+        agents = (ROOT / "docs/reference.md").read_text(encoding="utf-8")
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
 
         self.assertIn("Delivery Loops 1-285 are complete", readme)

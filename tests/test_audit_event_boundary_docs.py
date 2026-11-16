@@ -19,14 +19,14 @@ class AuditEventBoundaryDocsTests(TestCase):
 
     def test_public_docs_link_the_boundary(self):
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         assert_guide_reachable(self, 'docs/audit-event-boundary.md')
         for document in (stability, roadmap):
             self.assertIn("audit-event-boundary.md", document)
 
     def test_roadmap_and_readme_promote_loop_175(self):
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         self.assertIn("Completed delivery loops: 1-285", roadmap)
         self.assertIn(

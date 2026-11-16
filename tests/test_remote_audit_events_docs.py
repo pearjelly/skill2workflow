@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from tests.documentation_fixtures import assert_guide_reachable
@@ -14,7 +15,7 @@ class RemoteAuditEventsDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        guide = (ROOT / "docs" / "remote-audit-events.md").read_text(encoding="utf-8")
+        guide = read_api_section('remote-audit-events')
         self.assertEqual(
             schema["$id"],
             "https://skill2workflow.dev/schemas/audit-event-list-0.1.0.schema.json",
@@ -42,7 +43,7 @@ class RemoteAuditEventsDocumentationTests(TestCase):
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(encoding="utf-8")
-        assert_guide_reachable(self, 'docs/remote-audit-events.md')
+        assert_guide_reachable(self, 'docs/api-reference.md#remote-audit-events')
         self.assertIn("GET /api/v1/audit-events", service)
         self.assertIn("service-audit-events", stability)
         self.assertIn('"service-audit-events"', package_smoke)

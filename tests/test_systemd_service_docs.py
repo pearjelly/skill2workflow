@@ -24,7 +24,7 @@ class SystemdServiceDocumentationTests(TestCase):
 
     def test_public_docs_and_roadmap_record_loop_56_without_overclaiming(self):
         root = Path(__file__).resolve().parents[1]
-        roadmap = (root / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (root / "docs/loops/history.md").read_text(encoding="utf-8")
         readme = (root / "README.md").read_text(encoding="utf-8")
         guide = (root / "docs" / "systemd-service.md").read_text(encoding="utf-8")
         normalized = " ".join(guide.split())

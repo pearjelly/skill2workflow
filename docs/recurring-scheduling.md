@@ -160,7 +160,7 @@ authenticated `PUT /api/v1/recurring-schedules/{schedule_id}` route. The
 protected `service-recurring-schedule-update` command requires the last
 observed `next_run_at` value as a compare-and-swap token, so a concurrent
 dispatch produces a safe `409` instead of silently resetting progress. See
-[`remote-schedule-update.md`](remote-schedule-update.md).
+[`remote-schedule-update.md`](api-reference.md#remote-schedule-update).
 
 Retire a schedule only after disabling it and confirming the latest
 `next_run_at`:
@@ -175,7 +175,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli service-recurring-schedule-delete \
 
 The protected delete route rejects enabled schedules and active claims,
 retains dispatch history, and uses a durable tombstone for safe replay. See
-[`remote-schedule-delete.md`](remote-schedule-delete.md).
+[`remote-schedule-delete.md`](api-reference.md#remote-schedule-delete).
 
 The optional local `--limit` windows accept `1` through `1000`. Bounded
 schedule output uses `skill2workflow-local-schedule-list-0.1.0` and omits
@@ -190,7 +190,7 @@ and [`local-schedule-dispatch-list-0.1.0.schema.json`](../schemas/local-schedule
 The fixed remote `service-recurring-dispatches` tail remains available for a
 quick recent view. For older evidence, use the separate cursor-paged
 `service-recurring-dispatch-page` route and contract documented in
-[`remote-schedule-dispatch-pages.md`](remote-schedule-dispatch-pages.md); its
+[`remote-schedule-dispatch-pages.md`](api-reference.md#remote-schedule-dispatch-pages); its
 opaque cursor is source-bounded by SQLite and never exposes trigger input.
 
 The authenticated `POST /api/v1/recurring-schedule-dispatches/{dispatch_id}/review`
@@ -200,7 +200,7 @@ page as `--expected-completed-at`; a stale value returns `409`. Read the
 durable projection later with
 `GET /api/v1/recurring-schedule-dispatches/{dispatch_id}/review` or
 `service-recurring-dispatch-review-get`. The fixed contract is documented in
-[`remote-schedule-dispatch-reviews.md`](remote-schedule-dispatch-reviews.md).
+[`remote-schedule-dispatch-reviews.md`](api-reference.md#remote-schedule-dispatch-reviews).
 
 For SQLite recurring schedules, the bounded inventory reads a transactional
 `recurring_schedule_summaries` projection containing only scheduling metadata.
@@ -231,7 +231,7 @@ PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due \
 The legacy `skill2workflow-schedule-0.1.0` format remains a local one-shot JSON schedule for evaluation and compatibility. Each one-shot document is capped at a fixed 2 MiB UTF-8 envelope on save and every read path; an oversized or growing file fails closed before JSON normalization. The long-running service dispatches only the durable `0.2.0` SQLite contract.
 
 The remote create path is documented in
-[`remote-schedule-create.md`](remote-schedule-create.md). It is retry-safe for
+[`remote-schedule-create.md`](api-reference.md#remote-schedule-create). It is retry-safe for
 an identical definition, rejects a changed existing definition, and returns
 only scheduling metadata; it never echoes trigger input.
 

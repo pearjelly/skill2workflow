@@ -21,7 +21,7 @@ standard-library-only runtime remain requirements.
 | T12 | JSON Schema/validator agreement for examples and invalid cases; versioned 0.2 schema | Complete |
 | T10 | testing/demo/pilot modules excluded from runtime wheel; smoke entry points preserved | Complete |
 | T11 | SQLite CLI default; explicit JSON compatibility and documentation | Complete |
-| T14 | one-page roadmap, archived loop history, consolidated API reference, short agent notes and command reference | Pending |
+| T14 | one-page roadmap, archived loop history, consolidated API reference, short agent notes and command reference | Complete |
 
 Completion also requires the full Python and JavaScript suites, example and
 secret hygiene checks, installed artifact qualification, and a verified GitHub
@@ -121,3 +121,14 @@ branch update. Evidence below is updated only after a check finishes.
   (114.294 s). Installed package and Agent drills pass; Ruff/mypy, 83 JavaScript
   tests, corpus, example sync and secret hygiene pass. Library defaults, JSON run
   files and the existing registry/audit import behavior remain unchanged.
+
+- T14: ROADMAP is 52 lines with four goals and exit criteria. All 285 loops
+  remain in docs/loops/history.md; a text comparison preserves the historical
+  body apart from relocated links. The 26 remote guides become one API reference
+  with stable resource/subsection anchors; all contract text is preserved apart
+  from headings and links. Tests read individual resource sections. AGENTS keeps
+  ten commands; all 63 original command entries remain in docs/reference.md.
+  The approved design specs are unchanged. Full development suite: 1,591 tests
+  passed (115.119 s); Ruff/mypy and 83 JavaScript tests pass. All 89 public
+  document/archive files have valid local targets and anchors; all 78 top-level
+  guides are reachable within two hops. Corpus and secret hygiene pass.

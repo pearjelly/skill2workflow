@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class FirstProductConnectorCandidateDocsTests(TestCase):
     def test_loop_35_lark_task_candidate_decision_is_documented(self):
         decision = _read("docs/first-product-connector-candidate.md")
-        roadmap = _read("ROADMAP.md")
+        roadmap = _read("docs/loops/history.md")
 
         self.assertIn("# First Product Connector Candidate", decision)
         self.assertIn("Selected candidate: Lark/Feishu Task Connector", decision)

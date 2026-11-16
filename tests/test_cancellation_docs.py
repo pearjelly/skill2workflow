@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from tests.documentation_fixtures import assert_guide_reachable
@@ -50,7 +51,7 @@ class CancellationDocumentationTests(TestCase):
 
     def test_public_docs_record_loop_48_without_claiming_forceful_abort(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         service = (ROOT / "docs/service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs/stability.md").read_text(encoding="utf-8")
 
@@ -65,9 +66,7 @@ class CancellationDocumentationTests(TestCase):
 
     def test_public_docs_record_cross_database_retry_reconciliation(self):
         approval = (ROOT / "docs" / "human-approval.md").read_text(encoding="utf-8")
-        schedule = (ROOT / "docs" / "remote-schedule-actions.md").read_text(
-            encoding="utf-8"
-        )
+        schedule = read_api_section('remote-schedule-actions')
         self.assertIn("repairs only missing bounded audit evidence", approval)
         self.assertIn("changed: false", schedule)
         self.assertIn("scheduler commit succeeds", schedule)

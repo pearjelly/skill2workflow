@@ -25,7 +25,7 @@ class PublishedArtifactReadBoundaryDocumentationTests(TestCase):
     def test_public_docs_link_the_boundary(self):
         _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         assert_guide_reachable(self, 'docs/published-artifact-read-boundary.md')
         self.assertIn("published-artifact-read-boundary.md", stability)

@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from unittest import TestCase
@@ -8,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class RemoteBackupInventoryDocumentationTests(TestCase):
     def test_remote_backup_inventory_contract_is_documented_and_schema_bound(self):
-        guide = (ROOT / "docs" / "remote-backup-inventory.md").read_text(encoding="utf-8")
+        guide = read_api_section('remote-backup-inventory')
         schema = json.loads(
             (ROOT / "schemas" / "remote-backup-inventory-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -38,9 +39,7 @@ class RemoteBackupInventoryDocumentationTests(TestCase):
         self.assertEqual(runtime["properties"]["backup_parent_dir"]["type"], "string")
 
     def test_cursor_paged_remote_backup_inventory_contract_is_documented_and_schema_bound(self):
-        guide = (ROOT / "docs" / "remote-backup-inventory-pages.md").read_text(
-            encoding="utf-8"
-        )
+        guide = read_api_section('remote-backup-inventory-pages')
         schema = json.loads(
             (ROOT / "schemas" / "remote-backup-inventory-page-0.1.0.schema.json").read_text(
                 encoding="utf-8"

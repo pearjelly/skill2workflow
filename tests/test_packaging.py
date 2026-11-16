@@ -183,7 +183,7 @@ class PackagingMetadataTests(TestCase):
         guide = (root / "docs" / "release-artifact-qualification.md").read_text(
             encoding="utf-8"
         )
-        roadmap = (root / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (root / "docs/loops/history.md").read_text(encoding="utf-8")
         readme = (root / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("# Release Artifact Qualification", guide)

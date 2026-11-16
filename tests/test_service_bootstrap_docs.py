@@ -25,7 +25,7 @@ class ServiceBootstrapDocumentationTests(TestCase):
         self.assertIn("service-bootstrap.md", service)
 
     def test_roadmap_and_readme_record_completed_loop_51_without_maturity_inflation(self):
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
@@ -69,7 +69,7 @@ class ServiceBootstrapDocumentationTests(TestCase):
         guide = (ROOT / "docs" / "service-bootstrap.md").read_text(
             encoding="utf-8"
         )
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(
             encoding="utf-8"
         )

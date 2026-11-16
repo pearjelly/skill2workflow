@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class TriggerDocumentationTests(TestCase):
     def test_trigger_guide_publishes_durable_idempotency_boundary(self):
         guide = (ROOT / "docs" / "triggers.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         _readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
         for phrase in (

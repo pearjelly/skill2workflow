@@ -25,7 +25,7 @@ class JsonControlIndexDocumentationTests(TestCase):
     def test_public_docs_link_the_boundary(self):
         _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         assert_guide_reachable(self, 'docs/json-control-index-boundary.md')
         self.assertIn("json-control-index-boundary.md", stability)
         self.assertIn("Loop 171: Bounded Local JSON Control Index", roadmap)

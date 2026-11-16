@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Keep the roadmap to one page with four goals and exit criteria; retain all
+  285 delivery loops in `docs/loops/history.md`. Consolidate 26 remote API
+  guides into `docs/api-reference.md` with stable resource/subsection anchors.
+  Keep ten core agent commands and move the complete list to the contributor
+  reference. Existing contract assertions follow their archived/resource scopes.
+
 - Default CLI state storage to SQLite for all commands exposing `--storage`.
   Pass `--storage json` explicitly for existing JSON workspaces and examples.
   JSON run files are not migrated; Python library defaults and the existing

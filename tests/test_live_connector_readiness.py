@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class LiveConnectorReadinessTests(TestCase):
     def test_lark_live_connector_readiness_decision_is_documented(self):
         decision = _read("docs/lark-live-connector-readiness.md")
-        roadmap = _read("ROADMAP.md")
+        roadmap = _read("docs/loops/history.md")
         connectors = _read("docs/connectors.md")
 
         self.assertIn("# Lark/Feishu Live Connector Readiness Review", decision)

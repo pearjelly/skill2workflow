@@ -30,7 +30,7 @@ Start with the task paths below rather than reading every boundary in sequence.
 - [Single-service Docker self-hosting](docker-self-host.md) — Linux host-network deployment with private persistent state
 - [Recurring scheduling](recurring-scheduling.md) — durable dispatch semantics
 - [Human approval](human-approval.md) — remote approve/reject handoff
-- [Remote trigger](remote-trigger.md) — protected workflow start
+- [Remote trigger](api-reference.md#remote-trigger) — protected workflow start
 
 ## Review, recover, and troubleshoot
 

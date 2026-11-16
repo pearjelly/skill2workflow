@@ -126,7 +126,7 @@ class InputSchemaTests(TestCase):
         root = Path(__file__).resolve().parents[1]
         contract_docs = (root / "docs" / "workflow-dsl-contract.md").read_text(encoding="utf-8")
         trigger_docs = (root / "docs" / "triggers.md").read_text(encoding="utf-8")
-        roadmap = (root / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (root / "docs/loops/history.md").read_text(encoding="utf-8")
 
         self.assertIn("Declarative Trigger Input Contracts", contract_docs)
         self.assertIn("before SQLite idempotency claims", trigger_docs)
