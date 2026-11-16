@@ -13,6 +13,8 @@ release; Roadmap loop completion alone does not publish a new version.
   guides into `docs/api-reference.md` with stable resource/subsection anchors.
   Keep ten core agent commands and move the complete list to the contributor
   reference. Existing contract assertions follow their archived/resource scopes.
+  Release-preflight path filters follow the consolidated API guide and extracted
+  service route modules.
 
 - Default CLI state storage to SQLite for all commands exposing `--storage`.
   Pass `--storage json` explicitly for existing JSON workspaces and examples.

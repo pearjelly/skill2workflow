@@ -146,3 +146,6 @@ and restart checks pass for JSON and SQLite.
 [Machine-readable verification](verification/2026-11-16-improvement-report.json)
 records the tested commit and fixed outcome facts. GitHub publication is tracked
 by the branch/PR containing this ledger; no package release is performed.
+
+The release-preflight path filter also follows the consolidated API/history
+documents and extracted service-route modules; its CI contract tests pass.
