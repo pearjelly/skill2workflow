@@ -1358,6 +1358,7 @@ class LocalControlPlane:
                 "credential_handles",
                 "connector_metadata",
                 "execution",
+                "branch_index",
             ):
                 if key in event:
                     audit_event[key] = event[key]
@@ -1716,6 +1717,7 @@ def _now() -> str:
 def _promote_runtime_event(event_type: str) -> bool:
     return event_type.startswith("connector_") or event_type in {
         "node_completed",
+        "decision_evaluated",
         "node_retrying",
         "node_recovered",
         "node_failed",

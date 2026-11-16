@@ -94,6 +94,8 @@ UI_STATIC_FILES = frozenset({
     "examples/workflows/operations-analysis.workflow.json",
     "examples/workflows/risk-review.litegraph.json",
     "examples/workflows/risk-review.workflow.json",
+    "examples/workflows/risk-routing.litegraph.json",
+    "examples/workflows/risk-routing.workflow.json",
     "examples/workflows/sales-follow-up.litegraph.json",
     "examples/workflows/sales-follow-up.workflow.json",
 })

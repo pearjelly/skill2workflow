@@ -17,6 +17,7 @@ from .connectors import (
     connector_ref,
 )
 from .storage import create_run_store
+from .decisions import data_context, evaluate_decision
 
 
 RunState = Dict[str, object]
@@ -508,6 +509,30 @@ class LocalExecutor:
                 self._event(state, "run_failed", current_id)
                 self._save(state)
                 return state
+
+            if node_type == "decision":
+                self._event(state, "node_started", current_id)
+                try:
+                    if workflow.get("schema_version") != "0.2.0":
+                        raise ValueError("unsupported decision version")
+                    target, branch_index = evaluate_decision(node, data_context(state))
+                    if not isinstance(target, str) or target not in node_map:
+                        raise ValueError("decision target unavailable")
+                except (KeyError, ValueError, TypeError):
+                    state["status"] = "failed"
+                    state["error"] = "decision configuration is invalid"
+                    self._event(state, "run_failed", current_id)
+                    self._save(state)
+                    return state
+                state["node_results"][current_id] = {
+                    "status": "completed", "title": node.get("title", current_id),
+                    "execution": "enforced", "branch_index": branch_index, "timestamp": self._now(),
+                }
+                self._event(state, "decision_evaluated", current_id, {"branch_index": branch_index})
+                self._event(state, "node_completed", current_id)
+                state["current_node"] = target
+                self._save(state)
+                continue
 
             if node_type == "human_gate":
                 state["status"] = "waiting"

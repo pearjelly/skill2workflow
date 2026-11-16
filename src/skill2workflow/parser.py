@@ -54,11 +54,11 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     sections = _parse_sections(body)
     declaration_lines = {
         step['line'] for step in checklist_details
-        if isinstance(step.get('connector'), dict) and step['connector'].get('id') in {'http', 'http_assert'}
+        if step.get('node_type') is not None
     }
     guidance_body = '\n'.join(
         '' if fenced else (
-            re.sub(r'[ \t]+<!-- skill2workflow: (?:http|http_assert) \{.*\} -->[ \t]*$', '', line)
+            re.sub(r'[ \t]+<!-- skill2workflow: (?:human_gate|http|http_assert|decision|step)(?: \{.*\})? -->[ \t]*$', '', line)
             if line_number in declaration_lines else line
         )
         for line_number, line, fenced in _fence_aware_lines(body, body_start_line)
@@ -285,7 +285,7 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
         reserved = re.findall(r'<!--\s*skill2workflow\b', line, re.IGNORECASE)
         if not reserved:
             continue
-        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|(?:http|http_assert) (\{.*\})) -->[ \t]*$', line)
+        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|http|http_assert|decision|step)(?: (\{.*\}))? -->[ \t]*$', line)
         if len(reserved) != 1 or annotation is None or line_number not in selected:
             raise ValueError('Invalid Skill step annotation')
         content = re.sub(
@@ -296,18 +296,32 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
         if not title:
             raise ValueError('Invalid Skill step annotation')
         selected[line_number].update(title=title, detail=detail)
-        if annotation.group(1) == 'human_gate':
-            selected[line_number]['node_type'] = 'human_gate'
-        else:
-            try:
-                payload = annotation.group(2)
-                if '<!--' in payload or '-->' in payload:
-                    raise ValueError('nested comment delimiter')
-                factory = skill_http_action_binding if annotation.group(1).startswith('http ') else skill_http_assertion_binding
-                binding = factory(load_assertion_json(payload))
-            except (ValueError, TypeError, RecursionError, OverflowError) as error:
-                raise ValueError('Invalid Skill step annotation') from error
-            selected[line_number].update(node_type='tool_call', connector=binding)
+        try:
+            kind, payload = annotation.group(1), annotation.group(2)
+            if payload is None and kind != 'human_gate':
+                raise ValueError('configuration required')
+            if payload is not None and ('<!--' in payload or '-->' in payload):
+                raise ValueError('nested comment delimiter')
+            config = load_assertion_json(payload) if payload is not None else {}
+            if kind == 'decision':
+                if set(config) != {'branches', 'default'}:
+                    raise ValueError('decision branches and default required')
+                selected[line_number].update(node_type='decision', decision=config)
+                continue
+            if 'next' in config:
+                target = config.pop('next')
+                if not ((type(target) is int and target > 0) or (isinstance(target, str) and target.strip())):
+                    raise ValueError('invalid next step')
+                selected[line_number]['next'] = target
+            if kind in {'human_gate', 'step'}:
+                if config:
+                    raise ValueError('unsupported step configuration')
+                selected[line_number]['node_type'] = kind
+            else:
+                factory = skill_http_action_binding if kind == 'http' else skill_http_assertion_binding
+                selected[line_number].update(node_type='tool_call', connector=factory(config))
+        except (ValueError, TypeError, RecursionError, OverflowError) as error:
+            raise ValueError('Invalid Skill step annotation') from error
     # Never let an unrecognized reserved declaration fall through to inference.
     for step in steps:
         if 'node_type' not in step and re.search(

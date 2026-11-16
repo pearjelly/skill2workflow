@@ -1,5 +1,14 @@
 # Workflow DSL Compatibility
 
+Workflow DSL 0.2.0 adds explicit ordered decisions over trigger input and
+persisted outputs. Schema 0.1.0 and its execution behavior remain supported;
+Skills without 0.2 declarations keep compiling to 0.1.0. No state upgrade or
+automatic artifact rewrite is needed. Decision branches/default replace any
+attempt to execute `edges[].condition`; those edge conditions, descriptive
+guards and other reserved fields now have separate validator notices. See
+[the versioned contract](workflow-dsl-contract.md#decisions-and-data-in-020).
+Older runtimes reject the new schema instead of guessing a branch.
+
 Run results/events now carry additive `execution` metadata: descriptive
 steps/instructions/text-only verification record progress; connectors and
 human gates enforce their configured mechanism. Completion alone is not

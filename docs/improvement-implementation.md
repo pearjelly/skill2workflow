@@ -12,8 +12,8 @@ standard-library-only runtime remain requirements.
 | T2 | validation/publication reject HTTP bindings without requests | Complete |
 | T13 | 20–50 original licensed Skills, type expectations, benchmark and CI thresholds | Complete |
 | T3 | descriptive/enforced results and audit, CLI/UI run detail | Complete |
-| T4 | reviewed decision/data design, DSL 0.2, compiler/runtime/editor/write-back, risk-routing example and both paths | Pending |
-| T6 | enforced data dependencies and documented reserved fields with notices | Pending |
+| T4 | reviewed decision/data design, DSL 0.2, compiler/runtime/editor/write-back, risk-routing example and both paths | Complete |
+| T6 | enforced data dependencies and documented reserved fields with notices | Complete |
 | T5 | reviewed Agent protocol, filtered context, output validation and durable results, deterministic end-to-end adapter | Pending |
 | T7 | service route modules/table; unchanged service/client tests and both boundary smokes | Pending |
 | T8 | CLI command functions and argparse dispatch; unchanged CLI tests | Pending |
@@ -53,3 +53,14 @@ branch update. Evidence below is updated only after a check finishes.
   0 / 51.04%; example sync and secret hygiene pass. Two pre-existing muted
   text contrast findings were fixed through the shared muted color; the design
   hook reports no CSS findings. No findings were suppressed or left standing.
+
+- T4/T6: reviewed decision/data design committed before implementation. Full
+  suite: 1,568 tests passed (110.799 s); 83 JavaScript tests pass, including
+  real LiteGraph duplicate-destination ports and CLI write-back. The new
+  risk-routing Skill/DSL/graph fixtures prove high-risk, large-amount and default
+  routes against a real HTTP fixture, both stores and restart/resume. Stored
+  HTTP bodies remain strings; only the evaluation view is decoded. Decision
+  audit/detail exposes branch indexes only. Reserved-field notices do not change
+  validity or runtime behavior. Example sync and secret hygiene pass; the
+  installed asset inventory includes the new example. Corpus remains 100% /
+  0 / 51.04%. JSON Schema semantic agreement is independently tracked in T12.

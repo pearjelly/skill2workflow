@@ -1290,6 +1290,7 @@ _RUN_EVENT_FIELDS = (
     "connector_status",
     "has_error",
     "execution",
+    "branch_index",
 )
 
 
@@ -1343,6 +1344,10 @@ def _safe_run_event(event: Dict[str, object], sequence: int) -> Dict[str, object
     for field in _RUN_EVENT_FIELDS[1:]:
         if field == "has_error":
             safe[field] = bool(event.get("error") or event.get("last_error"))
+        elif field == "branch_index" and field in event:
+            value = event[field]
+            if value is None or (type(value) is int and value >= 0):
+                safe[field] = value
         elif field in event:
             value = event.get(field)
             if field in {"approved"}:

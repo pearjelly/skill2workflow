@@ -1593,10 +1593,13 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
             "sequence", "type", "node_id", "timestamp", "approved", "attempt", "max_attempts",
             "connector_id", "connector_kind", "connector_status", "has_error",
             "execution",
+            "branch_index",
         }
         or not isinstance(event.get("sequence"), int) or isinstance(event.get("sequence"), bool)
         or not isinstance(event.get("type"), str) or not isinstance(event.get("has_error"), bool)
         or ("execution" in event and event.get("execution") not in {"", "descriptive", "enforced"})
+        or ("branch_index" in event and event["branch_index"] is not None
+            and (type(event["branch_index"]) is not int or event["branch_index"] < 0))
         or any(field in event and not isinstance(event.get(field), str) for field in ("node_id", "timestamp", "connector_id", "connector_kind", "connector_status"))
         or any(field in event and (isinstance(event.get(field), bool) or not isinstance(event.get(field), int) or event.get(field) < 0) for field in ("attempt", "max_attempts"))
         or ("approved" in event and not isinstance(event.get("approved"), bool))

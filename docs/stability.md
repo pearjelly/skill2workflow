@@ -1,5 +1,11 @@
 # Stability Boundaries
 
+Workflow DSL 0.2.0 decisions are an explicit additive execution capability,
+documented in [the DSL contract](workflow-dsl-contract.md). The 0.1.0 schema
+and existing published workflows retain their behavior. Branch selection is
+deterministic over durable data; reserved fields have advisory notices rather
+than hidden runtime semantics. Graph write-back preserves branch topology.
+
 Run results and audit evidence distinguish `execution: descriptive` from
 `enforced`. The remote run-detail projection uses its additive 0.2.0 schema;
 clients retain legacy 0.1.0 read support. This classification describes the

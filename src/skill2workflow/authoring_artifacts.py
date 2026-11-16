@@ -554,7 +554,7 @@ def _review_matches_workflow(review: Dict[str, object], workflow: Dict[str, obje
         return False
     types = [node.get("type") for node in nodes if isinstance(node, dict)]
     executable = sum(
-        node_type in {"step", "human_gate", "tool_call", "verification", "instruction"}
+        node_type in {"step", "human_gate", "tool_call", "verification", "instruction", "decision"}
         for node_type in types
     )
     if review["executable_node_count"] != executable:

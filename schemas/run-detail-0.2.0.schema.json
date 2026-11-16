@@ -211,6 +211,13 @@
             "descriptive",
             "enforced"
           ]
+        },
+        "branch_index": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
         }
       }
     },

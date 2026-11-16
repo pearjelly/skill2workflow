@@ -48,6 +48,13 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add Workflow DSL 0.2.0 ordered decision nodes, durable input/output routing,
+  explicit Skill branch references and convergence, multiple LiteGraph output
+  ports, and the risk-routing example. Preserve 0.1.0 execution and HTTP result
+  shapes; decision audit records contain branch indexes without business values.
+- Surface nonempty descriptive/reserved DSL fields as advisory validation
+  notices, and document their actual runtime behavior.
+
 - Add 24 original Apache-2.0 Skill corpus cases and a CI benchmark for inference
   accuracy, false human gates and configured/enforced process-node coverage.
 

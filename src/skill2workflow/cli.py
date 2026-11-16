@@ -31,7 +31,7 @@ from .bundles import (
     load_verified_workflow_bundle_with_report,
     verify_workflow_bundle,
 )
-from .compiler import compile_ir_to_workflow, summarize_skill_compile, validate_workflow, validate_workflow_structured
+from .compiler import compile_ir_to_workflow, summarize_skill_compile, validate_workflow, validate_workflow_structured, validate_workflow_notices
 from .connectors import ConnectorRuntime
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
@@ -1243,6 +1243,7 @@ def _main(argv=None) -> int:
                     "valid": not structured_errors,
                     "schema_version": workflow.get("schema_version"),
                     "errors": structured_errors,
+                    "notices": validate_workflow_notices(workflow),
                 }
             )
             return 1 if structured_errors else 0
