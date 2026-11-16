@@ -653,6 +653,7 @@
           retry: cloneOrDefault(node.retry, null),
           connector: cloneOrDefault(node.connector, null),
           ...(node.type === "decision" ? { branches: deepClone(node.branches), default: node.default } : {}),
+          ...(Object.prototype.hasOwnProperty.call(node, "output_schema") ? { output_schema: deepClone(node.output_schema) } : {}),
         },
       };
     });

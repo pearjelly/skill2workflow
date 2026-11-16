@@ -1,5 +1,11 @@
 # Stability Boundaries
 
+The explicit [Agent connector protocol](connectors.md#agent-connector-protocol)
+is an experimental DSL 0.2 capability. Output schemas use the existing bounded
+object-root input-schema subset. Structured business output retention is
+explicit for validated Agent adapters; default external result projection,
+loading authority and runtime dependency policy remain unchanged.
+
 Workflow DSL 0.2.0 decisions are an explicit additive execution capability,
 documented in [the DSL contract](workflow-dsl-contract.md). The 0.1.0 schema
 and existing published workflows retain their behavior. Branch selection is

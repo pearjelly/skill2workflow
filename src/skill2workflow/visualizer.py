@@ -524,6 +524,8 @@ def _litegraph_node(
     }
     if node_type == "decision":
         properties.update(branches=copy.deepcopy(node.get("branches")), default=node.get("default"))
+    if "output_schema" in node:
+        properties["output_schema"] = copy.deepcopy(node["output_schema"])
     if run_overlay:
         properties["run_overlay"] = copy.deepcopy(run_overlay)
 

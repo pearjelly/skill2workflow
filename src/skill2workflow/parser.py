@@ -14,6 +14,7 @@ from .skill_input import SKILL_INPUT_SCHEMA_ERROR, skill_input_schema_contract
 from .frontmatter import SkillFenceError, parse_frontmatter
 from .skill_version import SKILL_WORKFLOW_VERSION_ERROR, skill_workflow_version
 from .inference import HUMAN_TERMS, VERIFY_TERMS, TOOL_TERMS, matched_term
+from .agent_protocol import skill_agent_config
 
 
 SkillIR = Dict[str, object]
@@ -58,7 +59,7 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     }
     guidance_body = '\n'.join(
         '' if fenced else (
-            re.sub(r'[ \t]+<!-- skill2workflow: (?:human_gate|http|http_assert|decision|step)(?: \{.*\})? -->[ \t]*$', '', line)
+            re.sub(r'[ \t]+<!-- skill2workflow: (?:human_gate|http|http_assert|decision|step|agent)(?: \{.*\})? -->[ \t]*$', '', line)
             if line_number in declaration_lines else line
         )
         for line_number, line, fenced in _fence_aware_lines(body, body_start_line)
@@ -285,7 +286,7 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
         reserved = re.findall(r'<!--\s*skill2workflow\b', line, re.IGNORECASE)
         if not reserved:
             continue
-        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|http|http_assert|decision|step)(?: (\{.*\}))? -->[ \t]*$', line)
+        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|http|http_assert|decision|step|agent)(?: (\{.*\}))? -->[ \t]*$', line)
         if len(reserved) != 1 or annotation is None or line_number not in selected:
             raise ValueError('Invalid Skill step annotation')
         content = re.sub(
@@ -313,7 +314,11 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
                 if not ((type(target) is int and target > 0) or (isinstance(target, str) and target.strip())):
                     raise ValueError('invalid next step')
                 selected[line_number]['next'] = target
-            if kind in {'human_gate', 'step'}:
+            if kind == 'agent':
+                config = skill_agent_config(config)
+                selected[line_number].update(node_type='tool_call', agent=config,
+                                             connector={'id': config['connector'], 'kind': 'agent'})
+            elif kind in {'human_gate', 'step'}:
                 if config:
                     raise ValueError('unsupported step configuration')
                 selected[line_number]['node_type'] = kind

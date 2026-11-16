@@ -636,6 +636,8 @@ class LocalExecutor:
                 return state
             self._ensure_execution_active(state)
             try:
+                if ref["kind"] == "agent" and state["workflow"].get("schema_version") != "0.2.0":
+                    raise ConnectorExecutionError("agent requires Workflow DSL 0.2.0")
                 connector_result = self.connector_runtime.execute_connector(
                     node,
                     credential_provider=self.credential_provider,
@@ -738,6 +740,11 @@ class LocalExecutor:
             connector_result.get("output", {}),
             external_metadata_policy,
         )
+        agent_registered = getattr(self.connector_runtime, "is_agent_connector", lambda connector_id: False)
+        if (state["workflow"].get("schema_version") == "0.2.0" and ref["kind"] == "agent"
+                and agent_registered(ref["id"]) and connector_result.get("agent_output_validated") is True
+                and result_status == "completed"):
+            durable_output = copy.deepcopy(connector_result["output"])
         mapping_summary = connector_result.get("input_mapping")
         credential_summary = connector_result.get("credentials")
         audit_summary = connector_result.get("audit")
@@ -1119,6 +1126,8 @@ def _execution_kind(node: Dict[str, object]) -> str:
 def _connector_context(state: RunState, node_id: str) -> Dict[str, object]:
     durable = state.get("context", {})
     context = copy.deepcopy(durable) if isinstance(durable, dict) else {}
+    if state.get("workflow", {}).get("schema_version") == "0.2.0":
+        context.update(data_context(state))
     context["_execution"] = {
         "workflow_id": str(state.get("workflow_id", "")),
         "workflow_version": str(state.get("workflow_version", "")),

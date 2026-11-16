@@ -48,6 +48,11 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add an explicit, provider-independent Agent connector protocol with filtered
+  durable dependencies, bounded output-schema validation and opt-in structured
+  result retention. Include a deterministic test adapter; no LLM SDK or runtime
+  dependency is added and external code loading remains explicit.
+
 - Add Workflow DSL 0.2.0 ordered decision nodes, durable input/output routing,
   explicit Skill branch references and convergence, multiple LiteGraph output
   ports, and the risk-routing example. Preserve 0.1.0 execution and HTTP result

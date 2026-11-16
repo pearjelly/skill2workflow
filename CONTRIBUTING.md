@@ -1,6 +1,10 @@
 # Contributing to skill2workflow
 
 For executable HTTP result checks, see [HTTP JSON assertions](docs/http-json-assertions.md).
+For explicit Agent adapters, follow the [Agent protocol](docs/connectors.md#agent-connector-protocol)
+and run `PYTHONPATH=src python3 -m unittest tests.test_agent_connector`.
+Keep provider SDKs outside the runtime package and use deterministic fixtures
+to prove dependency filtering, output contracts, routing and restart behavior.
 The package smoke runs their real loopback CLI checks against the isolated
 wheel; keep that contract aligned when changing connector execution.
 

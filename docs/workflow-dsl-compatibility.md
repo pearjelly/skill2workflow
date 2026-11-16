@@ -1,5 +1,15 @@
 # Workflow DSL Compatibility
 
+Explicit DSL 0.2 Agent tool calls use `connector.kind: agent`, an external
+adapter ID, an `agent_instruction` action and mandatory `output_schema`.
+Their `requires` node IDs must dominate the Agent and have successful durable
+outputs at runtime. Completed schema-valid Agent output is explicitly retained
+as business data for later decisions/Agents. Generic external connectors keep
+metadata-only retention; changing a DSL kind alone cannot opt one in.
+The adapter manifest declares `execution_contract.protocol:
+skill2workflow-agent-0.1.0`. No SDK, implicit prose execution or dynamic service
+loading is introduced. See [Agent connectors](connectors.md#agent-connector-protocol).
+
 Workflow DSL 0.2.0 adds explicit ordered decisions over trigger input and
 persisted outputs. Schema 0.1.0 and its execution behavior remain supported;
 Skills without 0.2 declarations keep compiling to 0.1.0. No state upgrade or

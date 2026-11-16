@@ -34,6 +34,16 @@ branches and topology. Edit branch rules in DSL, then reimport the graph.
 
 ## Descriptive and reserved fields
 
+Explicit DSL 0.2 Agent nodes enforce `requires` as successful node-output
+dependencies and validate `output_schema` before accepting a completed result.
+The root must be an object using the same bounded subset as `input_schema`.
+`connector.kind` is `agent`, `connector.id` selects a registered external
+adapter, and `action` has kind `agent_instruction` and a nonempty instruction.
+Requires IDs must exist and dominate the Agent on every incoming path.
+Agent context includes input and only those required outputs; a missing output
+fails the node without calling the adapter. Completed validated structured
+output is durable business data. See [the protocol](connectors.md#agent-connector-protocol).
+
 `guards` and node `guard` are descriptive HARD-GATE text, not enforced policy.
 `requires`, `produces`, `state_schema`, `checkpoints` and `edges[].condition`
 are reserved and ignored by the 0.1 runtime. In 0.2, `produces`, guards, state

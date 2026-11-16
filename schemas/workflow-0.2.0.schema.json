@@ -201,6 +201,10 @@
         "default": {
           "type": "string",
           "minLength": 1
+        },
+        "output_schema": {
+          "$ref": "#/$defs/input_schema",
+          "description": "Agent output contract using the same bounded object-root subset as trigger input."
         }
       },
       "allOf": [
@@ -243,6 +247,60 @@
                   ]
                 }
               ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "connector": {
+                "properties": {
+                  "kind": {
+                    "const": "agent"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            },
+            "required": [
+              "connector"
+            ]
+          },
+          "then": {
+            "required": [
+              "action",
+              "output_schema"
+            ],
+            "properties": {
+              "type": {
+                "const": "tool_call"
+              },
+              "action": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "instruction"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "agent_instruction"
+                  },
+                  "instruction": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "requires": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "uniqueItems": true
+              }
             }
           }
         }

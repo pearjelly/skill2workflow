@@ -15,6 +15,7 @@ from .skill_input import skill_input_schema_contract
 from .skill_version import skill_workflow_version
 from .inference import infer_step
 from .decisions import decision_errors
+from .agent_protocol import agent_node_errors, skill_agent_config
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -66,7 +67,11 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
         node_id = f"node_{index:03d}_{_slugify(title)}"
         explicit_type = step.get("node_type")
         explicit_connector = step.get("connector")
-        if explicit_connector is not None:
+        agent = skill_agent_config(step["agent"]) if step.get("agent") is not None else None
+        if agent is not None:
+            if explicit_type != "tool_call" or explicit_connector != {"id": agent["connector"], "kind": "agent"}:
+                raise ValueError("Invalid Skill step annotation")
+        elif explicit_connector is not None:
             if (explicit_type != "tool_call" or not isinstance(explicit_connector, dict)
                     or not isinstance(explicit_connector.get("id"), str)
                     or explicit_connector.get("id") not in {"http", "http_assert"}
@@ -110,6 +115,9 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
         connector = copy.deepcopy(explicit_connector) if explicit_connector is not None else default_connector_binding(node_type)
         if connector:
             node["connector"] = connector
+        if agent is not None:
+            node["action"] = {"kind": "agent_instruction", "instruction": agent["instruction"]}
+            node["output_schema"] = copy.deepcopy(agent["output_schema"])
         nodes.append(node)
 
     nodes.extend(
@@ -181,7 +189,12 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
     }
     if input_schema is not None:
         workflow['input_schema'] = input_schema
-    if any(step.get("node_type") == "decision" or step.get("next") is not None for step in steps):
+    if any(step.get("node_type") == "decision" or step.get("next") is not None or step.get("agent") is not None for step in steps):
+        for step, node_id in zip(steps, step_ids):
+            if step.get("agent") is not None:
+                _node_by_id(nodes, node_id)["requires"] = [
+                    _resolve_step_reference(reference, steps, step_ids) for reference in step["agent"]["requires"]
+                ]
         _compile_decisions(workflow, steps, step_ids)
     return workflow
 
@@ -256,6 +269,9 @@ def validate_workflow_notices(workflow: Workflow) -> List[ValidationError]:
     for index, node in enumerate(nodes if isinstance(nodes, list) else []):
         if isinstance(node, dict):
             for key in ("guard", "requires", "produces"):
+                if (key == "requires" and workflow.get("schema_version") == "0.2.0"
+                        and isinstance(node.get("connector"), dict) and node["connector"].get("kind") == "agent"):
+                    continue
                 if node.get(key):
                     notice(["nodes", index, key])
     edges = workflow.get("edges")
@@ -378,6 +394,8 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
             )
         _validate_retry_policy(node.get("retry"), ["nodes", index, "retry"], errors)
         _validate_connector_binding(node, index, errors)
+        if isinstance(node.get("connector"), dict) and node["connector"].get("kind") == "agent":
+            errors.extend(agent_node_errors(node, index, workflow.get("schema_version")))
         for key in _TRANSITION_KEYS:
             target = node.get(key)
             if target is not None and target not in node_map:
@@ -393,6 +411,8 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
     _validate_transition_edges(node_map, edge_pairs, errors, node_index_map, edges)
     if workflow.get("schema_version") == "0.2.0" and _has_cycle(node_map):
         errors.append(_validation_error("workflow_cycle", "Workflow DSL 0.2.0 requires a DAG", ["nodes"]))
+    elif workflow.get("schema_version") == "0.2.0":
+        _validate_agent_dependencies(node_map, entry, node_index_map, errors)
 
     if entry in node_map:
         reachable = _reachable_nodes(node_map, str(entry))
@@ -871,6 +891,45 @@ def _resolve_step_reference(reference, steps, step_ids):
     raise ValueError("Invalid Skill step reference")
 
 
+def _validate_agent_dependencies(node_map, entry, indexes, errors):
+    if entry not in node_map:
+        return
+    parents = {node_id: set() for node_id in node_map}
+    outgoing = {node_id: _transition_targets(node) & set(node_map) for node_id, node in node_map.items()}
+    for source, targets in outgoing.items():
+        for target in targets:
+            parents[target].add(source)
+    incoming = {node_id: len(sources) for node_id, sources in parents.items()}
+    ready = [node_id for node_id, count in incoming.items() if count == 0]
+    dominators = {}
+    while ready:
+        node_id = ready.pop()
+        sources = parents[node_id]
+        inherited = set.intersection(*(dominators[source] for source in sources)) if sources else set()
+        dominators[node_id] = inherited | {node_id}
+        for target in outgoing[node_id]:
+            incoming[target] -= 1
+            if incoming[target] == 0:
+                ready.append(target)
+    for node_id, node in node_map.items():
+        if not isinstance(node.get("connector"), dict) or node["connector"].get("kind") != "agent":
+            continue
+        requires = node.get("requires", [])
+        if not isinstance(requires, list):
+            continue
+        for dependency_index, dependency in enumerate(requires):
+            if not isinstance(dependency, str) or dependency not in node_map:
+                code = "agent_dependency_missing"
+            elif dependency == node_id or dependency not in dominators.get(node_id, set()):
+                code = "agent_dependency_not_dominating"
+            else:
+                continue
+            errors.append(_validation_error(
+                code, "agent requires an existing output dependency on every incoming path",
+                ["nodes", indexes[node_id], "requires", dependency_index],
+            ))
+
+
 def _compile_decisions(workflow, steps, step_ids):
     workflow["schema_version"] = "0.2.0"
     for step, node_id in zip(steps, step_ids):
@@ -947,6 +1006,7 @@ def _step_records_from_ir(ir: Dict[str, object]) -> List[Dict[str, object]]:
                     "connector": item.get("connector"),
                     "decision": item.get("decision"),
                     "next": item.get("next"),
+                    "agent": item.get("agent"),
                 }
             )
         return records

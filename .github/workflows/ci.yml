@@ -116,6 +116,7 @@ jobs:
           python-version: "3.14"
       - run: node --test tests/test_*.cjs
       - run: python scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-artifact-ci
+      - run: python scripts/agent_connector_smoke.py --executable /tmp/skill2workflow-package-artifact-ci/venv/bin/skill2workflow
       - run: python scripts/draft_input_ui_smoke.py --executable /tmp/skill2workflow-package-artifact-ci/venv/bin/skill2workflow --browser-module-tests
       - run: python scripts/skill_compile_recovery_smoke.py --executable /tmp/skill2workflow-package-artifact-ci/venv/bin/skill2workflow --browser-module-tests
       - run: python scripts/reproducible_build.py --work-dir /tmp/skill2workflow-reproducible-build-ci

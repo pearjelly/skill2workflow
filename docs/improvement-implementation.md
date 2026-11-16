@@ -14,7 +14,7 @@ standard-library-only runtime remain requirements.
 | T3 | descriptive/enforced results and audit, CLI/UI run detail | Complete |
 | T4 | reviewed decision/data design, DSL 0.2, compiler/runtime/editor/write-back, risk-routing example and both paths | Complete |
 | T6 | enforced data dependencies and documented reserved fields with notices | Complete |
-| T5 | reviewed Agent protocol, filtered context, output validation and durable results, deterministic end-to-end adapter | Pending |
+| T5 | reviewed Agent protocol, filtered context, output validation and durable results, deterministic end-to-end adapter | Complete |
 | T7 | service route modules/table; unchanged service/client tests and both boundary smokes | Pending |
 | T8 | CLI command functions and argparse dispatch; unchanged CLI tests | Pending |
 | T9 | development-only Ruff/mypy CI and typed IR/DSL/state contracts | Pending |
@@ -64,3 +64,11 @@ branch update. Evidence below is updated only after a check finishes.
   validity or runtime behavior. Example sync and secret hygiene pass; the
   installed asset inventory includes the new example. Corpus remains 100% /
   0 / 51.04%. JSON Schema semantic agreement is independently tracked in T12.
+
+- T5: eight Agent protocol tests cover both decisions, both stores, restart,
+  filtered dependencies, dominance, output rejection and generic-adapter kind
+  spoofing. Full suite: 1,576 tests passed (111.655 s); 83 JavaScript tests pass.
+  `agent_connector_smoke.py` passes 11 CLI checks against both source and an
+  isolated installed wheel (JSON/SQLite, high/low routing and restart). Package
+  smoke passes; corpus stays 100% / 0 / 51.04%, example sync and hygiene pass.
+  The installed Agent drill is now part of the CI artifact gate.

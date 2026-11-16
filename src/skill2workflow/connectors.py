@@ -14,6 +14,8 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .credentials import CredentialResolutionError
 from .http_assertions import evaluate_http_assertions, validate_http_assertion_binding
+from .agent_protocol import AGENT_PROTOCOL_VERSION, agent_node_errors, agent_request
+from .input_schema import InputSchemaValidationError, validate_trigger_input
 
 
 ConnectorBinding = Dict[str, object]
@@ -346,11 +348,39 @@ class ConnectorRuntime:
             return {}
         return durable_metadata_policy(connector.manifest)
 
+    def is_agent_connector(self, connector_id: object) -> bool:
+        connector = self._external_connectors.get(str(connector_id or ""))
+        return bool(connector and connector.manifest.get("kind") == "agent"
+                    and connector.manifest.get("execution_contract", {}).get("protocol") == AGENT_PROTOCOL_VERSION)
+
     def execute_connector(self, node: Dict[str, object], credential_provider=None, context=None) -> ConnectorResult:
         """Execute a connector through the built-in path or an explicit external fixture."""
         binding = node.get("connector")
         ref = connector_ref(binding)
         if ref["id"] in self._external_connectors:
+            if ref["kind"] == "agent" or self.is_agent_connector(ref["id"]):
+                if ref["kind"] != "agent" or not self.is_agent_connector(ref["id"]):
+                    raise ConnectorExecutionError("registered connector does not implement the Agent protocol")
+                if agent_node_errors(node, 0, "0.2.0"):
+                    raise ConnectorExecutionError("agent node contract is invalid")
+                try:
+                    payload = agent_request(node, context)
+                except (ValueError, TypeError, KeyError) as error:
+                    raise ConnectorExecutionError("agent required output is unavailable") from error
+                result = _execute_external_connector(
+                    self._external_connectors[ref["id"]], payload, ref,
+                    credential_provider=credential_provider, context=copy.deepcopy(payload["context"]),
+                    require_object_output=True,
+                )
+                if result["status"] == "completed":
+                    try:
+                        validate_trigger_input(node["output_schema"], result["output"])
+                    except InputSchemaValidationError:
+                        return {"status": "failed", "connector": ref, "output": {}, "error": "agent output does not match output_schema"}
+                    result["agent_output_validated"] = True
+                else:
+                    result["output"] = {}
+                return result
             return _execute_external_connector(
                 self._external_connectors[ref["id"]],
                 binding,
@@ -504,6 +534,7 @@ def _execute_external_connector(
     ref: Dict[str, str],
     credential_provider=None,
     context=None,
+    require_object_output=False,
 ) -> ConnectorResult:
     if not isinstance(binding, dict):
         raise ConnectorExecutionError("external connector binding must be an object")
@@ -522,6 +553,8 @@ def _execute_external_connector(
         raise ConnectorExecutionError(EXTERNAL_CONNECTOR_EXECUTION_FAILURE) from error
     if not isinstance(result, dict):
         raise ConnectorExecutionError("external connector executor must return an object")
+    if require_object_output and result.get("status") == "completed" and not isinstance(result.get("output"), dict):
+        raise ConnectorExecutionError("agent output must be an object")
 
     status = str(result.get("status") or "")
     if status not in {"completed", "failed"}:
