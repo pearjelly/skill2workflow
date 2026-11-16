@@ -1,5 +1,13 @@
 # Workflow DSL Compatibility
 
+Run results/events now carry additive `execution` metadata: descriptive
+steps/instructions/text-only verification record progress; connectors and
+human gates enforce their configured mechanism. Completion alone is not
+proof that described work happened. Node-completion audit events retain this
+classification. The closed remote run-detail contract advances to 0.2.0;
+the 0.1.0 schema is preserved and clients can still read legacy services.
+No workflow artifact, existing result status or transition is rewritten.
+
 Validation now rejects `http` and `http_assert` bindings without an object
 `connector.request`, using `connector_request_missing`. Publication rejects
 the same invalid drafts. This tightens 0.1.x validation: historical artifacts

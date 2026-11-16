@@ -3043,7 +3043,7 @@ name: authoring-publish
         self.assertEqual(detail["context"]["input"], {"customer_id": "customer_123"})
         self.assertEqual(detail["context"]["trigger"]["trigger_id"], result["trigger_id"])
         self.assertEqual(detail["context"]["trigger"]["source"], "local-cli")
-        self.assertEqual([event["type"] for event in audit_events], ["run_started", "run_completed"])
+        self.assertEqual([event["type"] for event in audit_events], ["run_started", "node_completed", "run_completed"])
         self.assertEqual(audit_events[0]["trigger_id"], result["trigger_id"])
         self.assertNotIn("input", audit_events[0])
 

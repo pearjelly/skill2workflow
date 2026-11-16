@@ -220,7 +220,7 @@ class WebhookTests(TestCase):
         self.assertNotIn("input", result)
         self.assertEqual(detail["context"]["input"], {"customer_id": "customer_123"})
         self.assertEqual(detail["context"]["trigger"]["source"], "partner-system")
-        self.assertEqual([event["type"] for event in audit_events], ["run_started", "run_completed"])
+        self.assertEqual([event["type"] for event in audit_events], ["run_started", "node_completed", "run_completed"])
         self.assertEqual(audit_events[0]["trigger_source"], "partner-system")
         self.assertEqual(audit_events[0]["input_keys"], ["customer_id"])
         self.assertNotIn("input", audit_events[0])

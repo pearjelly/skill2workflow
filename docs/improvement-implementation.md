@@ -11,7 +11,7 @@ standard-library-only runtime remain requirements.
 | T1 | whole-word/Chinese inference, explicit HTTP actions, inference provenance and review notices; example regeneration | Complete |
 | T2 | validation/publication reject HTTP bindings without requests | Complete |
 | T13 | 20–50 original licensed Skills, type expectations, benchmark and CI thresholds | Complete |
-| T3 | descriptive/enforced results and audit, CLI/UI run detail | Pending |
+| T3 | descriptive/enforced results and audit, CLI/UI run detail | Complete |
 | T4 | reviewed decision/data design, DSL 0.2, compiler/runtime/editor/write-back, risk-routing example and both paths | Pending |
 | T6 | enforced data dependencies and documented reserved fields with notices | Pending |
 | T5 | reviewed Agent protocol, filtered context, output validation and durable results, deterministic end-to-end adapter | Pending |
@@ -45,3 +45,11 @@ branch update. Evidence below is updated only after a check finishes.
   `03aa8d1`: accuracy 53.52% → 100%, false human gates 6 → 0, enforced
   coverage 46.88% → 51.04%. CI thresholds are 100% / 0 / 25%. Independent
   expectation and gate-failure tests pass; full suite: 1,558 tests (111.351 s).
+
+- T3: full suite 1,562 tests passed (111.580 s), 82 JavaScript tests pass.
+  Both stores, CLI, compact remote detail, connector attempts, gate resume,
+  and legacy unlabelled audit consistency are covered. The old closed detail
+  schema remains intact; 0.2 carries execution labels. Corpus remains 100% /
+  0 / 51.04%; example sync and secret hygiene pass. Two pre-existing muted
+  text contrast findings were fixed through the shared muted color; the design
+  hook reports no CSS findings. No findings were suppressed or left standing.

@@ -1186,9 +1186,11 @@ class ControlPlaneTests(TestCase):
                 "workflow_published",
                 "workflow_promoted",
                 "run_started",
+                "node_completed",
                 "run_completed",
                 "workflow_promoted",
                 "run_started",
+                "node_completed",
                 "run_completed",
             ],
         )
@@ -1289,7 +1291,7 @@ class ControlPlaneTests(TestCase):
                 "input_keys": ["customer_id"],
             },
         )
-        self.assertEqual([event["type"] for event in audit_events], ["run_started", "run_completed"])
+        self.assertEqual([event["type"] for event in audit_events], ["run_started", "node_completed", "run_completed"])
         self.assertEqual(started_events[0]["trigger_id"], result["trigger_id"])
         self.assertEqual(started_events[0]["trigger_source"], "local-test")
         self.assertEqual(started_events[0]["idempotency_key"], "demo-1")
@@ -1473,7 +1475,7 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(records[0]["version"], "4.0.0")
         self.assertEqual(audit_types_before_run, ["workflow_published"])
         self.assertEqual(run_state["status"], "completed")
-        self.assertEqual(audit_types_after_run, ["workflow_published", "run_started", "run_completed"])
+        self.assertEqual(audit_types_after_run, ["workflow_published", "run_started", "node_completed", "run_completed"])
 
     def test_resume_published_run_records_resume_and_terminal_audit(self):
         with TemporaryDirectory() as tmp:
@@ -1491,7 +1493,7 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(detail["status"], "completed")
         self.assertEqual(
             [event["type"] for event in audit_events],
-            ["run_started", "run_waiting", "run_resumed", "run_completed"],
+            ["run_started", "node_completed", "run_waiting", "run_resumed", "run_completed"],
         )
         self.assertLessEqual(
             datetime.fromisoformat(audit_events[2]["timestamp"]),
@@ -1523,7 +1525,7 @@ class ControlPlaneTests(TestCase):
         self.assertEqual(retried["status"], "completed")
         self.assertEqual(
             [event["type"] for event in events],
-            ["run_started", "run_waiting", "run_resumed", "run_completed"],
+            ["run_started", "node_completed", "run_waiting", "run_resumed", "run_completed"],
         )
         self.assertEqual(report["status"], "clean")
 
@@ -1539,7 +1541,7 @@ class ControlPlaneTests(TestCase):
             run_events = control.list_audit_events(run_id=second["run_id"])
 
         self.assertTrue(all(event.get("workflow_version") == "6.0.0" for event in version_events))
-        self.assertEqual([event["type"] for event in run_events], ["run_started", "run_completed"])
+        self.assertEqual([event["type"] for event in run_events], ["run_started", "node_completed", "run_completed"])
         self.assertEqual(run_events[0]["run_id"], second["run_id"])
         self.assertNotEqual(first["run_id"], second["run_id"])
 

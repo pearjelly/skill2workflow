@@ -1,5 +1,10 @@
 # Stability Boundaries
 
+Run results and audit evidence distinguish `execution: descriptive` from
+`enforced`. The remote run-detail projection uses its additive 0.2.0 schema;
+clients retain legacy 0.1.0 read support. This classification describes the
+mechanism and does not imply a connector succeeded or business intent was met.
+
 HTTP and HTTP-assertion bindings require an object `connector.request` at
 validation/publication time. The structured diagnostic is
 `connector_request_missing`; previously accepted unconfigured bindings always

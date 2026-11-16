@@ -287,6 +287,7 @@ class LocalExecutor:
 
         result = {
             "status": "approved" if approved else "rejected",
+            "execution": "enforced",
             "title": node.get("title", node["id"]),
             "approved": approved,
             "timestamp": self._now(),
@@ -299,6 +300,7 @@ class LocalExecutor:
                 "type": "human_gate_resumed",
                 "node_id": node["id"],
                 "approved": approved,
+                "execution": "enforced",
                 "connector_id": "manual",
                 "connector_kind": "manual",
                 "timestamp": self._now(),
@@ -852,6 +854,9 @@ class LocalExecutor:
             "node_id": node_id,
             "timestamp": self._now(),
         }
+        node = self._node_map(state["workflow"]).get(node_id)
+        if node:
+            event["execution"] = _execution_kind(node)
         if extra:
             event.update(extra)
         state["events"].append(event)
@@ -1045,6 +1050,10 @@ class LocalExecutor:
         return state
 
     def _save(self, state: RunState) -> None:
+        node_map = self._node_map(state["workflow"])
+        for node_id, result in state.get("node_results", {}).items():
+            if node_id in node_map:
+                result.setdefault("execution", _execution_kind(node_map[node_id]))
         run_id = str(state.get("run_id", ""))
         execution_id = self._execution_ids.get(run_id, "")
         if self.execution_owner and execution_id:
@@ -1076,6 +1085,10 @@ def _durable_connector_failure(ref: Dict[str, str], error: object) -> str:
     if ref.get("id") not in BUILTIN_CONNECTOR_IDS:
         return EXTERNAL_CONNECTOR_DURABLE_FAILURE
     return str(error or "connector failed")
+
+
+def _execution_kind(node: Dict[str, object]) -> str:
+    return "descriptive" if node.get("type") in {"step", "verification", "instruction"} else "enforced"
 
 
 def _connector_context(state: RunState, node_id: str) -> Dict[str, object]:

@@ -102,6 +102,7 @@ def run_overlay_for_nodes(
             "event_count": len(node_events),
             "latest_event_type": _overlay_string(latest_event.get("type", "")) if isinstance(latest_event, dict) else "",
             "result_status": str(result.get("status", "")) if result else "",
+            "execution": _overlay_text(result, node_events, "execution"),
             "attempts": _overlay_int(result.get("attempts") if result else None, node_events, "attempt"),
             "max_attempts": _overlay_int(result.get("max_attempts") if result else None, node_events, "max_attempts"),
             "backoff_ms": _overlay_int(result.get("backoff_ms") if result else None, node_events, "backoff_ms"),
@@ -157,6 +158,8 @@ def _overlay_int(explicit: object, events: List[Dict[str, object]], key: str) ->
 
 
 def _overlay_text(result: Dict[str, object], events: List[Dict[str, object]], key: str) -> str:
+    if key == "execution" and result.get(key) in {"descriptive", "enforced"}:
+        return result[key]
     if key in {"connector_id", "connector_kind"}:
         connector = result.get("connector", {})
         if isinstance(connector, dict) and connector.get(key.replace("connector_", "")):

@@ -23,7 +23,7 @@
   const LIVE_WORKFLOW_RELEASE_TARGET_REVIEW_URL = "/api/v1/workflow-release-target-reviews";
   const LIVE_WORKFLOW_PROMOTION_URL = "/api/v1/workflow-promotions";
   const LIVE_WORKFLOW_DEPRECATION_URL = "/api/v1/workflow-deprecations";
-  const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.1.0";
+  const RUN_DETAIL_SCHEMA = "skill2workflow-run-detail-0.2.0";
   const RUN_PAGE_SCHEMA = "skill2workflow-run-list-0.2.0";
   const AUDIT_PAGE_SCHEMA = "skill2workflow-audit-event-list-0.1.0";
   const SCHEDULE_LIST_SCHEMA = "skill2workflow-recurring-schedule-list-0.1.0";
@@ -2590,7 +2590,7 @@
     if (
       !detail ||
       typeof detail !== "object" ||
-      detail.schema_version !== RUN_DETAIL_SCHEMA ||
+      ![RUN_DETAIL_SCHEMA, "skill2workflow-run-detail-0.1.0"].includes(detail.schema_version) ||
       !detail.run ||
       typeof detail.run !== "object" ||
       detail.run.run_id !== runId ||
@@ -3188,6 +3188,7 @@
           pillCell(overlay.status || ""),
           textCell(String(overlay.event_count || 0)),
           textCell(connectorLabel(overlay)),
+          textCell(executionLabel(overlay.execution)),
         ];
       },
       "node overlay",
@@ -3806,6 +3807,10 @@
         " events" +
         (windowState.truncated ? " (truncated)." : ".");
       els.runDetailStatus.classList.add("is-valid");
+      const overlays = Object.values(state.liveRunDetail.run.node_overlays || {});
+      const recorded = overlays.filter(item => item.execution === "descriptive").length;
+      const enforced = overlays.filter(item => item.execution === "enforced").length;
+      els.runDetailStatus.textContent += " Recorded only (仅记录): " + recorded + "; Enforced (已强制执行): " + enforced + ".";
       return;
     }
     els.runDetailStatus.textContent = "Select a live run to load its bounded evidence.";
@@ -3926,7 +3931,7 @@
       return [["Kind", value.kind || ""], ["Severity", value.severity || ""], ["Workflow", value.workflow_id || ""], ["Run", value.run_id || ""]];
     }
     if (value.node_id && Object.prototype.hasOwnProperty.call(value, "event_count")) {
-      return [["Node", value.node_id], ["Status", value.status || ""], ["Events", String(value.event_count || 0)], ["Connector", connectorLabel(value)]];
+      return [["Node", value.node_id], ["Status", value.status || ""], ["Execution", executionLabel(value.execution)], ["Events", String(value.event_count || 0)], ["Connector", connectorLabel(value)]];
     }
     if (value.run_id) {
       return [["Run", value.run_id], ["Workflow", value.workflow_id || ""], ["Status", value.status || ""], ["Events", String(value.event_count || 0)]];
@@ -4343,6 +4348,10 @@
     const status = overlay.connector_status ? " " + overlay.connector_status : "";
     const attempts = overlay.attempts ? " x" + overlay.attempts : "";
     return overlay.connector_id + status + attempts;
+  }
+
+  function executionLabel(execution) {
+    return execution === "descriptive" ? "Recorded only (仅记录)" : execution === "enforced" ? "Enforced (已强制执行)" : "Unknown";
   }
 
   function formatDate(value) {

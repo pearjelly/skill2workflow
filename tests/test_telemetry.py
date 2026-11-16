@@ -156,7 +156,7 @@ class RuntimeTelemetryTests(TestCase):
             "skill2workflow_scheduler_lease_owned 1",
             'skill2workflow_workflows{status="published"} 1',
             'skill2workflow_runs{status="completed"} 1',
-            "skill2workflow_audit_events 3",
+            "skill2workflow_audit_events 4",
             "skill2workflow_recurring_schedules 1",
             'skill2workflow_http_requests_total{route="workflow_trigger",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="control_snapshot",status_class="2xx"} 1',

@@ -176,7 +176,7 @@ class CancellationTests(TestCase):
         self.assertEqual(retried["status"], "cancelled")
         self.assertEqual(
             [event["type"] for event in events],
-            ["run_started", "run_waiting", "run_cancel_requested", "run_cancelled"],
+            ["run_started", "node_completed", "run_waiting", "run_cancel_requested", "run_cancelled"],
         )
         self.assertEqual(report["status"], "clean")
 
