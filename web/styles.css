@@ -299,7 +299,7 @@ textarea {
   line-height: 1.35;
 }
 
-.assertion-review .inspector-note {
+.form-section .inspector-note {
   color: var(--muted);
   font-size: 12px;
   font-weight: 400;

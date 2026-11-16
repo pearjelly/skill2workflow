@@ -52,7 +52,7 @@ branch update. Evidence below is updated only after a check finishes.
   schema remains intact; 0.2 carries execution labels. Corpus remains 100% /
   0 / 51.04%; example sync and secret hygiene pass. Two pre-existing muted
   text contrast findings were fixed through the shared muted color; the design
-  hook reports no CSS findings. No findings were suppressed or left standing.
+  hook reports no deterministic CSS findings in that pass. No ignores were added.
 
 - T4/T6: reviewed decision/data design committed before implementation. Full
   suite: 1,568 tests passed (110.799 s); 83 JavaScript tests pass, including
@@ -149,3 +149,18 @@ by the branch/PR containing this ledger; no package release is performed.
 
 The release-preflight path filter also follows the consolidated API/history
 documents and extracted service-route modules; its CI contract tests pass.
+
+## Post-Stop design triage
+
+The deep design pass found the new decision explanation inheriting uppercase
+section-label styling. It now shares sentence-case inspector-note typography
+with the assertion help (12 px, normal weight, 18 px line height). Browser
+checks confirm normal case and wrapping on desktop and mobile; editor and UI
+regressions pass. The full development suite also passes 1,591 tests
+(115.100 s), and all 83 JavaScript tests pass.
+
+Two Inter findings predate this work: both font stacks are unchanged from
+03aa8d1. They remain standing while the user's preference about two file-scoped
+font exceptions is pending. No typography exception or broader ignore has been
+added. This corrects the earlier completion statement about zero remaining
+findings; the two contrast fixes remain valid.

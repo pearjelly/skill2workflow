@@ -12,8 +12,11 @@
   "date": "2026-11-16",
   "design_findings": {
     "contrast_fixed": 2,
-    "remaining": 0,
-    "suppressed": 0
+    "font_exception_status": "awaiting_user_preference",
+    "font_findings_preexisting": 2,
+    "remaining": 2,
+    "suppressed": 0,
+    "uppercase_body_fixed": 1
   },
   "documentation": {
     "local_link_errors": 0,
