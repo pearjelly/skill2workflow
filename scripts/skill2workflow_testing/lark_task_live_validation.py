@@ -8,9 +8,9 @@ import os
 from pathlib import Path
 from typing import Dict
 
-from .connectors import ConnectorRuntime, ExternalConnector
-from .credentials import StaticCredentialProvider
-from .external_connectors import load_external_connector
+from skill2workflow.connectors import ConnectorRuntime, ExternalConnector
+from skill2workflow.credentials import StaticCredentialProvider
+from skill2workflow.external_connectors import load_external_connector
 
 
 LIVE_SWITCH = "SKILL2WORKFLOW_LARK_TASK_LIVE"

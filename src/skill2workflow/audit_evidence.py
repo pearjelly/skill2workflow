@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Dict
 
-from ._controlled_lark_pilot_evidence_writer import (
+from .private_json import (
     ensure_private_directory_anchored,
     read_json_anchored,
     write_private_json_anchored,

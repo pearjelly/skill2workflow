@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.demo import run_demo_bootstrap
+from scripts.skill2workflow_testing.demo import run_demo_bootstrap
 
 
 class DemoBootstrapTests(TestCase):

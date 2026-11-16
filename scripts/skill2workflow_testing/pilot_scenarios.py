@@ -12,13 +12,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from typing import Dict, List
 
-from .compiler import validate_workflow
-from .control_plane import LocalControlPlane
-from .credentials import StaticCredentialProvider
-from .dashboard import build_control_snapshot
+from skill2workflow.compiler import validate_workflow
+from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.credentials import StaticCredentialProvider
+from skill2workflow.dashboard import build_control_snapshot
 from .pilot import DEFAULT_UI_URL, PILOT_SECRET, run_pilot_playbook
-from .visualizer import workflow_to_litegraph
-from .webhooks import handle_webhook_request
+from skill2workflow.visualizer import workflow_to_litegraph
+from skill2workflow.webhooks import handle_webhook_request
 
 
 DEFAULT_PACK_WORK_DIR = Path(tempfile.gettempdir()) / "skill2workflow-pilot-pack"

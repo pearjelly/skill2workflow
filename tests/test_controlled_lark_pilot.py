@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from skill2workflow.compiler import validate_workflow
 from skill2workflow.control_plane import LocalControlPlane
-from skill2workflow.controlled_lark_pilot import (
+from scripts.skill2workflow_testing.controlled_lark_pilot import (
     _validate_controlled_live_binding,
     create_private_case_template,
     decide_pilot_run,
@@ -28,7 +28,7 @@ from skill2workflow.controlled_lark_pilot import (
     verify_pilot,
 )
 from skill2workflow.credentials import StaticCredentialProvider
-from skill2workflow.lark_task_pilot import build_lark_task_pilot_workflow
+from scripts.skill2workflow_testing.lark_task_pilot import build_lark_task_pilot_workflow
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -399,7 +399,7 @@ class ControlledLarkPilotTests(TestCase):
             malformed_connector = SimpleNamespace(preflight=lambda *_args, **_kwargs: None)
 
             with patch(
-                "skill2workflow.controlled_lark_pilot.load_external_connector",
+                "scripts.skill2workflow_testing.controlled_lark_pilot.load_external_connector",
                 return_value=malformed_connector,
             ):
                 with self.assertRaisesRegex(
@@ -688,7 +688,7 @@ class ControlledLarkPilotTests(TestCase):
                 },
                 clear=True,
             ), patch(
-                "skill2workflow.lark_task_pilot.run_lark_task_pilot",
+                "scripts.skill2workflow_testing.lark_task_pilot.run_lark_task_pilot",
                 side_effect=AssertionError("dry run must not start"),
             ) as dry_run:
                 with self.assertRaisesRegex(ValueError, "remove.*live switch"):
@@ -710,7 +710,7 @@ class ControlledLarkPilotTests(TestCase):
             initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
             with patch.dict(os.environ, environment, clear=True):
                 with patch(
-                    "skill2workflow.controlled_lark_pilot.start_pilot_run",
+                    "scripts.skill2workflow_testing.controlled_lark_pilot.start_pilot_run",
                     side_effect=RuntimeError("disabled exercise failed"),
                 ), self.assertRaisesRegex(RuntimeError, "disabled exercise failed"):
                     exercise_disabled_live(ROOT, work_dir, now=NOW)
@@ -720,7 +720,7 @@ class ControlledLarkPilotTests(TestCase):
 
             with patch.dict(os.environ, environment, clear=True):
                 with patch(
-                    "skill2workflow.lark_task_pilot.run_lark_task_pilot",
+                    "scripts.skill2workflow_testing.lark_task_pilot.run_lark_task_pilot",
                     side_effect=RuntimeError("rollback dry run failed"),
                 ), self.assertRaisesRegex(RuntimeError, "rollback dry run failed"):
                     exercise_rollback(ROOT, work_dir, now=NOW)
@@ -761,10 +761,10 @@ class ControlledLarkPilotTests(TestCase):
     def test_task6_operations_reject_repository_work_dir_before_side_effects(self):
         runner = _FakeCommandRunner()
         with patch(
-            "skill2workflow.controlled_lark_pilot.load_pilot_charter",
+            "scripts.skill2workflow_testing.controlled_lark_pilot.load_pilot_charter",
             side_effect=AssertionError("charter must not be loaded"),
         ) as load_charter, patch(
-            "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+            "scripts.skill2workflow_testing.controlled_lark_pilot._pilot_control_plane",
             side_effect=AssertionError("control plane must not be created"),
         ) as control_plane:
             for operation in (
@@ -1532,10 +1532,10 @@ class ControlledLarkPilotTests(TestCase):
             work_dir = repo_root / "forged-pilot"
             transport = _FakeTransport()
             with patch(
-                "skill2workflow.controlled_lark_pilot.load_pilot_charter",
+                "scripts.skill2workflow_testing.controlled_lark_pilot.load_pilot_charter",
                 side_effect=AssertionError("charter must not be loaded"),
             ) as load_charter, patch(
-                "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+                "scripts.skill2workflow_testing.controlled_lark_pilot._pilot_control_plane",
                 side_effect=AssertionError("state must not be accessed"),
             ) as control_plane:
                 with self.assertRaisesRegex(ValueError, "outside the repository"):
@@ -1585,7 +1585,7 @@ class ControlledLarkPilotTests(TestCase):
             initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
             control = MismatchedRunControl()
             with patch(
-                "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+                "scripts.skill2workflow_testing.controlled_lark_pilot._pilot_control_plane",
                 return_value=control,
             ):
                 with self.assertRaisesRegex(
@@ -1700,7 +1700,7 @@ class ControlledLarkPilotTests(TestCase):
             initialize_pilot(ROOT, work_dir, _valid_charter(), now=NOW)
 
             with patch(
-                "skill2workflow.controlled_lark_pilot._pilot_control_plane"
+                "scripts.skill2workflow_testing.controlled_lark_pilot._pilot_control_plane"
             ) as control_plane:
                 with self.assertRaisesRegex(
                     ValueError,
@@ -1729,7 +1729,7 @@ class ControlledLarkPilotTests(TestCase):
                 return original_get(key, default)
 
             with patch(
-                "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+                "scripts.skill2workflow_testing.controlled_lark_pilot._pilot_control_plane",
                 side_effect=AssertionError("closed pilot must not access the control plane"),
             ) as control_plane, patch.object(
                 os.environ,
@@ -1895,7 +1895,7 @@ class ControlledLarkPilotTests(TestCase):
         with TemporaryDirectory() as tmp:
             work_dir = Path(tmp) / "pilot"
             with patch(
-                "skill2workflow._controlled_lark_pilot_evidence_writer.os.link",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer.os.link",
                 side_effect=fail_link,
             ):
                 with self.assertRaisesRegex(OSError, "publish failed"):
@@ -1953,7 +1953,7 @@ class ControlledLarkPilotTests(TestCase):
                 output = root / "output"
                 script = f"""
 from pathlib import Path
-from skill2workflow.controlled_lark_pilot import exercise_disabled_live, exercise_rollback, finalize_pilot, generate_pilot_evidence
+from scripts.skill2workflow_testing.controlled_lark_pilot import exercise_disabled_live, exercise_rollback, finalize_pilot, generate_pilot_evidence
 from tests.test_controlled_lark_pilot import NOW
 from tests.test_controlled_lark_pilot_evidence import _valid_decision
 repo = Path({str(ROOT)!r})
@@ -2016,7 +2016,7 @@ raise SystemExit(2)
                 os.mkfifo(case_path, 0o600)
                 script = f"""
 from pathlib import Path
-from skill2workflow.controlled_lark_pilot import load_private_case, start_pilot_run
+from scripts.skill2workflow_testing.controlled_lark_pilot import load_private_case, start_pilot_run
 from tests.test_controlled_lark_pilot import NOW
 repo = Path({str(ROOT)!r})
 work = Path({str(work_dir)!r})
@@ -2115,7 +2115,7 @@ raise SystemExit(2)
                 payload = _valid_case()
                 payload[key] = value
                 with self.subTest(key=key, value=value), patch(
-                    "skill2workflow.controlled_lark_pilot._pilot_control_plane",
+                    "scripts.skill2workflow_testing.controlled_lark_pilot._pilot_control_plane",
                     side_effect=AssertionError("control plane must not be created"),
                 ) as control_plane, TemporaryDirectory() as tmp:
                     root = Path(tmp)

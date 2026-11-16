@@ -355,7 +355,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     _qualify_installed_preflight_inputs(repo_root, console_script, isolated_dir)
     _qualify_installed_http_assertions(repo_root, console_script, isolated_dir)
     _qualify_installed_skill_http_actions(repo_root, console_script, isolated_dir)
-    _qualify_installed_quickstart_inputs(python_bin, console_script, isolated_dir)
+    _qualify_installed_quickstart_inputs(repo_root, console_script, isolated_dir)
     _qualify_installed_draft_input_ui(repo_root, console_script, isolated_dir)
     _qualify_installed_ui_static(repo_root, console_script, isolated_dir)
     validate_output = _run(
@@ -1032,13 +1032,11 @@ def _qualify_installed_skill_http_actions(repo_root: Path, console_script: Path,
     return True
 
 
-def _qualify_installed_quickstart_inputs(python_bin: Path, console_script: Path, isolated_dir: Path) -> bool:
-    code = (
-        'import json, os, sys; from pathlib import Path; '
-        'from skill2workflow.quickstart_smoke import _qualify_input_quickstart; '
-        'print(json.dumps(_qualify_input_quickstart(Path(sys.argv[1]), Path(sys.argv[2]), dict(os.environ))))'
-    )
-    result = json.loads(_run([str(python_bin), '-c', code, str(console_script), str(isolated_dir)], cwd=isolated_dir))
+def _qualify_installed_quickstart_inputs(repo_root: Path, console_script: Path, isolated_dir: Path) -> bool:
+    result = json.loads(_run([
+        sys.executable, str(repo_root / 'scripts/quickstart_input_smoke.py'),
+        '--executable', str(console_script), '--work-dir', str(isolated_dir),
+    ], cwd=isolated_dir))
     expected = {name: True for name in ('custom_input_waiting', 'invalid_input_no_workspace',
                 'network_prefix_refused', 'custom_input_approved_http', 'custom_input_compact_result',
                 'quickstart_preview_no_workspace', 'required_mapping_no_workspace',
@@ -1481,6 +1479,13 @@ def _inspect_wheel(wheel: Path) -> Dict[str, object]:
                     "wheel contains unexpected top-level content: "
                     + ", ".join(unexpected_roots)
                 )
+
+            if any(
+                path.parts[0] == "skill2workflow" and path.suffix == ".py"
+                and (path.stem == "demo" or any(part in path.stem for part in ("pilot", "smoke", "lark")))
+                for path in paths
+            ):
+                raise RuntimeError("wheel contains checkout tooling")
 
             forbidden_parts = {"__pycache__", "pilot-evidence", "private", "secrets"}
             forbidden_suffixes = {

@@ -8,12 +8,12 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
-from skill2workflow.controlled_lark_pilot import (
+from scripts.skill2workflow_testing.controlled_lark_pilot import (
     decide_pilot_run,
     initialize_pilot,
     start_pilot_run,
 )
-from skill2workflow.controlled_lark_pilot_evidence import (
+from scripts.skill2workflow_testing.controlled_lark_pilot_evidence import (
     RUN_EVIDENCE_KEYS,
     build_acceptance_summary,
     build_run_evidence,

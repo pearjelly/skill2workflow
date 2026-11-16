@@ -1,5 +1,11 @@
 # Stability Boundaries
 
+Contributor demo, pilot and qualification helpers are checkout-only under
+`scripts/skill2workflow_testing`; their Python module paths are not runtime API.
+The wheel contains production modules and installed UI/example assets. Package
+qualification rejects accidentally included pilot/smoke modules while preserving
+the existing script entry points and tenant-credential CLI check.
+
 The published JSON Schemas and validator now agree on known-field shapes and
 conditional requirements. Invalid declared fields in 0.1/0.2 drafts no longer
 pass validation; unknown extension fields retain their additive contract.

@@ -9,10 +9,10 @@ import tempfile
 from pathlib import Path
 from typing import Dict
 
-from .compiler import validate_workflow
-from .control_plane import LocalControlPlane
-from .dashboard import build_control_snapshot
-from .schedules import LocalScheduleRunner
+from skill2workflow.compiler import validate_workflow
+from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.dashboard import build_control_snapshot
+from skill2workflow.schedules import LocalScheduleRunner
 
 
 DEFAULT_WORK_DIR = Path(tempfile.gettempdir()) / "skill2workflow-schedule-loop29"

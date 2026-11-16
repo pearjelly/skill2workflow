@@ -49,7 +49,7 @@ from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace, rotate_service_token
 from .service_doctor import diagnose_service
 from .go_live import assess_go_live
-from .lark_tenant_credential_check import check_lark_tenant_credential
+from .tenant_credentials import check_lark_tenant_credential
 from .service_client import (
     fetch_audit_consistency,
     fetch_audit_events,

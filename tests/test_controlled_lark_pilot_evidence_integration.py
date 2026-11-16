@@ -7,20 +7,20 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
-from skill2workflow.controlled_lark_pilot import (
+from scripts.skill2workflow_testing.controlled_lark_pilot import (
     finalize_pilot,
     generate_pilot_evidence,
     initialize_pilot,
 )
-from skill2workflow.controlled_lark_pilot_evidence import (
+from scripts.skill2workflow_testing.controlled_lark_pilot_evidence import (
     prepare_evidence_pack_transaction,
 )
-from skill2workflow._controlled_lark_pilot_private_authorization import (
+from scripts.skill2workflow_testing._controlled_lark_pilot_private_authorization import (
     AnchoredPrivateSession,
     PrivateFinalizationBundle,
     open_private_session,
 )
-from skill2workflow._controlled_lark_pilot_pack_transaction import (
+from scripts.skill2workflow_testing._controlled_lark_pilot_pack_transaction import (
     EvidencePackTransaction,
 )
 
@@ -369,7 +369,7 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
             before = len(os.listdir("/dev/fd"))
 
             with patch(
-                "skill2workflow._controlled_lark_pilot_private_authorization.os.fsync",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_private_authorization.os.fsync",
                 side_effect=OSError("lock fsync failed"),
             ):
                 for _attempt in range(12):
@@ -393,7 +393,7 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
             session = open_private_session(private)
             snapshot = session.authorization_bundle_snapshot()
             authorization = __import__(
-                "skill2workflow._controlled_lark_pilot_private_authorization",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_private_authorization",
                 fromlist=["_close_descriptors"],
             )
             real_close = authorization._close_descriptors
@@ -1168,7 +1168,7 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                 return transaction
 
             with patch(
-                "skill2workflow.controlled_lark_pilot.prepare_evidence_pack_transaction",
+                "scripts.skill2workflow_testing.controlled_lark_pilot.prepare_evidence_pack_transaction",
                 side_effect=failing_second_write,
             ), self.assertRaisesRegex(OSError, "requested export failed"):
                 finalize_pilot(

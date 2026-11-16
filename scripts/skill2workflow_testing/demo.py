@@ -9,11 +9,11 @@ import tempfile
 from pathlib import Path
 from typing import Dict
 
-from .compiler import compile_ir_to_workflow, validate_workflow
-from .control_plane import LocalControlPlane
-from .dashboard import build_control_snapshot
-from .parser import parse_skill_file
-from .visualizer import workflow_to_litegraph
+from skill2workflow.compiler import compile_ir_to_workflow, validate_workflow
+from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.dashboard import build_control_snapshot
+from skill2workflow.parser import parse_skill_file
+from skill2workflow.visualizer import workflow_to_litegraph
 
 
 DEFAULT_WORK_DIR = Path(tempfile.gettempdir()) / "skill2workflow-demo"

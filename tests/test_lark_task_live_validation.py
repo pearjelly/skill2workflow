@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
 
-from skill2workflow.lark_task_live_validation import run_lark_task_live_validation
+from scripts.skill2workflow_testing.lark_task_live_validation import run_lark_task_live_validation
 
 
 ROOT = Path(__file__).resolve().parents[1]

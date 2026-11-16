@@ -1,5 +1,11 @@
 # Workflow DSL Compatibility
 
+Checkout demo/pilot/smoke Python imports have moved from `skill2workflow.*` to
+`scripts.skill2workflow_testing.*`. They are contributor tools, excluded from
+the wheel; their `scripts/*.py` entry points are unchanged. This packaging
+change does not alter DSL, state or CLI command contracts. The production
+tenant-credential check remains available through its existing CLI command.
+
 Known-field shape validation now matches the published 0.1/0.2 JSON Schema
 contracts for metadata, node headers, reserved fields, transitions and
 connector request metadata. Previously accepted documents with missing titles,

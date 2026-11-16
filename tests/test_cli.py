@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from skill2workflow.cli import MAX_CLI_JSON_DOCUMENT_BYTES, main
 from skill2workflow.compiler import validate_workflow
-from skill2workflow.external_connector_smoke import _external_connector_workflow
+from scripts.skill2workflow_testing.external_connector_smoke import _external_connector_workflow
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.state_layout import STATE_LAYOUT_MARKER
 from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES

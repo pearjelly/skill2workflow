@@ -9,12 +9,12 @@ import tempfile
 from pathlib import Path
 from typing import Dict
 
-from .compiler import validate_workflow
-from .connectors import ConnectorRuntime
-from .control_plane import LocalControlPlane
-from .credentials import StaticCredentialProvider
-from .dashboard import build_control_snapshot
-from .external_connectors import load_external_connector
+from skill2workflow.compiler import validate_workflow
+from skill2workflow.connectors import ConnectorRuntime
+from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.credentials import StaticCredentialProvider
+from skill2workflow.dashboard import build_control_snapshot
+from skill2workflow.external_connectors import load_external_connector
 
 
 DEFAULT_WORK_DIR = Path(tempfile.gettempdir()) / "skill2workflow-external-connector"

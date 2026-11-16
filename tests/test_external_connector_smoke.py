@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.external_connector_smoke import run_external_connector_smoke
+from scripts.skill2workflow_testing.external_connector_smoke import run_external_connector_smoke
 
 
 class ExternalConnectorSmokeTests(TestCase):

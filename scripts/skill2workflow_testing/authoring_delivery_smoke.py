@@ -9,15 +9,15 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Optional, Sequence
 
-from .authoring_artifacts import (
+from skill2workflow.authoring_artifacts import (
     create_authoring_artifacts,
     load_verified_authoring_workflow,
     repair_authoring_artifacts,
     verify_authoring_artifacts,
 )
-from .bundles import create_workflow_bundle, verify_workflow_bundle
-from .control_plane import LocalControlPlane
-from .dashboard import build_control_snapshot
+from skill2workflow.bundles import create_workflow_bundle, verify_workflow_bundle
+from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.dashboard import build_control_snapshot
 
 
 AUTHORING_DELIVERY_EVIDENCE_SCHEMA_VERSION = (

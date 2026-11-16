@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 
 ROOT = Path(__file__).resolve().parents[1]
 
-from skill2workflow.controlled_lark_pilot import main
+from scripts.skill2workflow_testing.controlled_lark_pilot import main
 
 
 class ControlledLarkPilotCLITests(unittest.TestCase):
@@ -206,7 +206,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             )
             for arguments, target in zip(commands, targets):
                 with self.subTest(command=arguments[0]), patch(
-                    "skill2workflow.controlled_lark_pilot." + target,
+                    "scripts.skill2workflow_testing.controlled_lark_pilot." + target,
                     return_value=dict(common),
                 ):
                     result, stdout, stderr = self._invoke(arguments)
@@ -394,7 +394,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             {"LARK_BOT_ACCESS_TOKEN": token},
             clear=True,
         ), patch(
-            "skill2workflow.controlled_lark_pilot.decide_pilot_run",
+            "scripts.skill2workflow_testing.controlled_lark_pilot.decide_pilot_run",
             return_value=response,
         ) as decide:
             result, stdout, stderr = self._invoke(
@@ -423,7 +423,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
 
     def test_reject_with_live_confirmation_is_a_fixed_error_before_dispatch(self):
         with tempfile.TemporaryDirectory() as temporary, patch(
-            "skill2workflow.controlled_lark_pilot.decide_pilot_run"
+            "scripts.skill2workflow_testing.controlled_lark_pilot.decide_pilot_run"
         ) as decide:
             result, stdout, stderr = self._invoke(
                 [
@@ -498,7 +498,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
                 "--decision-file",
                 str(decision),
             ]
-            with patch("skill2workflow.controlled_lark_pilot.finalize_pilot") as finalize:
+            with patch("scripts.skill2workflow_testing.controlled_lark_pilot.finalize_pilot") as finalize:
                 result, stdout, stderr = self._invoke(arguments)
                 self.assertNotEqual(result, 0)
                 self.assertEqual(stdout, "")
@@ -520,7 +520,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
                 tempfile.TemporaryDirectory() as outside:
             decision = Path(temporary) / "decision.json"
             self._write_decision(decision)
-            with patch("skill2workflow.controlled_lark_pilot.finalize_pilot") as finalize:
+            with patch("scripts.skill2workflow_testing.controlled_lark_pilot.finalize_pilot") as finalize:
                 result, stdout, stderr = self._invoke(
                     [
                         "finalize",
@@ -538,7 +538,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
     def test_expected_operator_error_uses_fixed_redacted_stderr(self):
         private_error = "PRIVATE INPUT /private/path/provider-message"
         with tempfile.TemporaryDirectory() as temporary, patch(
-            "skill2workflow.controlled_lark_pilot.start_pilot_run",
+            "scripts.skill2workflow_testing.controlled_lark_pilot.start_pilot_run",
             side_effect=ValueError(private_error),
         ):
             result, stdout, stderr = self._invoke(
@@ -588,7 +588,7 @@ class ControlledLarkPilotCLITests(unittest.TestCase):
             os.chmod(decision, 0o600)
 
             with patch(
-                "skill2workflow.controlled_lark_pilot.finalize_pilot"
+                "scripts.skill2workflow_testing.controlled_lark_pilot.finalize_pilot"
             ) as finalize:
                 result, stdout, stderr = self._invoke(
                     [

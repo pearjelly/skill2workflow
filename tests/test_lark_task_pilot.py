@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.lark_task_pilot import (
+from scripts.skill2workflow_testing.lark_task_pilot import (
     build_lark_task_pilot_workflow,
     run_lark_task_pilot,
 )

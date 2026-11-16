@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Move checkout demo, pilot and smoke helpers to
+  `scripts/skill2workflow_testing`, excluding them from runtime wheels. Existing
+  `scripts/*.py` entry points remain available; installed qualification drives
+  the selected CLI from checkout tools. Shared private JSON I/O and tenant
+  credential checks remain runtime capabilities.
+
 - Align known Workflow DSL field shapes and conditional requirements between
   versioned JSON Schemas and the dependency-free validator. Reject malformed
   metadata, unsupported node types and mistyped declared fields before graph

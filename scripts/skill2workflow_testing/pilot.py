@@ -12,12 +12,12 @@ from pathlib import Path
 from typing import Dict
 from urllib.parse import urlsplit
 
-from .compiler import validate_workflow
-from .control_plane import LocalControlPlane
-from .credentials import StaticCredentialProvider
-from .dashboard import build_control_snapshot
-from .visualizer import workflow_to_litegraph
-from .webhooks import handle_webhook_request
+from skill2workflow.compiler import validate_workflow
+from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.credentials import StaticCredentialProvider
+from skill2workflow.dashboard import build_control_snapshot
+from skill2workflow.visualizer import workflow_to_litegraph
+from skill2workflow.webhooks import handle_webhook_request
 
 
 DEFAULT_WORK_DIR = Path(tempfile.gettempdir()) / "skill2workflow-pilot"

@@ -1,5 +1,11 @@
 # Contributing to skill2workflow
 
+Demo, pilot and smoke orchestration lives in `scripts/skill2workflow_testing`.
+Run it through the existing `python3 scripts/<name>.py` entry points from a
+source checkout. Tests import `scripts.skill2workflow_testing`; these helpers
+are excluded from the installed runtime wheel. Package qualification checks
+that separation and exercises the installed CLI from an isolated directory.
+
 For executable HTTP result checks, see [HTTP JSON assertions](docs/http-json-assertions.md).
 For explicit Agent adapters, follow the [Agent protocol](docs/connectors.md#agent-connector-protocol)
 and run `PYTHONPATH=src python3 -m unittest tests.test_agent_connector`.

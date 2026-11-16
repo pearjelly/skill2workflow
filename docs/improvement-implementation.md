@@ -19,7 +19,7 @@ standard-library-only runtime remain requirements.
 | T8 | CLI command functions and argparse dispatch; unchanged CLI tests | Complete |
 | T9 | development-only Ruff/mypy CI and typed IR/DSL/state contracts | Complete |
 | T12 | JSON Schema/validator agreement for examples and invalid cases; versioned 0.2 schema | Complete |
-| T10 | testing/demo/pilot modules excluded from runtime wheel; smoke entry points preserved | Pending |
+| T10 | testing/demo/pilot modules excluded from runtime wheel; smoke entry points preserved | Complete |
 | T11 | SQLite CLI default; explicit JSON compatibility and documentation | Pending |
 | T14 | one-page roadmap, archived loop history, consolidated API reference, short agent notes and command reference | Pending |
 
@@ -102,3 +102,14 @@ branch update. Evidence below is updated only after a check finishes.
   runs as a mandatory CI quality gate. Old smoke/test fixtures now carry their
   required titles and use the documented step type. Full development suite:
   1,581 tests passed; Ruff/mypy, example sync and secret hygiene pass.
+
+- T10: moved 18 checkout tool modules under scripts/skill2workflow_testing.
+  Shared anchored JSON I/O and the production tenant-credential check retain
+  their runtime behavior under neutral module names. All migrated local script
+  entry points and help-only live entry points pass; the full development suite
+  passes 1,583 tests (including the real installed quickstart). Package smoke
+  and isolated installed Agent qualification pass. The inspected wheel has no
+  demo/pilot/smoke/Lark tool modules; its inspector rejects accidental inclusion.
+  A stale local build cache was detected by that gate and cleared before the
+  successful clean build. Ruff/mypy, 83 JavaScript tests, corpus, example sync
+  and repository/example secret hygiene pass.

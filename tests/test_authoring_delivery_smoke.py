@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.authoring_delivery_smoke import run_authoring_delivery_smoke
+from scripts.skill2workflow_testing.authoring_delivery_smoke import run_authoring_delivery_smoke
 
 
 class AuthoringDeliverySmokeTests(TestCase):

@@ -19,6 +19,15 @@ from scripts.package_smoke import (
 
 
 class PackageSmokeTests(TestCase):
+    def test_wheel_rejects_checkout_tool_modules(self):
+        for name in ("demo", "pilot", "quickstart_smoke", "controlled_lark_pilot",
+                     "_controlled_lark_pilot_evidence_writer", "lark_task_live_validation"):
+            with self.subTest(module=name), TemporaryDirectory() as temporary:
+                wheel = Path(temporary) / "skill2workflow-0.1.0-py3-none-any.whl"
+                _write_test_wheel(wheel, extra={"skill2workflow/" + name + ".py": ""})
+                with self.assertRaisesRegex(RuntimeError, "checkout tooling"):
+                    _inspect_wheel(wheel)
+
     def test_smoke_builds_and_installs_a_wheel_without_editable_source(self):
         with TemporaryDirectory() as temporary:
             root = Path(temporary)

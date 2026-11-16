@@ -17,7 +17,7 @@ import urllib.request
 from pathlib import Path
 from typing import Dict
 
-from .service import load_service_config
+from skill2workflow.service import load_service_config
 
 
 def run_service_bootstrap_smoke(

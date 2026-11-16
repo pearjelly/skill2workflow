@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 from zoneinfo import ZoneInfo
 
-from .connectors import ConnectorRuntime, ExternalConnector
-from .control_plane import LocalControlPlane
-from .credentials import StaticCredentialProvider
+from skill2workflow.connectors import ConnectorRuntime, ExternalConnector
+from skill2workflow.control_plane import LocalControlPlane
+from skill2workflow.credentials import StaticCredentialProvider
 from ._controlled_lark_pilot_operations import (
     APP_ID_ENVIRONMENT,
     APP_SECRET_ENVIRONMENT,
@@ -50,7 +50,7 @@ from ._controlled_lark_pilot_evidence_writer import (
     read_json_anchored,
     write_private_json_anchored,
 )
-from .external_connectors import load_external_connector
+from skill2workflow.external_connectors import load_external_connector
 from .lark_task_pilot import build_lark_task_pilot_workflow
 
 
