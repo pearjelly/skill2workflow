@@ -132,3 +132,17 @@ branch update. Evidence below is updated only after a check finishes.
   passed (115.119 s); Ruff/mypy and 83 JavaScript tests pass. All 89 public
   document/archive files have valid local targets and anchors; all 78 top-level
   guides are reachable within two hops. Corpus and secret hygiene pass.
+
+## Final qualification
+
+All T0–T14 tasks are complete. The final development suite passes 1,591 Python
+and 83 JavaScript tests; schema conformance, Ruff, core mypy, corpus and secret
+hygiene gates pass. The production-baseline runner passes all 19 checks,
+including isolated wheel installation, reproducible builds, service/security
+boundaries, observability, backup/restore, upgrade, retention, cancellation,
+interrupted recovery, scheduling and the service soak. Installed Agent routing
+and restart checks pass for JSON and SQLite.
+
+[Machine-readable verification](verification/2026-11-16-improvement-report.json)
+records the tested commit and fixed outcome facts. GitHub publication is tracked
+by the branch/PR containing this ledger; no package release is performed.
