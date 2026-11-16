@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Dispatch CLI subcommands through individual `cmd_<name>` functions and
+  argparse handler defaults while preserving argument construction and behavior.
+
 - Split service resource handlers into workflow, run, schedule, backup and
   operations modules behind fixed/parameter route tables; preserve endpoint,
   admission, telemetry, authentication and exception behavior.
