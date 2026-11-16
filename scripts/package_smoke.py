@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -425,7 +426,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             )
         )
         or not isinstance(compile_review.get("notices"), list)
-        or len(compile_review["notices"]) > 3
+        or len(compile_review["notices"]) > compile_review["executable_node_count"] + 3
         or not all(isinstance(notice, str) for notice in compile_review["notices"])
         or any(
             notice
@@ -433,7 +434,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
                 "checklist_not_found",
                 "human_gate_not_inferred",
                 "verification_not_inferred",
-            }
+            } and not re.fullmatch(r"inferred_node:[1-9][0-9]*:(step|human_gate|verification):[^:\r\n]*", notice)
             for notice in compile_review["notices"]
         )
         or len(set(compile_review["notices"])) != len(compile_review["notices"])
@@ -1160,7 +1161,7 @@ def _require_installed_process_compile(compiled, section: str, source_file: str,
         "human_gate_count": 1,
         "verification_node_count": 1,
         "hard_gate_count": 0,
-        "notices": [],
+        "notices": ["inferred_node:1:step:", "inferred_node:3:verification:verify"],
     }
     if not isinstance(compiled, dict) or compiled.get("review") != expected_review:
         raise RuntimeError("installed Skill compile did not preserve process step counts and gates")
@@ -1190,6 +1191,8 @@ def _require_installed_process_compile(compiled, section: str, source_file: str,
             "index": index,
             "line": index + source_offset,
             "section": section,
+            **({"inferred_type": "step", "matched_term": None} if index == 1 else
+               {"inferred_type": "verification", "matched_term": "verify"} if index == 3 else {}),
         }:
             raise RuntimeError("installed Skill compile did not preserve process source provenance")
 

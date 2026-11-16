@@ -89,7 +89,7 @@ class SkillHttpActionTests(TestCase):
         self.assertEqual(review['human_gate_count'], 1)
         self.assertEqual(review['verification_node_count'], 1)
         self.assertEqual(review['executable_node_count'], 4)
-        self.assertEqual(review['notices'], [])
+        self.assertEqual(review['notices'], ['inferred_node:4:step:'])
 
     def test_forged_ir_types_fail_closed_and_default_is_not_lost(self):
         ir = parse_skill_text('## Steps\n1. 提交 ' + declaration() + '\n')

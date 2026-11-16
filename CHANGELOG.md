@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Tighten Skill inference to English whole words and explicit approval phrases,
+  with Chinese approval/check vocabulary and per-step inference provenance.
+  Prose commands compile as descriptive steps; only explicit declarations bind
+  HTTP connectors. Compile review lists every inferred step for author review.
+  Enterprise examples now declare their illustrative HTTP actions explicitly.
+
 - Make the package smoke's simulated unit permissions independent of host
   umask, and skip the installed quickstart drill when ensurepip is unavailable.
 

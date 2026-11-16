@@ -16,7 +16,7 @@ Do NOT send customer-facing follow-up or update CRM until the account owner appr
 1. **Gather account context** - inspect current opportunity stage, last customer touch, and promised next action
 2. **Draft customer follow-up** - prepare a concise follow-up message tied to the current opportunity
 3. **Ask account owner for approval** - wait for explicit owner approval before sending or recording changes
-4. **Run CRM update command** - record the follow-up, next task, owner, and due date in CRM
+4. **Run CRM update command** - record the follow-up, next task, owner, and due date in CRM <!-- skill2workflow: http {"request":{"method":"POST","url":"https://example.invalid/crm/follow-ups"}} -->
 5. **Verify follow-up audit trail** - check that the message, task, owner, and timestamp are recorded
 
 ## Verification

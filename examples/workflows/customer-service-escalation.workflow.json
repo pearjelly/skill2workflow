@@ -39,7 +39,9 @@
           "kind": "ordered_step",
           "index": 1,
           "line": 16,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "step",
+          "matched_term": null
         }
       },
       "on_success": "node_002_check_sla_and_customer_history",
@@ -68,7 +70,9 @@
           "kind": "ordered_step",
           "index": 2,
           "line": 17,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "verification",
+          "matched_term": "check"
         }
       },
       "on_success": "node_003_draft_escalation_plan",
@@ -97,7 +101,9 @@
           "kind": "ordered_step",
           "index": 3,
           "line": 18,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "step",
+          "matched_term": null
         }
       },
       "on_success": "node_004_ask_support_lead_for_approval",
@@ -126,7 +132,9 @@
           "kind": "ordered_step",
           "index": 4,
           "line": 19,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "human_gate",
+          "matched_term": "approval"
         }
       },
       "connector": {
@@ -163,6 +171,11 @@
         }
       },
       "connector": {
+        "request": {
+          "method": "POST",
+          "url": "https://example.invalid/support/escalations",
+          "response_mode": "metadata"
+        },
         "id": "http",
         "kind": "http"
       },
@@ -192,7 +205,9 @@
           "kind": "ordered_step",
           "index": 6,
           "line": 21,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "verification",
+          "matched_term": "verify"
         }
       },
       "on_success": "end",

@@ -1,5 +1,15 @@
 # Workflow DSL Compatibility
 
+Skill inference now uses English whole words and explicit approval phrases,
+plus Chinese approval and verification terms. `human-readable`, `latest`,
+`contest`, `confirmation email` and `rerun` no longer invent control nodes.
+Only explicit HTTP declarations create tool calls; prose commands remain
+descriptive steps. Newly compiled source metadata includes `inferred_type`
+and `matched_term`; source-free review notices list each inferred step by
+index. These tightened inference rules change drafts on recompilation, not
+already published workflows. Illustrative enterprise actions now use explicit
+HTTP declarations with reserved example endpoints.
+
 Preflight now applies the existing trigger input canonical-copy and 1 MiB UTF-8
 bound before schema/mapping analysis. Over-limit or nonfinite input cannot
 produce a ready report; authenticated malformed preflights receive fixed 400

@@ -271,7 +271,10 @@ retains its DSL-only compatibility output.
 
 The review contains only inferred structural counts and the finite notices
 `checklist_not_found`, `human_gate_not_inferred`, and
-`verification_not_inferred`. It does not include Skill text, local paths,
+`verification_not_inferred`, plus `inferred_node:<index>:<type>:<matched_term>`
+for each inferred step (an empty term means no control term matched). The
+matched terms come from the fixed English/Chinese vocabulary, and never grant
+HTTP execution. It does not include Skill text, local paths,
 credentials, validation of business intent, or authorization to publish/run.
 The historical `executable_node_count` includes ordinary steps and text-only
 verification nodes that record progress but do not execute the described work

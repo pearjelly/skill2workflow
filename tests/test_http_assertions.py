@@ -104,6 +104,7 @@ class HttpAssertionTests(TestCase):
     def test_validator_rejects_bad_binding_and_runtime_obeys_failure_transition(self):
         workflow = compile_ir_to_workflow(parse_skill_text('## Steps\n1. Run status probe\n2. Deliver output\n'))
         workflow['nodes'][1]['connector'] = copy.deepcopy(node()['connector'])
+        workflow['nodes'][1]['type'] = 'tool_call'
         self.assertEqual(validate_workflow(workflow), [])
         invalid = copy.deepcopy(workflow)
         invalid['nodes'][1]['connector']['assertions'] = []

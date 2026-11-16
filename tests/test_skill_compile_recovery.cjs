@@ -165,7 +165,7 @@ test('compile review does not flag a configured HTTP action as missing its reque
   assert.doesNotMatch(text,/http.*request.*(missing|needs)/i);
 });
 
-test('a real compiled inferred action produces the missing-request warning',async()=>{
+test('a real compiled prose command stays descriptive and lists its inference',async()=>{
   let compiledFixture;
   if(process.env.S2W_EDITOR_MODULE){
     assert.ok(process.env.S2W_COMPILE_ACTION,'Served-module qualification requires a real compile response');
@@ -178,7 +178,8 @@ test('a real compiled inferred action produces the missing-request warning',asyn
   }
   const ui=setup(async()=>response(compiledFixture.reply,200));await ui.stage(compiledFixture.source);await ui.api.compileStagedSkill();
   const text=visibleReview(ui);
-  assert.match(text,/http.*request.*(missing|needs)/i);assert.doesNotMatch(text,/private-command-canary/);
+  assert.doesNotMatch(text,/http.*request.*(missing|needs)/i);assert.doesNotMatch(text,/private-command-canary/);
+  assert.match(text,/Step 2: inferred step/);
   assert.deepEqual(JSON.parse(JSON.stringify(ui.api.source)),compiledFixture.reply.workflow);
 });
 

@@ -34,7 +34,7 @@ class CompilerTests(TestCase):
                 "human_gate_count": 1,
                 "verification_node_count": 1,
                 "hard_gate_count": 1,
-                "notices": [],
+                "notices": ["inferred_node:1:human_gate:approval", "inferred_node:2:verification:verify"],
             },
         )
         self.assertNotIn("Obtain human approval.", str(review))
@@ -52,6 +52,7 @@ class CompilerTests(TestCase):
                 "checklist_not_found",
                 "human_gate_not_inferred",
                 "verification_not_inferred",
+                "inferred_node:1:step:",
             ],
         )
 
@@ -144,6 +145,8 @@ class CompilerTests(TestCase):
                 "index": 1,
                 "line": 24,
                 "section": "Checklist",
+                "inferred_type": "verification",
+                "matched_term": "check",
             },
         )
         self.assertEqual(review["type"], "human_gate")
@@ -165,11 +168,11 @@ class CompilerTests(TestCase):
         workflow = compile_ir_to_workflow(ir)
         errors = validate_workflow(workflow)
 
-        tool_node = next(node for node in workflow["nodes"] if node["type"] == "tool_call")
+        tool_node = workflow["nodes"][1]
         human_node = next(node for node in workflow["nodes"] if node["type"] == "human_gate")
         self.assertEqual(errors, [])
-        self.assertEqual(tool_node["connector"]["id"], "http")
-        self.assertEqual(tool_node["connector"]["kind"], "http")
+        self.assertEqual(tool_node["type"], "step")
+        self.assertNotIn("connector", tool_node)
         self.assertEqual(human_node["connector"]["id"], "manual")
         self.assertEqual(human_node["connector"]["kind"], "manual")
 

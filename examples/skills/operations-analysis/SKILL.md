@@ -13,7 +13,7 @@ Do NOT publish the operating action plan until the responsible business owner co
 
 ## Checklist
 
-1. **Run metrics query command** - collect the KPI slice, date range, and source system outputs
+1. **Run metrics query command** - collect the KPI slice, date range, and source system outputs <!-- skill2workflow: http {"request":{"method":"POST","url":"https://example.invalid/metrics/query"}} -->
 2. **Check threshold breaches** - identify metrics outside expected thresholds and note affected business areas
 3. **Draft operating narrative** - explain drivers, impact, assumptions, and recommended actions
 4. **Ask business owner to confirm action plan** - wait for owner confirmation before publishing the plan

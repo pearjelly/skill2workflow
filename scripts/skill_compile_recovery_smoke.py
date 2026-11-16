@@ -103,8 +103,9 @@ def qualify(executable=None, browser_module_tests=False):
         if status != 200 or headers.get('Cache-Control') != 'no-store' or set(action_reply) != {'workflow', 'review'}:
             raise RuntimeError('Inferred action compile qualification failed')
         nodes = action_reply['workflow']['nodes']
-        if (sum(node.get('type') == 'tool_call' and node.get('connector') == {'id': 'http', 'kind': 'http'}
-                for node in nodes) != 1 or 'private-command-canary' in json.dumps(action_reply['review'])):
+        if (any(node.get('type') == 'tool_call' for node in nodes)
+                or 'inferred_node:2:step:' not in action_reply['review']['notices']
+                or 'private-command-canary' in json.dumps(action_reply['review'])):
             raise RuntimeError('Inferred action compile contract failed')
         verified += 1
         if list(directory.iterdir()):

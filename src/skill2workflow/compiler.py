@@ -13,6 +13,7 @@ from .http_assertions import validate_http_assertion_binding, skill_http_asserti
 from .skill_http import skill_http_action_binding
 from .skill_input import skill_input_schema_contract
 from .skill_version import skill_workflow_version
+from .inference import infer_step
 
 Workflow = Dict[str, object]
 ValidationError = Dict[str, object]
@@ -79,7 +80,8 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
                 raise ValueError("Invalid Skill step annotation")
         elif explicit_type is not None and explicit_type != "human_gate":
             raise ValueError("Unsupported explicit Skill step type")
-        node_type = explicit_type or _node_type_for_step(f"{title} {detail}")
+        inferred_type, term = infer_step(f"{title} {detail}")
+        node_type = explicit_type or inferred_type
         step_ids.append(node_id)
         source = {
             "file": ir.get("source_path", "SKILL.md"),
@@ -90,6 +92,8 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
             source["line"] = step["line"]
         if step.get("section"):
             source["section"] = step["section"]
+        if explicit_type is None:
+            source.update(inferred_type=inferred_type, matched_term=term)
         node = {
             "id": node_id,
             "type": node_type,
@@ -218,6 +222,7 @@ def summarize_skill_compile(ir: Dict[str, object], workflow: Workflow) -> Dict[s
         notices.append("human_gate_not_inferred")
     if verification_node_count == 0:
         notices.append("verification_not_inferred")
+    notices.extend(inference_notices(workflow))
     return {
         "schema_version": SKILL_COMPILE_REVIEW_SCHEMA_VERSION,
         "ordered_step_count": ordered_step_count,
@@ -767,18 +772,19 @@ def _transition_targets(node: Dict[str, object]) -> Set[object]:
 
 
 def _node_type_for_step(title: str) -> str:
-    lowered = title.lower()
-    human_terms = ("approval", "approve", "user review", "ask user", "human", "confirm")
-    verify_terms = ("verify", "test", "validate", "check")
-    tool_terms = ("tool", "command", "run ")
+    return infer_step(title)[0]
 
-    if any(term in lowered for term in human_terms):
-        return "human_gate"
-    if any(term in lowered for term in verify_terms):
-        return "verification"
-    if any(term in lowered for term in tool_terms):
-        return "tool_call"
-    return "step"
+
+def inference_notices(workflow: Workflow) -> List[str]:
+    """List inferred source indexes, types and fixed terms without source text."""
+    notices = []
+    for node in workflow.get("nodes", []):
+        source = node.get("metadata", {}).get("source", {})
+        if "inferred_type" in source:
+            notices.append(
+                f"inferred_node:{source['index']}:{source['inferred_type']}:{source.get('matched_term') or ''}"
+            )
+    return notices
 
 
 def _step_records_from_ir(ir: Dict[str, object]) -> List[Dict[str, object]]:

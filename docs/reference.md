@@ -34,6 +34,7 @@ and delivery history remain in [the roadmap](../ROADMAP.md).
 - [Grafana Dashboard](grafana-dashboard.md)
 - [Installed Controlled Quickstart](quickstart.md)
 - [Installed Static UI](installed-ui.md)
+- [Improvement Report Implementation](improvement-implementation.md)
 - [Interrupted Run Recovery](interrupted-recovery.md)
 - [Iterate A Skill As A New Workflow Version](skill-workflow-versions.md)
 - [Lark/Feishu Live Connector Readiness Review](lark-live-connector-readiness.md)

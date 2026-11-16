@@ -82,7 +82,7 @@ class CliTests(TestCase):
                 "human_gate_count": 1,
                 "verification_node_count": 1,
                 "hard_gate_count": 0,
-                "notices": [],
+                "notices": ["inferred_node:1:human_gate:approval", "inferred_node:2:verification:verify"],
             },
         )
         self.assertNotIn("Ask for approval", json.dumps(review))
@@ -127,7 +127,7 @@ class CliTests(TestCase):
                         "human_gate_count": 1,
                         "verification_node_count": 1,
                         "hard_gate_count": 0,
-                        "notices": [],
+                        "notices": ["inferred_node:1:step:", "inferred_node:2:human_gate:approval", "inferred_node:3:verification:verify"],
                     },
                 )
                 nodes = workflow["nodes"][1:-2]
@@ -148,6 +148,8 @@ class CliTests(TestCase):
                             "index": index,
                             "line": index + 6,
                             "section": section,
+                            "inferred_type": ["step", "human_gate", "verification"][index - 1],
+                            "matched_term": [None, "approval", "verify"][index - 1],
                         }
                         for index in range(1, 4)
                     ],

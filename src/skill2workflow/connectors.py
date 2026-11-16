@@ -444,8 +444,6 @@ def default_connector_binding(node_type: str) -> ConnectorBinding:
     """Return the default connector binding for a DSL node type."""
     if node_type == "human_gate":
         return {"id": "manual", "kind": "manual"}
-    if node_type == "tool_call":
-        return {"id": "http", "kind": "http"}
     return {}
 
 

@@ -581,12 +581,13 @@
         throw new Error("local SKILL compilation returned an invalid review");
       }
     });
-    if (!Array.isArray(review.notices) || review.notices.length > 3) {
+    if (!Array.isArray(review.notices) || review.notices.length > MAX_SKILL_COMPILE_REVIEW_COUNT + 3) {
       throw new Error("local SKILL compilation returned an invalid review");
     }
     const seenNotices = new Set();
     review.notices.forEach(function (notice) {
-      if (!Object.prototype.hasOwnProperty.call(SKILL_COMPILE_REVIEW_NOTICES, notice) || seenNotices.has(notice)) {
+      const inferred = typeof notice === "string" && /^inferred_node:[1-9][0-9]*:(step|human_gate|verification):[^:\r\n]*$/.test(notice);
+      if ((!Object.prototype.hasOwnProperty.call(SKILL_COMPILE_REVIEW_NOTICES, notice) && !inferred) || seenNotices.has(notice)) {
         throw new Error("local SKILL compilation returned an invalid review");
       }
       seenNotices.add(notice);
@@ -939,7 +940,8 @@
     }
     review.notices.forEach(function (notice) {
       const item = document.createElement("li");
-      item.textContent = SKILL_COMPILE_REVIEW_NOTICES[notice];
+      const inferred = notice.split(":");
+      item.textContent = SKILL_COMPILE_REVIEW_NOTICES[notice] || ("Step " + inferred[1] + ": inferred " + inferred[2] + (inferred[3] ? " from “" + inferred[3] + "”" : " (no control term matched)") + ". Review this classification.");
       els.skillReviewList.appendChild(item);
     });
   }

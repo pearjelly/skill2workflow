@@ -30,7 +30,7 @@ class SkillHttpAssertionTests(TestCase):
         self.assertEqual(ir['hard_gates'], [])
         self.assertEqual(ir['human_gates'], [])
         self.assertEqual(ir['tool_hints'], [])
-        self.assertEqual(ir['verification_rules'], [])
+        self.assertEqual(ir['verification_rules'], ['1. 校验'])
         self.assertEqual(compile_ir_to_workflow(ir)['guards'], [])
 
     def test_cli_refusal_preserves_existing_output(self):
@@ -66,7 +66,7 @@ class SkillHttpAssertionTests(TestCase):
         review = summarize_skill_compile(ir, workflow)
         self.assertEqual(review['human_gate_count'], 1)
         self.assertEqual(review['verification_node_count'], 1)
-        self.assertEqual(review['notices'], [])
+        self.assertEqual(review['notices'], ['inferred_node:3:step:'])
         for storage in ('json', 'sqlite'):
             for ready in (True, False):
                 with self.subTest(storage=storage, ready=ready), TemporaryDirectory() as temporary:

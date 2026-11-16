@@ -13,6 +13,7 @@ from .input_schema import INPUT_SCHEMA_MAX_BYTES
 from .skill_input import SKILL_INPUT_SCHEMA_ERROR, skill_input_schema_contract
 from .frontmatter import SkillFenceError, parse_frontmatter
 from .skill_version import SKILL_WORKFLOW_VERSION_ERROR, skill_workflow_version
+from .inference import HUMAN_TERMS, VERIFY_TERMS, TOOL_TERMS, matched_term
 
 
 SkillIR = Dict[str, object]
@@ -69,21 +70,13 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
         "hard_gates": _extract_hard_gates(guidance_body),
         "ordered_steps": checklist,
         "ordered_step_details": checklist_details,
-        "tool_hints": _find_lines(guidance_body, ("tool", "command", "Run:", "Use ")),
+        "tool_hints": _find_lines(guidance_body, TOOL_TERMS),
         "human_gates": _find_lines(
             guidance_body,
-            (
-                "approval",
-                "approve",
-                "ask user",
-                "human",
-                "user review",
-                "user reviews",
-                "wait for user",
-            ),
+            HUMAN_TERMS,
             skip_section_terms=("verification", "validation"),
         ),
-        "verification_rules": _find_lines(guidance_body, ("verify", "test", "check", "validation")),
+        "verification_rules": _find_lines(guidance_body, VERIFY_TERMS),
         "sections": sections,
         "source_path": source_path,
     }
@@ -455,7 +448,6 @@ def _find_lines(
     needles: Tuple[str, ...],
     skip_section_terms: Tuple[str, ...] = (),
 ) -> List[str]:
-    lowered_needles = tuple(needle.lower() for needle in needles)
     lowered_skip_sections = tuple(term.lower() for term in skip_section_terms)
     matches = []
     current_section = "_root"
@@ -472,7 +464,6 @@ def _find_lines(
             continue
         if line.startswith("#"):
             continue
-        lowered = line.lower()
-        if any(needle in lowered for needle in lowered_needles):
+        if matched_term(line, needles) is not None:
             matches.append(line)
     return matches

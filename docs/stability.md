@@ -1,5 +1,10 @@
 # Stability Boundaries
 
+Skill prose inference is conservative authoring guidance: English whole words,
+Chinese control terms and explicit approval phrases. It cannot bind HTTP
+actions. Review each `inferred_node` notice and source `matched_term` before
+publication; published Workflow DSL is never recompiled automatically.
+
 `skill2workflow` is at Self-hosted Beta maturity. Some surfaces are stable for
 the `0.1.x` compatibility line, while Production Baseline work and the internals
 listed below remain experimental. This document separates those contracts from

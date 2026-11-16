@@ -17,7 +17,7 @@ Do NOT notify the customer or reassign the case until the support lead approves 
 2. **Check SLA and customer history** - compare the case against SLA commitments and recent customer interactions
 3. **Draft escalation plan** - identify target owner, escalation reason, customer message, and expected response time
 4. **Ask support lead for approval** - wait for support lead approval before handoff or customer notification
-5. **Run support handoff command** - create the escalation task and notify the assigned owner
+5. **Run support handoff command** - create the escalation task and notify the assigned owner <!-- skill2workflow: http {"request":{"method":"POST","url":"https://example.invalid/support/escalations"}} -->
 6. **Verify escalation acknowledgement** - check that the owner, SLA target, and acknowledgement timestamp are recorded
 
 ## Verification

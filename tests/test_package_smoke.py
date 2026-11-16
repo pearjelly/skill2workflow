@@ -687,6 +687,8 @@ def _process_compile_result(section, source_file):
                     "metadata": {"source": {
                         "file": source_file, "kind": "ordered_step", "index": index,
                         "section": section, "line": index + 12,
+                        **({"inferred_type": "step", "matched_term": None} if index == 1 else
+                           {"inferred_type": "verification", "matched_term": "verify"} if index == 3 else {}),
                     }},
                 }
                 for index, (node_type, title) in enumerate(steps, 1)
@@ -696,7 +698,7 @@ def _process_compile_result(section, source_file):
             "schema_version": "skill2workflow-skill-compile-review-0.1.0",
             "ordered_step_count": 3, "executable_node_count": 3,
             "human_gate_count": 1, "verification_node_count": 1,
-            "hard_gate_count": 0, "notices": [],
+            "hard_gate_count": 0, "notices": ["inferred_node:1:step:", "inferred_node:3:verification:verify"],
         },
     }
 

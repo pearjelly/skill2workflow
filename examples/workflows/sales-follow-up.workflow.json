@@ -39,7 +39,9 @@
           "kind": "ordered_step",
           "index": 1,
           "line": 16,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "step",
+          "matched_term": null
         }
       },
       "on_success": "node_002_draft_customer_follow_up",
@@ -68,7 +70,9 @@
           "kind": "ordered_step",
           "index": 2,
           "line": 17,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "step",
+          "matched_term": null
         }
       },
       "on_success": "node_003_ask_account_owner_for_approval",
@@ -97,7 +101,9 @@
           "kind": "ordered_step",
           "index": 3,
           "line": 18,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "human_gate",
+          "matched_term": "approval"
         }
       },
       "connector": {
@@ -134,6 +140,11 @@
         }
       },
       "connector": {
+        "request": {
+          "method": "POST",
+          "url": "https://example.invalid/crm/follow-ups",
+          "response_mode": "metadata"
+        },
         "id": "http",
         "kind": "http"
       },
@@ -163,7 +174,9 @@
           "kind": "ordered_step",
           "index": 5,
           "line": 20,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "verification",
+          "matched_term": "verify"
         }
       },
       "on_success": "end",
