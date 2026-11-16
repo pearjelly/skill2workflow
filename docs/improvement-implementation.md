@@ -10,7 +10,7 @@ standard-library-only runtime remain requirements.
 | T0 | umask-independent package fixture; ensurepip-aware quickstart test; full suites under 0002 and 0022 | Complete |
 | T1 | whole-word/Chinese inference, explicit HTTP actions, inference provenance and review notices; example regeneration | Complete |
 | T2 | validation/publication reject HTTP bindings without requests | Complete |
-| T13 | 20–50 original licensed Skills, type expectations, benchmark and CI thresholds | Pending |
+| T13 | 20–50 original licensed Skills, type expectations, benchmark and CI thresholds | Complete |
 | T3 | descriptive/enforced results and audit, CLI/UI run detail | Pending |
 | T4 | reviewed decision/data design, DSL 0.2, compiler/runtime/editor/write-back, risk-routing example and both paths | Pending |
 | T6 | enforced data dependencies and documented reserved fields with notices | Pending |
@@ -40,3 +40,8 @@ branch update. Evidence below is updated only after a check finishes.
 - T2: missing/non-object requests for both HTTP connectors fail library/CLI
   validation and publication; no workflow is published. Full suite: 1,556 tests
   passed (111.559 s).
+
+- T13: 24 original Skills / 96 process nodes / 71 inferred nodes. Against
+  `03aa8d1`: accuracy 53.52% → 100%, false human gates 6 → 0, enforced
+  coverage 46.88% → 51.04%. CI thresholds are 100% / 0 / 25%. Independent
+  expectation and gate-failure tests pass; full suite: 1,558 tests (111.351 s).

@@ -1,0 +1,222 @@
+{
+  "license": "Apache-2.0",
+  "source": "Original project-authored fixtures; no third-party Skills.",
+  "cases": [
+    {
+      "path": "readable-summary/SKILL.md",
+      "types": [
+        "step",
+        "step",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "customer-email/SKILL.md",
+      "types": [
+        "step",
+        "step",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "pipeline-rerun/SKILL.md",
+      "types": [
+        "step",
+        "step",
+        "verification",
+        "human_gate"
+      ]
+    },
+    {
+      "path": "chinese-risk/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "chinese-materials/SKILL.md",
+      "types": [
+        "step",
+        "human_gate",
+        "verification",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "support-sla/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "refund/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "inventory/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "content-publishing/SKILL.md",
+      "types": [
+        "step",
+        "human_gate",
+        "tool_call",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "metrics/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "travel/SKILL.md",
+      "types": [
+        "step",
+        "step",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "access-request/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "purchase/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "quality/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "legal-draft/SKILL.md",
+      "types": [
+        "step",
+        "step",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "incident/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "payroll/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "onboarding/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "data-export/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "order-check/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "research/SKILL.md",
+      "types": [
+        "step",
+        "step",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "release/SKILL.md",
+      "types": [
+        "step",
+        "verification",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "customer-survey/SKILL.md",
+      "types": [
+        "step",
+        "step",
+        "human_gate",
+        "tool_call"
+      ]
+    },
+    {
+      "path": "record-check/SKILL.md",
+      "types": [
+        "tool_call",
+        "tool_call",
+        "step",
+        "human_gate"
+      ]
+    }
+  ]
+}

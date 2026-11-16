@@ -1,5 +1,14 @@
 # Workflow Examples
 
+The [public Skill corpus](../tests/fixtures/skill_corpus/README.md) contains 24
+original Apache-2.0 Skills and independent expected node sequences. Run
+`python3 scripts/skill_corpus_benchmark.py` before/after compiler changes.
+CI requires 100% inference accuracy, zero false human gates, and at least 25%
+configured/enforced process nodes. At the report baseline (`03aa8d1`) these
+metrics were 53.52%, 6, and 46.88%; after inference correction they are 100%,
+0, and 51.04%. This curated regression set does not estimate general Skill
+coverage, and the benchmark never executes a connector.
+
 The example pack shows how standard Agent `SKILL.md` files become controlled Workflow DSL fixtures. Each example keeps Workflow DSL as the execution truth source; LiteGraph JSON is committed only as an inspectable visual fixture.
 
 ## Example Matrix

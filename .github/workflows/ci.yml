@@ -30,6 +30,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: PYTHONPATH=src python -m unittest discover -s tests -v
+      - run: python scripts/skill_corpus_benchmark.py --min-accuracy 1 --max-false-human-gates 0 --min-enforced-ratio 0.25
       - run: python -m py_compile src/skill2workflow/*.py
       - run: python scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
       - run: python scripts/security_boundary_smoke.py --work-dir /tmp/skill2workflow-security-ci

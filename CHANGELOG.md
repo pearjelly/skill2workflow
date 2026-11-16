@@ -43,6 +43,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add 24 original Apache-2.0 Skill corpus cases and a CI benchmark for inference
+  accuracy, false human gates and configured/enforced process-node coverage.
+
 - Declare `workflow_version` once in a Skill to compile, export, repair and
   quickstart a reviewed new workflow version without editing generated JSON.
   Keep the `0.1.0` default, immutable publication and existing run bindings.
