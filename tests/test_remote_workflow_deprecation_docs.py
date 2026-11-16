@@ -15,7 +15,7 @@ class RemoteWorkflowDeprecationDocumentationTests(TestCase):
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         observability = (ROOT / "docs" / "observability.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(
             encoding="utf-8"

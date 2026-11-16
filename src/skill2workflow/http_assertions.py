@@ -113,7 +113,7 @@ def skill_http_assertion_binding(config):
         parsed = urlsplit(url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None or parsed.password is not None:
             raise ValueError()
-        parsed.port
+        _ = parsed.port
         if "timeout_ms" in request and (type(request["timeout_ms"]) is not int or not 0 <= request["timeout_ms"] <= 86400000):
             raise ValueError()
         headers = request.get("headers", {})

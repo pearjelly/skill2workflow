@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 from contextlib import closing
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Protocol, Iterable, cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .credentials import CredentialResolutionError
@@ -18,10 +18,21 @@ from .agent_protocol import AGENT_PROTOCOL_VERSION, agent_node_errors, agent_req
 from .input_schema import InputSchemaValidationError, validate_trigger_input
 
 
-ConnectorBinding = Dict[str, object]
-ConnectorResult = Dict[str, object]
+ConnectorBinding = Dict[str, Any]
+ConnectorResult = Dict[str, Any]
 ExternalConnectorExecutor = Callable[..., ConnectorResult]
 ExternalConnectorPreflight = Callable[..., ConnectorResult]
+
+
+class HTTPHeaders(Protocol):
+    def items(self) -> Iterable[Tuple[str, str]]: ...
+
+
+class HTTPResponse(Protocol):
+    @property
+    def headers(self) -> HTTPHeaders: ...
+
+    def read(self, amount: int = -1) -> bytes: ...
 
 CONNECTOR_MANIFEST_VERSION = "skill2workflow-connector-0.1.0"
 CONNECTOR_EXECUTION_CONTRACT_VERSION = "skill2workflow-connector-execution-0.1.0"
@@ -137,7 +148,7 @@ def _validate_durable_metadata_policy(value: object, label: str) -> List[str]:
     return errors
 
 
-def durable_metadata_policy(manifest: object) -> Dict[str, object]:
+def durable_metadata_policy(manifest: object) -> Dict[str, Any]:
     """Return a normalized manifest-declared durable metadata policy.
 
     Validation happens when a manifest is registered. This helper remains
@@ -152,7 +163,7 @@ def durable_metadata_policy(manifest: object) -> Dict[str, object]:
     value = audit_contract.get("durable_metadata")
     if not isinstance(value, dict):
         return {}
-    result: Dict[str, object] = {
+    result: Dict[str, Any] = {
         "string_enums": {},
         "booleans": set(),
         "lists": set(),
@@ -173,7 +184,7 @@ def durable_metadata_policy(manifest: object) -> Dict[str, object]:
     return result
 
 
-DEFAULT_CONNECTORS: List[Dict[str, object]] = [
+DEFAULT_CONNECTORS: List[Dict[str, Any]] = [
     {
         "manifest_version": CONNECTOR_MANIFEST_VERSION,
         "id": "manual",
@@ -292,9 +303,9 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 class ExternalConnector:
     """Explicitly registered external connector fixture."""
 
-    manifest: Dict[str, object]
+    manifest: Dict[str, Any]
     executor: ExternalConnectorExecutor
-    preflight: ExternalConnectorPreflight = None
+    preflight: Optional[ExternalConnectorPreflight] = None
 
 
 class ConnectorRuntime:
@@ -302,7 +313,7 @@ class ConnectorRuntime:
 
     def __init__(
         self,
-        external_connectors: List[ExternalConnector] = None,
+        external_connectors: Optional[List[ExternalConnector]] = None,
         http_allowed_origins: object = None,
     ):
         self.http_allowed_origins = normalize_http_allowed_origins(
@@ -334,13 +345,13 @@ class ConnectorRuntime:
             preflight=connector.preflight,
         )
 
-    def list_connectors(self) -> List[Dict[str, object]]:
+    def list_connectors(self) -> List[Dict[str, Any]]:
         """Return built-in manifests plus explicitly registered external manifests."""
         manifests = default_connectors()
         manifests.extend(copy.deepcopy(item.manifest) for item in self._external_connectors.values())
         return manifests
 
-    def external_durable_metadata_policy(self, connector_id: object) -> Dict[str, object]:
+    def external_durable_metadata_policy(self, connector_id: object) -> Dict[str, Any]:
         """Return one registered external connector's safe metadata vocabulary."""
 
         connector = self._external_connectors.get(str(connector_id or ""))
@@ -353,7 +364,7 @@ class ConnectorRuntime:
         return bool(connector and connector.manifest.get("kind") == "agent"
                     and connector.manifest.get("execution_contract", {}).get("protocol") == AGENT_PROTOCOL_VERSION)
 
-    def execute_connector(self, node: Dict[str, object], credential_provider=None, context=None) -> ConnectorResult:
+    def execute_connector(self, node: Dict[str, Any], credential_provider=None, context=None) -> ConnectorResult:
         """Execute a connector through the built-in path or an explicit external fixture."""
         binding = node.get("connector")
         ref = connector_ref(binding)
@@ -396,7 +407,7 @@ class ConnectorRuntime:
         )
 
 
-def default_connectors() -> List[Dict[str, object]]:
+def default_connectors() -> List[Dict[str, Any]]:
     """Return built-in connector manifests."""
     return copy.deepcopy(DEFAULT_CONNECTORS)
 
@@ -487,7 +498,7 @@ def connector_ref(binding: object) -> Dict[str, str]:
 
 
 def execute_connector(
-    node: Dict[str, object],
+    node: Dict[str, Any],
     credential_provider=None,
     context=None,
     http_allowed_origins: object = None,
@@ -501,6 +512,7 @@ def execute_connector(
         error = validate_http_assertion_binding(binding)
         if error:
             raise ConnectorExecutionError(error)
+        binding = cast(Dict[str, Any], binding)
         response = _execute_http_connector(
             binding, credential_provider=credential_provider, context=context,
             service_allowed_origins=http_allowed_origins,
@@ -608,7 +620,7 @@ def _execute_external_connector(
         ) from error
 
 
-def _normalize_credential_summary(summary: object) -> Dict[str, object]:
+def _normalize_credential_summary(summary: object) -> Dict[str, Any]:
     if not isinstance(summary, dict) or not summary:
         return {}
     handles = summary.get("handles", [])
@@ -620,11 +632,11 @@ def _normalize_credential_summary(summary: object) -> Dict[str, object]:
     }
 
 
-def _normalize_compact_metadata(summary: object) -> Dict[str, object]:
+def _normalize_compact_metadata(summary: object) -> Dict[str, Any]:
     if not isinstance(summary, dict) or not summary:
         return {}
 
-    normalized: Dict[str, object] = {}
+    normalized: Dict[str, Any] = {}
     for key, value in summary.items():
         normalized_key = str(key)
         if not normalized_key:
@@ -776,7 +788,7 @@ def _validate_http_request_metadata(url: str, method: str, headers: Dict[str, st
     try:
         parsed_url = urlsplit(url)
         hostname = parsed_url.hostname
-        parsed_url.port
+        _ = parsed_url.port
     except ValueError as error:
         raise ConnectorExecutionError("http connector request.url is invalid") from error
     if parsed_url.scheme not in ("http", "https") or not parsed_url.netloc or not hostname:
@@ -912,7 +924,7 @@ def _normalize_http_origin(value: str, label: str, require_origin: bool = False)
     return f"{parsed.scheme}://{host}{port_suffix}"
 
 
-def _http_response_output(response: object, status_code: int, payload: str, mode: str) -> Dict[str, object]:
+def _http_response_output(response: HTTPResponse, status_code: int, payload: str, mode: str) -> Dict[str, Any]:
     """Return a full or metadata-only response projection."""
 
     if mode == "metadata":
@@ -929,7 +941,7 @@ def _http_response_output(response: object, status_code: int, payload: str, mode
     }
 
 
-def _read_http_payload(response: object, kind: str) -> str:
+def _read_http_payload(response: HTTPResponse, kind: str) -> str:
     """Read one bounded UTF-8 HTTP payload without retaining an oversized body."""
 
     try:
@@ -990,11 +1002,11 @@ def _apply_http_credentials(credentials: object, headers: Dict[str, str], creden
         try:
             value = credential_provider.resolve(handle)
         except CredentialResolutionError as error:
-            raise ConnectorExecutionError(str(error))
+            raise ConnectorExecutionError(str(error)) from error
         headers[name] = f"{credential.get('prefix', '') or ''}{value}"
 
 
-def _mapped_http_request(request_spec: Dict[str, object], context: object):
+def _mapped_http_request(request_spec: Dict[str, Any], context: object):
     input_mapping = request_spec.get("input_mapping", [])
     if input_mapping in (None, []):
         return str(request_spec.get("url") or ""), request_spec.get("body"), {}
@@ -1029,7 +1041,7 @@ def _mapped_http_request(request_spec: Dict[str, object], context: object):
                 raise ConnectorExecutionError(f"required input mapping value missing: {mapping['from']}")
             continue
         if mapping["target_kind"] == "body":
-            _json_pointer_set_body(body, mapping["to"], copy.deepcopy(value))
+            _json_pointer_set_body(cast(Dict[str, Any], body), mapping["to"], copy.deepcopy(value))
         else:
             query_value = _query_string_value(value)
             query_parts = [
@@ -1057,7 +1069,7 @@ def _mapped_http_request(request_spec: Dict[str, object], context: object):
     }
 
 
-def _normalize_input_mapping(input_mapping: object) -> List[Dict[str, object]]:
+def _normalize_input_mapping(input_mapping: object) -> List[Dict[str, Any]]:
     if not isinstance(input_mapping, list):
         raise ConnectorExecutionError("connector.request.input_mapping must be a list")
     normalized = []
@@ -1138,7 +1150,7 @@ def _json_pointer_get(root: object, pointer: str):
     return current
 
 
-def _json_pointer_set_body(body: Dict[str, object], pointer: str, value: object) -> None:
+def _json_pointer_set_body(body: Dict[str, Any], pointer: str, value: object) -> None:
     tokens = _json_pointer_tokens(pointer)
     if not tokens or tokens[0] != "body" or len(tokens) < 2:
         raise ConnectorExecutionError("input mapping target must start with /body/")

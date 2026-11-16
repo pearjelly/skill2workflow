@@ -81,7 +81,7 @@ class InstalledQuickstartTests(TestCase):
 
                 def pin(path):
                     descriptor = _pin_workspace(path)
-                    descriptors.append(descriptor)
+                    descriptors.append(descriptor)  # noqa: B023 - fixture lifetime ends in this iteration.
                     return descriptor
 
                 with patch('skill2workflow.quickstart._pin_workspace', side_effect=pin):

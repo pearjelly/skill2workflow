@@ -17,7 +17,7 @@ standard-library-only runtime remain requirements.
 | T5 | reviewed Agent protocol, filtered context, output validation and durable results, deterministic end-to-end adapter | Complete |
 | T7 | service route modules/table; unchanged service/client tests and both boundary smokes | Complete |
 | T8 | CLI command functions and argparse dispatch; unchanged CLI tests | Complete |
-| T9 | development-only Ruff/mypy CI and typed IR/DSL/state contracts | Pending |
+| T9 | development-only Ruff/mypy CI and typed IR/DSL/state contracts | Complete |
 | T12 | JSON Schema/validator agreement for examples and invalid cases; versioned 0.2 schema | Pending |
 | T10 | testing/demo/pilot modules excluded from runtime wheel; smoke entry points preserved | Pending |
 | T11 | SQLite CLI default; explicit JSON compatibility and documentation | Pending |
@@ -86,3 +86,11 @@ branch update. Evidence below is updated only after a check finishes.
   `tests/test_cli.py` keeps its pre-refactor SHA-256; all 122 tests pass. Full
   suite: 1,576 tests passed (112.350 s); 83 JavaScript tests and the Agent CLI
   drill pass. This pure refactor is committed separately from features.
+
+- T9: Ruff checks all runtime, script and test Python with E/F/B rules;
+  documented exceptions cover line wrapping, checkout bootstrap imports and
+  exact iteration-scoped fixture callback reads. Mypy 1.20.2 checks the four
+  core modules including unannotated bodies against Python 3.9; both gates pass.
+  Shared TypedDict contracts replace IR/DSL/state object-dictionary aliases.
+  Tools are pinned only in requirements-dev.txt and a separate CI job.
+  Full suite: 1,576 tests passed (112.013 s); JavaScript/corpus/hygiene pass.

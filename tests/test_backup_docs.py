@@ -154,7 +154,7 @@ class BackupDocumentationTests(TestCase):
             self.assertIn(text, guide)
 
     def test_inventory_contract_is_recorded_in_public_docs(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         guide = (ROOT / "docs" / "backup-restore.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")

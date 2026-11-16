@@ -49,6 +49,17 @@ Requirements:
 
 This bootstrap harness intentionally uses the Python standard library for runtime code. No runtime dependency install is required for tests.
 
+Development checks run separately from the runtime matrix. Use Python 3.10+
+to install `requirements-dev.txt`, then run `ruff check src scripts tests` and
+`mypy`. The latter checks parser, compiler, executor and connectors against the
+Python 3.9 target, including unannotated function bodies. Shared `TypedDict`
+contracts in `models.py` describe Skill IR, Workflow DSL and RunState; JSON
+extension maps remain dynamic and runtime validation stays authoritative.
+Ruff enables E/F/B rules. Long serialized protocol/example lines are exempt
+from E501; checkout bootstrappers have scoped E402 exceptions. Exact test
+callback reads with iteration-scoped lifetimes carry local B023 explanations.
+Do not expand those exceptions to runtime callbacks or undefined-name checks.
+
 Run the full test suite:
 
 ```bash

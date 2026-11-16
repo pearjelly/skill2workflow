@@ -971,7 +971,7 @@ class SqliteRunStore:
                     order by runs.run_id
                     """
                 )
-                for run_id, raw_state in rows:
+                for _run_id, raw_state in rows:
                     state = _decode_sqlite_run_state(raw_state)
                     _upsert_sqlite_summary(connection, state)
             projection_rows = connection.execute(
@@ -982,7 +982,7 @@ class SqliteRunStore:
                 order by runs.run_id
                 """
             )
-            for run_id, raw_state in projection_rows:
+            for _run_id, raw_state in projection_rows:
                 state = _decode_sqlite_run_state(raw_state)
                 _upsert_sqlite_summary(connection, state)
 

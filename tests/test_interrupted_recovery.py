@@ -10,6 +10,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
+from skill2workflow.backup import (
+    create_state_backup,
+    inspect_state_backup_readiness,
+    restore_state_backup,
+    verify_state_backup,
+)
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.service import RuntimeService, ServiceScheduleLoop
@@ -755,9 +761,3 @@ def _service_config(root: Path):
         auth_token_file=token,
         credential_dir=credentials,
     )
-from skill2workflow.backup import (
-    create_state_backup,
-    inspect_state_backup_readiness,
-    restore_state_backup,
-    verify_state_backup,
-)

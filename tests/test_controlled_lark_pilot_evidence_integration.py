@@ -256,29 +256,29 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                 mutated = []
 
                 def commit_then_mutate(transaction):
-                    result = real_commit(transaction)
-                    if mutated:
+                    result = real_commit(transaction)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    if mutated:  # noqa: B023 - fixture lifetime ends in this iteration.
                         return result
-                    if mutation == "decision_replace":
+                    if mutation == "decision_replace":  # noqa: B023 - fixture lifetime ends in this iteration.
                         replacement = _valid_decision()
                         replacement["rationale"] = "A different public rationale."
-                        temporary = private / "replacement-decision.json"
+                        temporary = private / "replacement-decision.json"  # noqa: B023 - fixture lifetime ends in this iteration.
                         _write_owner_only_json(temporary, replacement)
-                        os.replace(temporary, decision_path)
-                    elif mutation == "marker_replace":
-                        temporary = private / "replacement-finalization.json"
+                        os.replace(temporary, decision_path)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    elif mutation == "marker_replace":  # noqa: B023 - fixture lifetime ends in this iteration.
+                        temporary = private / "replacement-finalization.json"  # noqa: B023 - fixture lifetime ends in this iteration.
                         _write_owner_only_json(
                             temporary,
                             _valid_finalization_marker(),
                         )
-                        os.replace(temporary, marker_path)
-                    elif mutation == "marker_mode":
-                        os.chmod(marker_path, 0o644)
+                        os.replace(temporary, marker_path)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    elif mutation == "marker_mode":  # noqa: B023 - fixture lifetime ends in this iteration.
+                        os.chmod(marker_path, 0o644)  # noqa: B023 - fixture lifetime ends in this iteration.
                     else:
                         changed = _valid_finalization_marker()
                         changed["finalized_at"] = "2026-07-23T17:00:01+08:00"
-                        _write_owner_only_json(marker_path, changed)
-                    mutated.append(True)
+                        _write_owner_only_json(marker_path, changed)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    mutated.append(True)  # noqa: B023 - fixture lifetime ends in this iteration.
                     return result
 
                 with patch.object(

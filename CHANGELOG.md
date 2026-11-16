@@ -55,6 +55,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Added
 
+- Add a separate development-only Ruff E/F/B and mypy CI job, with shared
+  TypedDict contracts for Skill IR, Workflow DSL and RunState. Type checks
+  preserve the Python 3.9 target; runtime dependencies remain empty.
+
 - Add an explicit, provider-independent Agent connector protocol with filtered
   durable dependencies, bounded output-schema validation and opt-in structured
   result retention. Include a deterministic test adapter; no LLM SDK or runtime

@@ -357,7 +357,7 @@ def _non_negative_int(value: object, label: str) -> int:
     try:
         integer = int(value)
     except (TypeError, ValueError):
-        raise ValueError(f"{label} must be a non-negative integer")
+        raise ValueError(f"{label} must be a non-negative integer") from None
     if integer < 0:
         raise ValueError(f"{label} must be a non-negative integer")
     return integer

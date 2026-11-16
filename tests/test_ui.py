@@ -1067,9 +1067,9 @@ class UiTests(TestCase):
 
                 class UpstreamHandler(BaseHTTPRequestHandler):
                     def do_POST(self):
-                        observed["authorization"] = self.headers.get("Authorization", "")
-                        observed["path"] = self.path
-                        observed["body"] = self.rfile.read(
+                        observed["authorization"] = self.headers.get("Authorization", "")  # noqa: B023 - fixture lifetime ends in this iteration.
+                        observed["path"] = self.path  # noqa: B023 - fixture lifetime ends in this iteration.
+                        observed["body"] = self.rfile.read(  # noqa: B023 - fixture lifetime ends in this iteration.
                             int(self.headers["Content-Length"])
                         )
                         body = b'{"error":"upstream conflict"}'
@@ -1098,7 +1098,7 @@ class UiTests(TestCase):
                         ui_port = {}
 
                         def ready(server):
-                            ui_port["value"] = server.server_port
+                            ui_port["value"] = server.server_port  # noqa: B023 - fixture lifetime ends in this iteration.
 
                         ui_thread = threading.Thread(
                             target=serve_ui,
@@ -2191,9 +2191,9 @@ class UiTests(TestCase):
 
                 class UpstreamHandler(BaseHTTPRequestHandler):
                     def do_POST(self):
-                        observed["authorization"] = self.headers.get("Authorization", "")
-                        observed["path"] = self.path
-                        observed["body"] = json.loads(
+                        observed["authorization"] = self.headers.get("Authorization", "")  # noqa: B023 - fixture lifetime ends in this iteration.
+                        observed["path"] = self.path  # noqa: B023 - fixture lifetime ends in this iteration.
+                        observed["body"] = json.loads(  # noqa: B023 - fixture lifetime ends in this iteration.
                             self.rfile.read(int(self.headers["Content-Length"]))
                         )
                         body = b'{"error":"upstream conflict"}'
@@ -2222,7 +2222,7 @@ class UiTests(TestCase):
                         ui_port = {}
 
                         def ready(server):
-                            ui_port["value"] = server.server_port
+                            ui_port["value"] = server.server_port  # noqa: B023 - fixture lifetime ends in this iteration.
 
                         ui_thread = threading.Thread(
                             target=serve_ui,

@@ -864,7 +864,7 @@ class ControlPlaneTests(TestCase):
         with TemporaryDirectory() as tmp:
             state_dir = Path(tmp)
             control = LocalControlPlane(state_dir)
-            first = control.publish_workflow(_workflow(version="1.0.0"))
+            _first = control.publish_workflow(_workflow(version="1.0.0"))
             second = control.publish_workflow(_workflow(version="2.0.0"))
             control.promote_workflow("workflow_control", "1.0.0", alias="production")
             artifact_path = state_dir / second["artifact"]

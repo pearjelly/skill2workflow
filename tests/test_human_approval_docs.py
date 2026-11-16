@@ -33,7 +33,7 @@ class HumanApprovalDocumentationTests(TestCase):
         self.assertNotIn("LARK_BOT_ACCESS_TOKEN", guide)
 
     def test_current_docs_cross_link_the_stable_human_gate_route(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")

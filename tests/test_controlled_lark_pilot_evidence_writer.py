@@ -13,7 +13,6 @@ from skill2workflow.controlled_lark_pilot_evidence import (
     write_evidence_pack,
 )
 from skill2workflow._controlled_lark_pilot_evidence_writer import (
-    read_json_anchored,
     write_private_json_anchored,
 )
 
@@ -503,14 +502,14 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
 
                 def racing_open(path, flags, mode=0o777, *, dir_fd=None):
                     name = os.fspath(path)
-                    if not swapped and name.endswith(".tmp"):
-                        output.rename(anchored)
-                        if replacement == "different-directory":
-                            output.mkdir()
-                        swapped.append(True)
+                    if not swapped and name.endswith(".tmp"):  # noqa: B023 - fixture lifetime ends in this iteration.
+                        output.rename(anchored)  # noqa: B023 - fixture lifetime ends in this iteration.
+                        if replacement == "different-directory":  # noqa: B023 - fixture lifetime ends in this iteration.
+                            output.mkdir()  # noqa: B023 - fixture lifetime ends in this iteration.
+                        swapped.append(True)  # noqa: B023 - fixture lifetime ends in this iteration.
                     if dir_fd is None:
-                        return real_open(path, flags, mode)
-                    return real_open(path, flags, mode, dir_fd=dir_fd)
+                        return real_open(path, flags, mode)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    return real_open(path, flags, mode, dir_fd=dir_fd)  # noqa: B023 - fixture lifetime ends in this iteration.
 
                 with patch.object(
                     os,

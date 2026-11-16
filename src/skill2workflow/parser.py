@@ -6,7 +6,7 @@ import os
 import re
 import stat
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional, Iterator
 from .http_assertions import load_assertion_json, skill_http_assertion_binding
 from .skill_http import skill_http_action_binding
 from .input_schema import INPUT_SCHEMA_MAX_BYTES
@@ -17,7 +17,7 @@ from .inference import HUMAN_TERMS, VERIFY_TERMS, TOOL_TERMS, matched_term
 from .agent_protocol import skill_agent_config
 
 
-SkillIR = Dict[str, object]
+from .models import SkillIR
 MAX_SKILL_FILE_BYTES = 2 * 1024 * 1024
 
 
@@ -65,7 +65,7 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
         for line_number, line, fenced in _fence_aware_lines(body, body_start_line)
     )
 
-    ir = {
+    ir: SkillIR = {
         "metadata": metadata,
         "description": metadata.get("description", ""),
         "hard_gates": _extract_hard_gates(guidance_body),
@@ -125,11 +125,11 @@ def _fence_content(line: str, *, allow_list_marker: bool):
     return line[index:], tuple(quotes), column, list_marker
 
 
-def _fence_aware_lines(body: str, start_line: int):
+def _fence_aware_lines(body: str, start_line: int) -> Iterator[Tuple[int, str, bool]]:
     """Conservatively classify top-level and simple nested fenced examples."""
     fence_char, fence_length = '', 0
     fence_quotes, fence_indent = (), 0
-    fence_start = None
+    fence_start = start_line
     for line_number, line in enumerate(body.splitlines(), start=start_line):
         if fence_char:
             content, quotes, indent, _ = _fence_content(line, allow_list_marker=False)
@@ -242,7 +242,7 @@ def _read_skill_file(path: Path) -> str:
     return raw.decode("utf-8")
 
 
-def _parse_frontmatter(text: str) -> Tuple[Dict[str, object], str, int]:
+def _parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str, int]:
     return parse_frontmatter(text)
 
 
@@ -271,14 +271,14 @@ def _extract_hard_gates(body: str) -> List[str]:
     return gates
 
 
-def _extract_ordered_step_details(body: str, start_line: int) -> List[Dict[str, object]]:
+def _extract_ordered_step_details(body: str, start_line: int) -> List[Dict[str, Any]]:
     checklist, has_checklist = _extract_checklist_details(body, start_line)
     steps = checklist if has_checklist else _extract_process_step_details(body, start_line)
     _apply_step_annotations(body, start_line, steps)
     return steps
 
 
-def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, object]]) -> None:
+def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, Any]]) -> None:
     selected = {step['line']: step for step in steps}
     for line_number, line, fenced in _fence_aware_lines(body, start_line):
         if fenced:
@@ -337,10 +337,10 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
 
 def _extract_checklist_details(
     body: str, start_line: int
-) -> Tuple[List[Dict[str, object]], bool]:
+) -> Tuple[List[Dict[str, Any]], bool]:
     """Read Checklist items with existing list and empty-section precedence."""
 
-    items: List[Dict[str, object]] = []
+    items: List[Dict[str, Any]] = []
     current_section = "_root"
     has_checklist = False
 
@@ -378,11 +378,11 @@ def _extract_checklist_details(
     return items, has_checklist
 
 
-def _extract_process_step_details(body: str, start_line: int) -> List[Dict[str, object]]:
+def _extract_process_step_details(body: str, start_line: int) -> List[Dict[str, Any]]:
     """Read one explicit numbered process without interpreting prose or examples."""
 
     sections = []
-    current = None
+    current: Optional[List[Tuple[int, bool, str, int, str]]] = None
     current_section = ""
     for line_number, raw_line, fenced in _fence_aware_lines(body, start_line):
         if fenced:
@@ -454,7 +454,7 @@ def _split_step_title_detail(value: str) -> Tuple[str, str]:
     return cleaned, ""
 
 
-def _format_step_detail(step: Dict[str, object]) -> str:
+def _format_step_detail(step: Dict[str, Any]) -> str:
     title = str(step["title"])
     detail = str(step.get("detail") or "")
     if detail:

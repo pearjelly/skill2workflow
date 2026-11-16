@@ -20,7 +20,7 @@ class SqliteRunStateBoundaryDocsTests(TestCase):
     def test_public_docs_link_the_boundary(self):
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         assert_guide_reachable(self, 'docs/sqlite-run-state-boundary.md')
         for document in (stability, roadmap):
             self.assertIn("sqlite-run-state-boundary.md", document)

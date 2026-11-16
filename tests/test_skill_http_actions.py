@@ -183,10 +183,10 @@ class SkillHttpActionTests(TestCase):
                     requests = []
                     provider = StaticCredentialProvider({'task_token': 'private-credential-value'})
                     def transport(request, timeout):
-                        requests.append(request)
-                        if request.method == 'POST' and outcome == 'http_failure':
+                        requests.append(request)  # noqa: B023 - fixture lifetime ends in this iteration.
+                        if request.method == 'POST' and outcome == 'http_failure':  # noqa: B023 - fixture lifetime ends in this iteration.
                             raise urllib.error.HTTPError(request.full_url, 500, 'failure', {}, BytesIO(b'private-response-body'))
-                        return Response(json.dumps({'ready': outcome == 'match', 'private': 'private-response-body'}).encode())
+                        return Response(json.dumps({'ready': outcome == 'match', 'private': 'private-response-body'}).encode())  # noqa: B023 - fixture lifetime ends in this iteration.
                     runtime = ConnectorRuntime(http_allowed_origins=['https://other.invalid']) if outcome == 'origin_denied' else None
                     executor = LocalExecutor(Path(temporary), storage=storage, credential_provider=provider, connector_runtime=runtime)
                     with patch('skill2workflow.connectors._open_http_request', side_effect=transport), patch.object(provider, 'resolve', wraps=provider.resolve) as resolve:

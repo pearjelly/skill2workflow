@@ -39,7 +39,7 @@ def parse_webhook_request(method: str, path: str, body: bytes) -> Dict[str, obje
     try:
         trigger_input = normalize_trigger_input(trigger_input, "webhook input")
     except ValueError as error:
-        raise WebhookError(str(error), status_code=400)
+        raise WebhookError(str(error), status_code=400) from error
 
     return {
         "workflow_id": workflow_id,
@@ -139,7 +139,7 @@ def _parse_json_body(body: bytes) -> Dict[str, object]:
     try:
         payload = json.loads(body.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError):
-        raise WebhookError("webhook body must be valid JSON", status_code=400)
+        raise WebhookError("webhook body must be valid JSON", status_code=400) from None
     if not isinstance(payload, dict):
         raise WebhookError("webhook body must be a JSON object", status_code=400)
     return payload
@@ -165,7 +165,7 @@ def _content_length(handler: BaseHTTPRequestHandler) -> int:
         raise WebhookError(
             "content length must be a non-negative integer",
             status_code=400,
-        )
+        ) from None
     if value < 0:
         raise WebhookError(
             "content length must be a non-negative integer",

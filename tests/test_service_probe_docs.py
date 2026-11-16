@@ -37,7 +37,7 @@ class ServiceProbeDocumentationTests(TestCase):
         self.assertIn("readiness", schema["required"])
 
     def test_public_docs_link_the_probe_and_roadmap_records_loop_95(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         assert_guide_reachable(self, 'docs/service-probe.md')

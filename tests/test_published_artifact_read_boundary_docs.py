@@ -23,7 +23,7 @@ class PublishedArtifactReadBoundaryDocumentationTests(TestCase):
             self.assertIn(phrase, guide)
 
     def test_public_docs_link_the_boundary(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")

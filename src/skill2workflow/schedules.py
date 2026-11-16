@@ -603,7 +603,7 @@ def _normalize_timestamp(value: str, field: str) -> str:
     try:
         parsed = _parse_timestamp(value)
     except ValueError as error:
-        raise ValueError(f"{field} must be an ISO-8601 timestamp: {error}")
+        raise ValueError(f"{field} must be an ISO-8601 timestamp: {error}") from error
     return parsed.astimezone(timezone.utc).replace(microsecond=0).isoformat()
 
 
@@ -1389,7 +1389,7 @@ class RecurringScheduleStore:
                     order by recurring_schedules.schedule_id
                     """
                 )
-                for schedule_id, raw_definition in rows:
+                for _schedule_id, raw_definition in rows:
                     try:
                         definition = _load_recurring_definition(raw_definition)
                     except (TypeError, ValueError, json.JSONDecodeError) as error:
@@ -1839,7 +1839,7 @@ def _normalize_aware_timestamp(value: str, field: str) -> str:
     try:
         parsed = datetime.fromisoformat(normalized)
     except ValueError as error:
-        raise ValueError(f"{field} must be an ISO-8601 timestamp: {error}")
+        raise ValueError(f"{field} must be an ISO-8601 timestamp: {error}") from error
     if parsed.tzinfo is None:
         raise ValueError(f"{field} must include a timezone")
     return _format_timestamp(parsed)

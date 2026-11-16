@@ -44,7 +44,7 @@ class AgentConnectorTests(TestCase):
                 with self.subTest(storage=storage, risk=risk), TemporaryDirectory() as temporary:
                     calls = []
                     def execute(payload, **kwargs):
-                        calls.append(copy.deepcopy(payload))
+                        calls.append(copy.deepcopy(payload))  # noqa: B023 - fixture lifetime ends in this iteration.
                         return fixture.executor(payload, **kwargs)
                     runtime = ConnectorRuntime([ExternalConnector(fixture.manifest, execute)])
                     workflow = compile_ir_to_workflow(parse_skill_text(source()))
@@ -96,7 +96,7 @@ class AgentConnectorTests(TestCase):
         for output in ({'risk': 7, 'reason': {'source': 'invalid-canary'}}, [], None):
             with self.subTest(output=output), TemporaryDirectory() as temporary:
                 def execute(payload, **kwargs):
-                    return {'status': 'completed', 'output': output}
+                    return {'status': 'completed', 'output': output}  # noqa: B023 - fixture lifetime ends in this iteration.
                 runtime = ConnectorRuntime([ExternalConnector(fixture.manifest, execute)])
                 state = LocalExecutor(Path(temporary), connector_runtime=runtime).run(workflow)
                 self.assertEqual(state['status'], 'failed')

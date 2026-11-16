@@ -181,7 +181,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
             )
         )
         roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("# Reviewable Workflow Releases", guide)
         self.assertIn("workflow-diff", guide)

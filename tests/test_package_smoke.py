@@ -511,21 +511,21 @@ class PackageSmokeTests(TestCase):
 
                 def fake_run(command, cwd):
                     result = _process_compile_result("Workflow", str(command[2]))
-                    if defect == "fallback":
+                    if defect == "fallback":  # noqa: B023 - fixture lifetime ends in this iteration.
                         result["review"]["ordered_step_count"] = 0
                         result["workflow"]["nodes"] = [
                             {"type": "step", "title": "Review skill guidance"}
                         ]
-                    elif defect in ("human_gate", "verification"):
-                        index = 2 if defect == "human_gate" else 3
+                    elif defect in ("human_gate", "verification"):  # noqa: B023 - fixture lifetime ends in this iteration.
+                        index = 2 if defect == "human_gate" else 3  # noqa: B023 - fixture lifetime ends in this iteration.
                         result["workflow"]["nodes"][index]["type"] = "step"
-                    elif defect == "section":
+                    elif defect == "section":  # noqa: B023 - fixture lifetime ends in this iteration.
                         result["workflow"]["nodes"][1]["metadata"]["source"]["section"] = "Checklist"
-                    elif defect in ("identity", "description"):
-                        result['workflow']['workflow']['id' if defect == 'identity' else 'description'] = 'private-metadata-canary'
-                    elif defect == 'fenced_guard':
+                    elif defect in ("identity", "description"):  # noqa: B023 - fixture lifetime ends in this iteration.
+                        result['workflow']['workflow']['id' if defect == 'identity' else 'description'] = 'private-metadata-canary'  # noqa: B023 - fixture lifetime ends in this iteration.
+                    elif defect == 'fenced_guard':  # noqa: B023 - fixture lifetime ends in this iteration.
                         result['workflow']['guards'] = [{'description': 'private fenced example'}]
-                    elif defect == 'nested_example':
+                    elif defect == 'nested_example':  # noqa: B023 - fixture lifetime ends in this iteration.
                         result['workflow']['guards'] = [{'description': 'private nested example'}]
                     else:
                         result["workflow"]["nodes"][1]["metadata"]["source"]["line"] = 99
@@ -548,12 +548,12 @@ class PackageSmokeTests(TestCase):
                         markdown = source.read_text()
                         section = next(name for name in ('Checklist', 'Workflow', 'Steps') if '## ' + name in markdown)
                         return json.dumps(_process_compile_result(section, str(source)))
-                    return json.dumps({"valid": defect != "invalid_dsl"})
+                    return json.dumps({"valid": defect != "invalid_dsl"})  # noqa: B023 - fixture lifetime ends in this iteration.
 
                 def fake_request(_console, _isolated, _path, payload):
                     markdown = payload["skill_markdown"]
                     if "## Workflow" in markdown and "## Steps" in markdown:
-                        if defect == "accepted_ambiguity":
+                        if defect == "accepted_ambiguity":  # noqa: B023 - fixture lifetime ends in this iteration.
                             return 200, _process_compile_result("Workflow", "SKILL.md")
                         return 400, {"error": markdown}
                     section = next(name for name in ('Checklist', 'Workflow', 'Steps') if '## ' + name in markdown)

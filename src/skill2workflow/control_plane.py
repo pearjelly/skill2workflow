@@ -370,7 +370,7 @@ class LocalControlPlane:
             issue_counts[str(issue["kind"])] += 1
             _retain_artifact_issue(issues, issue, max_issues)
 
-        for key, record in records:
+        for _key, record in records:
             workflow_id = str(record.get("workflow_id", ""))
             version = str(record.get("version", ""))
             artifact_value = record.get("artifact")

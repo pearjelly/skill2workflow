@@ -166,7 +166,7 @@ def main() -> int:
                 raise RuntimeError("Docker Doctor did not pass")
 
             state_identity = None
-            for cycle in range(2):
+            for _cycle in range(2):
                 _docker(
                     "run", "--detach", "--name", container,
                     *_runtime_args(workspace), image,

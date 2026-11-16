@@ -850,4 +850,4 @@ def _waiting_workflow():
             {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "rejected"},
         ],
     }
-    build_backup_retention_plan,
+    _ = build_backup_retention_plan,

@@ -120,7 +120,7 @@ def write_state_layout_marker(
             os.link(temporary_path, marker_path)
         except FileExistsError:
             if inspect_state_layout(root) != CURRENT_STATE_LAYOUT_VERSION:
-                raise ValueError("state layout marker already exists with an incompatible value")
+                raise ValueError("state layout marker already exists with an incompatible value") from None
             return validate_current_state_marker(root)
         return marker
     finally:
