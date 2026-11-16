@@ -374,9 +374,9 @@ def _connector_workflow(provider_port: int):
         },
         "entry": "start",
         "nodes": [
-            {"id": "start", "type": "start", "on_success": "call"},
+            {"id": "start", "title": "start", "type": "start", "on_success": "call"},
             {
-                "id": "call",
+                "id": "call", "title": "call",
                 "type": "tool_call",
                 "connector": {
                     "id": "http",
@@ -391,8 +391,8 @@ def _connector_workflow(provider_port: int):
                 "on_success": "end",
                 "on_failure": "failure",
             },
-            {"id": "failure", "type": "failure"},
-            {"id": "end", "type": "end"},
+            {"id": "failure", "title": "failure", "type": "failure"},
+            {"id": "end", "title": "end", "type": "end"},
         ],
         "edges": [
             {"id": "edge_start_call", "from": "start", "to": "call", "label": "next"},
@@ -413,16 +413,16 @@ def _waiting_workflow():
         },
         "entry": "start",
         "nodes": [
-            {"id": "start", "type": "start", "on_success": "review"},
+            {"id": "start", "title": "start", "type": "start", "on_success": "review"},
             {
-                "id": "review",
+                "id": "review", "title": "review",
                 "type": "human_gate",
                 "connector": {"id": "manual", "kind": "manual"},
                 "on_success": "end",
                 "on_failure": "failure",
             },
-            {"id": "failure", "type": "failure"},
-            {"id": "end", "type": "end"},
+            {"id": "failure", "title": "failure", "type": "failure"},
+            {"id": "end", "title": "end", "type": "end"},
         ],
         "edges": [
             {"id": "edge_start_review", "from": "start", "to": "review", "label": "next"},

@@ -59,6 +59,10 @@ Ruff enables E/F/B rules. Long serialized protocol/example lines are exempt
 from E501; checkout bootstrappers have scoped E402 exceptions. Exact test
 callback reads with iteration-scoped lifetimes carry local B023 explanations.
 Do not expand those exceptions to runtime callbacks or undefined-name checks.
+Run `PYTHONPATH=src python -m unittest tests.test_schema_conformance -v` in that
+development environment when changing DSL fields. The dependency-free suite
+skips this optional-tool check if jsonschema is absent; CI's development job
+installs it and always executes the conformance cases.
 
 Run the full test suite:
 

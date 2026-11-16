@@ -328,7 +328,7 @@ def _workflow(workflow_id: str, gate: bool):
     middle = (
         {"id": "gate", "type": "human_gate", "title": "Gate", "on_success": "end", "on_failure": "end"}
         if gate
-        else {"id": "step", "type": "action", "title": "Step", "on_success": "end"}
+        else {"id": "step", "type": "step", "title": "Step", "on_success": "end"}
     )
     return {
         "schema_version": "0.1.0",

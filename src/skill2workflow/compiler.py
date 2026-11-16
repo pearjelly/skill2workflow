@@ -16,6 +16,7 @@ from .skill_version import skill_workflow_version
 from .inference import infer_step
 from .decisions import decision_errors
 from .agent_protocol import agent_node_errors, skill_agent_config
+from .workflow_shapes import validate_workflow_shapes
 
 from .models import SkillIR, Workflow
 ValidationError = Dict[str, Any]
@@ -292,7 +293,7 @@ def validate_workflow_structured(workflow: object) -> List[ValidationError]:
                 [],
             )
         ]
-    if workflow.get("schema_version") not in {"0.1.0", "0.2.0"}:
+    if not isinstance(workflow.get("schema_version"), str) or workflow.get("schema_version") not in {"0.1.0", "0.2.0"}:
         errors.append(
             _validation_error(
                 "unsupported_schema_version",
@@ -313,6 +314,10 @@ def validate_workflow_structured(workflow: object) -> List[ValidationError]:
                 ["workflow"],
             )
         )
+
+    shape_errors = validate_workflow_shapes(workflow)
+    if shape_errors:
+        return errors + shape_errors
 
     nodes = workflow.get("nodes")
     if not isinstance(nodes, list):

@@ -1,5 +1,16 @@
 # Workflow DSL Compatibility
 
+Known-field shape validation now matches the published 0.1/0.2 JSON Schema
+contracts for metadata, node headers, reserved fields, transitions and
+connector request metadata. Previously accepted documents with missing titles,
+unknown node types or mistyped declared fields are rejected on validation or
+publication, rather than causing graph-analysis errors or silently descriptive
+execution. Unknown extension properties remain accepted. Already stored
+artifacts are not rewritten. The new 0.2 schema was added with decisions.
+Runtime validation still owns cross-node references, reachability/DAG checks,
+dependent input-contract rules and UTF-8 byte bounds; JSON Schema alone cannot
+prove those execution semantics.
+
 Explicit DSL 0.2 Agent tool calls use `connector.kind: agent`, an external
 adapter ID, an `agent_instruction` action and mandatory `output_schema`.
 Their `requires` node IDs must dominate the Agent and have successful durable

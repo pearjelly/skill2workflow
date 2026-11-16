@@ -182,14 +182,17 @@
           "type": "object"
         },
         "on_success": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "on_failure": {
-          "type": "string"
+          "type": "string",
+          "minLength": 1
         },
         "on_fallback": {
           "type": "string",
-          "description": "Optional tool_call transition used after connector retries are exhausted; the failed node remains recorded and the fallback path must be explicit in edges."
+          "description": "Optional tool_call transition used after connector retries are exhausted; the failed node remains recorded and the fallback path must be explicit in edges.",
+          "minLength": 1
         },
         "branches": {
           "type": "array",
@@ -303,6 +306,139 @@
               }
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "connector": {
+                "properties": {
+                  "id": {
+                    "const": "http_assert"
+                  }
+                },
+                "required": [
+                  "id"
+                ]
+              }
+            },
+            "required": [
+              "connector"
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "const": "tool_call"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "not": {
+                  "enum": [
+                    "end",
+                    "failure",
+                    "decision"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "on_success"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "human_gate"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "on_failure"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "tool_call"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "connector"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "on_fallback"
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "const": "tool_call"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "end",
+                  "failure"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "on_success"
+                  ]
+                },
+                {
+                  "required": [
+                    "on_failure"
+                  ]
+                },
+                {
+                  "required": [
+                    "on_fallback"
+                  ]
+                }
+              ]
+            }
+          }
         }
       ]
     },
@@ -356,7 +492,72 @@
           "type": "array",
           "description": "Optional credential handle metadata. The built-in HTTP connector supports header credentials resolved by the local credential provider."
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "enum": [
+                  "http",
+                  "http_assert"
+                ]
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "then": {
+            "required": [
+              "request"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "id": {
+                "const": "http_assert"
+              }
+            },
+            "required": [
+              "id"
+            ]
+          },
+          "then": {
+            "required": [
+              "assertions"
+            ],
+            "properties": {
+              "request": {
+                "not": {
+                  "required": [
+                    "body"
+                  ]
+                },
+                "properties": {
+                  "method": {
+                    "const": "GET"
+                  },
+                  "response_mode": {
+                    "const": "full"
+                  },
+                  "input_mapping": {
+                    "items": {
+                      "properties": {
+                        "to": {
+                          "pattern": "^/query/[^/]+$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "connector_request": {
       "type": "object",
@@ -476,6 +677,11 @@
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/input_schema_node"
+          },
+          "maxProperties": 128,
+          "propertyNames": {
+            "minLength": 1,
+            "maxLength": 128
           }
         },
         "required": {
@@ -520,6 +726,11 @@
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/input_schema_node"
+          },
+          "maxProperties": 128,
+          "propertyNames": {
+            "minLength": 1,
+            "maxLength": 128
           }
         },
         "required": {
@@ -543,7 +754,8 @@
         },
         "maxLength": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 1048576
         },
         "minimum": {
           "type": "number"
@@ -556,7 +768,110 @@
           "minItems": 1,
           "maxItems": 128
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "properties"
+                ]
+              },
+              {
+                "required": [
+                  "required"
+                ]
+              },
+              {
+                "required": [
+                  "additionalProperties"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "object"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "items"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "array"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "minLength"
+                ]
+              },
+              {
+                "required": [
+                  "maxLength"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "string"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "anyOf": [
+              {
+                "required": [
+                  "minimum"
+                ]
+              },
+              {
+                "required": [
+                  "maximum"
+                ]
+              }
+            ]
+          },
+          "then": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "integer",
+                  "number"
+                ]
+              }
+            }
+          }
+        }
+      ]
     },
     "guard": {
       "type": "object",
@@ -753,5 +1068,6 @@
         }
       }
     }
-  }
+  },
+  "$comment": "This schema describes known JSON shapes. Runtime validation additionally checks graph references/reachability/DAGs, UTF-8 byte limits and dependent input-schema contracts."
 }

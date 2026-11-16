@@ -1,5 +1,11 @@
 # Stability Boundaries
 
+The published JSON Schemas and validator now agree on known-field shapes and
+conditional requirements. Invalid declared fields in 0.1/0.2 drafts no longer
+pass validation; unknown extension fields retain their additive contract.
+Use runtime validation as well as JSON Schema: cross-node references,
+reachability and byte/dependency limits require runtime semantic checks.
+
 The explicit [Agent connector protocol](connectors.md#agent-connector-protocol)
 is an experimental DSL 0.2 capability. Output schemas use the existing bounded
 object-root input-schema subset. Structured business output retention is

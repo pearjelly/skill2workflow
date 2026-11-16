@@ -550,7 +550,7 @@ class UiTests(TestCase):
             "entry": "start",
             "nodes": [
                 {"id": "start", "type": "start", "title": secret_marker, "on_success": "missing"},
-                {"id": "end", "type": "end"},
+                {"id": "end", "type": "end", "title": "end"},
             ],
             "edges": [],
         }

@@ -62,6 +62,15 @@ See `docs/workflow-dsl-compatibility.md` for the release-line compatibility poli
 
 ## Schema
 
+The development CI job runs `tests.test_schema_conformance` with pinned
+`jsonschema` tooling against every committed workflow example, the Agent
+contract and malformed known-field/conditional contracts. Runtime code still
+uses only the Python standard library. The schemas describe JSON shapes;
+runtime validation additionally checks cross-node references, reachability,
+0.2 DAGs, dependent input-schema rules and UTF-8 byte limits. Unknown extension
+properties remain permitted. Reserved fields must still have their documented
+types even though they do not grant execution semantics.
+
 The versioned JSON Schema lives at:
 
 ```text

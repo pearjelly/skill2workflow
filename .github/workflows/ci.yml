@@ -55,6 +55,7 @@ jobs:
       - run: python -m pip install -r requirements-dev.txt
       - run: ruff check src scripts tests
       - run: mypy
+      - run: PYTHONPATH=src python -m unittest tests.test_schema_conformance -v
 
   systemd-verify:
     name: systemd unit verification

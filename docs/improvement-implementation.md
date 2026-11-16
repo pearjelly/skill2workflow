@@ -18,7 +18,7 @@ standard-library-only runtime remain requirements.
 | T7 | service route modules/table; unchanged service/client tests and both boundary smokes | Complete |
 | T8 | CLI command functions and argparse dispatch; unchanged CLI tests | Complete |
 | T9 | development-only Ruff/mypy CI and typed IR/DSL/state contracts | Complete |
-| T12 | JSON Schema/validator agreement for examples and invalid cases; versioned 0.2 schema | Pending |
+| T12 | JSON Schema/validator agreement for examples and invalid cases; versioned 0.2 schema | Complete |
 | T10 | testing/demo/pilot modules excluded from runtime wheel; smoke entry points preserved | Pending |
 | T11 | SQLite CLI default; explicit JSON compatibility and documentation | Pending |
 | T14 | one-page roadmap, archived loop history, consolidated API reference, short agent notes and command reference | Pending |
@@ -94,3 +94,11 @@ branch update. Evidence below is updated only after a check finishes.
   Shared TypedDict contracts replace IR/DSL/state object-dictionary aliases.
   Tools are pinned only in requirements-dev.txt and a separate CI job.
   Full suite: 1,576 tests passed (112.013 s); JavaScript/corpus/hygiene pass.
+
+- T12: both versioned JSON Schemas and the dependency-free validator agree on
+  every committed DSL example, an Agent workflow, and malformed known-field,
+  HTTP, decision and nested input-contract shapes. Cross-node graph semantics
+  remain explicit runtime checks. The optional development conformance suite
+  runs as a mandatory CI quality gate. Old smoke/test fixtures now carry their
+  required titles and use the documented step type. Full development suite:
+  1,581 tests passed; Ruff/mypy, example sync and secret hygiene pass.

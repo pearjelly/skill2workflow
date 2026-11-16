@@ -8,6 +8,12 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Align known Workflow DSL field shapes and conditional requirements between
+  versioned JSON Schemas and the dependency-free validator. Reject malformed
+  metadata, unsupported node types and mistyped declared fields before graph
+  analysis; retain unknown extension properties. Qualify both schema versions
+  against examples and malformed contracts in the development CI job.
+
 - Dispatch CLI subcommands through individual `cmd_<name>` functions and
   argparse handler defaults while preserving argument construction and behavior.
 

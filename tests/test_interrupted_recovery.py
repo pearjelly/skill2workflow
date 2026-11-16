@@ -683,21 +683,21 @@ def _two_connector_workflow():
         "entry": "first",
         "nodes": [
             {
-                "id": "first",
+                "id": "first", "title": "first",
                 "type": "tool_call",
                 "connector": {"id": "recording", "kind": "local"},
                 "on_success": "second",
                 "on_failure": "failure",
             },
             {
-                "id": "second",
+                "id": "second", "title": "second",
                 "type": "tool_call",
                 "connector": {"id": "recording", "kind": "local"},
                 "on_success": "end",
                 "on_failure": "failure",
             },
-            {"id": "end", "type": "end"},
-            {"id": "failure", "type": "failure"},
+            {"id": "end", "title": "end", "type": "end"},
+            {"id": "failure", "title": "failure", "type": "failure"},
         ],
         "edges": [
             {"id": "edge_first_second", "from": "first", "to": "second", "label": "next"},
