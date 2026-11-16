@@ -8,6 +8,10 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Split service resource handlers into workflow, run, schedule, backup and
+  operations modules behind fixed/parameter route tables; preserve endpoint,
+  admission, telemetry, authentication and exception behavior.
+
 - Label descriptive versus enforced node results and audit events, expose the
   distinction in CLI/control UI, and version the closed remote run-detail
   contract as 0.2.0 while retaining client support for legacy 0.1.0 services.

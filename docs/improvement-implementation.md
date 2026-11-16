@@ -15,7 +15,7 @@ standard-library-only runtime remain requirements.
 | T4 | reviewed decision/data design, DSL 0.2, compiler/runtime/editor/write-back, risk-routing example and both paths | Complete |
 | T6 | enforced data dependencies and documented reserved fields with notices | Complete |
 | T5 | reviewed Agent protocol, filtered context, output validation and durable results, deterministic end-to-end adapter | Complete |
-| T7 | service route modules/table; unchanged service/client tests and both boundary smokes | Pending |
+| T7 | service route modules/table; unchanged service/client tests and both boundary smokes | Complete |
 | T8 | CLI command functions and argparse dispatch; unchanged CLI tests | Pending |
 | T9 | development-only Ruff/mypy CI and typed IR/DSL/state contracts | Pending |
 | T12 | JSON Schema/validator agreement for examples and invalid cases; versioned 0.2 schema | Pending |
@@ -72,3 +72,10 @@ branch update. Evidence below is updated only after a check finishes.
   isolated installed wheel (JSON/SQLite, high/low routing and restart). Package
   smoke passes; corpus stays 100% / 0 / 51.04%, example sync and hygiene pass.
   The installed Agent drill is now part of the CI artifact gate.
+
+- T7: 38 resource method ASTs match the originals after reversing only the
+  closure/global lookup move. Fixed table: 26 routes; ordered parameter table:
+  14 entries. `service.py` drops from 3,973 to 1,516 lines. The service/client
+  test files retain their pre-refactor SHA-256 digests; all 176 tests pass.
+  Service and security boundary smoke drills pass. Full suite: 1,576 tests
+  passed (112.412 s). This pure refactor is committed separately from features.
