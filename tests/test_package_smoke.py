@@ -156,6 +156,7 @@ class PackageSmokeTests(TestCase):
                         f"ReadWritePaths={config['runtime']['state_dir']}\n",
                         encoding="utf-8",
                     )
+                    output_path.chmod(0o644)
                     return json.dumps(
                         {"status": "written", "unit_name": output_path.name}
                     )

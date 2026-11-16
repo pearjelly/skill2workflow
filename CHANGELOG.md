@@ -8,6 +8,9 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Make the package smoke's simulated unit permissions independent of host
+  umask, and skip the installed quickstart drill when ensurepip is unavailable.
+
 - Update the editor's missing HTTP request warning as the current draft
   changes, including imported workflows, without modifying Workflow DSL or
   executing a request.
