@@ -529,4 +529,3 @@ def _allocate_transaction_directory(parent_fd: int, label: str) -> tuple:
             raise ValueError("transaction directory must be owner-only")
         return name, descriptor
     raise FileExistsError("could not allocate a transaction directory")
-
