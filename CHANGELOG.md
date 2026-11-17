@@ -10,6 +10,8 @@ release; Roadmap loop completion alone does not publish a new version.
 
 - Render decision guidance as normal sentence-case inspector help; preserve
   uppercase styling for short section labels.
+  Record user-approved Inter detector exceptions scoped to the editor and
+  control HTML pages, preserving their existing typography.
 
 - Keep the roadmap to one page with four goals and exit criteria; retain all
   285 delivery loops in `docs/loops/history.md`. Consolidate 26 remote API

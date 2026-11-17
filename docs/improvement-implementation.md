@@ -160,7 +160,9 @@ regressions pass. The full development suite also passes 1,591 tests
 (115.100 s), and all 83 JavaScript tests pass.
 
 Two Inter findings predate this work: both font stacks are unchanged from
-03aa8d1. They remain standing while the user's preference about two file-scoped
-font exceptions is pending. No typography exception or broader ignore has been
-added. This corrects the earlier completion statement about zero remaining
-findings; the two contrast fixes remain valid.
+03aa8d1. On 2026-11-17 the user confirmed retaining Inter and recording two
+file-scoped exceptions. The Impeccable CLI recorded `overused-font=inter` only
+for `web/index.html` and `web/control.html` in
+[the shared detector configuration](../.impeccable/config.json), with the user's
+decision recorded as the reason. The three Stop findings are resolved through
+one fix and two approved exceptions; the two contrast fixes remain valid.

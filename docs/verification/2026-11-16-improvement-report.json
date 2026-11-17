@@ -12,10 +12,12 @@
   "date": "2026-11-16",
   "design_findings": {
     "contrast_fixed": 2,
-    "font_exception_status": "awaiting_user_preference",
+    "font_exception_config": ".impeccable/config.json",
+    "font_exception_date": "2026-11-17",
+    "font_exception_status": "user_approved_file_scoped_exceptions",
     "font_findings_preexisting": 2,
-    "remaining": 2,
-    "suppressed": 0,
+    "remaining": 0,
+    "suppressed": 2,
     "uppercase_body_fixed": 1
   },
   "documentation": {
