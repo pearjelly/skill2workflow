@@ -166,3 +166,10 @@ for `web/index.html` and `web/control.html` in
 [the shared detector configuration](../.impeccable/config.json), with the user's
 decision recorded as the reason. The three Stop findings are resolved through
 one fix and two approved exceptions; the two contrast fixes remain valid.
+
+A later stylesheet scan flagged the validation list's 3 px side border. The
+warning, `ok` and `error` variants use it as a semantic status marker alongside
+the validation message, unchanged from 03aa8d1. This is a false positive for the
+decorative-card rule. The CLI recorded a `side-tab` exception scoped only to
+`web/styles.css`, with the agent's evidence as the reason. The interface and
+the two user-approved font exceptions are unchanged.

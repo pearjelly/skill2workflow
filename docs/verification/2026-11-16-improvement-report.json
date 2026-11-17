@@ -17,8 +17,13 @@
     "font_exception_status": "user_approved_file_scoped_exceptions",
     "font_findings_preexisting": 2,
     "remaining": 0,
-    "suppressed": 2,
-    "uppercase_body_fixed": 1
+    "suppressed": 3,
+    "uppercase_body_fixed": 1,
+    "validation_status_exception": {
+      "basis": "semantic validation status marker; unchanged from 03aa8d1",
+      "file": "web/styles.css",
+      "rule": "side-tab"
+    }
   },
   "documentation": {
     "local_link_errors": 0,
