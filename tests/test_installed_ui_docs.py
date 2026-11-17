@@ -12,7 +12,7 @@ class InstalledUiDocumentationTests(TestCase):
         docs = (ROOT / "docs" / "installed-ui.md").read_text(encoding="utf-8")
         guide = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
         pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
 
         self.assertIn("skill2workflow ui --port 4173", readme)
         assert_guide_reachable(self, 'docs/installed-ui.md')

@@ -8,6 +8,63 @@ release; Roadmap loop completion alone does not publish a new version.
 
 ### Changed
 
+- Render decision guidance as normal sentence-case inspector help; preserve
+  uppercase styling for short section labels.
+  Record user-approved Inter detector exceptions scoped to the editor and
+  control HTML pages, preserving their existing typography.
+  Record a stylesheet-scoped detector exception for the existing semantic
+  validation status markers.
+
+- Keep the roadmap to one page with four goals and exit criteria; retain all
+  285 delivery loops in `docs/loops/history.md`. Consolidate 26 remote API
+  guides into `docs/api-reference.md` with stable resource/subsection anchors.
+  Keep ten core agent commands and move the complete list to the contributor
+  reference. Existing contract assertions follow their archived/resource scopes.
+  Release-preflight path filters follow the consolidated API guide and extracted
+  service route modules.
+
+- Default CLI state storage to SQLite for all commands exposing `--storage`.
+  Pass `--storage json` explicitly for existing JSON workspaces and examples.
+  JSON run files are not migrated; Python library defaults and the existing
+  JSON registry/audit import behavior remain unchanged.
+
+- Move checkout demo, pilot and smoke helpers to
+  `scripts/skill2workflow_testing`, excluding them from runtime wheels. Existing
+  `scripts/*.py` entry points remain available; installed qualification drives
+  the selected CLI from checkout tools. Shared private JSON I/O and tenant
+  credential checks remain runtime capabilities.
+
+- Align known Workflow DSL field shapes and conditional requirements between
+  versioned JSON Schemas and the dependency-free validator. Reject malformed
+  metadata, unsupported node types and mistyped declared fields before graph
+  analysis; retain unknown extension properties. Qualify both schema versions
+  against examples and malformed contracts in the development CI job.
+
+- Dispatch CLI subcommands through individual `cmd_<name>` functions and
+  argparse handler defaults while preserving argument construction and behavior.
+
+- Split service resource handlers into workflow, run, schedule, backup and
+  operations modules behind fixed/parameter route tables; preserve endpoint,
+  admission, telemetry, authentication and exception behavior.
+
+- Label descriptive versus enforced node results and audit events, expose the
+  distinction in CLI/control UI, and version the closed remote run-detail
+  contract as 0.2.0 while retaining client support for legacy 0.1.0 services.
+  Increase muted control text contrast on tinted panels to meet WCAG AA.
+
+- Reject HTTP and HTTP-assertion nodes without a request object during DSL
+  validation and publication, with structured `connector_request_missing`
+  diagnostics instead of a predictable execution-time failure.
+
+- Tighten Skill inference to English whole words and explicit approval phrases,
+  with Chinese approval/check vocabulary and per-step inference provenance.
+  Prose commands compile as descriptive steps; only explicit declarations bind
+  HTTP connectors. Compile review lists every inferred step for author review.
+  Enterprise examples now declare their illustrative HTTP actions explicitly.
+
+- Make the package smoke's simulated unit permissions independent of host
+  umask, and skip the installed quickstart drill when ensurepip is unavailable.
+
 - Update the editor's missing HTTP request warning as the current draft
   changes, including imported workflows, without modifying Workflow DSL or
   executing a request.
@@ -29,6 +86,25 @@ release; Roadmap loop completion alone does not publish a new version.
   diagnostic requests and published workflows remain unchanged.
 
 ### Added
+
+- Add a separate development-only Ruff E/F/B and mypy CI job, with shared
+  TypedDict contracts for Skill IR, Workflow DSL and RunState. Type checks
+  preserve the Python 3.9 target; runtime dependencies remain empty.
+
+- Add an explicit, provider-independent Agent connector protocol with filtered
+  durable dependencies, bounded output-schema validation and opt-in structured
+  result retention. Include a deterministic test adapter; no LLM SDK or runtime
+  dependency is added and external code loading remains explicit.
+
+- Add Workflow DSL 0.2.0 ordered decision nodes, durable input/output routing,
+  explicit Skill branch references and convergence, multiple LiteGraph output
+  ports, and the risk-routing example. Preserve 0.1.0 execution and HTTP result
+  shapes; decision audit records contain branch indexes without business values.
+- Surface nonempty descriptive/reserved DSL fields as advisory validation
+  notices, and document their actual runtime behavior.
+
+- Add 24 original Apache-2.0 Skill corpus cases and a CI benchmark for inference
+  accuracy, false human gates and configured/enforced process-node coverage.
 
 - Declare `workflow_version` once in a Skill to compile, export, repair and
   quickstart a reviewed new workflow version without editing generated JSON.

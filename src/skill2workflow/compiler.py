@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 import copy
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Set
 from urllib.parse import urlsplit
 
 from .connectors import MAX_HTTP_ALLOWED_ORIGINS, MAX_HTTP_ORIGIN_BYTES, default_connector_binding
@@ -13,9 +13,13 @@ from .http_assertions import validate_http_assertion_binding, skill_http_asserti
 from .skill_http import skill_http_action_binding
 from .skill_input import skill_input_schema_contract
 from .skill_version import skill_workflow_version
+from .inference import infer_step
+from .decisions import decision_errors
+from .agent_protocol import agent_node_errors, skill_agent_config
+from .workflow_shapes import validate_workflow_shapes
 
-Workflow = Dict[str, object]
-ValidationError = Dict[str, object]
+from .models import SkillIR, Workflow
+ValidationError = Dict[str, Any]
 _TRANSITION_KEYS = ("on_success", "on_failure", "on_fallback")
 SKILL_COMPILE_REVIEW_SCHEMA_VERSION = "skill2workflow-skill-compile-review-0.1.0"
 _SKILL_COMPILE_REVIEW_NOTICE_CODES = (
@@ -25,7 +29,7 @@ _SKILL_COMPILE_REVIEW_NOTICE_CODES = (
 )
 
 
-def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
+def compile_ir_to_workflow(ir: SkillIR) -> Workflow:
     """Compile Skill IR into the initial skill2workflow DSL."""
     workflow_version = skill_workflow_version(ir['workflow_version']) if 'workflow_version' in ir else '0.1.0'
     input_schema = skill_input_schema_contract(ir['input_schema']) if 'input_schema' in ir else None
@@ -48,7 +52,7 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
         ]
 
     workflow_id = f"workflow_{_slugify(name)}"
-    nodes: List[Dict[str, object]] = [
+    nodes: List[Dict[str, Any]] = [
         {
             "id": "start",
             "type": "start",
@@ -64,7 +68,11 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
         node_id = f"node_{index:03d}_{_slugify(title)}"
         explicit_type = step.get("node_type")
         explicit_connector = step.get("connector")
-        if explicit_connector is not None:
+        agent = skill_agent_config(step["agent"]) if step.get("agent") is not None else None
+        if agent is not None:
+            if explicit_type != "tool_call" or explicit_connector != {"id": agent["connector"], "kind": "agent"}:
+                raise ValueError("Invalid Skill step annotation")
+        elif explicit_connector is not None:
             if (explicit_type != "tool_call" or not isinstance(explicit_connector, dict)
                     or not isinstance(explicit_connector.get("id"), str)
                     or explicit_connector.get("id") not in {"http", "http_assert"}
@@ -73,13 +81,14 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
             config = {k: v for k, v in explicit_connector.items() if k not in {"id", "kind"}}
             factory = skill_http_action_binding if explicit_connector["id"] == "http" else skill_http_assertion_binding
             explicit_connector = factory(config)
-            errors = []
+            errors: List[ValidationError] = []
             _validate_connector_binding({"id": node_id, "type": explicit_type, "connector": explicit_connector}, index, errors)
             if errors:
                 raise ValueError("Invalid Skill step annotation")
-        elif explicit_type is not None and explicit_type != "human_gate":
+        elif explicit_type is not None and explicit_type not in {"human_gate", "step", "decision"}:
             raise ValueError("Unsupported explicit Skill step type")
-        node_type = explicit_type or _node_type_for_step(f"{title} {detail}")
+        inferred_type, term = infer_step(f"{title} {detail}")
+        node_type = explicit_type or inferred_type
         step_ids.append(node_id)
         source = {
             "file": ir.get("source_path", "SKILL.md"),
@@ -90,7 +99,9 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
             source["line"] = step["line"]
         if step.get("section"):
             source["section"] = step["section"]
-        node = {
+        if explicit_type is None:
+            source.update(inferred_type=inferred_type, matched_term=term)
+        node: Dict[str, Any] = {
             "id": node_id,
             "type": node_type,
             "title": title,
@@ -105,6 +116,9 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
         connector = copy.deepcopy(explicit_connector) if explicit_connector is not None else default_connector_binding(node_type)
         if connector:
             node["connector"] = connector
+        if agent is not None:
+            node["action"] = {"kind": "agent_instruction", "instruction": agent["instruction"]}
+            node["output_schema"] = copy.deepcopy(agent["output_schema"])
         nodes.append(node)
 
     nodes.extend(
@@ -125,18 +139,18 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
     )
 
     sequence = ["start"] + step_ids + ["end"]
-    edges = []
-    for index, (source, target) in enumerate(zip(sequence, sequence[1:]), start=1):
+    edges: List[Dict[str, Any]] = []
+    for index, (source_id, target) in enumerate(zip(sequence, sequence[1:]), start=1):
         edges.append(
             {
-                "id": f"edge_{index:03d}_{source}_to_{target}",
-                "from": source,
+                "id": f"edge_{index:03d}_{source_id}_to_{target}",
+                "from": source_id,
                 "to": target,
                 "condition": None,
                 "label": "next",
             }
         )
-        _node_by_id(nodes, source)["on_success"] = target
+        _node_by_id(nodes, source_id)["on_success"] = target
 
     for node in nodes:
         if node["type"] in {"step", "human_gate", "tool_call", "verification", "instruction"}:
@@ -151,7 +165,7 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
                 }
             )
 
-    workflow = {
+    workflow: Workflow = {
         "schema_version": "0.1.0",
         "workflow": {
             "id": workflow_id,
@@ -176,10 +190,17 @@ def compile_ir_to_workflow(ir: Dict[str, object]) -> Workflow:
     }
     if input_schema is not None:
         workflow['input_schema'] = input_schema
+    if any(step.get("node_type") == "decision" or step.get("next") is not None or step.get("agent") is not None for step in steps):
+        for step, node_id in zip(steps, step_ids):
+            if step.get("agent") is not None:
+                _node_by_id(nodes, node_id)["requires"] = [
+                    _resolve_step_reference(reference, steps, step_ids) for reference in step["agent"]["requires"]
+                ]
+        _compile_decisions(workflow, steps, step_ids)
     return workflow
 
 
-def summarize_skill_compile(ir: Dict[str, object], workflow: Workflow) -> Dict[str, object]:
+def summarize_skill_compile(ir: SkillIR, workflow: Workflow) -> Dict[str, Any]:
     """Return a compact, source-free review of one compiled Skill draft.
 
     This is authoring guidance only. It describes what the conservative compiler
@@ -208,7 +229,7 @@ def summarize_skill_compile(ir: Dict[str, object], workflow: Workflow) -> Dict[s
         and node["connector"].get("id") == "http_assert"
     )
     executable_node_count = sum(
-        node_type in {"step", "human_gate", "tool_call", "verification", "instruction"}
+        node_type in {"step", "human_gate", "tool_call", "verification", "instruction", "decision"}
         for node_type in node_types
     )
     notices = []
@@ -218,6 +239,7 @@ def summarize_skill_compile(ir: Dict[str, object], workflow: Workflow) -> Dict[s
         notices.append("human_gate_not_inferred")
     if verification_node_count == 0:
         notices.append("verification_not_inferred")
+    notices.extend(inference_notices(workflow))
     return {
         "schema_version": SKILL_COMPILE_REVIEW_SCHEMA_VERSION,
         "ordered_step_count": ordered_step_count,
@@ -229,12 +251,38 @@ def summarize_skill_compile(ir: Dict[str, object], workflow: Workflow) -> Dict[s
     }
 
 
-def validate_workflow(workflow: Workflow) -> List[str]:
+def validate_workflow(workflow: object) -> List[str]:
     """Return human-readable validation errors for a Workflow DSL document."""
     return [str(error["message"]) for error in validate_workflow_structured(workflow)]
 
 
-def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
+def validate_workflow_notices(workflow: Workflow) -> List[ValidationError]:
+    """Report descriptive/reserved declarations separately from validity."""
+    notices = []
+    def notice(path):
+        notices.append({"code": "descriptive_field", "message": "Reserved/descriptive field is ignored at runtime", "path": path, "severity": "notice"})
+    if not isinstance(workflow, dict):
+        return notices
+    for key in ("guards", "state_schema", "checkpoints"):
+        if workflow.get(key):
+            notice([key])
+    nodes = workflow.get("nodes")
+    for index, node in enumerate(nodes if isinstance(nodes, list) else []):
+        if isinstance(node, dict):
+            for key in ("guard", "requires", "produces"):
+                if (key == "requires" and workflow.get("schema_version") == "0.2.0"
+                        and isinstance(node.get("connector"), dict) and node["connector"].get("kind") == "agent"):
+                    continue
+                if node.get(key):
+                    notice(["nodes", index, key])
+    edges = workflow.get("edges")
+    for index, edge in enumerate(edges if isinstance(edges, list) else []):
+        if isinstance(edge, dict) and edge.get("condition"):
+            notice(["edges", index, "condition"])
+    return notices
+
+
+def validate_workflow_structured(workflow: object) -> List[ValidationError]:
     """Return machine-readable validation errors for a Workflow DSL document."""
     errors: List[ValidationError] = []
     if not isinstance(workflow, dict):
@@ -245,11 +293,11 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
                 [],
             )
         ]
-    if workflow.get("schema_version") != "0.1.0":
+    if not isinstance(workflow.get("schema_version"), str) or workflow.get("schema_version") not in {"0.1.0", "0.2.0"}:
         errors.append(
             _validation_error(
                 "unsupported_schema_version",
-                "workflow.schema_version must be 0.1.0",
+                "workflow.schema_version must be 0.1.0 or 0.2.0",
                 ["schema_version"],
             )
         )
@@ -267,6 +315,10 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
             )
         )
 
+    shape_errors = validate_workflow_shapes(workflow)
+    if shape_errors:
+        return errors + shape_errors
+
     nodes = workflow.get("nodes")
     if not isinstance(nodes, list):
         errors.append(_validation_error("nodes_not_list", "workflow.nodes must be a list", ["nodes"]))
@@ -280,7 +332,7 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
     if len(node_ids) != len(set(node_ids)):
         errors.append(_validation_error("duplicate_node_id", "node ids must be unique", ["nodes"]))
 
-    node_map = {node.get("id"): node for node in nodes if isinstance(node, dict)}
+    node_map: Dict[Any, Dict[str, Any]] = {node.get("id"): node for node in nodes if isinstance(node, dict)}
     node_index_map = {node.get("id"): index for index, node in enumerate(nodes) if isinstance(node, dict)}
     edge_ids = [edge.get("id") for edge in edges if isinstance(edge, dict)]
     if len(edge_ids) != len(set(edge_ids)):
@@ -307,6 +359,9 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
         node_id = node.get("id")
         node_type = node.get("type")
         _validate_node_timeout(node, index, errors)
+        if node_type == "decision":
+            errors.extend(decision_errors(node, index, node_map, workflow.get("schema_version")))
+            continue
         if node_type in {"end", "failure"}:
             for key in _TRANSITION_KEYS:
                 if node.get(key):
@@ -344,6 +399,8 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
             )
         _validate_retry_policy(node.get("retry"), ["nodes", index, "retry"], errors)
         _validate_connector_binding(node, index, errors)
+        if isinstance(node.get("connector"), dict) and node["connector"].get("kind") == "agent":
+            errors.extend(agent_node_errors(node, index, workflow.get("schema_version")))
         for key in _TRANSITION_KEYS:
             target = node.get(key)
             if target is not None and target not in node_map:
@@ -356,7 +413,11 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
                 )
 
     edge_pairs = _validate_edges(edges, node_map, errors)
-    _validate_transition_edges(node_map, edge_pairs, errors, node_index_map)
+    _validate_transition_edges(node_map, edge_pairs, errors, node_index_map, edges)
+    if workflow.get("schema_version") == "0.2.0" and _has_cycle(node_map):
+        errors.append(_validation_error("workflow_cycle", "Workflow DSL 0.2.0 requires a DAG", ["nodes"]))
+    elif workflow.get("schema_version") == "0.2.0":
+        _validate_agent_dependencies(node_map, entry, node_index_map, errors)
 
     if entry in node_map:
         reachable = _reachable_nodes(node_map, str(entry))
@@ -376,8 +437,8 @@ def validate_workflow_structured(workflow: Workflow) -> List[ValidationError]:
 
 
 def _validate_edges(
-    edges: List[Dict[str, object]],
-    node_map: Dict[object, Dict[str, object]],
+    edges: List[Dict[str, Any]],
+    node_map: Dict[object, Dict[str, Any]],
     errors: List[ValidationError],
 ) -> Set[tuple]:
     edge_pairs = set()
@@ -416,6 +477,10 @@ def _validate_edges(
             )
 
         if source in node_map and target in node_map:
+            if node_map[source].get("type") == "decision" and dict(_decision_targets(node_map[source])).get(edge.get("label")) != target:
+                errors.append(_validation_error(
+                    "decision_edge_invalid", "decision edge label must identify its branch/default destination", ["edges", index],
+                ))
             edge_pairs.add((source, target))
             transition_targets = _transition_targets(node_map[source])
             if target not in transition_targets:
@@ -431,10 +496,11 @@ def _validate_edges(
 
 
 def _validate_transition_edges(
-    node_map: Dict[object, Dict[str, object]],
+    node_map: Dict[object, Dict[str, Any]],
     edge_pairs: Set[tuple],
     errors: List[ValidationError],
     node_index_map: Dict[object, int],
+    edges: List[Dict[str, Any]],
 ) -> None:
     for node_id, node in node_map.items():
         if node.get("type") in {"end", "failure"}:
@@ -452,9 +518,20 @@ def _validate_transition_edges(
                     )
                 )
 
+        if node.get("type") == "decision":
+            for label, target in _decision_targets(node):
+                if target in node_map and not any(
+                    isinstance(edge, dict) and edge.get("from") == node_id
+                    and edge.get("to") == target and edge.get("label") == label for edge in edges
+                ):
+                    errors.append(_validation_error(
+                        "transition_edge_missing", f"{node_id}.{label} must have matching edge to {target}",
+                        ["nodes", node_index_map.get(node_id, 0), label],
+                    ))
+
 
 def _validate_connector_binding(
-    node: Dict[str, object],
+    node: Dict[str, Any],
     index: int,
     errors: List[ValidationError],
 ) -> None:
@@ -582,7 +659,7 @@ def _validate_retry_policy(
 
 
 def _validate_node_timeout(
-    node: Dict[str, object],
+    node: Dict[str, Any],
     index: int,
     errors: List[ValidationError],
 ) -> None:
@@ -607,13 +684,18 @@ def _validate_node_timeout(
 
 
 def _validate_http_connector_request(
-    node: Dict[str, object],
+    node: Dict[str, Any],
     index: int,
-    connector: Dict[str, object],
+    connector: Dict[str, Any],
     errors: List[ValidationError],
 ) -> None:
     request = connector.get("request")
     if not isinstance(request, dict):
+        errors.append(_validation_error(
+            "connector_request_missing",
+            f"{node.get('id')} {connector.get('id')} connector requires connector.request",
+            ["nodes", index, "connector", "request"],
+        ))
         return
     if "allowed_origins" in request:
         _validate_http_allowed_origins(node, index, request.get("allowed_origins"), errors)
@@ -680,7 +762,7 @@ def _validate_http_connector_request(
 
 
 def _validate_http_allowed_origins(
-    node: Dict[str, object],
+    node: Dict[str, Any],
     index: int,
     origins: object,
     errors: List[ValidationError],
@@ -719,7 +801,7 @@ def _validate_http_allowed_origins(
                 raise ValueError("origin too long")
             parsed = urlsplit(origin)
             hostname = parsed.hostname
-            parsed.port
+            _ = parsed.port
         except (UnicodeError, ValueError):
             hostname = None
             parsed = None
@@ -762,26 +844,156 @@ def _validation_error(code: str, message: str, path: List[object]) -> Validation
     }
 
 
-def _transition_targets(node: Dict[str, object]) -> Set[object]:
-    return {node[key] for key in _TRANSITION_KEYS if node.get(key) is not None}
+def _transition_targets(node: Dict[str, Any]) -> Set[object]:
+    targets = {node[key] for key in _TRANSITION_KEYS if node.get(key) is not None}
+    targets.update(target for _, target in _decision_targets(node))
+    return targets
+
+
+def _decision_targets(node):
+    if node.get("type") != "decision":
+        return []
+    branches = node.get("branches")
+    targets = [
+        (f"branch_{index}", branch["to"])
+        for index, branch in enumerate(branches if isinstance(branches, list) else [])
+        if isinstance(branch, dict) and isinstance(branch.get("to"), str)
+    ]
+    if isinstance(node.get("default"), str):
+        targets.append(("default", node["default"]))
+    return targets
+
+
+def _has_cycle(node_map):
+    targets = {key: _transition_targets(node) & set(node_map) for key, node in node_map.items()}
+    incoming = dict.fromkeys(node_map, 0)
+    for destinations in targets.values():
+        for destination in destinations:
+            incoming[destination] += 1
+    ready = [key for key, count in incoming.items() if count == 0]
+    visited = 0
+    while ready:
+        source = ready.pop()
+        visited += 1
+        for target in targets[source]:
+            incoming[target] -= 1
+            if incoming[target] == 0:
+                ready.append(target)
+    return visited != len(node_map)
+
+
+def _resolve_step_reference(reference, steps, step_ids):
+    if type(reference) is int or (isinstance(reference, str) and reference.isascii() and reference.isdigit()):
+        index = int(reference)
+        if 1 <= index <= len(step_ids):
+            return step_ids[index - 1]
+    elif isinstance(reference, str):
+        if reference in {"end", "failure"} or reference in step_ids:
+            return reference
+        matches = [step_ids[index] for index, step in enumerate(steps) if step["title"] == reference]
+        if len(matches) == 1:
+            return matches[0]
+    raise ValueError("Invalid Skill step reference")
+
+
+def _validate_agent_dependencies(
+    node_map: Dict[str, Dict[str, Any]], entry: object,
+    indexes: Dict[Any, int], errors: List[ValidationError],
+) -> None:
+    if entry not in node_map:
+        return
+    parents: Dict[str, Set[str]] = {node_id: set() for node_id in node_map}
+    outgoing = {node_id: set(node_map) & _transition_targets(node) for node_id, node in node_map.items()}
+    for source, targets in outgoing.items():
+        for target in targets:
+            parents[target].add(source)
+    incoming = {node_id: len(sources) for node_id, sources in parents.items()}
+    ready = [node_id for node_id, count in incoming.items() if count == 0]
+    dominators: Dict[str, Set[str]] = {}
+    while ready:
+        node_id = ready.pop()
+        sources = parents[node_id]
+        inherited = set.intersection(*(dominators[source] for source in sources)) if sources else set()
+        dominators[node_id] = inherited | {node_id}
+        for target in outgoing[node_id]:
+            incoming[target] -= 1
+            if incoming[target] == 0:
+                ready.append(target)
+    for node_id, node in node_map.items():
+        if not isinstance(node.get("connector"), dict) or node["connector"].get("kind") != "agent":
+            continue
+        requires = node.get("requires", [])
+        if not isinstance(requires, list):
+            continue
+        for dependency_index, dependency in enumerate(requires):
+            if not isinstance(dependency, str) or dependency not in node_map:
+                code = "agent_dependency_missing"
+            elif dependency == node_id or dependency not in dominators.get(node_id, set()):
+                code = "agent_dependency_not_dominating"
+            else:
+                continue
+            errors.append(_validation_error(
+                code, "agent requires an existing output dependency on every incoming path",
+                ["nodes", indexes[node_id], "requires", dependency_index],
+            ))
+
+
+def _compile_decisions(workflow, steps, step_ids):
+    workflow["schema_version"] = "0.2.0"
+    for step, node_id in zip(steps, step_ids):
+        node = _node_by_id(workflow["nodes"], node_id)
+        if node["type"] == "decision":
+            config = step.get("decision")
+            if not isinstance(config, dict) or set(config) != {"branches", "default"}:
+                raise ValueError("Invalid Skill step annotation")
+            node.pop("on_success", None)
+            node.pop("action", None)
+            node["branches"] = copy.deepcopy(config["branches"])
+            node["default"] = _resolve_step_reference(config["default"], steps, step_ids)
+            if not isinstance(node["branches"], list):
+                raise ValueError("Invalid Skill step annotation")
+            for branch in node["branches"]:
+                if not isinstance(branch, dict) or set(branch) != {"when", "to"}:
+                    raise ValueError("Invalid Skill step annotation")
+                branch["to"] = _resolve_step_reference(branch["to"], steps, step_ids)
+                condition = branch["when"]
+                if isinstance(condition, dict) and isinstance(condition.get("path"), str) and condition["path"].startswith("/nodes/"):
+                    parts = condition["path"].split("/")
+                    reference = parts[2].replace("~1", "/").replace("~0", "~")
+                    parts[2] = _resolve_step_reference(reference, steps, step_ids).replace("~", "~0").replace("/", "~1")
+                    condition["path"] = "/".join(parts)
+        elif step.get("next") is not None:
+            node["on_success"] = _resolve_step_reference(step["next"], steps, step_ids)
+    edges = []
+    for node in workflow["nodes"]:
+        transitions = _decision_targets(node) if node.get("type") == "decision" else [
+            (label, node[key]) for key, label in (("on_success", "next"), ("on_failure", "failure"), ("on_fallback", "fallback"))
+            if node.get(key)
+        ]
+        for label, target in transitions:
+            edges.append({"id": f"edge_{node['id']}_{label}", "from": node["id"], "to": target, "label": label, "condition": None})
+    workflow["edges"] = edges
+    if validate_workflow_structured(workflow):
+        raise ValueError("Invalid Skill step annotation")
 
 
 def _node_type_for_step(title: str) -> str:
-    lowered = title.lower()
-    human_terms = ("approval", "approve", "user review", "ask user", "human", "confirm")
-    verify_terms = ("verify", "test", "validate", "check")
-    tool_terms = ("tool", "command", "run ")
-
-    if any(term in lowered for term in human_terms):
-        return "human_gate"
-    if any(term in lowered for term in verify_terms):
-        return "verification"
-    if any(term in lowered for term in tool_terms):
-        return "tool_call"
-    return "step"
+    return infer_step(title)[0]
 
 
-def _step_records_from_ir(ir: Dict[str, object]) -> List[Dict[str, object]]:
+def inference_notices(workflow: Workflow) -> List[str]:
+    """List inferred source indexes, types and fixed terms without source text."""
+    notices = []
+    for node in workflow.get("nodes", []):
+        source = node.get("metadata", {}).get("source", {})
+        if "inferred_type" in source:
+            notices.append(
+                f"inferred_node:{source['index']}:{source['inferred_type']}:{source.get('matched_term') or ''}"
+            )
+    return notices
+
+
+def _step_records_from_ir(ir: SkillIR) -> List[Dict[str, Any]]:
     details = ir.get("ordered_step_details")
     if isinstance(details, list) and details:
         records = []
@@ -800,6 +1012,9 @@ def _step_records_from_ir(ir: Dict[str, object]) -> List[Dict[str, object]]:
                     "index": index,
                     "node_type": item.get("node_type"),
                     "connector": item.get("connector"),
+                    "decision": item.get("decision"),
+                    "next": item.get("next"),
+                    "agent": item.get("agent"),
                 }
             )
         return records
@@ -836,14 +1051,14 @@ def _action_for_node(node_type: str, title: str) -> Dict[str, str]:
     return {"kind": "agent_instruction", "instruction": title}
 
 
-def _node_by_id(nodes: List[Dict[str, object]], node_id: str) -> Dict[str, object]:
+def _node_by_id(nodes: List[Dict[str, Any]], node_id: str) -> Dict[str, Any]:
     for node in nodes:
         if node["id"] == node_id:
             return node
     raise KeyError(node_id)
 
 
-def _reachable_nodes(node_map: Dict[object, Dict[str, object]], entry: str) -> Set[str]:
+def _reachable_nodes(node_map: Dict[object, Dict[str, Any]], entry: str) -> Set[str]:
     seen: Set[str] = set()
     stack = [entry]
     while stack:
@@ -852,8 +1067,7 @@ def _reachable_nodes(node_map: Dict[object, Dict[str, object]], entry: str) -> S
             continue
         seen.add(node_id)
         node = node_map[node_id]
-        for key in _TRANSITION_KEYS:
-            target = node.get(key)
+        for target in _transition_targets(node):
             if isinstance(target, str) and target in node_map:
                 stack.append(target)
     return seen

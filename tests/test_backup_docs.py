@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from tests.documentation_fixtures import assert_guide_reachable
@@ -101,9 +102,7 @@ class BackupDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        guide = (ROOT / "docs" / "remote-backup-retention-plan.md").read_text(
-            encoding="utf-8"
-        )
+        guide = read_api_section('remote-backup-retention-plan')
         self.assertEqual(
             schema["properties"]["schema_version"]["const"],
             "skill2workflow-remote-backup-retention-plan-0.1.0",
@@ -154,7 +153,7 @@ class BackupDocumentationTests(TestCase):
             self.assertIn(text, guide)
 
     def test_inventory_contract_is_recorded_in_public_docs(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         guide = (ROOT / "docs" / "backup-restore.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -164,9 +163,9 @@ class BackupDocumentationTests(TestCase):
 
         assert_guide_reachable(self, 'docs/backup-restore.md')
         self.assertIn('backup-list', guide)
-        assert_guide_reachable(self, 'docs/remote-backup-retention-plan.md')
+        assert_guide_reachable(self, 'docs/api-reference.md#remote-backup-retention-plan')
         self.assertIn('service-backup-retention-plan',
-                      (ROOT / 'docs/remote-backup-retention-plan.md').read_text(encoding='utf-8'))
+                      read_api_section('remote-backup-retention-plan'))
         for document in (stability, changelog, package_smoke):
             self.assertIn("backup-list", document)
         self.assertIn("service-backup-retention-plan", stability)
@@ -178,7 +177,7 @@ class BackupDocumentationTests(TestCase):
 
     def test_readme_and_roadmap_record_loop_44_without_overclaiming_production(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
 
         self.assertIn("Delivery Loops 1-285 are complete", readme)
         self.assertIn("Current maturity: Self-hosted Beta", readme)

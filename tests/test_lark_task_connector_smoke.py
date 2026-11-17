@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.lark_task_connector_smoke import run_lark_task_connector_smoke
+from scripts.skill2workflow_testing.lark_task_connector_smoke import run_lark_task_connector_smoke
 
 
 class LarkTaskConnectorSmokeTests(TestCase):

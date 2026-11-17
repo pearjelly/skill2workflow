@@ -233,7 +233,7 @@ class DashboardTests(TestCase):
         self.assertEqual(snapshot["schema_version"], "skill2workflow-control-snapshot-0.1.0")
         self.assertEqual(snapshot["summary"]["workflow_count"], 2)
         self.assertEqual(snapshot["summary"]["run_count"], 1)
-        self.assertEqual(snapshot["summary"]["audit_event_count"], 5)
+        self.assertEqual(snapshot["summary"]["audit_event_count"], 6)
         self.assertEqual(snapshot["summary"]["connector_count"], 3)
         self.assertEqual(snapshot["summary"]["status_counts"], {"deprecated": 1, "published": 1})
         self.assertEqual(snapshot["workflows"][0]["workflow_id"], "workflow_dashboard")
@@ -246,6 +246,7 @@ class DashboardTests(TestCase):
                 "workflow_published",
                 "workflow_deprecated",
                 "run_started",
+                "node_completed",
                 "run_completed",
             ],
         )

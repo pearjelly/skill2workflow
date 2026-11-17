@@ -8,9 +8,15 @@ GET /runs/{run_id}
 Authorization: Bearer <service-ingress-token>
 ```
 
-The response is versioned as
-`skill2workflow-run-detail-0.1.0` and follows
-[`schemas/run-detail-0.1.0.schema.json`](../schemas/run-detail-0.1.0.schema.json).
+The current response is versioned as
+`skill2workflow-run-detail-0.2.0` and follows
+[`schemas/run-detail-0.2.0.schema.json`](../schemas/run-detail-0.2.0.schema.json).
+The closed [0.1.0 schema](../schemas/run-detail-0.1.0.schema.json) remains
+available; clients accept legacy 0.1.0 services. Version 0.2 adds node/event
+`execution`: `descriptive` means recorded progress only (仅记录); `enforced`
+means a connector or control-flow mechanism ran (已强制执行), including a
+human gate waiting for a decision. It is independent of success/failure.
+Historical rows without evidence show an empty execution label, not success.
 It contains the run identity and status, a compact per-node operational
 overlay, and at most the latest 50 allowlisted run events. The `window` object
 states the total event count, returned count, and truncation status. The
@@ -37,7 +43,7 @@ no-store` and are capped at 64 KiB.
 
 The stable remote projection intentionally omits retry-delay values; operators
 can inspect the effective bounded `backoff_ms` in the local run state, control-
-plane audit events, or LiteGraph overlay without changing this 0.1.0 response
+plane audit events, or LiteGraph overlay without changing this bounded response
 shape.
 
 ## Protected CLI client

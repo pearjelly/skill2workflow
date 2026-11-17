@@ -1,6 +1,20 @@
 # Contributing to skill2workflow
 
+Local CLI state defaults to SQLite. Use `--storage json` explicitly when testing
+the JSON backend or inspecting JSON state created by a library fixture; Python
+library defaults remain unchanged. Do not mix backends in one workspace.
+
+Demo, pilot and smoke orchestration lives in `scripts/skill2workflow_testing`.
+Run it through the existing `python3 scripts/<name>.py` entry points from a
+source checkout. Tests import `scripts.skill2workflow_testing`; these helpers
+are excluded from the installed runtime wheel. Package qualification checks
+that separation and exercises the installed CLI from an isolated directory.
+
 For executable HTTP result checks, see [HTTP JSON assertions](docs/http-json-assertions.md).
+For explicit Agent adapters, follow the [Agent protocol](docs/connectors.md#agent-connector-protocol)
+and run `PYTHONPATH=src python3 -m unittest tests.test_agent_connector`.
+Keep provider SDKs outside the runtime package and use deterministic fixtures
+to prove dependency filtering, output contracts, routing and restart behavior.
 The package smoke runs their real loopback CLI checks against the isolated
 wheel; keep that contract aligned when changing connector execution.
 
@@ -14,7 +28,8 @@ Keep README focused on a safe first run and a short product boundary, not a
 per-loop changelog or command catalogue. Put detailed contracts in their topic
 guides, link every public top-level guide from [the reference](docs/reference.md),
 and keep the [task guide](docs/README.md) useful for authoring, deployment and
-recovery. Record delivery history in ROADMAP and changes in CHANGELOG.
+recovery. Keep current priorities in ROADMAP, completed delivery history in
+`docs/loops/history.md`, and user-visible changes in CHANGELOG.
 
 Run `python3 scripts/documentation_check.py` after documentation changes. The
 ordinary Python suite requires the same check: README at most 300 lines, a
@@ -44,6 +59,21 @@ Requirements:
 - A shell that can run the commands below
 
 This bootstrap harness intentionally uses the Python standard library for runtime code. No runtime dependency install is required for tests.
+
+Development checks run separately from the runtime matrix. Use Python 3.10+
+to install `requirements-dev.txt`, then run `ruff check src scripts tests` and
+`mypy`. The latter checks parser, compiler, executor and connectors against the
+Python 3.9 target, including unannotated function bodies. Shared `TypedDict`
+contracts in `models.py` describe Skill IR, Workflow DSL and RunState; JSON
+extension maps remain dynamic and runtime validation stays authoritative.
+Ruff enables E/F/B rules. Long serialized protocol/example lines are exempt
+from E501; checkout bootstrappers have scoped E402 exceptions. Exact test
+callback reads with iteration-scoped lifetimes carry local B023 explanations.
+Do not expand those exceptions to runtime callbacks or undefined-name checks.
+Run `PYTHONPATH=src python -m unittest tests.test_schema_conformance -v` in that
+development environment when changing DSL fields. The dependency-free suite
+skips this optional-tool check if jsonschema is absent; CI's development job
+installs it and always executes the conformance cases.
 
 Run the full test suite:
 

@@ -273,7 +273,7 @@ def _stop_service(process) -> Tuple[int, str]:
     except subprocess.TimeoutExpired:
         process.kill()
         stdout, stderr = process.communicate(timeout=5)
-        raise RuntimeError("service soak process did not stop after SIGTERM")
+        raise RuntimeError("service soak process did not stop after SIGTERM") from None
     del stdout
     return int(process.returncode), stderr or ""
 

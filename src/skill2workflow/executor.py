@@ -7,7 +7,7 @@ import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, Optional, Mapping
 
 from .connectors import (
     BUILTIN_CONNECTOR_IDS,
@@ -17,9 +17,10 @@ from .connectors import (
     connector_ref,
 )
 from .storage import create_run_store
+from .decisions import data_context, evaluate_decision
 
 
-RunState = Dict[str, object]
+from .models import RunState, Workflow
 MAX_ACTIVE_TIMEOUT_MS = 86_400_000
 MAX_NODE_TIMEOUT_MS = 86_400_000
 MAX_WORKFLOW_TIMEOUT_MS = 2_592_000_000
@@ -102,8 +103,8 @@ def _safe_external_metadata_names(value: object) -> List[str]:
 
 
 def _durable_external_metadata(
-    summary: object, policy: Dict[str, object] = None
-) -> Dict[str, object]:
+    summary: object, policy: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """Project external metadata to a fixed value-free durable vocabulary."""
 
     if not isinstance(summary, dict) or not summary:
@@ -132,7 +133,7 @@ def _durable_external_metadata(
             allowed_list_keys.update(
                 key for key in list_keys if isinstance(key, str)
             )
-    normalized: Dict[str, object] = {}
+    normalized: Dict[str, Any] = {}
     for raw_key, value in summary.items():
         key = str(raw_key)
         allowed_values = allowed_string_values.get(key)
@@ -149,10 +150,10 @@ def _durable_external_metadata(
     return normalized
 
 
-def _durable_external_input_mapping(summary: object) -> Dict[str, object]:
+def _durable_external_input_mapping(summary: object) -> Dict[str, Any]:
     if not isinstance(summary, dict) or not summary:
         return {}
-    normalized: Dict[str, object] = {}
+    normalized: Dict[str, Any] = {}
     status = summary.get("status")
     if isinstance(status, str) and status in {"applied", "skipped", "not_applied"}:
         normalized["status"] = status
@@ -161,10 +162,10 @@ def _durable_external_input_mapping(summary: object) -> Dict[str, object]:
     return normalized
 
 
-def _durable_external_credentials(summary: object) -> Dict[str, object]:
+def _durable_external_credentials(summary: object) -> Dict[str, Any]:
     if not isinstance(summary, dict) or not summary:
         return {}
-    normalized: Dict[str, object] = {}
+    normalized: Dict[str, Any] = {}
     status = summary.get("status")
     if isinstance(status, str) and status in _EXTERNAL_CREDENTIAL_STATUSES:
         normalized["status"] = status
@@ -174,14 +175,14 @@ def _durable_external_credentials(summary: object) -> Dict[str, object]:
 
 
 def _durable_connector_output(
-    ref: Dict[str, str], output: object, policy: Dict[str, object] = None
-) -> Dict[str, object]:
+    ref: Dict[str, str], output: object, policy: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     if ref.get("id") not in BUILTIN_CONNECTOR_IDS:
         return _durable_external_metadata(output, policy)
     return copy.deepcopy(output) if isinstance(output, dict) else {}
 
 
-def _external_metadata_policy(runtime: object, ref: Dict[str, str]) -> Dict[str, object]:
+def _external_metadata_policy(runtime: object, ref: Dict[str, str]) -> Dict[str, Any]:
     if ref.get("id") in BUILTIN_CONNECTOR_IDS:
         return {}
     provider = getattr(runtime, "external_durable_metadata_policy", None)
@@ -204,8 +205,8 @@ class LocalExecutor:
         credential_provider=None,
         connector_runtime=None,
         execution_owner: str = "",
-        clock: Callable[[], str] = None,
-        sleeper: Callable[[float], None] = None,
+        clock: Optional[Callable[[], str]] = None,
+        sleeper: Optional[Callable[[float], None]] = None,
     ):
         self.state_dir = Path(state_dir)
         self.store = create_run_store(self.state_dir, storage)
@@ -216,7 +217,7 @@ class LocalExecutor:
         self._sleep = sleeper or time.sleep
         self._execution_ids: Dict[str, str] = {}
 
-    def run(self, workflow: Dict[str, object], context: Dict[str, object] = None) -> RunState:
+    def run(self, workflow: Workflow, context: Optional[Dict[str, Any]] = None) -> RunState:
         workflow_meta = workflow.get("workflow", {})
         if not isinstance(workflow_meta, dict):
             workflow_meta = {}
@@ -287,6 +288,7 @@ class LocalExecutor:
 
         result = {
             "status": "approved" if approved else "rejected",
+            "execution": "enforced",
             "title": node.get("title", node["id"]),
             "approved": approved,
             "timestamp": self._now(),
@@ -299,6 +301,7 @@ class LocalExecutor:
                 "type": "human_gate_resumed",
                 "node_id": node["id"],
                 "approved": approved,
+                "execution": "enforced",
                 "connector_id": "manual",
                 "connector_kind": "manual",
                 "timestamp": self._now(),
@@ -330,11 +333,11 @@ class LocalExecutor:
 
         return self.store.request_cancellation(run_id)
 
-    def list_runs(self, limit: int = None) -> List[RunState]:
+    def list_runs(self, limit: Optional[int] = None) -> List[RunState]:
         states = self.store.list() if limit is None else self.store.list_bounded(limit)
         return [_summarize_run(state) for state in states]
 
-    def snapshot_window(self, limit: int) -> Dict[str, object]:
+    def snapshot_window(self, limit: int) -> Dict[str, Any]:
         """Return a bounded SQLite run window and aggregate status counts."""
 
         window = self.store.snapshot_window(limit)
@@ -352,7 +355,7 @@ class LocalExecutor:
         before_run_id: str = "",
         status: str = "",
         workflow_id: str = "",
-    ) -> Dict[str, object]:
+    ) -> Dict[str, Any]:
         """Return one bounded filtered run page from the durable store."""
 
         page = self.store.run_page(
@@ -378,7 +381,7 @@ class LocalExecutor:
 
     def get_run_detail_projection(
         self, run_id: str, max_events: int
-    ) -> RunState:
+    ) -> Optional[RunState]:
         """Read a compact SQLite detail source without loading full state."""
 
         reader = getattr(self.store, "get_run_detail_projection", None)
@@ -399,7 +402,7 @@ class LocalExecutor:
 
         return self.store.count()
 
-    def recover_interrupted_runs(self, max_items: int = None) -> List[RunState]:
+    def recover_interrupted_runs(self, max_items: Optional[int] = None) -> List[RunState]:
         if not self.execution_owner:
             raise ValueError("interrupted run recovery requires an execution owner")
         return self.store.recover_interrupted(
@@ -421,7 +424,7 @@ class LocalExecutor:
         return self.store.iter_interrupted_runs(after_run_id=after_run_id)
 
     def expire_workflow_deadlines(
-        self, now: str = None, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS
+        self, now: Optional[str] = None, limit: int = MAX_WORKFLOW_DEADLINE_SWEEP_RUNS
     ) -> List[RunState]:
         """Expire bounded waiting runs without resuming workflow execution."""
 
@@ -507,6 +510,30 @@ class LocalExecutor:
                 self._save(state)
                 return state
 
+            if node_type == "decision":
+                self._event(state, "node_started", current_id)
+                try:
+                    if workflow.get("schema_version") != "0.2.0":
+                        raise ValueError("unsupported decision version")
+                    target, branch_index = evaluate_decision(node, data_context(state))
+                    if not isinstance(target, str) or target not in node_map:
+                        raise ValueError("decision target unavailable")
+                except (KeyError, ValueError, TypeError):
+                    state["status"] = "failed"
+                    state["error"] = "decision configuration is invalid"
+                    self._event(state, "run_failed", current_id)
+                    self._save(state)
+                    return state
+                state["node_results"][current_id] = {
+                    "status": "completed", "title": node.get("title", current_id),
+                    "execution": "enforced", "branch_index": branch_index, "timestamp": self._now(),
+                }
+                self._event(state, "decision_evaluated", current_id, {"branch_index": branch_index})
+                self._event(state, "node_completed", current_id)
+                state["current_node"] = target
+                self._save(state)
+                continue
+
             if node_type == "human_gate":
                 state["status"] = "waiting"
                 self._clear_execution_window(state)
@@ -554,9 +581,9 @@ class LocalExecutor:
     def _execute_connector_node(
         self,
         state: RunState,
-        node: Dict[str, object],
+        node: Dict[str, Any],
         current_id: str,
-        node_map: Dict[str, Dict[str, object]],
+        node_map: Dict[str, Dict[str, Any]],
     ):
         ref = connector_ref(node.get("connector"))
         if not ref["id"]:
@@ -582,7 +609,7 @@ class LocalExecutor:
             {"max_attempts": max_attempts, "backoff_ms": backoff_ms},
         )
         last_error = ""
-        connector_result = {}
+        connector_result: Dict[str, Any] = {}
         attempts = 0
         recovered = False
 
@@ -609,6 +636,8 @@ class LocalExecutor:
                 return state
             self._ensure_execution_active(state)
             try:
+                if ref["kind"] == "agent" and state["workflow"].get("schema_version") != "0.2.0":
+                    raise ConnectorExecutionError("agent requires Workflow DSL 0.2.0")
                 connector_result = self.connector_runtime.execute_connector(
                     node,
                     credential_provider=self.credential_provider,
@@ -711,6 +740,11 @@ class LocalExecutor:
             connector_result.get("output", {}),
             external_metadata_policy,
         )
+        agent_registered = getattr(self.connector_runtime, "is_agent_connector", lambda connector_id: False)
+        if (state["workflow"].get("schema_version") == "0.2.0" and ref["kind"] == "agent"
+                and agent_registered(ref["id"]) and connector_result.get("agent_output_validated") is True
+                and result_status == "completed"):
+            durable_output = copy.deepcopy(connector_result["output"])
         mapping_summary = connector_result.get("input_mapping")
         credential_summary = connector_result.get("credentials")
         audit_summary = connector_result.get("audit")
@@ -846,12 +880,15 @@ class LocalExecutor:
         self.store.mark_cancellation_applied(run_id)
         return state
 
-    def _event(self, state: RunState, event_type: str, node_id: str, extra: Dict[str, object] = None) -> None:
-        event = {
+    def _event(self, state: RunState, event_type: str, node_id: str, extra: Optional[Dict[str, Any]] = None) -> None:
+        event: Dict[str, Any] = {
             "type": event_type,
             "node_id": node_id,
             "timestamp": self._now(),
         }
+        node = self._node_map(state["workflow"]).get(node_id)
+        if node:
+            event["execution"] = _execution_kind(node)
         if extra:
             event.update(extra)
         state["events"].append(event)
@@ -937,7 +974,7 @@ class LocalExecutor:
         execution["workflow_started_at"] = ""
         execution["workflow_deadline_at"] = ""
 
-    def _start_node_window(self, state: RunState, node: Dict[str, object]) -> None:
+    def _start_node_window(self, state: RunState, node: Dict[str, Any]) -> None:
         execution = state.get("execution")
         if not isinstance(execution, dict):
             execution = {}
@@ -1045,6 +1082,10 @@ class LocalExecutor:
         return state
 
     def _save(self, state: RunState) -> None:
+        node_map = self._node_map(state["workflow"])
+        for node_id, result in state.get("node_results", {}).items():
+            if node_id in node_map:
+                result.setdefault("execution", _execution_kind(node_map[node_id]))
         run_id = str(state.get("run_id", ""))
         execution_id = self._execution_ids.get(run_id, "")
         if self.execution_owner and execution_id:
@@ -1066,7 +1107,7 @@ class LocalExecutor:
         return self.store.load(run_id)
 
     @staticmethod
-    def _node_map(workflow: Dict[str, object]) -> Dict[str, Dict[str, object]]:
+    def _node_map(workflow: Mapping[str, Any]) -> Dict[str, Dict[str, Any]]:
         return {node["id"]: node for node in workflow.get("nodes", [])}
 
 
@@ -1078,9 +1119,15 @@ def _durable_connector_failure(ref: Dict[str, str], error: object) -> str:
     return str(error or "connector failed")
 
 
-def _connector_context(state: RunState, node_id: str) -> Dict[str, object]:
+def _execution_kind(node: Dict[str, Any]) -> str:
+    return "descriptive" if node.get("type") in {"step", "verification", "instruction"} else "enforced"
+
+
+def _connector_context(state: RunState, node_id: str) -> Dict[str, Any]:
     durable = state.get("context", {})
     context = copy.deepcopy(durable) if isinstance(durable, dict) else {}
+    if state.get("workflow", {}).get("schema_version") == "0.2.0":
+        context.update(data_context(state))
     context["_execution"] = {
         "workflow_id": str(state.get("workflow_id", "")),
         "workflow_version": str(state.get("workflow_version", "")),
@@ -1172,7 +1219,7 @@ def _deadline_after(started_at: str, timeout_ms: int) -> str:
     return (_parse_timestamp(started_at) + timedelta(milliseconds=timeout_ms)).isoformat()
 
 
-def _retry_max_attempts(node: Dict[str, object], workflow: object) -> int:
+def _retry_max_attempts(node: Dict[str, Any], workflow: object) -> int:
     retry = node.get("retry")
     if isinstance(retry, dict) and retry.get("max_attempts") is not None:
         return _non_negative_int(retry.get("max_attempts"))
@@ -1186,7 +1233,7 @@ def _retry_max_attempts(node: Dict[str, object], workflow: object) -> int:
     return 0
 
 
-def _retry_backoff_ms(node: Dict[str, object], workflow: object) -> int:
+def _retry_backoff_ms(node: Dict[str, Any], workflow: object) -> int:
     retry = node.get("retry")
     if isinstance(retry, dict) and retry.get("backoff_ms") is not None:
         return _bounded_non_negative_int(retry.get("backoff_ms"), MAX_RETRY_BACKOFF_MS)
@@ -1216,27 +1263,27 @@ def _bounded_non_negative_int(value: object, maximum: int) -> int:
     return min(value, maximum)
 
 
-def _input_mapping_event_fields(summary: object) -> Dict[str, object]:
+def _input_mapping_event_fields(summary: object) -> Dict[str, Any]:
     if not isinstance(summary, dict) or not summary:
         return {}
-    fields = {"input_mapping_status": str(summary.get("status", ""))}
+    fields: Dict[str, Any] = {"input_mapping_status": str(summary.get("status", ""))}
     keys = summary.get("input_keys", [])
     if isinstance(keys, list):
         fields["input_mapping_keys"] = [str(key) for key in keys]
     return fields
 
 
-def _credential_event_fields(summary: object) -> Dict[str, object]:
+def _credential_event_fields(summary: object) -> Dict[str, Any]:
     if not isinstance(summary, dict) or not summary:
         return {}
-    fields = {"credential_status": str(summary.get("status", ""))}
+    fields: Dict[str, Any] = {"credential_status": str(summary.get("status", ""))}
     handles = summary.get("handles", [])
     if isinstance(handles, list):
         fields["credential_handles"] = [str(handle) for handle in handles]
     return fields
 
 
-def _connector_audit_event_fields(summary: object) -> Dict[str, object]:
+def _connector_audit_event_fields(summary: object) -> Dict[str, Any]:
     if not isinstance(summary, dict) or not summary:
         return {}
     return {"connector_metadata": copy.deepcopy(summary)}

@@ -117,6 +117,8 @@ class ContinuousIntegrationContractTests(TestCase):
         self.assertIn("production_baseline_smoke.py", workflow)
         self.assertIn("tests/test_production_baseline_smoke.py", workflow)
         self.assertIn("--production-baseline", workflow)
+        self.assertIn('"docs/api-reference.md"', workflow)
+        self.assertIn('"src/skill2workflow/service_routes/**"', workflow)
 
     def test_contributor_and_release_docs_reproduce_production_boundary_drills(self):
         root = Path(__file__).resolve().parents[1]

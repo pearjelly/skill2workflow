@@ -1,5 +1,73 @@
 # Workflow DSL Compatibility
 
+CLI storage selection now defaults to SQLite. Existing JSON workspaces remain
+compatible with explicit `--storage json` on each command. JSON run files are
+not migrated. Selecting SQLite retains the existing one-time JSON registry/audit
+import into an empty control store. Python library defaults and DSL artifacts
+are unchanged.
+SQLite layout upgrades use the separate [state upgrade procedure](upgrade-migration.md);
+changing this CLI default does not convert a JSON workspace.
+
+Checkout demo/pilot/smoke Python imports have moved from `skill2workflow.*` to
+`scripts.skill2workflow_testing.*`. They are contributor tools, excluded from
+the wheel; their `scripts/*.py` entry points are unchanged. This packaging
+change does not alter DSL, state or CLI command contracts. The production
+tenant-credential check remains available through its existing CLI command.
+
+Known-field shape validation now matches the published 0.1/0.2 JSON Schema
+contracts for metadata, node headers, reserved fields, transitions and
+connector request metadata. Previously accepted documents with missing titles,
+unknown node types or mistyped declared fields are rejected on validation or
+publication, rather than causing graph-analysis errors or silently descriptive
+execution. Unknown extension properties remain accepted. Already stored
+artifacts are not rewritten. The new 0.2 schema was added with decisions.
+Runtime validation still owns cross-node references, reachability/DAG checks,
+dependent input-contract rules and UTF-8 byte bounds; JSON Schema alone cannot
+prove those execution semantics.
+
+Explicit DSL 0.2 Agent tool calls use `connector.kind: agent`, an external
+adapter ID, an `agent_instruction` action and mandatory `output_schema`.
+Their `requires` node IDs must dominate the Agent and have successful durable
+outputs at runtime. Completed schema-valid Agent output is explicitly retained
+as business data for later decisions/Agents. Generic external connectors keep
+metadata-only retention; changing a DSL kind alone cannot opt one in.
+The adapter manifest declares `execution_contract.protocol:
+skill2workflow-agent-0.1.0`. No SDK, implicit prose execution or dynamic service
+loading is introduced. See [Agent connectors](connectors.md#agent-connector-protocol).
+
+Workflow DSL 0.2.0 adds explicit ordered decisions over trigger input and
+persisted outputs. Schema 0.1.0 and its execution behavior remain supported;
+Skills without 0.2 declarations keep compiling to 0.1.0. No state upgrade or
+automatic artifact rewrite is needed. Decision branches/default replace any
+attempt to execute `edges[].condition`; those edge conditions, descriptive
+guards and other reserved fields now have separate validator notices. See
+[the versioned contract](workflow-dsl-contract.md#decisions-and-data-in-020).
+Older runtimes reject the new schema instead of guessing a branch.
+
+Run results/events now carry additive `execution` metadata: descriptive
+steps/instructions/text-only verification record progress; connectors and
+human gates enforce their configured mechanism. Completion alone is not
+proof that described work happened. Node-completion audit events retain this
+classification. The closed remote run-detail contract advances to 0.2.0;
+the 0.1.0 schema is preserved and clients can still read legacy services.
+No workflow artifact, existing result status or transition is rewritten.
+
+Validation now rejects `http` and `http_assert` bindings without an object
+`connector.request`, using `connector_request_missing`. Publication rejects
+the same invalid drafts. This tightens 0.1.x validation: historical artifacts
+with this defect already failed at execution and need correction and a new
+version, rather than a state migration. Immutable stored bytes are preserved.
+
+Skill inference now uses English whole words and explicit approval phrases,
+plus Chinese approval and verification terms. `human-readable`, `latest`,
+`contest`, `confirmation email` and `rerun` no longer invent control nodes.
+Only explicit HTTP declarations create tool calls; prose commands remain
+descriptive steps. Newly compiled source metadata includes `inferred_type`
+and `matched_term`; source-free review notices list each inferred step by
+index. These tightened inference rules change drafts on recompilation, not
+already published workflows. Illustrative enterprise actions now use explicit
+HTTP declarations with reserved example endpoints.
+
 Preflight now applies the existing trigger input canonical-copy and 1 MiB UTF-8
 bound before schema/mapping analysis. Over-limit or nonfinite input cannot
 produce a ready report; authenticated malformed preflights receive fixed 400

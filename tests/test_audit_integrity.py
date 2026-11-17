@@ -39,7 +39,7 @@ class AuditIntegrityTests(TestCase):
 
         self.assertEqual(valid["status"], "valid")
         self.assertEqual(valid["algorithm"], "sha256-chain-v1")
-        self.assertEqual(valid["event_count"], 3)
+        self.assertEqual(valid["event_count"], 4)
         self.assertEqual(len(valid["head_digest"]), 64)
         self.assertEqual(invalid["status"], "invalid")
         self.assertEqual(invalid["first_invalid_sequence"], 2)
@@ -62,7 +62,7 @@ class AuditIntegrityTests(TestCase):
             result = LocalControlPlane(restored_dir, storage="sqlite").verify_audit_integrity()
 
         self.assertEqual(result["status"], "valid")
-        self.assertEqual(result["event_count"], 3)
+        self.assertEqual(result["event_count"], 4)
 
     def test_opening_legacy_sqlite_audit_rows_adds_integrity_columns(self):
         with TemporaryDirectory() as tmp:

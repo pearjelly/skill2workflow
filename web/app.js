@@ -14,7 +14,7 @@
     human_gate_not_inferred: "No human approval node was inferred. Add a human gate before real-world effects when approval is required.",
     verification_not_inferred: "No verification node was inferred. Use an explicit executable check, such as an HTTP assertion, to check results automatically.",
   };
-  const NODE_TYPES = ["start", "step", "human_gate", "tool_call", "verification", "instruction", "failure", "end"];
+  const NODE_TYPES = ["start", "step", "human_gate", "tool_call", "verification", "instruction", "decision", "failure", "end"];
   const TYPE_THEME = {
     start: { color: "#1769aa", background: "#eaf4fc" },
     step: { color: "#3b5b92", background: "#edf2fb" },
@@ -22,6 +22,7 @@
     tool_call: { color: "#00796b", background: "#e7f6f3" },
     verification: { color: "#5d3fd3", background: "#f0edff" },
     instruction: { color: "#4f5b66", background: "#eef1f4" },
+    decision: { color: "#6b46a4", background: "#f4edff" },
     failure: { color: "#b42318", background: "#fdeceb" },
     end: { color: "#087443", background: "#e9f7ef" },
   };
@@ -42,6 +43,7 @@
     "sales-follow-up.workflow.json": "../examples/workflows/sales-follow-up.workflow.json",
     "customer-service-escalation.workflow.json": "../examples/workflows/customer-service-escalation.workflow.json",
     "risk-review.workflow.json": "../examples/workflows/risk-review.workflow.json",
+    "risk-routing.workflow.json": "../examples/workflows/risk-routing.workflow.json",
     "operations-analysis.workflow.json": "../examples/workflows/operations-analysis.workflow.json",
     "http-connector.workflow.json": "../examples/workflows/http-connector.workflow.json",
     "http-action-flow.workflow.json": "../examples/workflows/http-action-flow.workflow.json",
@@ -143,6 +145,8 @@
     els.nodeRetryMax = document.getElementById("node-retry-max");
     els.nodeRetryBackoff = document.getElementById("node-retry-backoff");
     els.connectorSection = document.getElementById("connector-section");
+    els.decisionSection = document.getElementById("decision-section");
+    els.nodeDecision = document.getElementById("node-decision");
     els.nodeConnectorId = document.getElementById("node-connector-id");
     els.nodeConnectorKind = document.getElementById("node-connector-kind");
     els.httpSection = document.getElementById("http-section");
@@ -207,7 +211,9 @@
         if (nodeType !== "start") {
           this.addInput("in", "flow");
         }
-        if (!TERMINAL_TYPES.has(nodeType)) {
+        if (nodeType === "decision") {
+          this.addOutput("default", "flow");
+        } else if (!TERMINAL_TYPES.has(nodeType)) {
           this.addOutput("success", "flow");
           if (nodeType !== "start") {
             this.addOutput("failure", "flow");
@@ -581,12 +587,13 @@
         throw new Error("local SKILL compilation returned an invalid review");
       }
     });
-    if (!Array.isArray(review.notices) || review.notices.length > 3) {
+    if (!Array.isArray(review.notices) || review.notices.length > MAX_SKILL_COMPILE_REVIEW_COUNT + 3) {
       throw new Error("local SKILL compilation returned an invalid review");
     }
     const seenNotices = new Set();
     review.notices.forEach(function (notice) {
-      if (!Object.prototype.hasOwnProperty.call(SKILL_COMPILE_REVIEW_NOTICES, notice) || seenNotices.has(notice)) {
+      const inferred = typeof notice === "string" && /^inferred_node:[1-9][0-9]*:(step|human_gate|verification):[^:\r\n]*$/.test(notice);
+      if ((!Object.prototype.hasOwnProperty.call(SKILL_COMPILE_REVIEW_NOTICES, notice) && !inferred) || seenNotices.has(notice)) {
         throw new Error("local SKILL compilation returned an invalid review");
       }
       seenNotices.add(notice);
@@ -631,7 +638,7 @@
         mode: 0,
         title: node.title || node.id,
         inputs: nodeType === "start" ? [] : [{ name: "in", type: "flow", link: null }],
-        outputs: nodeOutputs(Boolean(node.on_success), Boolean(node.on_failure)),
+        outputs: node.type === "decision" ? decisionOutputs(node) : nodeOutputs(Boolean(node.on_success), Boolean(node.on_failure)),
         properties: {
           workflow_node_id: node.id,
           node_type: nodeType,
@@ -645,6 +652,8 @@
           action: cloneOrDefault(node.action, null),
           retry: cloneOrDefault(node.retry, null),
           connector: cloneOrDefault(node.connector, null),
+          ...(node.type === "decision" ? { branches: deepClone(node.branches), default: node.default } : {}),
+          ...(Object.prototype.hasOwnProperty.call(node, "output_schema") ? { output_schema: deepClone(node.output_schema) } : {}),
         },
       };
     });
@@ -706,6 +715,12 @@
     return outputs;
   }
 
+  function decisionOutputs(node) {
+    return (node.branches || []).map(function (_, index) {
+      return { name: "branch_" + index, type: "flow", links: [] };
+    }).concat([{ name: "default", type: "flow", links: [] }]);
+  }
+
   function nodePosition(index, nodeType) {
     if (nodeType === "failure") {
       return [260 * Math.max(index - 2, 0) + 80, 260];
@@ -719,6 +734,13 @@
   function derivedEdges(nodes) {
     const edges = [];
     nodes.forEach(function (node) {
+      if (node.type === "decision") {
+        (node.branches || []).forEach(function (branch, index) {
+          edges.push({ from: node.id, to: branch.to, label: "branch_" + index });
+        });
+        edges.push({ from: node.id, to: node.default, label: "default" });
+        return;
+      }
       if (node.on_success) {
         edges.push({ from: node.id, to: node.on_success, label: "success" });
       }
@@ -730,6 +752,9 @@
   }
 
   function sourceSlotFor(edge, sourceNode) {
+    if (sourceNode.type === "decision") {
+      return decisionOutputs(sourceNode).findIndex(function (output) { return output.name === edge.label; });
+    }
     if (edge.label === "failure" || edge.to === sourceNode.on_failure) {
       return 1;
     }
@@ -875,6 +900,7 @@
     if (TERMINAL_TYPES.has(sourceType)) {
       return false;
     }
+    if (sourceType === "decision") return targetType !== "start";
     if (outputName === "failure") {
       return targetType === "failure";
     }
@@ -939,7 +965,8 @@
     }
     review.notices.forEach(function (notice) {
       const item = document.createElement("li");
-      item.textContent = SKILL_COMPILE_REVIEW_NOTICES[notice];
+      const inferred = notice.split(":");
+      item.textContent = SKILL_COMPILE_REVIEW_NOTICES[notice] || ("Step " + inferred[1] + ": inferred " + inferred[2] + (inferred[3] ? " from “" + inferred[3] + "”" : " (no control term matched)") + ". Review this classification.");
       els.skillReviewList.appendChild(item);
     });
   }
@@ -1055,6 +1082,10 @@
     els.nodeHttpBody.value = request.body === undefined ? "" : stringifyJsonInput(request.body);
     els.nodeHttpTimeout.value = request.timeout_ms !== undefined ? request.timeout_ms : "";
     els.nodeSource.value = hasNode ? JSON.stringify(props.source || {}, null, 2) : "";
+    if (els.decisionSection && els.nodeDecision) {
+      els.decisionSection.hidden = props.node_type !== "decision";
+      els.nodeDecision.value = props.node_type === "decision" ? JSON.stringify({branches: props.branches, default: props.default}, null, 2) : "";
+    }
     renderHttpAssertionReview(node, connector);
     els.connectorSection.hidden = !connector;
     els.httpSection.hidden = !connector || connector.id !== "http";
@@ -1536,6 +1567,18 @@
         }
         return;
       }
+      if (node.type === "decision") {
+        if (workflow.schema_version !== "0.2.0" || !Array.isArray(node.branches) || !node.branches.length
+            || !nodeIdSet.has(node.default) || node.on_success || node.on_failure || node.on_fallback || node.connector) {
+          errors.push(node.id + " requires DSL 0.2 branches and a default destination.");
+        }
+        (Array.isArray(node.branches) ? node.branches : []).forEach(function (branch) {
+          if (!plainObject(branch) || !plainObject(branch.when) || !nodeIdSet.has(branch.to)) {
+            errors.push(node.id + " has an invalid decision branch.");
+          }
+        });
+        return;
+      }
       if (!node.on_success) {
         errors.push(node.id + " must define on_success.");
       }
@@ -1588,7 +1631,7 @@
   function workflowEdgeSet(workflow) {
     return new Set(
       workflow.edges.map(function (edge) {
-        const kind = String(edge.label || "").toLowerCase() === "failure" ? "failure" : "success";
+        const kind = flowLabel(edge.label);
         return edge.from + "->" + edge.to + ":" + kind;
       })
     );
@@ -1607,10 +1650,15 @@
         return;
       }
       const output = source.outputs && source.outputs[link.origin_slot];
-      const kind = output && output.name === "failure" ? "failure" : "success";
+      const kind = flowLabel(output && output.name);
       edges.add(source.properties.workflow_node_id + "->" + target.properties.workflow_node_id + ":" + kind);
     });
     return edges;
+  }
+
+  function flowLabel(label) {
+    label = String(label || "").toLowerCase();
+    return ["failure", "fallback", "default"].includes(label) || /^branch_[0-9]+$/.test(label) ? label : "success";
   }
 
   function sameSet(left, right) {

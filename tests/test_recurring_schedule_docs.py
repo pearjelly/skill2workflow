@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from tests.documentation_fixtures import assert_guide_reachable
@@ -59,9 +60,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("schedule-dispatch-review", guide)
         self.assertIn("effect_not_observed", guide)
 
-        review_guide = (ROOT / "docs" / "remote-schedule-dispatch-reviews.md").read_text(
-            encoding="utf-8"
-        )
+        review_guide = read_api_section('remote-schedule-dispatch-reviews')
         review_schema = json.loads(
             (ROOT / "schemas" / "recurring-schedule-dispatch-review-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -114,7 +113,7 @@ class RecurringScheduleDocumentationTests(TestCase):
 
     def test_readme_and_roadmap_advance_only_after_all_beta_loops(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
 
         self.assertIn("Current maturity: Self-hosted Beta", readme)
         self.assertIn("Delivery Loops 1-285 are complete", readme)
@@ -127,9 +126,7 @@ class RecurringScheduleDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        create_guide = (ROOT / "docs" / "remote-schedule-create.md").read_text(
-            encoding="utf-8"
-        )
+        create_guide = read_api_section('remote-schedule-create')
         self.assertEqual(
             create_schema["properties"]["schema_version"]["const"],
             "skill2workflow-recurring-schedule-create-0.1.0",
@@ -151,9 +148,7 @@ class RecurringScheduleDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        update_guide = (ROOT / "docs" / "remote-schedule-update.md").read_text(
-            encoding="utf-8"
-        )
+        update_guide = read_api_section('remote-schedule-update')
         self.assertEqual(
             update_schema["properties"]["schema_version"]["const"],
             "skill2workflow-recurring-schedule-update-0.1.0",
@@ -167,9 +162,7 @@ class RecurringScheduleDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        delete_guide = (ROOT / "docs" / "remote-schedule-delete.md").read_text(
-            encoding="utf-8"
-        )
+        delete_guide = read_api_section('remote-schedule-delete')
         self.assertEqual(
             delete_schema["properties"]["schema_version"]["const"],
             "skill2workflow-recurring-schedule-delete-0.1.0",
@@ -178,9 +171,7 @@ class RecurringScheduleDocumentationTests(TestCase):
         self.assertIn("DELETE /api/v1/recurring-schedules/{schedule_id}", delete_guide)
         self.assertIn("tombstone", delete_guide)
         self.assertIn("active claim", delete_guide)
-        action_guide = (ROOT / "docs" / "remote-schedule-actions.md").read_text(
-            encoding="utf-8"
-        )
+        action_guide = read_api_section('remote-schedule-actions')
         self.assertIn("expected_next_run_at", action_guide)
         self.assertIn("precondition failed", action_guide)
         self.assertIn("legacy empty JSON object", action_guide)
@@ -189,9 +180,7 @@ class RecurringScheduleDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        patch_guide = (ROOT / "docs" / "remote-schedule-patch.md").read_text(
-            encoding="utf-8"
-        )
+        patch_guide = read_api_section('remote-schedule-patch')
         self.assertEqual(
             patch_schema["properties"]["schema_version"]["const"],
             "skill2workflow-recurring-schedule-patch-0.1.0",

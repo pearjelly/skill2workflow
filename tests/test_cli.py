@@ -11,7 +11,7 @@ from unittest.mock import patch
 
 from skill2workflow.cli import MAX_CLI_JSON_DOCUMENT_BYTES, main
 from skill2workflow.compiler import validate_workflow
-from skill2workflow.external_connector_smoke import _external_connector_workflow
+from scripts.skill2workflow_testing.external_connector_smoke import _external_connector_workflow
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.state_layout import STATE_LAYOUT_MARKER
 from skill2workflow.triggers import MAX_TRIGGER_INPUT_BYTES
@@ -82,7 +82,7 @@ class CliTests(TestCase):
                 "human_gate_count": 1,
                 "verification_node_count": 1,
                 "hard_gate_count": 0,
-                "notices": [],
+                "notices": ["inferred_node:1:human_gate:approval", "inferred_node:2:verification:verify"],
             },
         )
         self.assertNotIn("Ask for approval", json.dumps(review))
@@ -127,7 +127,7 @@ class CliTests(TestCase):
                         "human_gate_count": 1,
                         "verification_node_count": 1,
                         "hard_gate_count": 0,
-                        "notices": [],
+                        "notices": ["inferred_node:1:step:", "inferred_node:2:human_gate:approval", "inferred_node:3:verification:verify"],
                     },
                 )
                 nodes = workflow["nodes"][1:-2]
@@ -148,6 +148,8 @@ class CliTests(TestCase):
                             "index": index,
                             "line": index + 6,
                             "section": section,
+                            "inferred_type": ["step", "human_gate", "verification"][index - 1],
+                            "matched_term": [None, "approval", "verify"][index - 1],
                         }
                         for index in range(1, 4)
                     ],
@@ -2887,7 +2889,7 @@ name: authoring-publish
 
             from skill2workflow.control_plane import LocalControlPlane
 
-            control = LocalControlPlane(state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
             workflow_records = control.list_workflows()
             run_summary = control.list_runs()[0]
 
@@ -3026,7 +3028,7 @@ name: authoring-publish
             from skill2workflow.control_plane import LocalControlPlane
 
             detail = json.loads(detail_stdout.getvalue())
-            audit_events = LocalControlPlane(state_dir).list_audit_events(run_id=result["run_id"])
+            audit_events = LocalControlPlane(state_dir, storage="sqlite").list_audit_events(run_id=result["run_id"])
 
         self.assertEqual(publish_exit, 0)
         self.assertEqual(trigger_exit, 0)
@@ -3041,7 +3043,7 @@ name: authoring-publish
         self.assertEqual(detail["context"]["input"], {"customer_id": "customer_123"})
         self.assertEqual(detail["context"]["trigger"]["trigger_id"], result["trigger_id"])
         self.assertEqual(detail["context"]["trigger"]["source"], "local-cli")
-        self.assertEqual([event["type"] for event in audit_events], ["run_started", "run_completed"])
+        self.assertEqual([event["type"] for event in audit_events], ["run_started", "node_completed", "run_completed"])
         self.assertEqual(audit_events[0]["trigger_id"], result["trigger_id"])
         self.assertNotIn("input", audit_events[0])
 
@@ -3245,7 +3247,7 @@ name: authoring-publish
 
             from skill2workflow.control_plane import LocalControlPlane
 
-            control = LocalControlPlane(state_dir)
+            control = LocalControlPlane(state_dir, storage="sqlite")
             detail = control.get_run(result["runs"][0]["run_id"])
             audit_events = control.list_audit_events(run_id=result["runs"][0]["run_id"])
 

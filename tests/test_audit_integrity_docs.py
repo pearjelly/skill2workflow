@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from unittest import TestCase
@@ -14,11 +15,9 @@ class AuditIntegrityDocumentationTests(TestCase):
             )
         )
         guide = (ROOT / "docs" / "audit-integrity.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-        remote_guide = (ROOT / "docs" / "remote-audit-integrity.md").read_text(
-            encoding="utf-8"
-        )
+        remote_guide = read_api_section('remote-audit-integrity')
 
         self.assertEqual(
             schema["$id"],

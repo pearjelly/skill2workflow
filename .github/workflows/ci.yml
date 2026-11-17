@@ -30,6 +30,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: PYTHONPATH=src python -m unittest discover -s tests -v
+      - run: python scripts/skill_corpus_benchmark.py --min-accuracy 1 --max-false-human-gates 0 --min-enforced-ratio 0.25
       - run: python -m py_compile src/skill2workflow/*.py
       - run: python scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke
       - run: python scripts/security_boundary_smoke.py --work-dir /tmp/skill2workflow-security-ci
@@ -39,6 +40,22 @@ jobs:
       - run: python scripts/service_boundary_smoke.py --work-dir /tmp/skill2workflow-service-boundary-ci
       - run: python scripts/secret_hygiene.py examples/workflows
       - run: python scripts/secret_hygiene.py --repository-root .
+
+  code-quality:
+    name: lint and core types
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - run: python -m pip install -r requirements-dev.txt
+      - run: ruff check src scripts tests
+      - run: mypy
+      - run: PYTHONPATH=src python -m unittest tests.test_schema_conformance -v
 
   systemd-verify:
     name: systemd unit verification
@@ -115,6 +132,7 @@ jobs:
           python-version: "3.14"
       - run: node --test tests/test_*.cjs
       - run: python scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-artifact-ci
+      - run: python scripts/agent_connector_smoke.py --executable /tmp/skill2workflow-package-artifact-ci/venv/bin/skill2workflow
       - run: python scripts/draft_input_ui_smoke.py --executable /tmp/skill2workflow-package-artifact-ci/venv/bin/skill2workflow --browser-module-tests
       - run: python scripts/skill_compile_recovery_smoke.py --executable /tmp/skill2workflow-package-artifact-ci/venv/bin/skill2workflow --browser-module-tests
       - run: python scripts/reproducible_build.py --work-dir /tmp/skill2workflow-reproducible-build-ci

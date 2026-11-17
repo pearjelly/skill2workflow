@@ -23,6 +23,7 @@
             <option value="sales-follow-up.workflow.json">Sales Follow-Up</option>
             <option value="customer-service-escalation.workflow.json">Customer Service Escalation</option>
             <option value="risk-review.workflow.json">Risk Review</option>
+            <option value="risk-routing.workflow.json">Risk Routing (DSL 0.2)</option>
             <option value="operations-analysis.workflow.json">Operations Analysis</option>
             <option value="http-connector.workflow.json">HTTP Connector</option>
             <option value="http-action-flow.workflow.json">HTTP Action + Typed Input</option>
@@ -138,6 +139,12 @@
               Retry Backoff (ms)
               <input id="node-retry-backoff" type="number" min="0" max="60000" step="1" />
             </label>
+            <div id="decision-section" class="form-section" hidden>
+              <h2>Decision branches</h2>
+              <p class="inspector-note">The first matching branch wins; otherwise the default path runs. Edit rules and destinations in Workflow DSL, then reimport.</p>
+              <label for="node-decision">Ordered rules and destinations</label>
+              <textarea id="node-decision" rows="8" readonly></textarea>
+            </div>
             <div id="connector-section" class="form-section">
               <p>Connector</p>
               <label>

@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ProductConnectorPilotRoadmapTests(TestCase):
     def test_loop_40_controlled_pilot_is_complete_and_scoped(self):
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
 
         self.assertIn("Active loop: None; Loop 285 is complete with reader-focused documentation entrypoints", roadmap)
         self.assertIn("| Loop 36: First Product Connector Package Smoke | Complete |", roadmap)

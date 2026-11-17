@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 from pathlib import Path
 from tests.documentation_fixtures import assert_guide_reachable
 from unittest import TestCase
@@ -8,13 +9,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class RemoteWorkflowReleaseDocumentationTests(TestCase):
     def test_remote_publication_contract_is_published_across_project_surfaces(self):
-        guide = (ROOT / "docs" / "remote-workflow-release.md").read_text(
-            encoding="utf-8"
-        )
+        guide = read_api_section('remote-workflow-release')
         service_guide = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(
             encoding="utf-8"
@@ -36,10 +35,10 @@ class RemoteWorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("1 MiB", guide)
         self.assertIn("409", guide)
         self.assertIn("skill2workflow-workflow-release-0.1.0", guide)
-        self.assertIn("remote-workflow-release.md", service_guide)
+        self.assertIn("api-reference.md#remote-workflow-release", service_guide)
         self.assertIn("workflow-releases", stability)
         self.assertIn("Loop 86: Protected Remote Workflow Publication", roadmap)
-        assert_guide_reachable(self, 'docs/remote-workflow-release.md')
+        assert_guide_reachable(self, 'docs/api-reference.md#remote-workflow-release')
         self.assertIn("workflow-releases", changelog)
         self.assertIn('"service-workflow-publish"', package_smoke)
         self.assertIn('"service-workflow-release-preflight"', package_smoke)

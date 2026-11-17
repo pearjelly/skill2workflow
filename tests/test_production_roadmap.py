@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ProductionRoadmapTests(TestCase):
     def test_roadmap_uses_a_rolling_production_readiness_path(self):
-        roadmap = _read("ROADMAP.md")
+        roadmap = _read("docs/loops/history.md")
 
         headings = [
             "## Product Direction",
@@ -375,7 +375,7 @@ class ProductionRoadmapTests(TestCase):
         self.assertIn("must not claim exactly-once execution", roadmap)
 
     def test_roadmap_rules_keep_loop_selection_and_dsl_migration_explicit(self):
-        roadmap = _read("ROADMAP.md")
+        roadmap = _read("docs/loops/history.md")
 
         self.assertIn("- Select only one active loop.", roadmap)
         self.assertIn(
@@ -385,7 +385,7 @@ class ProductionRoadmapTests(TestCase):
         )
 
     def test_roadmap_preserves_complete_delivery_history(self):
-        roadmap = _read("ROADMAP.md")
+        roadmap = _read("docs/loops/history.md")
         history_rows = [
             "| Loop 1: Parser | Complete | Frontmatter, hard gates, checklist normalization, source line mapping |",
             "| Loop 2: Compiler / Validator | Complete | Ordered workflow generation, node and edge validation, terminal-node checks |",
@@ -441,7 +441,7 @@ class ProductionRoadmapTests(TestCase):
                 self.assertIn(row, roadmap)
 
     def test_loop_39_completion_requires_one_explicitly_enabled_live_task(self):
-        roadmap = _read("ROADMAP.md")
+        roadmap = _read("docs/loops/history.md")
 
         self.assertIn(
             "docs/lark-live-connector-validation.md",

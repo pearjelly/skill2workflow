@@ -292,7 +292,7 @@ def _stop_service(process) -> None:
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=5)
-        raise RuntimeError("service did not stop after SIGTERM")
+        raise RuntimeError("service did not stop after SIGTERM") from None
 
 
 def _available_port() -> int:
@@ -328,7 +328,7 @@ def _workflow(workflow_id: str, gate: bool):
     middle = (
         {"id": "gate", "type": "human_gate", "title": "Gate", "on_success": "end", "on_failure": "end"}
         if gate
-        else {"id": "step", "type": "action", "title": "Step", "on_success": "end"}
+        else {"id": "step", "type": "step", "title": "Step", "on_success": "end"}
     )
     return {
         "schema_version": "0.1.0",

@@ -17,7 +17,7 @@ from .visualizer import run_overlay_for_nodes
 
 
 SNAPSHOT_SCHEMA_VERSION = "skill2workflow-control-snapshot-0.1.0"
-RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.1.0"
+RUN_DETAIL_SCHEMA_VERSION = "skill2workflow-run-detail-0.2.0"
 RUN_LIST_SCHEMA_VERSION = "skill2workflow-run-list-0.1.0"
 RUN_PAGE_SCHEMA_VERSION = "skill2workflow-run-list-0.2.0"
 AUDIT_EVENT_LIST_SCHEMA_VERSION = "skill2workflow-audit-event-list-0.1.0"
@@ -1267,6 +1267,7 @@ _RUN_OVERLAY_FIELDS = (
     "event_count",
     "latest_event_type",
     "result_status",
+    "execution",
     "attempts",
     "max_attempts",
     "retry_count",
@@ -1288,6 +1289,8 @@ _RUN_EVENT_FIELDS = (
     "connector_kind",
     "connector_status",
     "has_error",
+    "execution",
+    "branch_index",
 )
 
 
@@ -1295,6 +1298,7 @@ def _safe_run_overlay(overlay: Dict[str, object]) -> Dict[str, object]:
     """Keep operational overlay fields while replacing raw errors with a flag."""
 
     safe = {field: overlay.get(field) for field in _RUN_OVERLAY_FIELDS}
+    safe["execution"] = overlay.get("execution") if overlay.get("execution") in {"descriptive", "enforced"} else ""
     safe["has_error"] = bool(overlay.get("error")) or bool(overlay.get("has_error"))
     return safe
 
@@ -1340,6 +1344,10 @@ def _safe_run_event(event: Dict[str, object], sequence: int) -> Dict[str, object
     for field in _RUN_EVENT_FIELDS[1:]:
         if field == "has_error":
             safe[field] = bool(event.get("error") or event.get("last_error"))
+        elif field == "branch_index" and field in event:
+            value = event[field]
+            if value is None or (type(value) is int and value >= 0):
+                safe[field] = value
         elif field in event:
             value = event.get(field)
             if field in {"approved"}:

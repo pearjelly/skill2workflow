@@ -379,7 +379,7 @@ class UiTests(TestCase):
                 "human_gate_count": 0,
                 "verification_node_count": 0,
                 "hard_gate_count": 0,
-                "notices": ["human_gate_not_inferred", "verification_not_inferred"],
+                "notices": ["human_gate_not_inferred", "verification_not_inferred", "inferred_node:1:step:"],
             },
         )
         self.assertNotIn("Review draft", json.dumps(compiled["review"]))
@@ -407,7 +407,7 @@ class UiTests(TestCase):
                         "human_gate_count": 1,
                         "verification_node_count": 1,
                         "hard_gate_count": 0,
-                        "notices": [],
+                        "notices": ["inferred_node:1:step:", "inferred_node:2:human_gate:approval", "inferred_node:3:verification:verify"],
                     },
                 )
                 nodes = workflow["nodes"][1:-2]
@@ -428,6 +428,8 @@ class UiTests(TestCase):
                             "index": index,
                             "line": index + 6,
                             "section": section,
+                            "inferred_type": ["step", "human_gate", "verification"][index - 1],
+                            "matched_term": [None, "approval", "verify"][index - 1],
                         }
                         for index in range(1, 4)
                     ],
@@ -548,7 +550,7 @@ class UiTests(TestCase):
             "entry": "start",
             "nodes": [
                 {"id": "start", "type": "start", "title": secret_marker, "on_success": "missing"},
-                {"id": "end", "type": "end"},
+                {"id": "end", "type": "end", "title": "end"},
             ],
             "edges": [],
         }
@@ -1065,9 +1067,9 @@ class UiTests(TestCase):
 
                 class UpstreamHandler(BaseHTTPRequestHandler):
                     def do_POST(self):
-                        observed["authorization"] = self.headers.get("Authorization", "")
-                        observed["path"] = self.path
-                        observed["body"] = self.rfile.read(
+                        observed["authorization"] = self.headers.get("Authorization", "")  # noqa: B023 - fixture lifetime ends in this iteration.
+                        observed["path"] = self.path  # noqa: B023 - fixture lifetime ends in this iteration.
+                        observed["body"] = self.rfile.read(  # noqa: B023 - fixture lifetime ends in this iteration.
                             int(self.headers["Content-Length"])
                         )
                         body = b'{"error":"upstream conflict"}'
@@ -1096,7 +1098,7 @@ class UiTests(TestCase):
                         ui_port = {}
 
                         def ready(server):
-                            ui_port["value"] = server.server_port
+                            ui_port["value"] = server.server_port  # noqa: B023 - fixture lifetime ends in this iteration.
 
                         ui_thread = threading.Thread(
                             target=serve_ui,
@@ -2189,9 +2191,9 @@ class UiTests(TestCase):
 
                 class UpstreamHandler(BaseHTTPRequestHandler):
                     def do_POST(self):
-                        observed["authorization"] = self.headers.get("Authorization", "")
-                        observed["path"] = self.path
-                        observed["body"] = json.loads(
+                        observed["authorization"] = self.headers.get("Authorization", "")  # noqa: B023 - fixture lifetime ends in this iteration.
+                        observed["path"] = self.path  # noqa: B023 - fixture lifetime ends in this iteration.
+                        observed["body"] = json.loads(  # noqa: B023 - fixture lifetime ends in this iteration.
                             self.rfile.read(int(self.headers["Content-Length"]))
                         )
                         body = b'{"error":"upstream conflict"}'
@@ -2220,7 +2222,7 @@ class UiTests(TestCase):
                         ui_port = {}
 
                         def ready(server):
-                            ui_port["value"] = server.server_port
+                            ui_port["value"] = server.server_port  # noqa: B023 - fixture lifetime ends in this iteration.
 
                         ui_thread = threading.Thread(
                             target=serve_ui,

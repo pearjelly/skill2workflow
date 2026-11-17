@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "web/index.html"
+        ],
+        "createdAt": "2026-11-17T00:55:47.171Z",
+        "reason": "User confirmed on 2026-11-17: retain the existing Inter font and record an exception only for this page."
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "web/control.html"
+        ],
+        "createdAt": "2026-11-17T00:55:47.192Z",
+        "reason": "User confirmed on 2026-11-17: retain the existing Inter font and record an exception only for this page."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "web/styles.css"
+        ],
+        "createdAt": "2026-11-17T00:58:44.667Z",
+        "reason": "Agent: .validation-panel li is an operational validation status marker; warning, ok and error variants communicate severity alongside text. It is unchanged from baseline 03aa8d1 and is not a decorative card accent."
+      }
+    ]
+  }
+}

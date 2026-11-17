@@ -2622,7 +2622,7 @@ class RuntimeServiceTests(TestCase):
         self.assertEqual(denied, {"error": "authentication required"})
         self.assertEqual(accepted_status, 200)
         self.assertEqual(detail["run"]["run_id"], run["run_id"])
-        self.assertEqual(detail["schema_version"], "skill2workflow-run-detail-0.1.0")
+        self.assertEqual(detail["schema_version"], "skill2workflow-run-detail-0.2.0")
         serialized = json.dumps(detail, ensure_ascii=False)
         for private_value in (
             "private-input-value",

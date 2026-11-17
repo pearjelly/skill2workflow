@@ -16,6 +16,7 @@ from .compiler import (
     SKILL_COMPILE_REVIEW_SCHEMA_VERSION,
     compile_ir_to_workflow,
     summarize_skill_compile,
+    inference_notices,
     validate_workflow_structured,
 )
 from .parser import parse_skill_file
@@ -553,7 +554,7 @@ def _review_matches_workflow(review: Dict[str, object], workflow: Dict[str, obje
         return False
     types = [node.get("type") for node in nodes if isinstance(node, dict)]
     executable = sum(
-        node_type in {"step", "human_gate", "tool_call", "verification", "instruction"}
+        node_type in {"step", "human_gate", "tool_call", "verification", "instruction", "decision"}
         for node_type in types
     )
     if review["executable_node_count"] != executable:
@@ -574,6 +575,7 @@ def _review_matches_workflow(review: Dict[str, object], workflow: Dict[str, obje
         expected_notices.append("human_gate_not_inferred")
     if review["verification_node_count"] == 0:
         expected_notices.append("verification_not_inferred")
+    expected_notices.extend(inference_notices(workflow))
     return notices == expected_notices
 
 

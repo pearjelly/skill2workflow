@@ -17,7 +17,7 @@ Do NOT apply a hold, release funds, or close the case until the assigned risk an
 2. **Check risk signals against policy** - compare evidence against documented policy thresholds and exception rules
 3. **Draft risk decision recommendation** - propose hold, release, or escalate with reasoning and required evidence
 4. **Ask risk analyst for approval** - wait for analyst approval before changing case disposition
-5. **Run case disposition command** - apply the selected hold, release, or escalation state in the case system
+5. **Run case disposition command** - apply the selected hold, release, or escalation state in the case system <!-- skill2workflow: http {"request":{"method":"POST","url":"https://example.invalid/risk/dispositions"}} -->
 6. **Verify risk audit record** - check that evidence, analyst decision, disposition, and timestamp are recorded
 
 ## Verification

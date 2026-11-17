@@ -1,0 +1,193 @@
+{
+  "corpus": {
+    "enforced_node_ratio": 0.5104166666666666,
+    "false_human_gates": 0,
+    "inference_accuracy": 1.0,
+    "inferred_nodes": 71,
+    "mismatches": [],
+    "passed": true,
+    "process_nodes": 96,
+    "skills": 24
+  },
+  "date": "2026-11-16",
+  "design_findings": {
+    "contrast_fixed": 2,
+    "font_exception_config": ".impeccable/config.json",
+    "font_exception_date": "2026-11-17",
+    "font_exception_status": "user_approved_file_scoped_exceptions",
+    "font_findings_preexisting": 2,
+    "remaining": 0,
+    "suppressed": 3,
+    "uppercase_body_fixed": 1,
+    "validation_status_exception": {
+      "basis": "semantic validation status marker; unchanged from 03aa8d1",
+      "file": "web/styles.css",
+      "rule": "side-tab"
+    }
+  },
+  "documentation": {
+    "local_link_errors": 0,
+    "max_guide_hops": 2,
+    "public_files_checked": 89,
+    "public_guides": 78
+  },
+  "installed_agent": {
+    "checks": {
+      "compiled_dsl_02": true,
+      "json_high_output": true,
+      "json_high_route": true,
+      "json_low_output": true,
+      "json_low_route": true,
+      "json_restart": true,
+      "sqlite_high_output": true,
+      "sqlite_high_route": true,
+      "sqlite_low_output": true,
+      "sqlite_low_route": true,
+      "sqlite_restart": true
+    },
+    "installed": true,
+    "status": "passed"
+  },
+  "javascript_tests": {
+    "count": 83,
+    "status": "passed"
+  },
+  "production_baseline": {
+    "check_count": 19,
+    "checks": [
+      {
+        "exit_code": 0,
+        "name": "unit_tests",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "py_compile",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "package_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "reproducible_build",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "secret_hygiene",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "security_boundary_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "observability_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "observability_rules",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "observability_dashboard",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "service_boundary_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "service_doctor_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "backup_restore_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "state_upgrade_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "retention_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "cancellation_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "interrupted_recovery_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "schedule_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "recurring_scheduler_smoke",
+        "status": "passed",
+        "timed_out": false
+      },
+      {
+        "exit_code": 0,
+        "name": "service_soak_smoke",
+        "status": "passed",
+        "timed_out": false
+      }
+    ],
+    "passed_count": 19,
+    "schema_version": "skill2workflow-production-baseline-evidence-0.1.0",
+    "status": "passed"
+  },
+  "python_tests": {
+    "count": 1591,
+    "json_schema_conformance_executed": true,
+    "status": "passed"
+  },
+  "quality": {
+    "mypy": "passed",
+    "mypy_core_modules": 4,
+    "ruff": "passed"
+  },
+  "schema_version": "skill2workflow-improvement-verification-0.1.0",
+  "secret_hygiene": {
+    "examples": "passed",
+    "repository": "passed"
+  },
+  "tested_commit": "b0088360a509a0e592045be477f40fa2f4d8949c"
+}

@@ -31,7 +31,7 @@ from .bundles import (
     load_verified_workflow_bundle_with_report,
     verify_workflow_bundle,
 )
-from .compiler import compile_ir_to_workflow, summarize_skill_compile, validate_workflow, validate_workflow_structured
+from .compiler import compile_ir_to_workflow, summarize_skill_compile, validate_workflow, validate_workflow_structured, validate_workflow_notices
 from .connectors import ConnectorRuntime
 from .control_plane import LocalControlPlane
 from .credentials import load_credential_file
@@ -49,7 +49,7 @@ from .service import load_service_config, serve_runtime_service
 from .service_bootstrap import initialize_service_workspace, rotate_service_token
 from .service_doctor import diagnose_service
 from .go_live import assess_go_live
-from .lark_tenant_credential_check import check_lark_tenant_credential
+from .tenant_credentials import check_lark_tenant_credential
 from .service_client import (
     fetch_audit_consistency,
     fetch_audit_events,
@@ -185,7 +185,7 @@ def _main(argv=None) -> int:
         "--state-dir", type=Path, default=Path(".skill2workflow")
     )
     authoring_publish_cmd.add_argument(
-        "--storage", choices=["json", "sqlite"], default="json"
+        "--storage", choices=["json", "sqlite"], default="sqlite"
     )
 
     validate_cmd = subparsers.add_parser("validate", help="Validate a Workflow DSL JSON file")
@@ -231,7 +231,7 @@ def _main(argv=None) -> int:
     )
     bundle_publish_cmd.add_argument("bundle", type=Path)
     bundle_publish_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    bundle_publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    bundle_publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     bundle_diff_cmd = subparsers.add_parser(
         "bundle-diff",
@@ -254,7 +254,7 @@ def _main(argv=None) -> int:
     )
     bundle_run_cmd.add_argument("bundle", type=Path)
     bundle_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    bundle_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    bundle_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     bundle_run_cmd.add_argument("--input", type=Path)
     bundle_run_cmd.add_argument(
         "--allow-side-effects",
@@ -292,7 +292,7 @@ def _main(argv=None) -> int:
     run_cmd = subparsers.add_parser("run", help="Run a Workflow DSL JSON file")
     run_cmd.add_argument("workflow", type=Path)
     run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     run_cmd.add_argument("--credential-file", type=Path)
     run_cmd.add_argument(
         "--connector-fixture",
@@ -303,7 +303,7 @@ def _main(argv=None) -> int:
     resume_cmd = subparsers.add_parser("resume", help="Resume a waiting run")
     resume_cmd.add_argument("run_id")
     resume_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    resume_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     resume_cmd.add_argument("--credential-file", type=Path)
     resume_cmd.add_argument("--reject", action="store_true")
     resume_cmd.add_argument(
@@ -314,24 +314,24 @@ def _main(argv=None) -> int:
 
     runs_cmd = subparsers.add_parser("runs", help="List local runs")
     runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     runs_cmd.add_argument("--limit", type=int, help="Return the newest bounded run window (1-1000)")
 
     show_cmd = subparsers.add_parser("show", help="Show a local run detail")
     show_cmd.add_argument("run_id")
     show_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    show_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    show_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     publish_cmd = subparsers.add_parser("publish", help="Publish an immutable Workflow DSL version")
     publish_cmd.add_argument("workflow", type=Path)
     publish_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    publish_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     deprecate_cmd = subparsers.add_parser("deprecate", help="Deprecate a published workflow version")
     deprecate_cmd.add_argument("workflow_id")
     deprecate_cmd.add_argument("--version", required=True)
     deprecate_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    deprecate_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    deprecate_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     promote_cmd = subparsers.add_parser(
         "promote", help="Point a stable alias at a published workflow version"
@@ -345,11 +345,11 @@ def _main(argv=None) -> int:
         help="Require the alias to still point at this version before promotion",
     )
     promote_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    promote_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    promote_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     workflows_cmd = subparsers.add_parser("workflows", help="List published workflow versions")
     workflows_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    workflows_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    workflows_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     workflows_cmd.add_argument(
         "--limit",
         type=int,
@@ -364,14 +364,14 @@ def _main(argv=None) -> int:
         "--state-dir", type=Path, default=Path(".skill2workflow")
     )
     workflow_artifacts_cmd.add_argument(
-        "--storage", choices=["json", "sqlite"], default="json"
+        "--storage", choices=["json", "sqlite"], default="sqlite"
     )
 
     workflow_cmd = subparsers.add_parser("workflow", help="Show a published workflow version")
     workflow_cmd.add_argument("workflow_id")
     workflow_cmd.add_argument("--version", required=True)
     workflow_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    workflow_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    workflow_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     workflow_diff_cmd = subparsers.add_parser(
         "workflow-diff", help="Compare two published workflow versions without printing values"
@@ -380,20 +380,20 @@ def _main(argv=None) -> int:
     workflow_diff_cmd.add_argument("--from-version", required=True)
     workflow_diff_cmd.add_argument("--to-version", required=True)
     workflow_diff_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    workflow_diff_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    workflow_diff_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     run_published_cmd = subparsers.add_parser("run-published", help="Run a published workflow version")
     run_published_cmd.add_argument("workflow_id")
     run_published_cmd.add_argument("--version", required=True)
     run_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    run_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     run_published_cmd.add_argument("--credential-file", type=Path)
 
     trigger_cmd = subparsers.add_parser("trigger", help="Trigger a published workflow through the local API")
     trigger_cmd.add_argument("workflow_id")
     trigger_cmd.add_argument("--version", required=True)
     trigger_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    trigger_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    trigger_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     trigger_cmd.add_argument("--source", default="local-cli")
     trigger_cmd.add_argument("--idempotency-key", default="")
     trigger_cmd.add_argument("--input", type=Path, help="JSON object with trigger input metadata")
@@ -402,11 +402,11 @@ def _main(argv=None) -> int:
     schedule_add_cmd = subparsers.add_parser("schedule-add", help="Add or replace a local schedule definition")
     schedule_add_cmd.add_argument("schedule", type=Path)
     schedule_add_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    schedule_add_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedule_add_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     schedules_cmd = subparsers.add_parser("schedules", help="List local schedule definitions")
     schedules_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    schedules_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedules_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     schedules_cmd.add_argument("--limit", type=int, help="Return a compact newest window (1-1000)")
 
     schedule_dispatches_cmd = subparsers.add_parser(
@@ -454,7 +454,7 @@ def _main(argv=None) -> int:
         help="Run due local schedules through the trigger boundary",
     )
     schedule_run_due_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    schedule_run_due_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    schedule_run_due_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     schedule_run_due_cmd.add_argument("--now", required=True, help="ISO-8601 timestamp used for deterministic due checks")
     schedule_run_due_cmd.add_argument(
         "--max-items",
@@ -470,7 +470,7 @@ def _main(argv=None) -> int:
     webhook_server_cmd.add_argument("--host", default="127.0.0.1")
     webhook_server_cmd.add_argument("--port", type=int, default=8080)
     webhook_server_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    webhook_server_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    webhook_server_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     webhook_server_cmd.add_argument("--credential-file", type=Path)
     webhook_server_cmd.add_argument("--once", action="store_true", help="Handle one request and then exit")
 
@@ -653,7 +653,7 @@ def _main(argv=None) -> int:
     resume_published_cmd = subparsers.add_parser("resume-published", help="Resume a waiting published run")
     resume_published_cmd.add_argument("run_id")
     resume_published_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    resume_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    resume_published_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     resume_published_cmd.add_argument("--credential-file", type=Path)
     resume_published_cmd.add_argument("--reject", action="store_true")
 
@@ -1095,17 +1095,17 @@ def _main(argv=None) -> int:
 
     control_runs_cmd = subparsers.add_parser("control-runs", help="List control-plane run summaries")
     control_runs_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    control_runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_runs_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     control_runs_cmd.add_argument("--limit", type=int, help="Return the newest bounded run window (1-1000)")
 
     control_run_cmd = subparsers.add_parser("control-run", help="Show a control-plane run detail")
     control_run_cmd.add_argument("run_id")
     control_run_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    control_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_run_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
 
     audit_cmd = subparsers.add_parser("audit", help="List control plane audit events")
     audit_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    audit_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    audit_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     audit_cmd.add_argument("--workflow-id", default="")
     audit_cmd.add_argument("--version", default="")
     audit_cmd.add_argument("--run-id", default="")
@@ -1122,7 +1122,7 @@ def _main(argv=None) -> int:
         help="Compare durable run state with control-plane audit evidence",
     )
     audit_consistency_cmd.add_argument("--state-dir", type=Path, default=Path(".skill2workflow"))
-    audit_consistency_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    audit_consistency_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     audit_consistency_cmd.add_argument("--run-id", default="")
 
     audit_verify_cmd = subparsers.add_parser(
@@ -1163,7 +1163,7 @@ def _main(argv=None) -> int:
         help="Export a read-only control-plane snapshot for the local UI",
     )
     control_snapshot_cmd.add_argument("--state-dir", type=Path)
-    control_snapshot_cmd.add_argument("--storage", choices=["json", "sqlite"], default="json")
+    control_snapshot_cmd.add_argument("--storage", choices=["json", "sqlite"], default="sqlite")
     control_snapshot_cmd.add_argument("--service-url")
     control_snapshot_cmd.add_argument("--auth-token-file", type=Path)
     control_snapshot_cmd.add_argument(
@@ -1174,1054 +1174,1307 @@ def _main(argv=None) -> int:
     )
     control_snapshot_cmd.add_argument("-o", "--output", type=Path)
 
+
+    # Bind command handlers without changing argument construction.
+    subparsers.choices['parse'].set_defaults(func=cmd_parse)
+    subparsers.choices['compile'].set_defaults(func=cmd_compile)
+    subparsers.choices['authoring-export'].set_defaults(func=cmd_authoring_export)
+    subparsers.choices['authoring-verify'].set_defaults(func=cmd_authoring_verify)
+    subparsers.choices['authoring-repair'].set_defaults(func=cmd_authoring_repair)
+    subparsers.choices['authoring-bundle'].set_defaults(func=cmd_authoring_bundle)
+    subparsers.choices['authoring-publish'].set_defaults(func=cmd_authoring_publish)
+    subparsers.choices['validate'].set_defaults(func=cmd_validate)
+    subparsers.choices['explain'].set_defaults(func=cmd_explain)
+    subparsers.choices['preflight'].set_defaults(func=cmd_preflight)
+    subparsers.choices['bundle-create'].set_defaults(func=cmd_bundle_create)
+    subparsers.choices['bundle-verify'].set_defaults(func=cmd_bundle_verify)
+    subparsers.choices['bundle-publish'].set_defaults(func=cmd_bundle_publish)
+    subparsers.choices['bundle-diff'].set_defaults(func=cmd_bundle_diff)
+    subparsers.choices['bundle-preflight'].set_defaults(func=cmd_bundle_preflight)
+    subparsers.choices['bundle-run'].set_defaults(func=cmd_bundle_run)
+    subparsers.choices['visualize'].set_defaults(func=cmd_visualize)
+    subparsers.choices['write-back'].set_defaults(func=cmd_write_back)
+    subparsers.choices['run'].set_defaults(func=cmd_run)
+    subparsers.choices['resume'].set_defaults(func=cmd_resume)
+    subparsers.choices['runs'].set_defaults(func=cmd_runs)
+    subparsers.choices['show'].set_defaults(func=cmd_show)
+    subparsers.choices['publish'].set_defaults(func=cmd_publish)
+    subparsers.choices['deprecate'].set_defaults(func=cmd_deprecate)
+    subparsers.choices['promote'].set_defaults(func=cmd_promote)
+    subparsers.choices['workflows'].set_defaults(func=cmd_workflows)
+    subparsers.choices['workflow-artifacts'].set_defaults(func=cmd_workflow_artifacts)
+    subparsers.choices['workflow'].set_defaults(func=cmd_workflow)
+    subparsers.choices['workflow-diff'].set_defaults(func=cmd_workflow_diff)
+    subparsers.choices['run-published'].set_defaults(func=cmd_run_published)
+    subparsers.choices['trigger'].set_defaults(func=cmd_trigger)
+    subparsers.choices['schedule-add'].set_defaults(func=cmd_schedule_add)
+    subparsers.choices['schedules'].set_defaults(func=cmd_schedules)
+    subparsers.choices['schedule-dispatches'].set_defaults(func=cmd_schedule_dispatches)
+    subparsers.choices['schedule-dispatch-review'].set_defaults(func=cmd_schedule_dispatch_review)
+    subparsers.choices['schedule-dispatch-review-get'].set_defaults(func=cmd_schedule_dispatch_review_get)
+    subparsers.choices['schedule-enable'].set_defaults(func=cmd_schedule_enable)
+    subparsers.choices['schedule-disable'].set_defaults(func=cmd_schedule_disable)
+    subparsers.choices['schedule-run-due'].set_defaults(func=cmd_schedule_run_due)
+    subparsers.choices['webhook-server'].set_defaults(func=cmd_webhook_server)
+    subparsers.choices['ui'].set_defaults(func=cmd_ui)
+    subparsers.choices['service'].set_defaults(func=cmd_service)
+    subparsers.choices['service-doctor'].set_defaults(func=cmd_service_doctor)
+    subparsers.choices['service-go-live-check'].set_defaults(func=cmd_service_go_live_check)
+    subparsers.choices['service-lark-tenant-credential-check'].set_defaults(func=cmd_service_lark_tenant_credential_check)
+    subparsers.choices['service-init'].set_defaults(func=cmd_service_init)
+    subparsers.choices['service-token-rotate'].set_defaults(func=cmd_service_token_rotate)
+    subparsers.choices['systemd-unit'].set_defaults(func=cmd_systemd_unit)
+    subparsers.choices['quickstart'].set_defaults(func=cmd_quickstart)
+    subparsers.choices['backup'].set_defaults(func=cmd_backup)
+    subparsers.choices['backup-verify'].set_defaults(func=cmd_backup_verify)
+    subparsers.choices['backup-list'].set_defaults(func=cmd_backup_list)
+    subparsers.choices['backup-retention-plan'].set_defaults(func=cmd_backup_retention_plan)
+    subparsers.choices['restore'].set_defaults(func=cmd_restore)
+    subparsers.choices['state-upgrade-plan'].set_defaults(func=cmd_state_upgrade_plan)
+    subparsers.choices['state-upgrade'].set_defaults(func=cmd_state_upgrade)
+    subparsers.choices['state-retention-plan'].set_defaults(func=cmd_state_retention_plan)
+    subparsers.choices['state-retention-apply'].set_defaults(func=cmd_state_retention_apply)
+    subparsers.choices['resume-published'].set_defaults(func=cmd_resume_published)
+    subparsers.choices['cancel-run'].set_defaults(func=cmd_cancel_run)
+    subparsers.choices['service-resume'].set_defaults(func=cmd_service_resume)
+    subparsers.choices['service-cancel'].set_defaults(func=cmd_service_cancel)
+    subparsers.choices['service-show'].set_defaults(func=cmd_service_show)
+    subparsers.choices['service-runs'].set_defaults(func=cmd_service_runs)
+    subparsers.choices['service-run-page'].set_defaults(func=cmd_service_run_page)
+    subparsers.choices['service-recurring-schedules'].set_defaults(func=cmd_service_recurring_schedules)
+    subparsers.choices['service-recurring-dispatches'].set_defaults(func=cmd_service_recurring_dispatches)
+    subparsers.choices['service-recurring-dispatch-page'].set_defaults(func=cmd_service_recurring_dispatch_page)
+    subparsers.choices['service-recurring-dispatch-review'].set_defaults(func=cmd_service_recurring_dispatch_review)
+    subparsers.choices['service-recurring-dispatch-review-get'].set_defaults(func=cmd_service_recurring_dispatch_review_get)
+    subparsers.choices['service-workflow-artifacts'].set_defaults(func=cmd_service_workflow_artifacts)
+    subparsers.choices['service-backup-readiness'].set_defaults(func=cmd_service_backup_readiness)
+    subparsers.choices['service-backup-inventory'].set_defaults(func=cmd_service_backup_inventory)
+    subparsers.choices['service-backup-inventory-page'].set_defaults(func=cmd_service_backup_inventory_page)
+    subparsers.choices['service-retention-readiness'].set_defaults(func=cmd_service_retention_readiness)
+    subparsers.choices['service-backup-retention-plan'].set_defaults(func=cmd_service_backup_retention_plan)
+    subparsers.choices['service-operational-readiness'].set_defaults(func=cmd_service_operational_readiness)
+    subparsers.choices['service-probe'].set_defaults(func=cmd_service_probe)
+    subparsers.choices['service-wait'].set_defaults(func=cmd_service_wait)
+    subparsers.choices['service-audit-integrity'].set_defaults(func=cmd_service_audit_integrity)
+    subparsers.choices['service-runtime-info'].set_defaults(func=cmd_service_runtime_info)
+    subparsers.choices['service-workflows'].set_defaults(func=cmd_service_workflows)
+    subparsers.choices['service-workflow-diff'].set_defaults(func=cmd_service_workflow_diff)
+    subparsers.choices['service-workflow-explain'].set_defaults(func=cmd_service_workflow_explain)
+    subparsers.choices['service-workflow-preflight'].set_defaults(func=cmd_service_workflow_preflight)
+    subparsers.choices['service-workflow-publish'].set_defaults(func=cmd_service_workflow_publish)
+    subparsers.choices['service-workflow-release-preflight'].set_defaults(func=cmd_service_workflow_release_preflight)
+    subparsers.choices['service-workflow-release-target-review'].set_defaults(func=cmd_service_workflow_release_target_review)
+    subparsers.choices['authoring-service-release-preflight'].set_defaults(func=cmd_authoring_service_release_preflight)
+    subparsers.choices['authoring-service-release-target-review'].set_defaults(func=cmd_authoring_service_release_target_review)
+    subparsers.choices['authoring-service-publish'].set_defaults(func=cmd_authoring_service_publish)
+    subparsers.choices['service-workflow-promote'].set_defaults(func=cmd_service_workflow_promote)
+    subparsers.choices['service-workflow-deprecate'].set_defaults(func=cmd_service_workflow_deprecate)
+    subparsers.choices['service-trigger'].set_defaults(func=cmd_service_trigger)
+    subparsers.choices['service-schedule-enable'].set_defaults(func=cmd_service_schedule_enable)
+    subparsers.choices['service-schedule-disable'].set_defaults(func=cmd_service_schedule_disable)
+    subparsers.choices['service-recurring-schedule-add'].set_defaults(func=cmd_service_recurring_schedule_add)
+    subparsers.choices['service-recurring-schedule-update'].set_defaults(func=cmd_service_recurring_schedule_update)
+    subparsers.choices['service-recurring-schedule-patch'].set_defaults(func=cmd_service_recurring_schedule_patch)
+    subparsers.choices['service-recurring-schedule-delete'].set_defaults(func=cmd_service_recurring_schedule_delete)
+    subparsers.choices['service-support-bundle'].set_defaults(func=cmd_service_support_bundle)
+    subparsers.choices['service-audit-consistency'].set_defaults(func=cmd_service_audit_consistency)
+    subparsers.choices['service-audit-events'].set_defaults(func=cmd_service_audit_events)
+    subparsers.choices['control-runs'].set_defaults(func=cmd_control_runs)
+    subparsers.choices['control-run'].set_defaults(func=cmd_control_run)
+    subparsers.choices['audit'].set_defaults(func=cmd_audit)
+    subparsers.choices['audit-consistency'].set_defaults(func=cmd_audit_consistency)
+    subparsers.choices['audit-verify'].set_defaults(func=cmd_audit_verify)
+    subparsers.choices['audit-evidence'].set_defaults(func=cmd_audit_evidence)
+    subparsers.choices['audit-evidence-verify'].set_defaults(func=cmd_audit_evidence_verify)
+    subparsers.choices['connectors'].set_defaults(func=cmd_connectors)
+    subparsers.choices['control-snapshot'].set_defaults(func=cmd_control_snapshot)
+
     args = parser.parse_args(argv)
+    return args.func(args)
 
-    if args.command == "parse":
-        _print_json(parse_skill_file(args.skill))
-        return 0
 
-    if args.command == "compile":
-        ir = parse_skill_file(args.skill)
-        workflow = compile_ir_to_workflow(ir)
-        review = summarize_skill_compile(ir, workflow)
-        if args.output:
-            args.output.write_text(json.dumps(workflow, ensure_ascii=False, indent=2), encoding="utf-8")
-        if args.review:
-            _print_json(review if args.output else {"workflow": workflow, "review": review})
-        elif not args.output:
-            _print_json(workflow)
-        return 0
+def cmd_parse(args: argparse.Namespace) -> int:
+    _print_json(parse_skill_file(args.skill))
+    return 0
 
-    if args.command == "authoring-export":
-        _print_json(create_authoring_artifacts(args.skill, args.output_dir))
-        return 0
 
-    if args.command == "authoring-verify":
-        report = verify_authoring_artifacts(args.output_dir)
-        _print_json(report)
-        return 0 if report["valid"] else 1
+def cmd_compile(args: argparse.Namespace) -> int:
+    ir = parse_skill_file(args.skill)
+    workflow = compile_ir_to_workflow(ir)
+    review = summarize_skill_compile(ir, workflow)
+    if args.output:
+        args.output.write_text(json.dumps(workflow, ensure_ascii=False, indent=2), encoding="utf-8")
+    if args.review:
+        _print_json(review if args.output else {"workflow": workflow, "review": review})
+    elif not args.output:
+        _print_json(workflow)
+    return 0
 
-    if args.command == "authoring-repair":
-        operation = (
-            preflight_authoring_repair
-            if args.dry_run
-            else repair_authoring_artifacts
+
+def cmd_authoring_export(args: argparse.Namespace) -> int:
+    _print_json(create_authoring_artifacts(args.skill, args.output_dir))
+    return 0
+
+
+def cmd_authoring_verify(args: argparse.Namespace) -> int:
+    report = verify_authoring_artifacts(args.output_dir)
+    _print_json(report)
+    return 0 if report["valid"] else 1
+
+
+def cmd_authoring_repair(args: argparse.Namespace) -> int:
+    operation = (
+        preflight_authoring_repair
+        if args.dry_run
+        else repair_authoring_artifacts
+    )
+    _print_json(
+        operation(
+            args.skill,
+            args.output_dir,
+            args.backup_dir,
         )
-        _print_json(
-            operation(
-                args.skill,
-                args.output_dir,
-                args.backup_dir,
-            )
-        )
-        return 0
+    )
+    return 0
 
-    if args.command == "authoring-bundle":
-        _print_json(
-            create_workflow_bundle(
-                load_verified_authoring_workflow(args.output_dir),
-                args.output,
-                overwrite=args.force,
-            )
-        )
-        return 0
 
-    if args.command == "authoring-publish":
-        return _control_action(
-            lambda: LocalControlPlane(
-                args.state_dir,
-                storage=args.storage,
-            ).publish_workflow(load_verified_authoring_workflow(args.output_dir))
-        )
-
-    if args.command == "validate":
-        workflow = _load_json(args.workflow)
-        structured_errors = validate_workflow_structured(workflow)
-        if args.format == "json":
-            _print_json(
-                {
-                    "valid": not structured_errors,
-                    "schema_version": workflow.get("schema_version"),
-                    "errors": structured_errors,
-                }
-            )
-            return 1 if structured_errors else 0
-        errors = [str(error["message"]) for error in structured_errors]
-        if errors:
-            for error in errors:
-                print(error, file=sys.stderr)
-            return 1
-        print("valid")
-        return 0
-
-    if args.command == "explain":
-        workflow = _load_json(args.workflow)
-        explanation = build_workflow_explanation(workflow)
-        if args.format == "text":
-            print(render_workflow_explanation_text(explanation), end="")
-        else:
-            _print_json(explanation)
-        return 0
-
-    if args.command == "preflight":
-        workflow = _load_json(args.workflow)
-        input_value = _load_json(args.input) if args.input else None
-        report = build_workflow_preflight(
-            workflow,
-            input_value=input_value,
-            input_present=args.input is not None,
-        )
-        if args.format == "text":
-            print(render_workflow_preflight_text(report), end="")
-        else:
-            _print_json(report)
-        return 0 if report["ready"] else 1
-
-    if args.command == "bundle-create":
-        result = create_workflow_bundle(
-            _load_json(args.workflow),
+def cmd_authoring_bundle(args: argparse.Namespace) -> int:
+    _print_json(
+        create_workflow_bundle(
+            load_verified_authoring_workflow(args.output_dir),
             args.output,
             overwrite=args.force,
         )
-        _print_json(result)
-        return 0
+    )
+    return 0
 
-    if args.command == "bundle-verify":
-        report = verify_workflow_bundle(args.bundle)
-        _print_json(report)
-        return 0 if report["valid"] else 1
 
-    if args.command == "bundle-publish":
-        workflow = load_verified_workflow_bundle(args.bundle)
-        return _control_action(
-            lambda: LocalControlPlane(
-                args.state_dir,
-                storage=args.storage,
-            ).publish_workflow(workflow)
-        )
-
-    if args.command == "bundle-diff":
-        _print_json(diff_workflow_bundles(args.from_bundle, args.to_bundle))
-        return 0
-
-    if args.command == "bundle-preflight":
-        workflow = load_verified_workflow_bundle(args.bundle)
-        input_value = _load_bundle_input(args.input)
-        report = build_workflow_preflight(
-            workflow,
-            input_value=input_value,
-            input_present=args.input is not None,
-        )
-        if args.format == "text":
-            print(render_workflow_preflight_text(report), end="")
-        else:
-            _print_json(report)
-        return 0 if report["ready"] else 1
-
-    if args.command == "bundle-run":
-        workflow, bundle_report = load_verified_workflow_bundle_with_report(args.bundle)
-        input_value = _load_bundle_input(args.input)
-        preflight = build_workflow_preflight(
-            workflow,
-            input_value=input_value,
-            input_present=args.input is not None,
-        )
-        if not preflight["ready"]:
-            if args.format == "text":
-                print(render_workflow_preflight_text(preflight), end="")
-            else:
-                _print_json(preflight)
-            return 1
-        if (
-            preflight["summary"]["side_effecting_node_count"] > 0
-            and not args.allow_side_effects
-        ):
-            if args.format == "json":
-                _print_json(_bundle_run_consent_report(preflight, bundle_report))
-            else:
-                print(
-                    "bundle-run requires --allow-side-effects for workflows with connector side effects",
-                    file=sys.stderr,
-                )
-            return 1
-        context = {
-            "bundle_run": {
-                "bundle_verified": True,
-                "side_effects_authorized": bool(args.allow_side_effects),
-                "bundle_sha256": str(bundle_report["bundle_sha256"]),
-            }
-        }
-        if args.input is not None:
-            context["input"] = input_value
-        result = LocalExecutor(
+def cmd_authoring_publish(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(
             args.state_dir,
             storage=args.storage,
-            credential_provider=_credential_provider(args),
-            connector_runtime=_connector_runtime(args),
-        ).run(workflow, context=context)
-        _print_json(_bundle_run_summary(result) if args.summary else result)
-        return 0
+        ).publish_workflow(load_verified_authoring_workflow(args.output_dir))
+    )
 
-    if args.command == "visualize":
-        workflow = _load_json(args.workflow)
-        errors = validate_workflow(workflow)
-        if errors:
-            for error in errors:
-                print(error, file=sys.stderr)
-            return 1
-        run_state = _load_json(args.run_state) if args.run_state else None
-        graph = workflow_to_litegraph(workflow, run_state=run_state)
-        if args.output:
-            args.output.write_text(json.dumps(graph, ensure_ascii=False, indent=2), encoding="utf-8")
-        else:
-            _print_json(graph)
-        return 0
 
-    if args.command == "write-back":
-        try:
-            updated = _write_back_workflow(_load_json(args.workflow), _load_json(args.litegraph))
-        except ValueError as error:
-            print(str(error), file=sys.stderr)
-            return 1
-        if args.output:
-            args.output.write_text(json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8")
-        else:
-            _print_json(updated)
-        return 0
-
-    if args.command == "run":
-        workflow = _load_json(args.workflow)
-        errors = validate_workflow(workflow)
-        if errors:
-            for error in errors:
-                print(error, file=sys.stderr)
-            return 1
+def cmd_validate(args: argparse.Namespace) -> int:
+    workflow = _load_json(args.workflow)
+    structured_errors = validate_workflow_structured(workflow)
+    if args.format == "json":
         _print_json(
-            LocalExecutor(
-                args.state_dir,
-                storage=args.storage,
-                credential_provider=_credential_provider(args),
-                connector_runtime=_connector_runtime(args),
-            ).run(workflow)
+            {
+                "valid": not structured_errors,
+                "schema_version": workflow.get("schema_version"),
+                "errors": structured_errors,
+                "notices": validate_workflow_notices(workflow),
+            }
         )
-        return 0
+        return 1 if structured_errors else 0
+    errors = [str(error["message"]) for error in structured_errors]
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+    print("valid")
+    return 0
 
-    if args.command == "resume":
-        state = LocalExecutor(
+
+def cmd_explain(args: argparse.Namespace) -> int:
+    workflow = _load_json(args.workflow)
+    explanation = build_workflow_explanation(workflow)
+    if args.format == "text":
+        print(render_workflow_explanation_text(explanation), end="")
+    else:
+        _print_json(explanation)
+    return 0
+
+
+def cmd_preflight(args: argparse.Namespace) -> int:
+    workflow = _load_json(args.workflow)
+    input_value = _load_json(args.input) if args.input else None
+    report = build_workflow_preflight(
+        workflow,
+        input_value=input_value,
+        input_present=args.input is not None,
+    )
+    if args.format == "text":
+        print(render_workflow_preflight_text(report), end="")
+    else:
+        _print_json(report)
+    return 0 if report["ready"] else 1
+
+
+def cmd_bundle_create(args: argparse.Namespace) -> int:
+    result = create_workflow_bundle(
+        _load_json(args.workflow),
+        args.output,
+        overwrite=args.force,
+    )
+    _print_json(result)
+    return 0
+
+
+def cmd_bundle_verify(args: argparse.Namespace) -> int:
+    report = verify_workflow_bundle(args.bundle)
+    _print_json(report)
+    return 0 if report["valid"] else 1
+
+
+def cmd_bundle_publish(args: argparse.Namespace) -> int:
+    workflow = load_verified_workflow_bundle(args.bundle)
+    return _control_action(
+        lambda: LocalControlPlane(
+            args.state_dir,
+            storage=args.storage,
+        ).publish_workflow(workflow)
+    )
+
+
+def cmd_bundle_diff(args: argparse.Namespace) -> int:
+    _print_json(diff_workflow_bundles(args.from_bundle, args.to_bundle))
+    return 0
+
+
+def cmd_bundle_preflight(args: argparse.Namespace) -> int:
+    workflow = load_verified_workflow_bundle(args.bundle)
+    input_value = _load_bundle_input(args.input)
+    report = build_workflow_preflight(
+        workflow,
+        input_value=input_value,
+        input_present=args.input is not None,
+    )
+    if args.format == "text":
+        print(render_workflow_preflight_text(report), end="")
+    else:
+        _print_json(report)
+    return 0 if report["ready"] else 1
+
+
+def cmd_bundle_run(args: argparse.Namespace) -> int:
+    workflow, bundle_report = load_verified_workflow_bundle_with_report(args.bundle)
+    input_value = _load_bundle_input(args.input)
+    preflight = build_workflow_preflight(
+        workflow,
+        input_value=input_value,
+        input_present=args.input is not None,
+    )
+    if not preflight["ready"]:
+        if args.format == "text":
+            print(render_workflow_preflight_text(preflight), end="")
+        else:
+            _print_json(preflight)
+        return 1
+    if (
+        preflight["summary"]["side_effecting_node_count"] > 0
+        and not args.allow_side_effects
+    ):
+        if args.format == "json":
+            _print_json(_bundle_run_consent_report(preflight, bundle_report))
+        else:
+            print(
+                "bundle-run requires --allow-side-effects for workflows with connector side effects",
+                file=sys.stderr,
+            )
+        return 1
+    context = {
+        "bundle_run": {
+            "bundle_verified": True,
+            "side_effects_authorized": bool(args.allow_side_effects),
+            "bundle_sha256": str(bundle_report["bundle_sha256"]),
+        }
+    }
+    if args.input is not None:
+        context["input"] = input_value
+    result = LocalExecutor(
+        args.state_dir,
+        storage=args.storage,
+        credential_provider=_credential_provider(args),
+        connector_runtime=_connector_runtime(args),
+    ).run(workflow, context=context)
+    _print_json(_bundle_run_summary(result) if args.summary else result)
+    return 0
+
+
+def cmd_visualize(args: argparse.Namespace) -> int:
+    workflow = _load_json(args.workflow)
+    errors = validate_workflow(workflow)
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+    run_state = _load_json(args.run_state) if args.run_state else None
+    graph = workflow_to_litegraph(workflow, run_state=run_state)
+    if args.output:
+        args.output.write_text(json.dumps(graph, ensure_ascii=False, indent=2), encoding="utf-8")
+    else:
+        _print_json(graph)
+    return 0
+
+
+def cmd_write_back(args: argparse.Namespace) -> int:
+    try:
+        updated = _write_back_workflow(_load_json(args.workflow), _load_json(args.litegraph))
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    if args.output:
+        args.output.write_text(json.dumps(updated, ensure_ascii=False, indent=2), encoding="utf-8")
+    else:
+        _print_json(updated)
+    return 0
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    workflow = _load_json(args.workflow)
+    errors = validate_workflow(workflow)
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+    _print_json(
+        LocalExecutor(
             args.state_dir,
             storage=args.storage,
             credential_provider=_credential_provider(args),
             connector_runtime=_connector_runtime(args),
-        ).resume(args.run_id, approved=not args.reject)
-        _print_json(state)
+        ).run(workflow)
+    )
+    return 0
+
+
+def cmd_resume(args: argparse.Namespace) -> int:
+    state = LocalExecutor(
+        args.state_dir,
+        storage=args.storage,
+        credential_provider=_credential_provider(args),
+        connector_runtime=_connector_runtime(args),
+    ).resume(args.run_id, approved=not args.reject)
+    _print_json(state)
+    return 0
+
+
+def cmd_runs(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalExecutor(args.state_dir, storage=args.storage).list_runs(
+            limit=args.limit
+        )
+    )
+
+
+def cmd_show(args: argparse.Namespace) -> int:
+    _print_json(LocalExecutor(args.state_dir, storage=args.storage).get_run(args.run_id))
+    return 0
+
+
+def cmd_publish(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(args.state_dir, storage=args.storage).publish_workflow(
+            _load_json(args.workflow)
+        )
+    )
+
+
+def cmd_deprecate(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(args.state_dir, storage=args.storage).deprecate_workflow(
+            args.workflow_id, args.version
+        )
+    )
+
+
+def cmd_promote(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(args.state_dir, storage=args.storage).promote_workflow(
+            args.workflow_id,
+            args.version,
+            alias=args.alias,
+            expected_current_version=args.expected_current_version,
+        )
+    )
+
+
+def cmd_workflows(args: argparse.Namespace) -> int:
+    control = LocalControlPlane(args.state_dir, storage=args.storage)
+    if args.limit is None:
+        _print_json(control.list_workflows())
         return 0
-
-    if args.command == "runs":
-        return _control_action(
-            lambda: LocalExecutor(args.state_dir, storage=args.storage).list_runs(
-                limit=args.limit
-            )
+    return _control_action(
+        lambda: build_workflow_inventory_from_control(
+            control, max_items=args.limit
         )
+    )
 
-    if args.command == "show":
-        _print_json(LocalExecutor(args.state_dir, storage=args.storage).get_run(args.run_id))
+
+def cmd_workflow_artifacts(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(
+            args.state_dir, storage=args.storage
+        ).inspect_workflow_artifacts()
+    )
+
+
+def cmd_workflow(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(args.state_dir, storage=args.storage).get_workflow(
+            args.workflow_id, args.version
+        )
+    )
+
+
+def cmd_workflow_diff(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(args.state_dir, storage=args.storage).diff_workflow_versions(
+            args.workflow_id, args.from_version, args.to_version
+        )
+    )
+
+
+def cmd_run_published(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(
+            args.state_dir,
+            storage=args.storage,
+            credential_provider=_credential_provider(args),
+        ).run_published_workflow(
+            args.workflow_id, args.version
+        )
+    )
+
+
+def cmd_trigger(args: argparse.Namespace) -> int:
+    return _control_action(lambda: _trigger_workflow(args))
+
+
+def cmd_schedule_add(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalScheduleRunner(args.state_dir, storage=args.storage).add_schedule(
+            _load_json(args.schedule)
+        )
+    )
+
+
+def cmd_schedules(args: argparse.Namespace) -> int:
+    runner = LocalScheduleRunner(args.state_dir, storage=args.storage)
+    if args.limit is None:
+        _print_json(runner.list_schedules())
         return 0
+    return _control_action(lambda: runner.list_schedules_bounded(args.limit))
 
-    if args.command == "publish":
+
+def cmd_schedule_dispatches(args: argparse.Namespace) -> int:
+    runner = LocalScheduleRunner(args.state_dir, storage=args.storage)
+    if args.limit is None:
         return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).publish_workflow(
-                _load_json(args.workflow)
-            )
+            lambda: runner.list_dispatches(schedule_id=args.schedule_id)
         )
-
-    if args.command == "deprecate":
-        return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).deprecate_workflow(
-                args.workflow_id, args.version
-            )
+    return _control_action(
+        lambda: runner.list_dispatches_bounded(
+            args.limit, schedule_id=args.schedule_id
         )
+    )
 
-    if args.command == "promote":
-        return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).promote_workflow(
-                args.workflow_id,
-                args.version,
-                alias=args.alias,
-                expected_current_version=args.expected_current_version,
-            )
+
+def cmd_schedule_dispatch_review(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalScheduleRunner(
+            args.state_dir,
+            storage=args.storage,
+        ).review_uncertain_dispatch(
+            args.dispatch_id,
+            expected_completed_at=args.expected_completed_at,
+            outcome=args.outcome,
         )
+    )
 
-    if args.command == "workflows":
-        control = LocalControlPlane(args.state_dir, storage=args.storage)
-        if args.limit is None:
-            _print_json(control.list_workflows())
-            return 0
-        return _control_action(
-            lambda: build_workflow_inventory_from_control(
-                control, max_items=args.limit
-            )
+
+def cmd_schedule_dispatch_review_get(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalScheduleRunner(
+            args.state_dir,
+            storage=args.storage,
+        ).get_dispatch_review(args.dispatch_id)
+    )
+
+
+def cmd_schedule_enable(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalScheduleRunner(
+            args.state_dir,
+            storage=args.storage,
+        ).set_recurring_enabled(
+            args.schedule_id,
+            enabled=args.command == "schedule-enable",
         )
+    )
 
-    if args.command == "workflow-artifacts":
-        return _control_action(
-            lambda: LocalControlPlane(
-                args.state_dir, storage=args.storage
-            ).inspect_workflow_artifacts()
+
+def cmd_schedule_disable(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalScheduleRunner(
+            args.state_dir,
+            storage=args.storage,
+        ).set_recurring_enabled(
+            args.schedule_id,
+            enabled=args.command == "schedule-enable",
         )
+    )
 
-    if args.command == "workflow":
-        return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).get_workflow(
-                args.workflow_id, args.version
-            )
+
+def cmd_schedule_run_due(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalScheduleRunner(
+            args.state_dir,
+            storage=args.storage,
+            credential_provider=_credential_provider(args),
+        ).run_due(args.now, max_items=args.max_items)
+    )
+
+
+def cmd_webhook_server(args: argparse.Namespace) -> int:
+    return _serve_webhook_server(args)
+
+
+def cmd_ui(args: argparse.Namespace) -> int:
+    return _serve_ui(args)
+
+
+def cmd_service(args: argparse.Namespace) -> int:
+    return _serve_runtime_service(args)
+
+
+def cmd_service_doctor(args: argparse.Namespace) -> int:
+    result = diagnose_service(args.config)
+    _print_json(result)
+    return 0 if result["status"] == "ready" else 1
+
+
+def cmd_service_go_live_check(args: argparse.Namespace) -> int:
+    result = assess_go_live(
+        args.config,
+        args.service_url,
+        args.auth_token_file,
+        verify_lark_tenant_credential=args.verify_lark_tenant_credential,
+    )
+    _print_json(result)
+    return 0 if result["status"] == "ready" else 1
+
+
+def cmd_service_lark_tenant_credential_check(args: argparse.Namespace) -> int:
+    result = check_lark_tenant_credential(args.config)
+    _print_json(result)
+    return 0 if result["status"] == "ready" else 1
+
+
+def cmd_service_init(args: argparse.Namespace) -> int:
+    return _service_bootstrap_action(
+        lambda: initialize_service_workspace(
+            args.root,
+            host=args.host,
+            port=args.port,
+            http_allowed_origins=args.http_allowed_origins,
+            lark_app_id=args.lark_app_id,
+            lark_app_secret_handle=args.lark_app_secret_handle,
         )
+    )
 
-    if args.command == "workflow-diff":
-        return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).diff_workflow_versions(
-                args.workflow_id, args.from_version, args.to_version
-            )
-        )
 
-    if args.command == "run-published":
-        return _control_action(
-            lambda: LocalControlPlane(
-                args.state_dir,
-                storage=args.storage,
-                credential_provider=_credential_provider(args),
-            ).run_published_workflow(
-                args.workflow_id, args.version
-            )
-        )
+def cmd_service_token_rotate(args: argparse.Namespace) -> int:
+    return _service_bootstrap_action(
+        lambda: rotate_service_token(load_service_config(args.config).auth_token_file)
+    )
 
-    if args.command == "trigger":
-        return _control_action(lambda: _trigger_workflow(args))
 
-    if args.command == "schedule-add":
-        return _control_action(
-            lambda: LocalScheduleRunner(args.state_dir, storage=args.storage).add_schedule(
-                _load_json(args.schedule)
-            )
-        )
-
-    if args.command == "schedules":
-        runner = LocalScheduleRunner(args.state_dir, storage=args.storage)
-        if args.limit is None:
-            _print_json(runner.list_schedules())
-            return 0
-        return _control_action(lambda: runner.list_schedules_bounded(args.limit))
-
-    if args.command == "schedule-dispatches":
-        runner = LocalScheduleRunner(args.state_dir, storage=args.storage)
-        if args.limit is None:
-            return _control_action(
-                lambda: runner.list_dispatches(schedule_id=args.schedule_id)
-            )
-        return _control_action(
-            lambda: runner.list_dispatches_bounded(
-                args.limit, schedule_id=args.schedule_id
-            )
-        )
-
-    if args.command == "schedule-dispatch-review":
-        return _control_action(
-            lambda: LocalScheduleRunner(
-                args.state_dir,
-                storage=args.storage,
-            ).review_uncertain_dispatch(
-                args.dispatch_id,
-                expected_completed_at=args.expected_completed_at,
-                outcome=args.outcome,
-            )
-        )
-
-    if args.command == "schedule-dispatch-review-get":
-        return _control_action(
-            lambda: LocalScheduleRunner(
-                args.state_dir,
-                storage=args.storage,
-            ).get_dispatch_review(args.dispatch_id)
-        )
-
-    if args.command in {"schedule-enable", "schedule-disable"}:
-        return _control_action(
-            lambda: LocalScheduleRunner(
-                args.state_dir,
-                storage=args.storage,
-            ).set_recurring_enabled(
-                args.schedule_id,
-                enabled=args.command == "schedule-enable",
-            )
-        )
-
-    if args.command == "schedule-run-due":
-        return _control_action(
-            lambda: LocalScheduleRunner(
-                args.state_dir,
-                storage=args.storage,
-                credential_provider=_credential_provider(args),
-            ).run_due(args.now, max_items=args.max_items)
-        )
-
-    if args.command == "webhook-server":
-        return _serve_webhook_server(args)
-
-    if args.command == "ui":
-        return _serve_ui(args)
-
-    if args.command == "service":
-        return _serve_runtime_service(args)
-
-    if args.command == "service-doctor":
-        result = diagnose_service(args.config)
-        _print_json(result)
-        return 0 if result["status"] == "ready" else 1
-
-    if args.command == "service-go-live-check":
-        result = assess_go_live(
+def cmd_systemd_unit(args: argparse.Namespace) -> int:
+    return _systemd_unit_action(
+        lambda: write_systemd_service_unit(
             args.config,
+            args.output,
+            service_user=args.service_user,
+            service_group=args.service_group,
+            executable=args.executable,
+        )
+    )
+
+
+def cmd_quickstart(args: argparse.Namespace) -> int:
+    return _quickstart_action(
+        lambda: initialize_quickstart_workspace(
+            args.root,
+            host=args.host,
+            port=args.port,
+            skill_path=args.skill,
+            trigger_input=_load_trigger_input(args.input) if args.input is not None else None,
+            dry_run=args.dry_run,
+        ),
+        readiness=args.dry_run,
+    )
+
+
+def cmd_backup(args: argparse.Namespace) -> int:
+    return _backup_action(
+        lambda: create_state_backup(args.state_dir, args.output_dir)
+    )
+
+
+def cmd_backup_verify(args: argparse.Namespace) -> int:
+    return _backup_action(lambda: verify_state_backup(args.backup_dir))
+
+
+def cmd_backup_list(args: argparse.Namespace) -> int:
+    return _backup_action(
+        lambda: list_state_backups(args.parent_dir, limit=args.limit)
+    )
+
+
+def cmd_backup_retention_plan(args: argparse.Namespace) -> int:
+    return _backup_action(
+        lambda: build_backup_retention_plan(
+            args.parent_dir,
+            _load_json(args.policy),
+            limit=args.limit,
+        )
+    )
+
+
+def cmd_restore(args: argparse.Namespace) -> int:
+    return _backup_action(
+        lambda: restore_state_backup(args.backup_dir, args.state_dir)
+    )
+
+
+def cmd_state_upgrade_plan(args: argparse.Namespace) -> int:
+    return _migration_action(lambda: inspect_state_upgrade(args.state_dir))
+
+
+def cmd_state_upgrade(args: argparse.Namespace) -> int:
+    return _migration_action(
+        lambda: upgrade_state(
+            args.state_dir,
+            args.output_dir,
+            args.backup_dir,
+        )
+    )
+
+
+def cmd_state_retention_plan(args: argparse.Namespace) -> int:
+    return _retention_action(
+        lambda: inspect_state_retention(
+            args.state_dir,
+            _load_json(args.policy),
+        )
+    )
+
+
+def cmd_state_retention_apply(args: argparse.Namespace) -> int:
+    return _retention_action(
+        lambda: apply_state_retention(
+            args.state_dir,
+            args.output_dir,
+            _load_json(args.policy),
+        )
+    )
+
+
+def cmd_resume_published(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(
+            args.state_dir,
+            storage=args.storage,
+            credential_provider=_credential_provider(args),
+        ).resume_published_run(
+            args.run_id, approved=not args.reject
+        )
+    )
+
+
+def cmd_cancel_run(args: argparse.Namespace) -> int:
+    return _control_action(lambda: _cancel_run(args))
+
+
+def cmd_service_resume(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_run_resume(
             args.service_url,
             args.auth_token_file,
-            verify_lark_tenant_credential=args.verify_lark_tenant_credential,
+            args.run_id,
+            approved=not args.reject,
         )
-        _print_json(result)
-        return 0 if result["status"] == "ready" else 1
+    )
 
-    if args.command == "service-lark-tenant-credential-check":
-        result = check_lark_tenant_credential(args.config)
-        _print_json(result)
-        return 0 if result["status"] == "ready" else 1
 
-    if args.command == "service-init":
-        return _service_bootstrap_action(
-            lambda: initialize_service_workspace(
-                args.root,
-                host=args.host,
-                port=args.port,
-                http_allowed_origins=args.http_allowed_origins,
-                lark_app_id=args.lark_app_id,
-                lark_app_secret_handle=args.lark_app_secret_handle,
-            )
-        )
-
-    if args.command == "service-token-rotate":
-        return _service_bootstrap_action(
-            lambda: rotate_service_token(load_service_config(args.config).auth_token_file)
-        )
-
-    if args.command == "systemd-unit":
-        return _systemd_unit_action(
-            lambda: write_systemd_service_unit(
-                args.config,
-                args.output,
-                service_user=args.service_user,
-                service_group=args.service_group,
-                executable=args.executable,
-            )
-        )
-
-    if args.command == "quickstart":
-        return _quickstart_action(
-            lambda: initialize_quickstart_workspace(
-                args.root,
-                host=args.host,
-                port=args.port,
-                skill_path=args.skill,
-                trigger_input=_load_trigger_input(args.input) if args.input is not None else None,
-                dry_run=args.dry_run,
-            ),
-            readiness=args.dry_run,
-        )
-
-    if args.command == "backup":
-        return _backup_action(
-            lambda: create_state_backup(args.state_dir, args.output_dir)
-        )
-
-    if args.command == "backup-verify":
-        return _backup_action(lambda: verify_state_backup(args.backup_dir))
-
-    if args.command == "backup-list":
-        return _backup_action(
-            lambda: list_state_backups(args.parent_dir, limit=args.limit)
-        )
-
-    if args.command == "backup-retention-plan":
-        return _backup_action(
-            lambda: build_backup_retention_plan(
-                args.parent_dir,
-                _load_json(args.policy),
-                limit=args.limit,
-            )
-        )
-
-    if args.command == "restore":
-        return _backup_action(
-            lambda: restore_state_backup(args.backup_dir, args.state_dir)
-        )
-
-    if args.command == "state-upgrade-plan":
-        return _migration_action(lambda: inspect_state_upgrade(args.state_dir))
-
-    if args.command == "state-upgrade":
-        return _migration_action(
-            lambda: upgrade_state(
-                args.state_dir,
-                args.output_dir,
-                args.backup_dir,
-            )
-        )
-
-    if args.command == "state-retention-plan":
-        return _retention_action(
-            lambda: inspect_state_retention(
-                args.state_dir,
-                _load_json(args.policy),
-            )
-        )
-
-    if args.command == "state-retention-apply":
-        return _retention_action(
-            lambda: apply_state_retention(
-                args.state_dir,
-                args.output_dir,
-                _load_json(args.policy),
-            )
-        )
-
-    if args.command == "resume-published":
-        return _control_action(
-            lambda: LocalControlPlane(
-                args.state_dir,
-                storage=args.storage,
-                credential_provider=_credential_provider(args),
-            ).resume_published_run(
-                args.run_id, approved=not args.reject
-            )
-        )
-
-    if args.command == "cancel-run":
-        return _control_action(lambda: _cancel_run(args))
-
-    if args.command == "service-resume":
-        return _service_action(
-            lambda: post_run_resume(
-                args.service_url,
-                args.auth_token_file,
-                args.run_id,
-                approved=not args.reject,
-            )
-        )
-
-    if args.command == "service-cancel":
-        return _service_action(
-            lambda: post_run_cancel(
-                args.service_url,
-                args.auth_token_file,
-                args.run_id,
-            )
-        )
-
-    if args.command == "service-show":
-        return _service_action(
-            lambda: fetch_run_detail(
-                args.service_url,
-                args.auth_token_file,
-                args.run_id,
-            )
-        )
-
-    if args.command == "service-runs":
-        return _service_action(
-            lambda: fetch_run_list(
-                args.service_url,
-                args.auth_token_file,
-            )
-        )
-
-    if args.command == "service-run-page":
-        return _service_action(
-            lambda: fetch_run_page(
-                args.service_url,
-                args.auth_token_file,
-                max_items=args.max_items,
-                cursor=args.cursor,
-                status=args.status,
-                workflow_id=args.workflow_id,
-            )
-        )
-
-    if args.command == "service-recurring-schedules":
-        return _service_action(
-            lambda: fetch_recurring_schedule_list(
-                args.service_url,
-                args.auth_token_file,
-            )
-        )
-
-    if args.command == "service-recurring-dispatches":
-        return _service_action(
-            lambda: fetch_recurring_schedule_dispatches(
-                args.service_url,
-                args.auth_token_file,
-                args.schedule_id,
-            )
-        )
-
-    if args.command == "service-recurring-dispatch-page":
-        return _service_action(
-            lambda: fetch_recurring_schedule_dispatch_page(
-                args.service_url,
-                args.auth_token_file,
-                schedule_id=args.schedule_id,
-                max_items=args.max_items,
-                cursor=args.cursor,
-            )
-        )
-
-    if args.command == "service-recurring-dispatch-review":
-        return _service_action(
-            lambda: post_recurring_schedule_dispatch_review(
-                args.service_url,
-                args.auth_token_file,
-                args.dispatch_id,
-                expected_completed_at=args.expected_completed_at,
-                outcome=args.outcome,
-            )
-        )
-
-    if args.command == "service-recurring-dispatch-review-get":
-        return _service_action(
-            lambda: fetch_recurring_schedule_dispatch_review(
-                args.service_url,
-                args.auth_token_file,
-                args.dispatch_id,
-            )
-        )
-
-    if args.command == "service-workflow-artifacts":
-        return _service_action(
-            lambda: fetch_workflow_artifact_report(
-                args.service_url,
-                args.auth_token_file,
-            )
-        )
-
-    if args.command == "service-backup-readiness":
-        return _service_action(
-            lambda: fetch_backup_readiness(
-                args.service_url,
-                args.auth_token_file,
-            )
-        )
-
-    if args.command == "service-backup-inventory":
-        return _service_action(
-            lambda: fetch_backup_inventory(
-                args.service_url,
-                args.auth_token_file,
-                max_items=args.max_items,
-            )
-        )
-
-    if args.command == "service-backup-inventory-page":
-        return _service_action(
-            lambda: fetch_backup_inventory_page(
-                args.service_url,
-                args.auth_token_file,
-                max_items=args.max_items,
-                cursor=args.cursor,
-            )
-        )
-
-    if args.command == "service-retention-readiness":
-        return _service_action(
-            lambda: fetch_retention_readiness(
-                args.service_url,
-                args.auth_token_file,
-                _load_json(args.policy),
-            )
-        )
-
-    if args.command == "service-backup-retention-plan":
-        return _service_action(
-            lambda: fetch_backup_retention_plan(
-                args.service_url,
-                args.auth_token_file,
-                _load_json(args.policy),
-            )
-        )
-
-    if args.command == "service-operational-readiness":
-        return _service_action(
-            lambda: fetch_operational_readiness(
-                args.service_url,
-                args.auth_token_file,
-            )
-        )
-
-    if args.command == "service-probe":
-        return _service_probe_action(args.service_url)
-
-    if args.command == "service-wait":
-        return _service_wait_action(
+def cmd_service_cancel(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_run_cancel(
             args.service_url,
-            args.timeout_seconds,
-            args.poll_interval_seconds,
+            args.auth_token_file,
+            args.run_id,
         )
+    )
 
-    if args.command == "service-audit-integrity":
-        return _service_action(
-            lambda: fetch_audit_integrity(
-                args.service_url,
-                args.auth_token_file,
-            )
+
+def cmd_service_show(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_run_detail(
+            args.service_url,
+            args.auth_token_file,
+            args.run_id,
         )
+    )
 
-    if args.command == "service-runtime-info":
-        return _service_action(
-            lambda: fetch_runtime_info(
-                args.service_url,
-                args.auth_token_file,
-            )
+
+def cmd_service_runs(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_run_list(
+            args.service_url,
+            args.auth_token_file,
         )
+    )
 
-    if args.command == "service-workflows":
-        return _service_action(
-            lambda: fetch_workflow_inventory(
-                args.service_url,
-                args.auth_token_file,
-            )
+
+def cmd_service_run_page(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_run_page(
+            args.service_url,
+            args.auth_token_file,
+            max_items=args.max_items,
+            cursor=args.cursor,
+            status=args.status,
+            workflow_id=args.workflow_id,
         )
+    )
 
-    if args.command == "service-workflow-diff":
-        return _service_action(
-            lambda: fetch_workflow_diff(
-                args.service_url,
-                args.auth_token_file,
-                args.workflow_id,
-                args.from_version,
-                args.to_version,
-            )
+
+def cmd_service_recurring_schedules(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_recurring_schedule_list(
+            args.service_url,
+            args.auth_token_file,
         )
+    )
 
-    if args.command == "service-workflow-explain":
-        return _service_action(
-            lambda: fetch_workflow_explanation(
-                args.service_url,
-                args.auth_token_file,
-                args.workflow_id,
-                args.version,
-            )
+
+def cmd_service_recurring_dispatches(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_recurring_schedule_dispatches(
+            args.service_url,
+            args.auth_token_file,
+            args.schedule_id,
         )
+    )
 
-    if args.command == "service-workflow-preflight":
-        return _service_preflight_action(
-            lambda: fetch_workflow_preflight(
-                args.service_url,
-                args.auth_token_file,
-                args.workflow_id,
-                args.version,
-                input_value=_load_json(args.input) if args.input else None,
-                input_present=args.input is not None,
-            )
+
+def cmd_service_recurring_dispatch_page(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_recurring_schedule_dispatch_page(
+            args.service_url,
+            args.auth_token_file,
+            schedule_id=args.schedule_id,
+            max_items=args.max_items,
+            cursor=args.cursor,
         )
+    )
 
-    if args.command == "service-workflow-publish":
-        return _service_action(
-            lambda: post_workflow_release(
-                args.service_url,
-                args.auth_token_file,
-                _load_json(args.workflow),
-            )
+
+def cmd_service_recurring_dispatch_review(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_recurring_schedule_dispatch_review(
+            args.service_url,
+            args.auth_token_file,
+            args.dispatch_id,
+            expected_completed_at=args.expected_completed_at,
+            outcome=args.outcome,
         )
+    )
 
-    if args.command == "service-workflow-release-preflight":
-        return _service_action(
-            lambda: post_workflow_release_preflight(
-                args.service_url,
-                args.auth_token_file,
-                _load_json(args.workflow),
-            )
+
+def cmd_service_recurring_dispatch_review_get(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_recurring_schedule_dispatch_review(
+            args.service_url,
+            args.auth_token_file,
+            args.dispatch_id,
         )
+    )
 
-    if args.command == "service-workflow-release-target-review":
-        return _service_action(
-            lambda: post_workflow_release_target_review(
-                args.service_url,
-                args.auth_token_file,
-                _load_json(args.workflow),
-            )
+
+def cmd_service_workflow_artifacts(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_workflow_artifact_report(
+            args.service_url,
+            args.auth_token_file,
         )
+    )
 
-    if args.command == "authoring-service-release-preflight":
-        return _service_action(
-            lambda: post_workflow_release_preflight(
-                args.service_url,
-                args.auth_token_file,
-                load_verified_authoring_workflow(args.output_dir),
-            )
+
+def cmd_service_backup_readiness(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_backup_readiness(
+            args.service_url,
+            args.auth_token_file,
         )
+    )
 
-    if args.command == "authoring-service-release-target-review":
-        return _service_action(
-            lambda: post_workflow_release_target_review(
-                args.service_url,
-                args.auth_token_file,
-                load_verified_authoring_workflow(args.output_dir),
-            )
+
+def cmd_service_backup_inventory(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_backup_inventory(
+            args.service_url,
+            args.auth_token_file,
+            max_items=args.max_items,
         )
+    )
 
-    if args.command == "authoring-service-publish":
-        return _service_action(
-            lambda: post_workflow_release(
-                args.service_url,
-                args.auth_token_file,
-                load_verified_authoring_workflow(args.output_dir),
-            )
+
+def cmd_service_backup_inventory_page(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_backup_inventory_page(
+            args.service_url,
+            args.auth_token_file,
+            max_items=args.max_items,
+            cursor=args.cursor,
         )
+    )
 
-    if args.command == "service-workflow-promote":
-        return _service_action(
-            lambda: post_workflow_promotion(
-                args.service_url,
-                args.auth_token_file,
-                args.workflow_id,
-                args.version,
-                alias=args.alias,
-                expected_current_version=args.expected_current_version,
-            )
+
+def cmd_service_retention_readiness(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_retention_readiness(
+            args.service_url,
+            args.auth_token_file,
+            _load_json(args.policy),
         )
+    )
 
-    if args.command == "service-workflow-deprecate":
-        deprecation_kwargs = {}
-        if args.expected_checksum or args.expected_aliases is not None:
-            deprecation_kwargs = {
-                "expected_checksum": args.expected_checksum,
-                "expected_aliases": args.expected_aliases,
+
+def cmd_service_backup_retention_plan(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_backup_retention_plan(
+            args.service_url,
+            args.auth_token_file,
+            _load_json(args.policy),
+        )
+    )
+
+
+def cmd_service_operational_readiness(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_operational_readiness(
+            args.service_url,
+            args.auth_token_file,
+        )
+    )
+
+
+def cmd_service_probe(args: argparse.Namespace) -> int:
+    return _service_probe_action(args.service_url)
+
+
+def cmd_service_wait(args: argparse.Namespace) -> int:
+    return _service_wait_action(
+        args.service_url,
+        args.timeout_seconds,
+        args.poll_interval_seconds,
+    )
+
+
+def cmd_service_audit_integrity(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_audit_integrity(
+            args.service_url,
+            args.auth_token_file,
+        )
+    )
+
+
+def cmd_service_runtime_info(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_runtime_info(
+            args.service_url,
+            args.auth_token_file,
+        )
+    )
+
+
+def cmd_service_workflows(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_workflow_inventory(
+            args.service_url,
+            args.auth_token_file,
+        )
+    )
+
+
+def cmd_service_workflow_diff(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_workflow_diff(
+            args.service_url,
+            args.auth_token_file,
+            args.workflow_id,
+            args.from_version,
+            args.to_version,
+        )
+    )
+
+
+def cmd_service_workflow_explain(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_workflow_explanation(
+            args.service_url,
+            args.auth_token_file,
+            args.workflow_id,
+            args.version,
+        )
+    )
+
+
+def cmd_service_workflow_preflight(args: argparse.Namespace) -> int:
+    return _service_preflight_action(
+        lambda: fetch_workflow_preflight(
+            args.service_url,
+            args.auth_token_file,
+            args.workflow_id,
+            args.version,
+            input_value=_load_json(args.input) if args.input else None,
+            input_present=args.input is not None,
+        )
+    )
+
+
+def cmd_service_workflow_publish(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_workflow_release(
+            args.service_url,
+            args.auth_token_file,
+            _load_json(args.workflow),
+        )
+    )
+
+
+def cmd_service_workflow_release_preflight(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_workflow_release_preflight(
+            args.service_url,
+            args.auth_token_file,
+            _load_json(args.workflow),
+        )
+    )
+
+
+def cmd_service_workflow_release_target_review(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_workflow_release_target_review(
+            args.service_url,
+            args.auth_token_file,
+            _load_json(args.workflow),
+        )
+    )
+
+
+def cmd_authoring_service_release_preflight(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_workflow_release_preflight(
+            args.service_url,
+            args.auth_token_file,
+            load_verified_authoring_workflow(args.output_dir),
+        )
+    )
+
+
+def cmd_authoring_service_release_target_review(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_workflow_release_target_review(
+            args.service_url,
+            args.auth_token_file,
+            load_verified_authoring_workflow(args.output_dir),
+        )
+    )
+
+
+def cmd_authoring_service_publish(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_workflow_release(
+            args.service_url,
+            args.auth_token_file,
+            load_verified_authoring_workflow(args.output_dir),
+        )
+    )
+
+
+def cmd_service_workflow_promote(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_workflow_promotion(
+            args.service_url,
+            args.auth_token_file,
+            args.workflow_id,
+            args.version,
+            alias=args.alias,
+            expected_current_version=args.expected_current_version,
+        )
+    )
+
+
+def cmd_service_workflow_deprecate(args: argparse.Namespace) -> int:
+    deprecation_kwargs = {}
+    if args.expected_checksum or args.expected_aliases is not None:
+        deprecation_kwargs = {
+            "expected_checksum": args.expected_checksum,
+            "expected_aliases": args.expected_aliases,
+        }
+    return _service_action(
+        lambda: post_workflow_deprecation(
+            args.service_url,
+            args.auth_token_file,
+            args.workflow_id,
+            args.version,
+            **deprecation_kwargs,
+        )
+    )
+
+
+def cmd_service_trigger(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_workflow_trigger(
+            args.service_url,
+            args.auth_token_file,
+            args.workflow_id,
+            args.version,
+            idempotency_key=args.idempotency_key,
+            source=args.source,
+            trigger_input=_load_trigger_input(args.input),
+        )
+    )
+
+
+def cmd_service_schedule_enable(args: argparse.Namespace) -> int:
+    state_kwargs = {}
+    if args.expected_next_run_at is not None:
+        state_kwargs["expected_next_run_at"] = args.expected_next_run_at
+    return _service_action(
+        lambda: post_recurring_schedule_state(
+            args.service_url,
+            args.auth_token_file,
+            args.schedule_id,
+            enabled=args.command == "service-schedule-enable",
+            **state_kwargs,
+        )
+    )
+
+
+def cmd_service_schedule_disable(args: argparse.Namespace) -> int:
+    state_kwargs = {}
+    if args.expected_next_run_at is not None:
+        state_kwargs["expected_next_run_at"] = args.expected_next_run_at
+    return _service_action(
+        lambda: post_recurring_schedule_state(
+            args.service_url,
+            args.auth_token_file,
+            args.schedule_id,
+            enabled=args.command == "service-schedule-enable",
+            **state_kwargs,
+        )
+    )
+
+
+def cmd_service_recurring_schedule_add(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: post_recurring_schedule_create(
+            args.service_url,
+            args.auth_token_file,
+            _load_json(args.schedule),
+        )
+    )
+
+
+def cmd_service_recurring_schedule_update(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: put_recurring_schedule_update(
+            args.service_url,
+            args.auth_token_file,
+            args.schedule_id,
+            _load_json(args.schedule),
+            expected_next_run_at=args.expected_next_run_at,
+        )
+    )
+
+
+def cmd_service_recurring_schedule_patch(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: patch_recurring_schedule(
+            args.service_url,
+            args.auth_token_file,
+            args.schedule_id,
+            _load_json(args.schedule),
+            expected_next_run_at=args.expected_next_run_at,
+        )
+    )
+
+
+def cmd_service_recurring_schedule_delete(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: delete_recurring_schedule(
+            args.service_url,
+            args.auth_token_file,
+            args.schedule_id,
+            expected_next_run_at=args.expected_next_run_at,
+        )
+    )
+
+
+def cmd_service_support_bundle(args: argparse.Namespace) -> int:
+    try:
+        bundle = fetch_support_bundle(args.service_url, args.auth_token_file)
+        write_private_snapshot(args.output, bundle)
+        _print_json(
+            {
+                "schema_version": bundle["schema_version"],
+                "output": str(args.output),
             }
-        return _service_action(
-            lambda: post_workflow_deprecation(
-                args.service_url,
-                args.auth_token_file,
-                args.workflow_id,
-                args.version,
-                **deprecation_kwargs,
-            )
         )
+        return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except OSError:
+        print("support bundle operation failed", file=sys.stderr)
+        return 1
 
-    if args.command == "service-trigger":
-        return _service_action(
-            lambda: post_workflow_trigger(
-                args.service_url,
-                args.auth_token_file,
-                args.workflow_id,
-                args.version,
-                idempotency_key=args.idempotency_key,
-                source=args.source,
-                trigger_input=_load_trigger_input(args.input),
-            )
-        )
 
-    if args.command in {"service-schedule-enable", "service-schedule-disable"}:
-        state_kwargs = {}
-        if args.expected_next_run_at is not None:
-            state_kwargs["expected_next_run_at"] = args.expected_next_run_at
-        return _service_action(
-            lambda: post_recurring_schedule_state(
-                args.service_url,
-                args.auth_token_file,
-                args.schedule_id,
-                enabled=args.command == "service-schedule-enable",
-                **state_kwargs,
-            )
-        )
-
-    if args.command == "service-recurring-schedule-add":
-        return _service_action(
-            lambda: post_recurring_schedule_create(
-                args.service_url,
-                args.auth_token_file,
-                _load_json(args.schedule),
-            )
-        )
-
-    if args.command == "service-recurring-schedule-update":
-        return _service_action(
-            lambda: put_recurring_schedule_update(
-                args.service_url,
-                args.auth_token_file,
-                args.schedule_id,
-                _load_json(args.schedule),
-                expected_next_run_at=args.expected_next_run_at,
-            )
-        )
-
-    if args.command == "service-recurring-schedule-patch":
-        return _service_action(
-            lambda: patch_recurring_schedule(
-                args.service_url,
-                args.auth_token_file,
-                args.schedule_id,
-                _load_json(args.schedule),
-                expected_next_run_at=args.expected_next_run_at,
-            )
-        )
-
-    if args.command == "service-recurring-schedule-delete":
-        return _service_action(
-            lambda: delete_recurring_schedule(
-                args.service_url,
-                args.auth_token_file,
-                args.schedule_id,
-                expected_next_run_at=args.expected_next_run_at,
-            )
-        )
-
-    if args.command == "service-support-bundle":
-        try:
-            bundle = fetch_support_bundle(args.service_url, args.auth_token_file)
-            write_private_snapshot(args.output, bundle)
-            _print_json(
-                {
-                    "schema_version": bundle["schema_version"],
-                    "output": str(args.output),
-                }
-            )
-            return 0
-        except ValueError as error:
-            print(str(error), file=sys.stderr)
-            return 1
-        except OSError:
-            print("support bundle operation failed", file=sys.stderr)
-            return 1
-
-    if args.command == "service-audit-consistency":
-        if args.run_id:
-            return _service_action(
-                lambda: fetch_audit_consistency(
-                    args.service_url,
-                    args.auth_token_file,
-                    args.run_id,
-                )
-            )
+def cmd_service_audit_consistency(args: argparse.Namespace) -> int:
+    if args.run_id:
         return _service_action(
             lambda: fetch_audit_consistency(
                 args.service_url,
                 args.auth_token_file,
+                args.run_id,
             )
         )
-
-    if args.command == "service-audit-events":
-        return _service_action(
-            lambda: fetch_audit_events(
-                args.service_url,
-                args.auth_token_file,
-                max_items=args.max_items,
-                cursor=args.cursor,
-                workflow_id=args.workflow_id,
-                workflow_version=args.workflow_version,
-                run_id=args.run_id,
-                event_type=args.event_type,
-            )
+    return _service_action(
+        lambda: fetch_audit_consistency(
+            args.service_url,
+            args.auth_token_file,
         )
+    )
 
-    if args.command == "control-runs":
-        return _control_action(
-            lambda: LocalControlPlane(
-                args.state_dir, storage=args.storage
-            ).list_runs(limit=args.limit)
-        )
 
-    if args.command == "control-run":
-        return _control_action(
-            lambda: LocalControlPlane(args.state_dir, storage=args.storage).get_run(args.run_id)
-        )
-
-    if args.command == "audit":
-        return _control_action(
-            lambda: LocalControlPlane(
-                args.state_dir, storage=args.storage
-            ).list_audit_events(
-                workflow_id=args.workflow_id,
-                version=args.version,
-                run_id=args.run_id,
-                event_type=args.event_type,
-                limit=args.limit,
-            )
-        )
-
-    if args.command == "audit-consistency":
-        return _control_action(
-            lambda: LocalControlPlane(
-                args.state_dir, storage=args.storage
-            ).inspect_run_audit(run_id=args.run_id)
-        )
-
-    if args.command == "audit-verify":
-        result = LocalControlPlane(args.state_dir, storage=args.storage).verify_audit_integrity()
-        _print_json(result)
-        return 0 if result.get("status") == "valid" else 1
-
-    if args.command == "audit-evidence":
-        result = export_audit_evidence(
-            args.state_dir,
-            args.output,
+def cmd_service_audit_events(args: argparse.Namespace) -> int:
+    return _service_action(
+        lambda: fetch_audit_events(
+            args.service_url,
+            args.auth_token_file,
             max_items=args.max_items,
+            cursor=args.cursor,
             workflow_id=args.workflow_id,
             workflow_version=args.workflow_version,
             run_id=args.run_id,
             event_type=args.event_type,
         )
-        _print_json(result)
-        return 0
+    )
 
-    if args.command == "audit-evidence-verify":
-        _print_json(verify_audit_evidence_file(args.path))
-        return 0
 
-    if args.command == "connectors":
-        runtime = _connector_runtime(args)
-        if runtime is not None:
-            _print_json(runtime.list_connectors())
+def cmd_control_runs(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(
+            args.state_dir, storage=args.storage
+        ).list_runs(limit=args.limit)
+    )
+
+
+def cmd_control_run(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(args.state_dir, storage=args.storage).get_run(args.run_id)
+    )
+
+
+def cmd_audit(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(
+            args.state_dir, storage=args.storage
+        ).list_audit_events(
+            workflow_id=args.workflow_id,
+            version=args.version,
+            run_id=args.run_id,
+            event_type=args.event_type,
+            limit=args.limit,
+        )
+    )
+
+
+def cmd_audit_consistency(args: argparse.Namespace) -> int:
+    return _control_action(
+        lambda: LocalControlPlane(
+            args.state_dir, storage=args.storage
+        ).inspect_run_audit(run_id=args.run_id)
+    )
+
+
+def cmd_audit_verify(args: argparse.Namespace) -> int:
+    result = LocalControlPlane(args.state_dir, storage=args.storage).verify_audit_integrity()
+    _print_json(result)
+    return 0 if result.get("status") == "valid" else 1
+
+
+def cmd_audit_evidence(args: argparse.Namespace) -> int:
+    result = export_audit_evidence(
+        args.state_dir,
+        args.output,
+        max_items=args.max_items,
+        workflow_id=args.workflow_id,
+        workflow_version=args.workflow_version,
+        run_id=args.run_id,
+        event_type=args.event_type,
+    )
+    _print_json(result)
+    return 0
+
+
+def cmd_audit_evidence_verify(args: argparse.Namespace) -> int:
+    _print_json(verify_audit_evidence_file(args.path))
+    return 0
+
+
+def cmd_connectors(args: argparse.Namespace) -> int:
+    runtime = _connector_runtime(args)
+    if runtime is not None:
+        _print_json(runtime.list_connectors())
+    else:
+        _print_json(LocalControlPlane(args.state_dir).list_connectors())
+    return 0
+
+
+def cmd_control_snapshot(args: argparse.Namespace) -> int:
+    try:
+        if args.service_url:
+            if args.auth_token_file is None or args.state_dir is not None:
+                raise ValueError(
+                    "live control snapshot requires --auth-token-file and excludes --state-dir"
+                )
+            if args.max_items is not None:
+                raise ValueError("--max-items is only valid for offline snapshots")
+            snapshot = fetch_live_control_snapshot(
+                args.service_url,
+                args.auth_token_file,
+            )
         else:
-            _print_json(LocalControlPlane(args.state_dir).list_connectors())
+            if args.auth_token_file is not None:
+                raise ValueError("--auth-token-file requires --service-url")
+            snapshot = build_control_snapshot(
+                args.state_dir or Path(".skill2workflow"),
+                storage=args.storage,
+                max_items=args.max_items,
+            )
+        if args.output:
+            write_private_snapshot(args.output, snapshot)
+        else:
+            _print_json(snapshot)
         return 0
+    except ValueError as error:
+        print(str(error), file=sys.stderr)
+        return 1
+    except OSError:
+        print("control snapshot operation failed", file=sys.stderr)
+        return 1
 
-    if args.command == "control-snapshot":
-        try:
-            if args.service_url:
-                if args.auth_token_file is None or args.state_dir is not None:
-                    raise ValueError(
-                        "live control snapshot requires --auth-token-file and excludes --state-dir"
-                    )
-                if args.max_items is not None:
-                    raise ValueError("--max-items is only valid for offline snapshots")
-                snapshot = fetch_live_control_snapshot(
-                    args.service_url,
-                    args.auth_token_file,
-                )
-            else:
-                if args.auth_token_file is not None:
-                    raise ValueError("--auth-token-file requires --service-url")
-                snapshot = build_control_snapshot(
-                    args.state_dir or Path(".skill2workflow"),
-                    storage=args.storage,
-                    max_items=args.max_items,
-                )
-            if args.output:
-                write_private_snapshot(args.output, snapshot)
-            else:
-                _print_json(snapshot)
-            return 0
-        except ValueError as error:
-            print(str(error), file=sys.stderr)
-            return 1
-        except OSError:
-            print("control snapshot operation failed", file=sys.stderr)
-            return 1
-
-    return 1
 
 
 def _load_json(path: Path):

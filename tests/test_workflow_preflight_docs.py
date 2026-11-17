@@ -17,7 +17,7 @@ class WorkflowPreflightDocumentationTests(TestCase):
         guide = (ROOT / "docs" / "workflow-preflight.md").read_text(encoding="utf-8")
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         cli = (ROOT / "src" / "skill2workflow" / "cli.py").read_text(encoding="utf-8")
         package_smoke = (ROOT / "scripts" / "package_smoke.py").read_text(encoding="utf-8")
 

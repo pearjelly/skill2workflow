@@ -31,8 +31,10 @@ def visible_markdown(text):
 
 
 def anchors(text):
-    result, used = set(), {}
-    for line in visible_markdown(text).splitlines():
+    visible = visible_markdown(text)
+    result = set(re.findall(r'<a\b[^>]*\b(?:id|name)=["\']([^"\']+)["\']', visible, re.I))
+    used = {}
+    for line in visible.splitlines():
         heading = re.match(r'^ {0,3}#{1,6}\s+(.+?)\s*#*\s*$', line)
         if not heading:
             continue

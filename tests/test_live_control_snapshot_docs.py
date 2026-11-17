@@ -58,7 +58,7 @@ class LiveControlSnapshotDocumentationTests(TestCase):
 
     def test_public_contracts_record_loop_55_and_fixed_route(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         installed_ui = (ROOT / "docs" / "installed-ui.md").read_text(
             encoding="utf-8"

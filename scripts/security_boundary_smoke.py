@@ -158,7 +158,7 @@ def _stop_service(process):
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=5)
-        raise RuntimeError("service did not stop after SIGTERM")
+        raise RuntimeError("service did not stop after SIGTERM") from None
     if process.stderr is not None:
         process.stderr.close()
 

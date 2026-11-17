@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from skill2workflow.pilot_scenarios import run_pilot_scenario_pack
+from scripts.skill2workflow_testing.pilot_scenarios import run_pilot_scenario_pack
 
 
 class PilotScenarioPackTests(TestCase):

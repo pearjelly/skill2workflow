@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import re
 from typing import Dict, Iterable, List, Optional, Tuple
 
 
@@ -102,6 +103,7 @@ def run_overlay_for_nodes(
             "event_count": len(node_events),
             "latest_event_type": _overlay_string(latest_event.get("type", "")) if isinstance(latest_event, dict) else "",
             "result_status": str(result.get("status", "")) if result else "",
+            "execution": _overlay_text(result, node_events, "execution"),
             "attempts": _overlay_int(result.get("attempts") if result else None, node_events, "attempt"),
             "max_attempts": _overlay_int(result.get("max_attempts") if result else None, node_events, "max_attempts"),
             "backoff_ms": _overlay_int(result.get("backoff_ms") if result else None, node_events, "backoff_ms"),
@@ -157,6 +159,8 @@ def _overlay_int(explicit: object, events: List[Dict[str, object]], key: str) ->
 
 
 def _overlay_text(result: Dict[str, object], events: List[Dict[str, object]], key: str) -> str:
+    if key == "execution" and result.get(key) in {"descriptive", "enforced"}:
+        return result[key]
     if key in {"connector_id", "connector_kind"}:
         connector = result.get("connector", {})
         if isinstance(connector, dict) and connector.get(key.replace("connector_", "")):
@@ -353,7 +357,7 @@ def _non_negative_int(value: object, label: str) -> int:
     try:
         integer = int(value)
     except (TypeError, ValueError):
-        raise ValueError(f"{label} must be a non-negative integer")
+        raise ValueError(f"{label} must be a non-negative integer") from None
     if integer < 0:
         raise ValueError(f"{label} must be a non-negative integer")
     return integer
@@ -385,6 +389,11 @@ def _workflow_edges(workflow: Workflow, nodes: List[Dict[str, object]]) -> List[
     derived_edges = []
     for node in nodes:
         node_id = node.get("id")
+        if node.get("type") == "decision":
+            for index, branch in enumerate(node.get("branches", [])):
+                derived_edges.append({"id": f"derived_{node_id}_branch_{index}", "from": node_id, "to": branch["to"], "label": f"branch_{index}"})
+            derived_edges.append({"id": f"derived_{node_id}_default", "from": node_id, "to": node.get("default"), "label": "default"})
+            continue
         for transition, label in (
             ("on_success", "success"),
             ("on_failure", "failure"),
@@ -459,7 +468,7 @@ def _graph_edge_set(graph: LiteGraph) -> set:
             output = source_outputs[source_slot]
             if isinstance(output, dict):
                 output_name = str(output.get("name") or "success")
-        if output_name not in {"failure", "fallback"}:
+        if output_name not in {"failure", "fallback", "default"} and not re.fullmatch(r"branch_[0-9]+", output_name):
             output_name = "success"
         if source_graph_id in graph_workflow_ids and target_graph_id in graph_workflow_ids:
             edges.add((graph_workflow_ids[source_graph_id], graph_workflow_ids[target_graph_id], output_name))
@@ -513,6 +522,10 @@ def _litegraph_node(
         "retry": copy.deepcopy(node.get("retry")),
         "connector": copy.deepcopy(node.get("connector")),
     }
+    if node_type == "decision":
+        properties.update(branches=copy.deepcopy(node.get("branches")), default=node.get("default"))
+    if "output_schema" in node:
+        properties["output_schema"] = copy.deepcopy(node["output_schema"])
     if run_overlay:
         properties["run_overlay"] = copy.deepcopy(run_overlay)
 
@@ -526,7 +539,8 @@ def _litegraph_node(
         "mode": 0,
         "title": str(node.get("title") or node_id),
         "inputs": [] if node_type == "start" else [{"name": "in", "type": "flow", "link": None}],
-        "outputs": _outputs(has_success, has_failure, has_fallback),
+        "outputs": ([{"name": name, "type": "flow", "links": []} for name in _decision_output_names(node)]
+                    if node_type == "decision" else _outputs(has_success, has_failure, has_fallback)),
         "properties": properties,
     }
 
@@ -536,6 +550,10 @@ def _outputs(has_success: bool, has_failure: bool, has_fallback: bool) -> List[D
         {"name": name, "type": "flow", "links": []}
         for name in _output_names(has_success, has_failure, has_fallback)
     ]
+
+
+def _decision_output_names(node):
+    return [f"branch_{index}" for index, _ in enumerate(node.get("branches", []))] + ["default"]
 
 
 def _output_names(has_success: bool, has_failure: bool, has_fallback: bool) -> List[str]:
@@ -585,6 +603,9 @@ def _run_status(node_id: str, run_state: Optional[RunState]) -> str:
 
 def _source_slot(edge: Dict[str, object], source_node: Dict[str, object]) -> int:
     label = str(edge.get("label") or "").lower()
+    if source_node.get("type") == "decision":
+        names = _decision_output_names(source_node)
+        return names.index(label) if label in names else 0
     if label not in {"success", "failure", "fallback"}:
         if edge.get("to") == source_node.get("on_fallback"):
             label = "fallback"
@@ -602,7 +623,7 @@ def _source_slot(edge: Dict[str, object], source_node: Dict[str, object]) -> int
 
 def _edge_label(edge: Dict[str, object]) -> str:
     label = str(edge.get("label") or "").lower()
-    if label in {"failure", "fallback"}:
+    if label in {"failure", "fallback", "default"} or re.fullmatch(r"branch_[0-9]+", label):
         return label
     return "success"
 

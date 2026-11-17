@@ -72,6 +72,22 @@ function writeBack(graph, workflow=fixture) {
   } finally { fs.rmSync(directory, {recursive:true, force:true}); }
 }
 
+test('decision branches keep separate real LiteGraph ports and survive CLI write-back', () => {
+  const workflow = JSON.parse(fs.readFileSync(path.join(root, 'examples/workflows/risk-routing.workflow.json'), 'utf8'));
+  const context = setup();
+  context.api.load(workflow);
+  const route = context.api.graph._nodes.find(node => node.properties.node_type === 'decision');
+  assert.ok(route, 'decision is a registered node type');
+  assert.deepEqual(Array.from(route.outputs, output => output.name), ['branch_0', 'branch_1', 'default']);
+  const graph = context.save();
+  const result = writeBack(graph, workflow);
+  assert.equal(result.status, 0, result.message);
+  assert.deepEqual(result.workflow, workflow);
+  const branch = graph.links.find(link => link[1] === route.id && link[2] === 0);
+  branch[2] = 2;
+  assert.notEqual(writeBack(graph, workflow).status, 0);
+});
+
 test('Save Graph materializes titles omitted by the real pinned LiteGraph serializer', () => {
   const context = setup();
   const raw = clone(context.api.graph.serialize());

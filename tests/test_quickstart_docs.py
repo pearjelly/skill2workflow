@@ -90,7 +90,7 @@ class InstalledQuickstartDocumentationTests(TestCase):
         self.assertIn('--dry-run', custom_preview)
 
     def test_roadmap_and_harness_record_completed_loop_52(self):
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")
         agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
 

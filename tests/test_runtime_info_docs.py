@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from unittest import TestCase
@@ -13,11 +14,9 @@ class RuntimeInfoDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        guide = (ROOT / "docs" / "remote-runtime-info.md").read_text(
-            encoding="utf-8"
-        )
+        guide = read_api_section('remote-runtime-info')
         service_guide = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
         changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
 
         self.assertEqual(

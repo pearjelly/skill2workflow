@@ -23,6 +23,14 @@ WorkflowRecord = Dict[str, object]
 AuditEvent = Dict[str, object]
 
 
+def runtime_audit_event_type(event: Dict[str, object]) -> str:
+    """Distinguish completions written before node execution audit existed."""
+    event_type = str(event.get("type", "event"))
+    if event_type == "node_completed" and event.get("execution") not in {"descriptive", "enforced"}:
+        return "legacy_node_completed"
+    return event_type
+
+
 AUDIT_INTEGRITY_SCHEMA_VERSION = "skill2workflow-audit-integrity-0.1.0"
 AUDIT_INTEGRITY_ALGORITHM = "sha256-chain-v1"
 MAX_AUDIT_LIST_ITEMS = 1000
@@ -140,7 +148,7 @@ class JsonRunStore:
             if isinstance(events, list):
                 for event in events:
                     if isinstance(event, dict):
-                        counter[str(event.get("type", "event"))] += 1
+                        counter[runtime_audit_event_type(event)] += 1
             counts[run_id] = dict(counter)
         return counts
 
@@ -593,13 +601,23 @@ class SqliteRunStore:
             return {}
         placeholders = ",".join("?" for _ in selected)
         with self._connection() as connection:
+            # Legacy completions predate execution-labelled node audit events.
+            # Decode only these compact event rows, never the full run state.
+            connection.create_function(
+                "s2w_audit_event_type", 1,
+                lambda payload: runtime_audit_event_type(json.loads(payload)),
+            )
             rows = connection.execute(
                 f"""
-                select run_id, event_type, count(*)
+                select run_id,
+                       case when event_type = 'node_completed'
+                            then s2w_audit_event_type(payload_json)
+                            else event_type end as audit_type,
+                       count(*)
                 from run_events
                 where run_id in ({placeholders})
-                group by run_id, event_type
-                order by run_id, event_type
+                group by run_id, audit_type
+                order by run_id, audit_type
                 """,
                 selected,
             ).fetchall()
@@ -953,7 +971,7 @@ class SqliteRunStore:
                     order by runs.run_id
                     """
                 )
-                for run_id, raw_state in rows:
+                for _run_id, raw_state in rows:
                     state = _decode_sqlite_run_state(raw_state)
                     _upsert_sqlite_summary(connection, state)
             projection_rows = connection.execute(
@@ -964,7 +982,7 @@ class SqliteRunStore:
                 order by runs.run_id
                 """
             )
-            for run_id, raw_state in projection_rows:
+            for _run_id, raw_state in projection_rows:
                 state = _decode_sqlite_run_state(raw_state)
                 _upsert_sqlite_summary(connection, state)
 
@@ -2888,6 +2906,7 @@ def _upsert_sqlite_summary(connection, state: RunState) -> None:
                 "event_count",
                 "latest_event_type",
                 "result_status",
+                "execution",
                 "attempts",
                 "max_attempts",
                 "backoff_ms",

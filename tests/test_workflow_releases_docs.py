@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from tests.documentation_fixtures import assert_guide_reachable
@@ -62,9 +63,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         run_audit_guide = (ROOT / "docs" / "run-audit-consistency.md").read_text(
             encoding="utf-8"
         )
-        remote_audit_guide = (ROOT / "docs" / "remote-audit-consistency.md").read_text(
-            encoding="utf-8"
-        )
+        remote_audit_guide = read_api_section('remote-audit-consistency')
         targeted_audit_plan = (
             ROOT
             / "docs"
@@ -79,9 +78,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
             / "plans"
             / "2026-08-13-remote-schedule-inventory.md"
         ).read_text(encoding="utf-8")
-        schedule_action_guide = (
-            ROOT / "docs" / "remote-schedule-actions.md"
-        ).read_text(encoding="utf-8")
+        schedule_action_guide = read_api_section('remote-schedule-actions')
         schedule_action_plan = (
             ROOT
             / "docs"
@@ -96,12 +93,8 @@ class WorkflowReleaseDocumentationTests(TestCase):
                 / "recurring-schedule-action-0.1.0.schema.json"
             ).read_text(encoding="utf-8")
         )
-        dispatch_guide = (ROOT / "docs" / "remote-schedule-dispatches.md").read_text(
-            encoding="utf-8"
-        )
-        dispatch_page_guide = (
-            ROOT / "docs" / "remote-schedule-dispatch-pages.md"
-        ).read_text(encoding="utf-8")
+        dispatch_guide = read_api_section('remote-schedule-dispatches')
+        dispatch_page_guide = read_api_section('remote-schedule-dispatch-pages')
         dispatch_plan = (
             ROOT
             / "docs"
@@ -123,9 +116,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
                 / "recurring-schedule-dispatch-page-0.1.0.schema.json"
             ).read_text(encoding="utf-8")
         )
-        artifact_remote_guide = (
-            ROOT / "docs" / "remote-workflow-artifacts.md"
-        ).read_text(encoding="utf-8")
+        artifact_remote_guide = read_api_section('remote-workflow-artifacts')
         artifact_remote_plan = (
             ROOT
             / "docs"
@@ -133,9 +124,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
             / "plans"
             / "2026-08-13-remote-workflow-artifacts.md"
         ).read_text(encoding="utf-8")
-        backup_readiness_guide = (
-            ROOT / "docs" / "remote-backup-readiness.md"
-        ).read_text(encoding="utf-8")
+        backup_readiness_guide = read_api_section('remote-backup-readiness')
         backup_readiness_plan = (
             ROOT
             / "docs"
@@ -155,9 +144,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        audit_integrity_remote_guide = (
-            ROOT / "docs" / "remote-audit-integrity.md"
-        ).read_text(encoding="utf-8")
+        audit_integrity_remote_guide = read_api_section('remote-audit-integrity')
         audit_integrity_remote_plan = (
             ROOT
             / "docs"
@@ -165,9 +152,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
             / "plans"
             / "2026-08-13-remote-audit-integrity.md"
         ).read_text(encoding="utf-8")
-        runtime_info_guide = (ROOT / "docs" / "remote-runtime-info.md").read_text(
-            encoding="utf-8"
-        )
+        runtime_info_guide = read_api_section('remote-runtime-info')
         runtime_info_plan = (
             ROOT
             / "docs"
@@ -180,8 +165,8 @@ class WorkflowReleaseDocumentationTests(TestCase):
                 encoding="utf-8"
             )
         )
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("# Reviewable Workflow Releases", guide)
         self.assertIn("workflow-diff", guide)
@@ -232,9 +217,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("GET /api/v1/audit-consistency", remote_audit_guide)
         self.assertIn("service-audit-consistency", remote_audit_guide)
         self.assertIn("--run-id", remote_audit_guide)
-        schedule_guide = (ROOT / "docs" / "remote-schedule-inventory.md").read_text(
-            encoding="utf-8"
-        )
+        schedule_guide = read_api_section('remote-schedule-inventory')
         schedule_schema = json.loads(
             (ROOT / "schemas" / "recurring-schedule-list-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -242,9 +225,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         )
         self.assertIn("service-recurring-schedules", schedule_guide)
         self.assertIn("trigger input", schedule_guide)
-        create_guide = (ROOT / "docs" / "remote-schedule-create.md").read_text(
-            encoding="utf-8"
-        )
+        create_guide = read_api_section('remote-schedule-create')
         create_schema = json.loads(
             (ROOT / "schemas" / "recurring-schedule-create-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -255,9 +236,7 @@ class WorkflowReleaseDocumentationTests(TestCase):
         self.assertIn("created: false", create_guide)
         self.assertIn("BEGIN IMMEDIATE", create_guide)
         self.assertIn("trigger input", create_guide)
-        update_guide = (ROOT / "docs" / "remote-schedule-update.md").read_text(
-            encoding="utf-8"
-        )
+        update_guide = read_api_section('remote-schedule-update')
         update_schema = json.loads(
             (ROOT / "schemas" / "recurring-schedule-update-0.1.0.schema.json").read_text(
                 encoding="utf-8"

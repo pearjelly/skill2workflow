@@ -148,11 +148,11 @@ class LiveSnapshotClientTests(TestCase):
                 class Handler(BaseHTTPRequestHandler):
                     def do_GET(self):
                         self.send_response(200)
-                        self.send_header("Content-Type", content_type)
-                        self.send_header("Content-Length", str(len(body)))
+                        self.send_header("Content-Type", content_type)  # noqa: B023 - fixture lifetime ends in this iteration.
+                        self.send_header("Content-Length", str(len(body)))  # noqa: B023 - fixture lifetime ends in this iteration.
                         self.end_headers()
                         try:
-                            self.wfile.write(body)
+                            self.wfile.write(body)  # noqa: B023 - fixture lifetime ends in this iteration.
                         except (BrokenPipeError, ConnectionResetError):
                             pass
 

@@ -43,6 +43,11 @@
         }
       },
       "connector": {
+        "request": {
+          "method": "POST",
+          "url": "https://example.invalid/metrics/query",
+          "response_mode": "metadata"
+        },
         "id": "http",
         "kind": "http"
       },
@@ -72,7 +77,9 @@
           "kind": "ordered_step",
           "index": 2,
           "line": 17,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "verification",
+          "matched_term": "check"
         }
       },
       "on_success": "node_003_draft_operating_narrative",
@@ -101,7 +108,9 @@
           "kind": "ordered_step",
           "index": 3,
           "line": 18,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "step",
+          "matched_term": null
         }
       },
       "on_success": "node_004_ask_business_owner_to_confirm_action_plan",
@@ -130,7 +139,9 @@
           "kind": "ordered_step",
           "index": 4,
           "line": 19,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "human_gate",
+          "matched_term": "ask business owner to confirm"
         }
       },
       "connector": {
@@ -163,7 +174,9 @@
           "kind": "ordered_step",
           "index": 5,
           "line": 20,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "step",
+          "matched_term": null
         }
       },
       "on_success": "node_006_verify_action_owners_and_follow_up_dates",
@@ -192,7 +205,9 @@
           "kind": "ordered_step",
           "index": 6,
           "line": 21,
-          "section": "Checklist"
+          "section": "Checklist",
+          "inferred_type": "verification",
+          "matched_term": "verify"
         }
       },
       "on_success": "end",

@@ -17,6 +17,7 @@ PUBLIC_DOCS = (
     ROOT / "CODE_OF_CONDUCT.md",
     *sorted((ROOT / "docs").glob("*.md")),
     *sorted((ROOT / "docs" / "releases").glob("*.md")),
+    *sorted((ROOT / "docs" / "loops").glob("*.md")),
 )
 
 

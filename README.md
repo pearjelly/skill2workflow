@@ -153,6 +153,7 @@ input contracts and versions.
 | Share reviewed local artifacts | [Workflow bundles](docs/workflow-bundles.md) with verification and separate execution consent |
 | Deploy one team instance | [Secure service bootstrap](docs/service-bootstrap.md), [go-live checklist](docs/go-live.md), [Docker](docs/docker-self-host.md), [systemd](docs/systemd-service.md) |
 | Approve, trigger and schedule | [Human approval](docs/human-approval.md), [triggers](docs/triggers.md), [recurring scheduling](docs/recurring-scheduling.md) |
+| Route structured business results | [Decision/data contracts](docs/workflow-dsl-contract.md#decisions-and-data-in-020), [Agent adapter protocol](docs/connectors.md#agent-connector-protocol) |
 | Diagnose and recover | [Service Doctor](docs/service-doctor.md), [run detail](docs/run-detail.md), [backup/restore](docs/backup-restore.md), [interrupted recovery](docs/interrupted-recovery.md) |
 | Extend integrations safely | [Connectors](docs/connectors.md), [credentials](docs/credential-boundary.md), [runtime policy](docs/runtime-policy.md) |
 
@@ -195,21 +196,19 @@ tests/               Python and editor behavior tests
 scripts/             Contributor and release qualification tools
 docs/                Task guides, contracts, specs and delivery evidence
 CONTRIBUTING.md       Setup, tests and contribution workflow
-ROADMAP.md           Readiness gates and delivery history
+ROADMAP.md           Current maturity, goals and exit criteria
 ```
 
 ## Roadmap
 
-Current maturity: Self-hosted Beta. Delivery Loops 1-285 are complete.
-Production Baseline remains directional; passing an individual drill does not
-promote maturity. Loop 40 completed a paid assisted Pilot under one scoped
-Lark/Feishu `create_task` boundary, not general live SaaS readiness.
-See [the evidence](docs/pilot-evidence/loop-40/), [pilot boundary](docs/controlled-live-pilot.md)
-and [`ROADMAP.md`](ROADMAP.md) for current decisions and detailed history.
-
-For changes, start with [Contributing](CONTRIBUTING.md).
-For packaged compatibility and release evidence, see
-[stability](docs/stability.md) and the [release process](docs/release-process.md).
+Current maturity: Self-hosted Beta, a self-hosted, single-tenant runtime for one team.
+Delivery Loops 1-285 are complete and preserved in the [history archive](docs/loops/history.md).
+Loop 40 completed a paid assisted Pilot, scoped to one live connector action
+([redacted evidence](docs/pilot-evidence/loop-40/), [pilot boundary](docs/controlled-live-pilot.md)).
+Unreleased DSL 0.2 adds decisions and structured Agent results. Next priorities
+are executable Skill coverage, a real Agent adapter, visual authoring and
+sustained Production Baseline evidence. See `ROADMAP.md` for the
+[current goals and exit criteria](ROADMAP.md).
 
 ## License
 

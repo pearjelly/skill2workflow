@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict
 
-from .lark_tenant_credential_check import check_lark_tenant_credential
+from .tenant_credentials import check_lark_tenant_credential
 from .service_client import fetch_operational_readiness, fetch_service_probe
 from .service_doctor import diagnose_service
 

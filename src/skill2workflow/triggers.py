@@ -163,7 +163,7 @@ def _json_object_copy(value: Dict[str, object], label: str) -> Dict[str, object]
             separators=(",", ":"),
         )
     except (TypeError, ValueError, OverflowError, RecursionError) as error:
-        raise ValueError(f"{label} must be JSON serializable: {error}")
+        raise ValueError(f"{label} must be JSON serializable: {error}") from error
     encoded = serialized.encode("utf-8")
     if len(encoded) > MAX_TRIGGER_INPUT_BYTES:
         raise ValueError(
@@ -172,7 +172,7 @@ def _json_object_copy(value: Dict[str, object], label: str) -> Dict[str, object]
     try:
         copied = json.loads(serialized)
     except (TypeError, ValueError, json.JSONDecodeError) as error:
-        raise ValueError(f"{label} must be JSON serializable: {error}")
+        raise ValueError(f"{label} must be JSON serializable: {error}") from error
     if not isinstance(copied, dict):
         raise ValueError(f"{label} must be a JSON object")
     return copied

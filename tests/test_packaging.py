@@ -5,6 +5,20 @@ from unittest import TestCase
 
 
 class PackagingMetadataTests(TestCase):
+    def test_demo_and_qualification_tools_are_checkout_only(self):
+        root = Path(__file__).resolve().parents[1]
+        runtime = root / "src" / "skill2workflow"
+        tools = root / "scripts" / "skill2workflow_testing"
+        for name in ("demo", "pilot", "pilot_scenarios", "controlled_lark_pilot",
+                     "quickstart_smoke", "service_bootstrap_smoke", "lark_task_live_validation"):
+            with self.subTest(module=name):
+                self.assertFalse((runtime / (name + ".py")).exists())
+                self.assertTrue((tools / (name + ".py")).is_file())
+        self.assertFalse(any(
+            path.stem == "demo" or any(part in path.stem for part in ("pilot", "smoke", "lark"))
+            for path in runtime.rglob("*.py")
+        ))
+
     def test_license_is_the_exact_official_apache_2_0_text(self):
         license_path = Path(__file__).resolve().parents[1] / "LICENSE"
         content = license_path.read_bytes()
@@ -169,7 +183,7 @@ class PackagingMetadataTests(TestCase):
         guide = (root / "docs" / "release-artifact-qualification.md").read_text(
             encoding="utf-8"
         )
-        roadmap = (root / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (root / "docs/loops/history.md").read_text(encoding="utf-8")
         readme = (root / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("# Release Artifact Qualification", guide)

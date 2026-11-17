@@ -7,20 +7,20 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
-from skill2workflow.controlled_lark_pilot import (
+from scripts.skill2workflow_testing.controlled_lark_pilot import (
     finalize_pilot,
     generate_pilot_evidence,
     initialize_pilot,
 )
-from skill2workflow.controlled_lark_pilot_evidence import (
+from scripts.skill2workflow_testing.controlled_lark_pilot_evidence import (
     prepare_evidence_pack_transaction,
 )
-from skill2workflow._controlled_lark_pilot_private_authorization import (
+from scripts.skill2workflow_testing._controlled_lark_pilot_private_authorization import (
     AnchoredPrivateSession,
     PrivateFinalizationBundle,
     open_private_session,
 )
-from skill2workflow._controlled_lark_pilot_pack_transaction import (
+from scripts.skill2workflow_testing._controlled_lark_pilot_pack_transaction import (
     EvidencePackTransaction,
 )
 
@@ -256,29 +256,29 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                 mutated = []
 
                 def commit_then_mutate(transaction):
-                    result = real_commit(transaction)
-                    if mutated:
+                    result = real_commit(transaction)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    if mutated:  # noqa: B023 - fixture lifetime ends in this iteration.
                         return result
-                    if mutation == "decision_replace":
+                    if mutation == "decision_replace":  # noqa: B023 - fixture lifetime ends in this iteration.
                         replacement = _valid_decision()
                         replacement["rationale"] = "A different public rationale."
-                        temporary = private / "replacement-decision.json"
+                        temporary = private / "replacement-decision.json"  # noqa: B023 - fixture lifetime ends in this iteration.
                         _write_owner_only_json(temporary, replacement)
-                        os.replace(temporary, decision_path)
-                    elif mutation == "marker_replace":
-                        temporary = private / "replacement-finalization.json"
+                        os.replace(temporary, decision_path)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    elif mutation == "marker_replace":  # noqa: B023 - fixture lifetime ends in this iteration.
+                        temporary = private / "replacement-finalization.json"  # noqa: B023 - fixture lifetime ends in this iteration.
                         _write_owner_only_json(
                             temporary,
                             _valid_finalization_marker(),
                         )
-                        os.replace(temporary, marker_path)
-                    elif mutation == "marker_mode":
-                        os.chmod(marker_path, 0o644)
+                        os.replace(temporary, marker_path)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    elif mutation == "marker_mode":  # noqa: B023 - fixture lifetime ends in this iteration.
+                        os.chmod(marker_path, 0o644)  # noqa: B023 - fixture lifetime ends in this iteration.
                     else:
                         changed = _valid_finalization_marker()
                         changed["finalized_at"] = "2026-07-23T17:00:01+08:00"
-                        _write_owner_only_json(marker_path, changed)
-                    mutated.append(True)
+                        _write_owner_only_json(marker_path, changed)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    mutated.append(True)  # noqa: B023 - fixture lifetime ends in this iteration.
                     return result
 
                 with patch.object(
@@ -369,7 +369,7 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
             before = len(os.listdir("/dev/fd"))
 
             with patch(
-                "skill2workflow._controlled_lark_pilot_private_authorization.os.fsync",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_private_authorization.os.fsync",
                 side_effect=OSError("lock fsync failed"),
             ):
                 for _attempt in range(12):
@@ -393,7 +393,7 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
             session = open_private_session(private)
             snapshot = session.authorization_bundle_snapshot()
             authorization = __import__(
-                "skill2workflow._controlled_lark_pilot_private_authorization",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_private_authorization",
                 fromlist=["_close_descriptors"],
             )
             real_close = authorization._close_descriptors
@@ -1168,7 +1168,7 @@ class ControlledLarkPilotEvidenceIntegrationTests(TestCase):
                 return transaction
 
             with patch(
-                "skill2workflow.controlled_lark_pilot.prepare_evidence_pack_transaction",
+                "scripts.skill2workflow_testing.controlled_lark_pilot.prepare_evidence_pack_transaction",
                 side_effect=failing_second_write,
             ), self.assertRaisesRegex(OSError, "requested export failed"):
                 finalize_pilot(

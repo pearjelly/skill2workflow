@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import os
 import shutil
@@ -7,7 +8,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest import TestCase
+from unittest import TestCase, skipUnless
 from unittest.mock import patch
 
 from skill2workflow.cli import main
@@ -80,7 +81,7 @@ class InstalledQuickstartTests(TestCase):
 
                 def pin(path):
                     descriptor = _pin_workspace(path)
-                    descriptors.append(descriptor)
+                    descriptors.append(descriptor)  # noqa: B023 - fixture lifetime ends in this iteration.
                     return descriptor
 
                 with patch('skill2workflow.quickstart._pin_workspace', side_effect=pin):
@@ -336,6 +337,7 @@ Do not execute before a designated reviewer approves.
         self.assertEqual(result["run_status"], "waiting")
         self.assertNotIn(str(source), stdout.getvalue())
 
+    @skipUnless(importlib.util.find_spec("ensurepip"), "installed quickstart smoke requires ensurepip (python3-venv)")
     def test_real_process_quickstart_smoke_proves_installed_user_journey(self):
         with TemporaryDirectory() as temporary:
             completed = subprocess.run(

@@ -1,0 +1,5 @@
+# Development/CI tools only; the runtime wheel has no dependency requirements.
+ruff==0.17.5
+# Keep the Python 3.9 type-check target supported (mypy 2 requires 3.10+ targets).
+mypy==1.20.2
+jsonschema==4.26.0

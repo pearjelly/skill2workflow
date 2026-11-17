@@ -1,5 +1,14 @@
 # Workflow Examples
 
+The [public Skill corpus](../tests/fixtures/skill_corpus/README.md) contains 24
+original Apache-2.0 Skills and independent expected node sequences. Run
+`python3 scripts/skill_corpus_benchmark.py` before/after compiler changes.
+CI requires 100% inference accuracy, zero false human gates, and at least 25%
+configured/enforced process nodes. At the report baseline (`03aa8d1`) these
+metrics were 53.52%, 6, and 46.88%; after inference correction they are 100%,
+0, and 51.04%. This curated regression set does not estimate general Skill
+coverage, and the benchmark never executes a connector.
+
 The example pack shows how standard Agent `SKILL.md` files become controlled Workflow DSL fixtures. Each example keeps Workflow DSL as the execution truth source; LiteGraph JSON is committed only as an inspectable visual fixture.
 
 ## Example Matrix
@@ -10,6 +19,7 @@ The example pack shows how standard Agent `SKILL.md` files become controlled Wor
 | Sales follow-up | `examples/skills/sales-follow-up/SKILL.md` | `examples/workflows/sales-follow-up.workflow.json` | `examples/workflows/sales-follow-up.litegraph.json` | Account-owner approval before CRM update |
 | Customer service escalation | `examples/skills/customer-service-escalation/SKILL.md` | `examples/workflows/customer-service-escalation.workflow.json` | `examples/workflows/customer-service-escalation.litegraph.json` | SLA check, lead approval, handoff audit |
 | Risk review | `examples/skills/risk-review/SKILL.md` | `examples/workflows/risk-review.workflow.json` | `examples/workflows/risk-review.litegraph.json` | Policy check, analyst approval, disposition audit |
+| Risk routing | `examples/skills/risk-routing/SKILL.md` | `examples/workflows/risk-routing.workflow.json` | `examples/workflows/risk-routing.litegraph.json` | DSL 0.2: fetch → decision → manual or automatic approval |
 | Operations analysis | `examples/skills/operations-analysis/SKILL.md` | `examples/workflows/operations-analysis.workflow.json` | `examples/workflows/operations-analysis.litegraph.json` | Metrics query, threshold check, owner confirmation |
 | HTTP connector | n/a | `examples/workflows/http-connector.workflow.json` | `examples/workflows/http-connector.litegraph.json` | Editable HTTP connector request and body input-mapping fixture |
 | Skill HTTP action | `examples/skills/http-action-flow/SKILL.md` | `examples/workflows/http-action-flow.workflow.json` | `examples/workflows/http-action-flow.litegraph.json` | Explicit approval, mapped POST, credential handles, and executable result check |

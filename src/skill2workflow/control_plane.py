@@ -28,7 +28,7 @@ from .executor import (
     RunState,
 )
 from .input_schema import InputSchemaValidationError, validate_trigger_input
-from .storage import MAX_INTERRUPTED_RECOVERY_BATCH, create_control_store
+from .storage import MAX_INTERRUPTED_RECOVERY_BATCH, create_control_store, runtime_audit_event_type
 from .triggers import (
     TriggerIdempotencyError,
     normalize_trigger_request,
@@ -370,7 +370,7 @@ class LocalControlPlane:
             issue_counts[str(issue["kind"])] += 1
             _retain_artifact_issue(issues, issue, max_issues)
 
-        for key, record in records:
+        for _key, record in records:
             workflow_id = str(record.get("workflow_id", ""))
             version = str(record.get("version", ""))
             artifact_value = record.get("artifact")
@@ -806,6 +806,7 @@ class LocalControlPlane:
             [
                 {
                     "type": "run_resumed",
+                    "execution": "enforced",
                     "run_id": run_id,
                     "workflow_id": workflow_id,
                     "workflow_version": workflow_version,
@@ -1329,7 +1330,7 @@ class LocalControlPlane:
         for event in events[start_index:]:
             if not isinstance(event, dict):
                 continue
-            event_type = str(event.get("type", ""))
+            event_type = runtime_audit_event_type(event)
             if not _promote_runtime_event(event_type):
                 continue
             audit_event = {
@@ -1356,6 +1357,8 @@ class LocalControlPlane:
                 "credential_status",
                 "credential_handles",
                 "connector_metadata",
+                "execution",
+                "branch_index",
             ):
                 if key in event:
                     audit_event[key] = event[key]
@@ -1713,6 +1716,8 @@ def _now() -> str:
 
 def _promote_runtime_event(event_type: str) -> bool:
     return event_type.startswith("connector_") or event_type in {
+        "node_completed",
+        "decision_evaluated",
         "node_retrying",
         "node_recovered",
         "node_failed",
@@ -1729,7 +1734,7 @@ def _expected_run_audit_counts(state: RunState) -> Counter:
         for event in events:
             if not isinstance(event, dict):
                 continue
-            event_counts[str(event.get("type", "event"))] += 1
+            event_counts[runtime_audit_event_type(event)] += 1
     return _expected_run_audit_counts_from_summary(state, event_counts)
 
 

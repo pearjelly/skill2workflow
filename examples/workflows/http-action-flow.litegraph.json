@@ -355,7 +355,9 @@
           "kind": "ordered_step",
           "index": 4,
           "line": 23,
-          "section": "Steps"
+          "section": "Steps",
+          "inferred_type": "step",
+          "matched_term": null
         },
         "requires": [],
         "produces": [
@@ -734,7 +736,9 @@
               "kind": "ordered_step",
               "index": 4,
               "line": 23,
-              "section": "Steps"
+              "section": "Steps",
+              "inferred_type": "step",
+              "matched_term": null
             }
           },
           "on_success": "end",

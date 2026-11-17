@@ -1,5 +1,55 @@
 # Connector Runtime
 
+## Agent Connector Protocol
+
+DSL 0.2 supports explicit Agent work through the existing external connector
+registry. No LLM provider or SDK ships in the runtime. Register a reviewed
+adapter with `kind: "agent"` and
+`execution_contract.protocol: "skill2workflow-agent-0.1.0"`, using the existing
+external execution contract. The deterministic
+[test adapter](../examples/connectors/deterministic_agent_connector.py) is the
+only Agent implementation included here.
+
+An Agent is a `tool_call` with an `agent_instruction` action, a mandatory
+`output_schema` using the existing bounded object-root input-schema subset,
+and `requires` node IDs. Requires must exist and dominate the Agent on every
+incoming path; runtime also requires successful persisted outputs. The
+adapter's first argument is `{instruction, context: {input, nodes}}`. Only
+declared dependencies appear under `nodes.<id>.output`; unrelated run state,
+outputs and execution metadata are omitted. The optional context keyword
+contains the same filtered context. Input is the trigger input object.
+
+The adapter returns the ordinary external `{status, output}` envelope. The
+runtime first normalizes finite JSON within the existing 1 MiB bound, then
+validates a completed output against the node's schema. A failed schema or
+missing dependency fails the node through ordinary retry/failure/fallback
+handling; missing dependencies do not call the adapter. Completed, validated
+Agent output is deliberately retained as structured business data. Audit and
+remote run detail contain operational metadata rather than those values.
+Adapters must never return credential values as business output. Generic
+external connectors retain their existing metadata-only durable projection.
+
+Save a Skill such as:
+
+```markdown
+---
+name: agent-routing
+---
+## Steps
+1. Classify request <!-- skill2workflow: agent {"connector":"deterministic_agent","instruction":"Classify request","requires":[],"output_schema":{"type":"object","properties":{"risk":{"type":"string","enum":["high","low"]},"reason":{"type":"object"}},"required":["risk","reason"],"additionalProperties":false}} -->
+2. Route <!-- skill2workflow: decision {"branches":[{"when":{"path":"/nodes/1/output/risk","equals":"high"},"to":3}],"default":"end"} -->
+3. Manual approval <!-- skill2workflow: human_gate -->
+```
+
+`requires` in a Skill may use one-based step numbers, unique exact titles or
+generated node IDs. A connector ID is only a reference; it cannot load code.
+For local CLI evaluation, explicitly pass the fixture to `run`, `resume` or
+`bundle-run` through `--connector-fixture`. Use a Bundle's `--input` to provide
+`{"risk":"high"}` for the manual path or `{"risk":"low"}` for the default.
+The long-running service does not gain dynamic loading or discovery. A
+successful upstream Agent result is reused on restart/resume, not regenerated.
+See the [reviewed design](superpowers/specs/2026-11-16-agent-connector-design.md).
+
 `skill2workflow` currently ships a minimal local connector runtime. It is designed to make connector-bound workflow nodes testable and auditable without adding external services, SDK dependencies, secret storage, or a connector marketplace. Built-in HTTP payloads are bounded to protect the self-hosted process from untrusted response sizes and oversized serialized request bodies.
 Loop 33 adds one explicitly loaded local external connector fixture to prove the extension boundary. Loop 36 adds the first product-shaped connector package fixture, a Lark/Feishu task `create_task` dry-run connector. Loop 37 proves that connector inside a sales renewal risk pilot workflow. Loop 38 readiness review approved only a scoped live `create_task` follow-up, documented in `docs/lark-live-connector-readiness.md`. Loop 39 implements that one opt-in live action while preserving explicit loading and the dry-run default. Loop 261 adds an optional self-hosted Feishu China tenant-token descriptor that derives the existing public credential handle at execution time without caching or persisting a token. The project still does not add automatic discovery, generic OAuth, a general token-refresh system, or marketplace behavior.
 

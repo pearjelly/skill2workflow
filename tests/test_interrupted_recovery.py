@@ -10,6 +10,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
+from skill2workflow.backup import (
+    create_state_backup,
+    inspect_state_backup_readiness,
+    restore_state_backup,
+    verify_state_backup,
+)
 from skill2workflow.control_plane import LocalControlPlane
 from skill2workflow.schedules import RecurringScheduleStore
 from skill2workflow.service import RuntimeService, ServiceScheduleLoop
@@ -677,21 +683,21 @@ def _two_connector_workflow():
         "entry": "first",
         "nodes": [
             {
-                "id": "first",
+                "id": "first", "title": "first",
                 "type": "tool_call",
                 "connector": {"id": "recording", "kind": "local"},
                 "on_success": "second",
                 "on_failure": "failure",
             },
             {
-                "id": "second",
+                "id": "second", "title": "second",
                 "type": "tool_call",
                 "connector": {"id": "recording", "kind": "local"},
                 "on_success": "end",
                 "on_failure": "failure",
             },
-            {"id": "end", "type": "end"},
-            {"id": "failure", "type": "failure"},
+            {"id": "end", "title": "end", "type": "end"},
+            {"id": "failure", "title": "failure", "type": "failure"},
         ],
         "edges": [
             {"id": "edge_first_second", "from": "first", "to": "second", "label": "next"},
@@ -755,9 +761,3 @@ def _service_config(root: Path):
         auth_token_file=token,
         credential_dir=credentials,
     )
-from skill2workflow.backup import (
-    create_state_backup,
-    inspect_state_backup_readiness,
-    restore_state_backup,
-    verify_state_backup,
-)

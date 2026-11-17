@@ -1,5 +1,15 @@
 # External Connector Result Boundary
 
+Explicit [Agent protocol](connectors.md#agent-connector-protocol) nodes in DSL
+0.2 deliberately opt into structured business-output retention after the
+existing 1 MiB finite JSON normalization and node `output_schema` validation.
+The registered adapter manifest must identify the Agent protocol; a DSL kind
+alone cannot change a generic external connector's metadata-only policy.
+Failed or unvalidated Agent output is discarded. Agent audit events still
+retain only operational metadata, and adapters must keep credentials out of
+their returned business output. The default contract below remains in effect
+for all ordinary external connectors.
+
 Loop 173 introduced the bounded JSON handoff between an explicitly loaded
 external connector and the durable executor. Loop 203 closes the remaining
 metadata projection gap at that same boundary.

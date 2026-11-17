@@ -161,7 +161,7 @@ Investigate every `blocking_reasons` entry before business traffic. The report
 checks service readiness, state layout, workflow-artifact consistency, audit
 integrity, and offline-backup readiness without exporting workflow content,
 inputs, credentials, paths, or audit payloads. See
-[Remote operational readiness](remote-operational-readiness.md).
+[Remote operational readiness](api-reference.md#remote-operational-readiness).
 
 For normal go-live verification, prefer the preceding `service-go-live-check`
 command so this protected read cannot run before the Doctor and Probe succeed.
@@ -177,7 +177,7 @@ before another confirmation; it never retries a write automatically.
 
 For a first controlled workflow, use [Quickstart](quickstart.md). For remote
 operator actions, use the installed clients documented in [Human approval](human-approval.md),
-[Remote trigger](remote-trigger.md), and [Workflow releases](workflow-releases.md).
+[Remote trigger](api-reference.md#remote-trigger), and [Workflow releases](workflow-releases.md).
 
 ## 7. Preserve recovery evidence
 

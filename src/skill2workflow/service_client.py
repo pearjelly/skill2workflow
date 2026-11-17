@@ -1545,7 +1545,7 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
 
     if set(payload) != {"schema_version", "run", "events", "window"}:
         raise ServiceActionError()
-    if payload.get("schema_version") != RUN_DETAIL_SCHEMA_VERSION:
+    if payload.get("schema_version") not in {RUN_DETAIL_SCHEMA_VERSION, "skill2workflow-run-detail-0.1.0"}:
         raise ServiceActionError()
     run = payload.get("run")
     if not isinstance(run, dict) or set(run) != {
@@ -1564,14 +1564,16 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
     ):
         raise ServiceActionError()
     overlays = run.get("node_overlays")
+    execution_fields = {"execution"} if payload.get("schema_version") == RUN_DETAIL_SCHEMA_VERSION else set()
     if not isinstance(overlays, dict) or any(
         not isinstance(node_id, str) or not isinstance(overlay, dict)
-        or set(overlay) != {
+        or set(overlay) != execution_fields | {
             "node_id", "status", "current", "event_count", "latest_event_type", "result_status",
             "attempts", "max_attempts", "retry_count", "recovered", "connector_id", "connector_kind",
             "connector_status", "audit_event_count", "has_error",
         }
         or overlay.get("node_id") != node_id
+        or ("execution" in overlay and overlay.get("execution") not in {"", "descriptive", "enforced"})
         or any(
             not isinstance(overlay.get(field), str)
             for field in ("node_id", "status", "latest_event_type", "result_status", "connector_id", "connector_kind", "connector_status")
@@ -1590,9 +1592,14 @@ def _validate_run_detail(payload: Dict[str, object], run_id: str) -> None:
         or set(event) - {
             "sequence", "type", "node_id", "timestamp", "approved", "attempt", "max_attempts",
             "connector_id", "connector_kind", "connector_status", "has_error",
+            "execution",
+            "branch_index",
         }
         or not isinstance(event.get("sequence"), int) or isinstance(event.get("sequence"), bool)
         or not isinstance(event.get("type"), str) or not isinstance(event.get("has_error"), bool)
+        or ("execution" in event and event.get("execution") not in {"", "descriptive", "enforced"})
+        or ("branch_index" in event and event["branch_index"] is not None
+            and (type(event["branch_index"]) is not int or event["branch_index"] < 0))
         or any(field in event and not isinstance(event.get(field), str) for field in ("node_id", "timestamp", "connector_id", "connector_kind", "connector_status"))
         or any(field in event and (isinstance(event.get(field), bool) or not isinstance(event.get(field), int) or event.get(field) < 0) for field in ("attempt", "max_attempts"))
         or ("approved" in event and not isinstance(event.get("approved"), bool))

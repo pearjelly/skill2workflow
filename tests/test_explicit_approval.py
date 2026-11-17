@@ -73,7 +73,7 @@ class ExplicitApprovalTests(TestCase):
     def test_fenced_annotations_are_examples_and_unmarked_steps_stay_compatible(self):
         ir = parse_skill_text(f'```markdown\n1. 示例 {MARKER}\n```\n## Steps\n1. 等待负责人审核\n')
         self.assertNotIn('node_type', ir['ordered_step_details'][0])
-        self.assertEqual(compile_ir_to_workflow(ir)['nodes'][1]['type'], 'step')
+        self.assertEqual(compile_ir_to_workflow(ir)['nodes'][1]['type'], 'human_gate')
         ir = parse_skill_text(f'## Checklist\n~~~\n1. 示例 {MARKER}\n~~~\n')
         self.assertEqual(ir['ordered_steps'], [])
         self.assertEqual(ir['human_gates'], [])

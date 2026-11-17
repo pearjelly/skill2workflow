@@ -1,3 +1,4 @@
+from tests.documentation_fixtures import read_api_section
 import json
 from pathlib import Path
 from tests.documentation_fixtures import assert_guide_reachable
@@ -53,7 +54,7 @@ class RetentionDocumentationTests(TestCase):
 
     def test_readme_and_roadmap_record_loop_47_without_overclaiming_production(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
+        roadmap = (ROOT / "docs/loops/history.md").read_text(encoding="utf-8")
 
         self.assertIn("Delivery Loops 1-285 are complete", readme)
         assert_guide_reachable(self, 'docs/data-retention.md')
@@ -63,7 +64,7 @@ class RetentionDocumentationTests(TestCase):
         self.assertIn("Current maturity remains Self-hosted Beta", roadmap)
 
     def test_remote_readiness_guide_and_schema_define_quiesced_contract(self):
-        guide = (ROOT / "docs/remote-retention-readiness.md").read_text(encoding="utf-8")
+        guide = read_api_section('remote-retention-readiness')
         schema = json.loads(
             (ROOT / "schemas/retention-readiness-0.1.0.schema.json").read_text(
                 encoding="utf-8"
@@ -80,9 +81,7 @@ class RetentionDocumentationTests(TestCase):
         self.assertIn("preserved", schema["required"])
 
     def test_operational_readiness_guide_and_schema_define_fixed_aggregate_contract(self):
-        guide = (ROOT / "docs/remote-operational-readiness.md").read_text(
-            encoding="utf-8"
-        )
+        guide = read_api_section('remote-operational-readiness')
         schema = json.loads(
             (ROOT / "schemas/operational-readiness-0.1.0.schema.json").read_text(
                 encoding="utf-8"

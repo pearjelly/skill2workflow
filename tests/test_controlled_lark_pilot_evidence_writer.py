@@ -8,12 +8,11 @@ from tempfile import TemporaryDirectory
 from unittest import TestCase
 from unittest.mock import patch
 
-from skill2workflow.controlled_lark_pilot_evidence import (
+from scripts.skill2workflow_testing.controlled_lark_pilot_evidence import (
     build_acceptance_summary,
     write_evidence_pack,
 )
-from skill2workflow._controlled_lark_pilot_evidence_writer import (
-    read_json_anchored,
+from scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer import (
     write_private_json_anchored,
 )
 
@@ -26,7 +25,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
             root = Path(tmp).resolve()
             output = root / "evidence"
             writer = __import__(
-                "skill2workflow._controlled_lark_pilot_evidence_writer",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer",
                 fromlist=["_remove_tree_at"],
             )
             real_remove = writer._remove_tree_at
@@ -61,7 +60,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
             root = Path(tmp).resolve()
             output = root / "evidence"
             writer = __import__(
-                "skill2workflow._controlled_lark_pilot_evidence_writer",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer",
                 fromlist=["_remove_tree_at"],
             )
             real_remove = writer._remove_tree_at
@@ -96,7 +95,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
             os.mkfifo(fifo, 0o600)
             script = (
                 "from pathlib import Path; "
-                "from skill2workflow._controlled_lark_pilot_evidence_writer "
+                "from scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer "
                 "import read_json_anchored; "
                 f"path = Path({str(fifo)!r}); "
                 "\ntry:\n read_json_anchored(path)"
@@ -362,7 +361,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
         with TemporaryDirectory() as tmp:
             output = Path(tmp).resolve() / "evidence"
             real_write = __import__(
-                "skill2workflow._controlled_lark_pilot_evidence_writer",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer",
                 fromlist=["_write_json_atomic"],
             )._write_json_atomic
             calls = []
@@ -374,7 +373,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
                 return real_write(parent_fd, name, value)
 
             with patch(
-                "skill2workflow._controlled_lark_pilot_evidence_writer._write_json_atomic",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer._write_json_atomic",
                 side_effect=fail_second,
             ), self.assertRaisesRegex(OSError, "second staged file failed"):
                 write_evidence_pack(output, _valid_pack())
@@ -401,7 +400,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
             replacement = deepcopy(_valid_pack())
             replacement["charter"]["expires_on"] = "2026-08-16"
             real_write = __import__(
-                "skill2workflow._controlled_lark_pilot_evidence_writer",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer",
                 fromlist=["_write_json_atomic"],
             )._write_json_atomic
             calls = []
@@ -413,7 +412,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
                 return real_write(parent_fd, name, value)
 
             with patch(
-                "skill2workflow._controlled_lark_pilot_evidence_writer._write_json_atomic",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer._write_json_atomic",
                 side_effect=fail_second,
             ), self.assertRaisesRegex(OSError, "second staged file failed"):
                 write_evidence_pack(output, replacement)
@@ -503,14 +502,14 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
 
                 def racing_open(path, flags, mode=0o777, *, dir_fd=None):
                     name = os.fspath(path)
-                    if not swapped and name.endswith(".tmp"):
-                        output.rename(anchored)
-                        if replacement == "different-directory":
-                            output.mkdir()
-                        swapped.append(True)
+                    if not swapped and name.endswith(".tmp"):  # noqa: B023 - fixture lifetime ends in this iteration.
+                        output.rename(anchored)  # noqa: B023 - fixture lifetime ends in this iteration.
+                        if replacement == "different-directory":  # noqa: B023 - fixture lifetime ends in this iteration.
+                            output.mkdir()  # noqa: B023 - fixture lifetime ends in this iteration.
+                        swapped.append(True)  # noqa: B023 - fixture lifetime ends in this iteration.
                     if dir_fd is None:
-                        return real_open(path, flags, mode)
-                    return real_open(path, flags, mode, dir_fd=dir_fd)
+                        return real_open(path, flags, mode)  # noqa: B023 - fixture lifetime ends in this iteration.
+                    return real_open(path, flags, mode, dir_fd=dir_fd)  # noqa: B023 - fixture lifetime ends in this iteration.
 
                 with patch.object(
                     os,
@@ -599,7 +598,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
             output = Path(tmp).resolve() / "evidence"
 
             with patch(
-                "skill2workflow._controlled_lark_pilot_evidence_writer.os.replace",
+                "scripts.skill2workflow_testing._controlled_lark_pilot_evidence_writer.os.replace",
                 side_effect=OSError("replace failed"),
             ), self.assertRaisesRegex(OSError, "replace failed"):
                 write_evidence_pack(output, _valid_pack())
@@ -614,7 +613,7 @@ class ControlledLarkPilotEvidenceWriterTests(TestCase):
             output = Path(tmp).resolve() / "evidence"
 
             with patch(
-                "skill2workflow._controlled_lark_pilot_evidence_writer._DIR_FD_SUPPORTED",
+                "skill2workflow.private_json._DIR_FD_SUPPORTED",
                 False,
             ), self.assertRaisesRegex(ValueError, "directory-fd"):
                 write_evidence_pack(output, _valid_pack())

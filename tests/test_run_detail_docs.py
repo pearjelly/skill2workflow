@@ -41,7 +41,7 @@ class RunDetailDocumentationTests(TestCase):
             self.assertIn(phrase, guide)
 
     def test_public_docs_cross_link_run_detail_and_installed_command(self):
-        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        _readme = (ROOT / "README.md").read_text(encoding="utf-8")
         service = (ROOT / "docs" / "service.md").read_text(encoding="utf-8")
         stability = (ROOT / "docs" / "stability.md").read_text(encoding="utf-8")
         harness = (ROOT / "HARNESS.md").read_text(encoding="utf-8")

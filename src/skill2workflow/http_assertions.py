@@ -7,6 +7,30 @@ from urllib.parse import urlsplit
 
 
 CONFIG_ERROR = "http assertion configuration is invalid"
+MISSING = object()
+
+
+def json_pointer_value(document, path):
+    """Resolve an RFC 6901 pointer, distinguishing absent values from null."""
+    actual = document
+    try:
+        for token in path.split("/")[1:] if path else []:
+            token = token.replace("~1", "/").replace("~0", "~")
+            if isinstance(actual, dict):
+                actual = actual[token]
+            elif isinstance(actual, list) and re.fullmatch(r"0|[1-9][0-9]{0,8}", token):
+                actual = actual[int(token)]
+            else:
+                return MISSING
+    except (KeyError, IndexError):
+        return MISSING
+    return actual
+
+
+def json_scalar_equal(actual, expected):
+    return (isinstance(actual, bool) == isinstance(expected, bool)
+            and type(actual) in (str, int, float, bool, type(None))
+            and actual == expected)
 
 
 def validate_http_assertion_binding(binding):
@@ -89,7 +113,7 @@ def skill_http_assertion_binding(config):
         parsed = urlsplit(url)
         if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None or parsed.password is not None:
             raise ValueError()
-        parsed.port
+        _ = parsed.port
         if "timeout_ms" in request and (type(request["timeout_ms"]) is not int or not 0 <= request["timeout_ms"] <= 86400000):
             raise ValueError()
         headers = request.get("headers", {})
@@ -122,22 +146,9 @@ def evaluate_http_assertions(payload, checks):
     except (ValueError, TypeError, RecursionError, OverflowError):
         return "http assertion response is invalid"
     for check in checks:
-        actual = document
-        try:
-            for token in check["path"].split("/")[1:] if check["path"] else []:
-                token = token.replace("~1", "/").replace("~0", "~")
-                if isinstance(actual, dict):
-                    actual = actual[token]
-                elif isinstance(actual, list) and re.fullmatch(r"0|[1-9][0-9]{0,8}", token):
-                    actual = actual[int(token)]
-                else:
-                    return "http assertion did not match"
-        except (KeyError, IndexError):
-            return "http assertion did not match"
+        actual = json_pointer_value(document, check["path"])
         expected = check["equals"]
         # JSON numbers compare numerically; booleans never equal 0 or 1.
-        if (isinstance(actual, bool) != isinstance(expected, bool)
-                or type(actual) not in (str, int, float, bool, type(None))
-                or actual != expected):
+        if not json_scalar_equal(actual, expected):
             return "http assertion did not match"
     return None

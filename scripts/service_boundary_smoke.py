@@ -129,7 +129,7 @@ def _service_cycle(config_path: Path, port: int, idempotency_key: str):
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
-            raise RuntimeError("service did not stop after SIGTERM")
+            raise RuntimeError("service did not stop after SIGTERM") from None
     if exit_code != 0:
         stderr = process.stderr.read().strip() if process.stderr else ""
         raise RuntimeError(f"service exited with {exit_code}: {stderr}")

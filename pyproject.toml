@@ -48,6 +48,28 @@ skill2workflow = "skill2workflow.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "B"]
+# Serialized protocol examples and historical fixtures keep their source lines.
+# All correctness/whitespace/bugbear rules remain enabled; wrapping is not a gate.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# Checkout entry points must select the local source before importing it.
+"scripts/*.py" = ["E402"]
+"tests/test_controlled_lark_pilot_docs.py" = ["E402"]
+
+[tool.mypy]
+python_version = "3.9"
+files = ["src/skill2workflow/parser.py", "src/skill2workflow/compiler.py", "src/skill2workflow/executor.py", "src/skill2workflow/connectors.py"]
+follow_imports = "silent"
+warn_unused_ignores = true
+check_untyped_defs = true
+
 [tool.setuptools.data-files]
 "share/skill2workflow/web" = [
   "web/app.js",

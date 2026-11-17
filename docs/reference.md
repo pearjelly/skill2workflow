@@ -2,7 +2,8 @@
 
 Use the [task guide](README.md) to start, deploy or diagnose a workflow.
 This alphabetical reference lists public top-level guides; implementation plans
-and delivery history remain in [the roadmap](../ROADMAP.md).
+and delivery history remain in the [loop archive](loops/history.md).
+Current priorities are in [the roadmap](../ROADMAP.md).
 
 - [Audit Event Boundary](audit-event-boundary.md)
 - [Authenticated Human-Gate Decisions](human-approval.md)
@@ -18,8 +19,6 @@ and delivery history remain in [the roadmap](../ROADMAP.md).
 - [Controlled Lark/Feishu Live Pilot Runbook](controlled-live-pilot.md)
 - [Controlled Pilot Deferral Review](controlled-pilot-deferral-review.md)
 - [Credential Boundary And Secret Hygiene](credential-boundary.md)
-- [Cursor-Paged Remote Backup Inventory](remote-backup-inventory-pages.md)
-- [Cursor-Paged Remote Recurring-Schedule Dispatch Diagnostics](remote-schedule-dispatch-pages.md)
 - [Data Retention And Disposal](data-retention.md)
 - [Declare HTTP Actions In A Skill](skill-http-actions.md)
 - [Declare Trigger Inputs In A Skill](skill-input-contracts.md)
@@ -34,6 +33,7 @@ and delivery history remain in [the roadmap](../ROADMAP.md).
 - [Grafana Dashboard](grafana-dashboard.md)
 - [Installed Controlled Quickstart](quickstart.md)
 - [Installed Static UI](installed-ui.md)
+- [Improvement Report Implementation](improvement-implementation.md)
 - [Interrupted Run Recovery](interrupted-recovery.md)
 - [Iterate A Skill As A New Workflow Version](skill-workflow-versions.md)
 - [Lark/Feishu Live Connector Readiness Review](lark-live-connector-readiness.md)
@@ -54,33 +54,10 @@ and delivery history remain in [the roadmap](../ROADMAP.md).
 - [Release Artifact Qualification](release-artifact-qualification.md)
 - [Release Artifact SPDX SBOM](release-artifact-sbom.md)
 - [Release Process](release-process.md)
-- [Remote Audit Consistency](remote-audit-consistency.md)
-- [Remote Audit Event Tail](remote-audit-events.md)
-- [Remote Audit Integrity](remote-audit-integrity.md)
-- [Remote Backup Inventory](remote-backup-inventory.md)
-- [Remote Backup Readiness](remote-backup-readiness.md)
-- [Remote Backup Retention Plan](remote-backup-retention-plan.md)
-- [Remote Operational Readiness](remote-operational-readiness.md)
-- [Remote Recurring Schedule Inventory](remote-schedule-inventory.md)
-- [Remote recurring-schedule actions](remote-schedule-actions.md)
-- [Remote recurring-schedule creation](remote-schedule-create.md)
-- [Remote recurring-schedule deletion](remote-schedule-delete.md)
-- [Remote Recurring-Schedule Dispatch Diagnostics](remote-schedule-dispatches.md)
-- [Remote Recurring-Schedule Patch](remote-schedule-patch.md)
-- [Remote recurring-schedule updates](remote-schedule-update.md)
-- [Remote Retention Readiness](remote-retention-readiness.md)
-- [Remote Runtime Info](remote-runtime-info.md)
-- [Remote Uncertain-Dispatch Reviews](remote-schedule-dispatch-reviews.md)
-- [Remote Workflow Artifact Consistency](remote-workflow-artifacts.md)
-- [Remote Workflow Deprecation](remote-workflow-deprecation.md)
-- [Remote Workflow Diff](remote-workflow-diff.md)
-- [Remote Workflow Inventory](remote-workflow-inventory.md)
-- [Remote Workflow Promotion](remote-workflow-promotion.md)
-- [Remote Workflow Publication](remote-workflow-release.md)
-- [Remote Workflow Trigger](remote-trigger.md)
 - [Reproducible Release Builds](reproducible-builds.md)
 - [Reviewable Workflow Releases](workflow-releases.md)
 - [Run Audit Consistency](run-audit-consistency.md)
+- [Runtime service API](api-reference.md)
 - [Runtime Observability](observability.md)
 - [Runtime Policy And Recovery](runtime-policy.md)
 - [Runtime Service Configuration Boundary](service-config-boundary.md)
@@ -105,3 +82,78 @@ and delivery history remain in [the roadmap](../ROADMAP.md).
 - [Workflow Examples](examples.md)
 - [Workflow Explanation](workflow-explanation.md)
 - [Workflow trigger preflight](workflow-preflight.md)
+
+## Command reference
+
+Run these from the repository root. CLI state defaults to SQLite; add
+`--storage json` to every operation on an existing JSON workspace. Demo and
+smoke scripts run from the checkout and are excluded from runtime wheels.
+
+- Tests: `PYTHONPATH=src python3 -m unittest discover -s tests -v`
+- Parse: `PYTHONPATH=src python3 -m skill2workflow.cli parse examples/skills/approval-flow/SKILL.md`
+- Compile: `PYTHONPATH=src python3 -m skill2workflow.cli compile examples/skills/approval-flow/SKILL.md -o /tmp/skill2workflow-workflow.json`
+- Validate: `PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json`
+- Structured validate: `PYTHONPATH=src python3 -m skill2workflow.cli validate /tmp/skill2workflow-workflow.json --format json`
+- Visualize: `PYTHONPATH=src python3 -m skill2workflow.cli visualize /tmp/skill2workflow-workflow.json -o /tmp/skill2workflow-litegraph.json`
+- Write-back: `PYTHONPATH=src python3 -m skill2workflow.cli write-back /tmp/skill2workflow-workflow.json /tmp/skill2workflow-litegraph.json -o /tmp/skill2workflow-edited-workflow.json`
+- Validate HTTP connector example: `PYTHONPATH=src python3 -m skill2workflow.cli validate examples/workflows/http-connector.workflow.json --format json`
+- Visualize HTTP connector example: `PYTHONPATH=src python3 -m skill2workflow.cli visualize examples/workflows/http-connector.workflow.json -o examples/workflows/http-connector.litegraph.json`
+- Example fixture sync: `PYTHONPATH=src python3 -m unittest tests.test_examples -v`
+- Web preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/`
+- Control UI preview: `python3 -m http.server 4173`, then open `http://localhost:4173/web/control.html`
+- Installed UI preview: `skill2workflow ui --port 4173`, then open `http://127.0.0.1:4173/web/`; add `--service-url` and `--auth-token-file` only for the fixed read-only live snapshot proxy
+- Secure service bootstrap: `PYTHONPATH=src python3 -m skill2workflow.cli service-init --root /tmp/skill2workflow-service --port 8080`
+- Rotate service ingress token: `PYTHONPATH=src python3 -m skill2workflow.cli service-token-rotate --config /tmp/skill2workflow-runtime/config/service.json`
+- Installed controlled quickstart: `PYTHONPATH=src python3 -m skill2workflow.cli quickstart --root /tmp/skill2workflow-quickstart --port 8080`
+- Service Doctor: `PYTHONPATH=src python3 -m skill2workflow.cli service-doctor --config /tmp/skill2workflow-runtime/config/service.json`
+- systemd unit: `PYTHONPATH=src python3 -m skill2workflow.cli systemd-unit --config /tmp/skill2workflow-runtime/config/service.json --output /tmp/skill2workflow.service --service-user skill2workflow --executable /usr/local/bin/skill2workflow`
+- Run with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-sqlite-state --storage sqlite`
+- Run with local credential file: `PYTHONPATH=src python3 -m skill2workflow.cli run /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-state --credential-file /tmp/skill2workflow-credentials.json`
+- Publish: `PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control`
+- Publish with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli publish /tmp/skill2workflow-workflow.json --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite`
+- Run published: `PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control`
+- Run published with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli run-published workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite`
+- Trigger published: `PYTHONPATH=src python3 -m skill2workflow.cli trigger workflow_approval_flow --version 0.1.0 --state-dir /tmp/skill2workflow-control --source local-cli --idempotency-key example-001 --input /tmp/skill2workflow-trigger-input.json`
+- Add schedule: `PYTHONPATH=src python3 -m skill2workflow.cli schedule-add /tmp/skill2workflow-schedule.json --state-dir /tmp/skill2workflow-control`
+- List schedules: `PYTHONPATH=src python3 -m skill2workflow.cli schedules --state-dir /tmp/skill2workflow-control`
+- Run due schedules: `PYTHONPATH=src python3 -m skill2workflow.cli schedule-run-due --state-dir /tmp/skill2workflow-control --now 2026-07-06T00:00:00Z`
+- Local webhook server: `PYTHONPATH=src python3 -m skill2workflow.cli webhook-server --state-dir /tmp/skill2workflow-control --host 127.0.0.1 --port 8080`
+- Resume published: `PYTHONPATH=src python3 -m skill2workflow.cli resume-published <run_id> --state-dir /tmp/skill2workflow-control`
+- Cancel published: `PYTHONPATH=src python3 -m skill2workflow.cli cancel-run <run_id> --state-dir /tmp/skill2workflow-control --storage sqlite`
+- Control runs: `PYTHONPATH=src python3 -m skill2workflow.cli control-runs --state-dir /tmp/skill2workflow-control`
+- Control run detail: `PYTHONPATH=src python3 -m skill2workflow.cli control-run <run_id> --state-dir /tmp/skill2workflow-control`
+- Remote workflow inventory: `PYTHONPATH=src python3 -m skill2workflow.cli service-workflows --service-url http://127.0.0.1:8080 --auth-token-file /run/secrets/skill2workflow-ingress-token`
+- Audit: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control`
+- Filter audit: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type run_completed`
+- Filter connector audit: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --run-id <run_id> --event-type connector_completed`
+- Filter retry audit: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control --event-type node_retrying`
+- Audit with SQLite storage: `PYTHONPATH=src python3 -m skill2workflow.cli audit --state-dir /tmp/skill2workflow-control-sqlite --storage sqlite`
+- Connectors: `PYTHONPATH=src python3 -m skill2workflow.cli connectors --state-dir /tmp/skill2workflow-control`
+- Control snapshot: `PYTHONPATH=src python3 -m skill2workflow.cli control-snapshot --state-dir /tmp/skill2workflow-control -o /tmp/skill2workflow-control-snapshot.json`
+- First-run demo: `python3 scripts/demo_bootstrap.py --work-dir /tmp/skill2workflow-demo`
+- Pilot smoke: `python3 scripts/pilot_playbook_smoke.py --work-dir /tmp/skill2workflow-pilot`
+- Controlled Lark pilot: `python3 scripts/controlled_lark_pilot.py --help`
+- Controlled Lark preflight: `python3 scripts/controlled_lark_pilot.py preflight --input /tmp/skill2workflow-private-case.json`
+- State upgrade plan: `PYTHONPATH=src python3 -m skill2workflow.cli state-upgrade-plan --state-dir /tmp/skill2workflow-legacy-state`
+- State upgrade: `PYTHONPATH=src python3 -m skill2workflow.cli state-upgrade --state-dir /tmp/skill2workflow-legacy-state --backup-dir /tmp/skill2workflow-pre-upgrade-backup --output-dir /tmp/skill2workflow-upgraded-state`
+- State upgrade smoke: `python3 scripts/state_upgrade_smoke.py --work-dir /tmp/skill2workflow-state-upgrade-loop45`
+- Observability smoke: `python3 scripts/observability_smoke.py --work-dir /tmp/skill2workflow-observability-loop46`
+- Retention smoke: `python3 scripts/retention_smoke.py --work-dir /tmp/skill2workflow-retention-loop47`
+- Cancellation smoke: `python3 scripts/cancellation_smoke.py --work-dir /tmp/skill2workflow-cancellation-loop48`
+- Interrupted recovery smoke: `python3 scripts/interrupted_recovery_smoke.py --work-dir /tmp/skill2workflow-interrupted-loop49`
+- Schedule smoke: `python3 scripts/schedule_smoke.py --work-dir /tmp/skill2workflow-schedule-loop29`
+- Package smoke: `python3 scripts/package_smoke.py --work-dir /tmp/skill2workflow-package-smoke`
+- Service Doctor smoke: `python3 scripts/service_doctor_smoke.py --work-dir /tmp/skill2workflow-service-doctor`
+- systemd supervision smoke: `python3 scripts/systemd_service_smoke.py --work-dir /tmp/skill2workflow-systemd-service`
+- Linux Docker service smoke: `python3 scripts/docker_service_smoke.py`
+- Secret hygiene: `python3 scripts/secret_hygiene.py examples/workflows`
+- Editable install: `python3 -m venv /tmp/skill2workflow-venv && /tmp/skill2workflow-venv/bin/python -m pip install --upgrade pip "setuptools>=68" && /tmp/skill2workflow-venv/bin/python -m pip install --no-build-isolation -e .`
+- Installed CLI smoke: `/tmp/skill2workflow-venv/bin/skill2workflow validate examples/workflows/approval-flow.workflow.json --format json`
+- Release preflight dry-run: `PYTHONPATH=src python3 scripts/release_preflight.py --version 0.1.0 --notes docs/releases/v0.1.0.md --dry-run --skip-git`
+- Production baseline evidence: `python3 scripts/production_baseline_smoke.py --work-dir /tmp/skill2workflow-production-baseline`
+- Release notes: `docs/releases/v0.1.0.md`
+
+- Skill corpus gate: `python3 scripts/skill_corpus_benchmark.py --min-accuracy 1 --max-false-human-gates 0 --min-enforced-ratio 0.25`
+- Quality gates (development environment): `ruff check src scripts tests` and `mypy`
+- Schema conformance (development environment): `PYTHONPATH=src python3 -m unittest tests.test_schema_conformance -v`
+- Installed Agent drill: `python3 scripts/agent_connector_smoke.py --executable /tmp/skill2workflow-package-smoke/venv/bin/skill2workflow`

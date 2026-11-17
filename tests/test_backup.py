@@ -833,16 +833,16 @@ def _waiting_workflow():
         },
         "entry": "start",
         "nodes": [
-            {"id": "start", "type": "start", "on_success": "review"},
+            {"id": "start", "title": "start", "type": "start", "on_success": "review"},
             {
-                "id": "review",
+                "id": "review", "title": "review",
                 "type": "human_gate",
                 "connector": {"id": "manual", "kind": "manual"},
                 "on_success": "end",
                 "on_failure": "failure",
             },
-            {"id": "failure", "type": "failure"},
-            {"id": "end", "type": "end"},
+            {"id": "failure", "title": "failure", "type": "failure"},
+            {"id": "end", "title": "end", "type": "end"},
         ],
         "edges": [
             {"id": "edge_start_review", "from": "start", "to": "review", "label": "next"},
@@ -850,4 +850,4 @@ def _waiting_workflow():
             {"id": "edge_review_failure", "from": "review", "to": "failure", "label": "rejected"},
         ],
     }
-    build_backup_retention_plan,
+    _ = build_backup_retention_plan,

@@ -1,12 +1,75 @@
 # Workflow DSL Contract
 
-This document describes the public contract for Workflow DSL `0.1.0`.
+This document describes the public contract for Workflow DSL `0.1.0` and the
+explicit decision/data extension in `0.2.0`.
+
+## Decisions and data in 0.2.0
+
+The [0.2 schema](../schemas/workflow-0.2.0.schema.json) adds `decision` nodes
+with ordered `branches: [{when, to}]` and a mandatory `default`. First match
+wins. A predicate contains `path` plus exactly one of `equals`, `in`, `exists`,
+`gt`, `lt`; there is no expression evaluation or template language. JSON
+Pointers read `/input/...` or `/nodes/<id>/output/...` from successful durable
+results. Null is present; absent pointers do not match comparisons; booleans
+never compare as numbers. Numeric comparisons on other types do not match.
+All nodes must be reachable and the 0.2 transition graph must be a DAG.
+Decision branch/default edges use labels `branch_0`, `branch_1`, …, `default`.
+They are view metadata matching the authoritative node branches.
+
+Full HTTP bodies remain stored as strings. The decision context decodes valid
+JSON in a detached view; stored output is unchanged. Select `response_mode:
+"full"` explicitly to route on a body. Metadata retention exposes no body.
+`decision_evaluated` records a zero-based `branch_index` (null for default),
+without the looked-up business value.
+
+In a Skill, `<!-- skill2workflow: decision {...} -->` declares routing. Targets
+and `/nodes/<step-number>/output` references resolve to stable generated node
+IDs. Targets may be one-based step numbers, unique exact titles or terminal
+names `end`/`failure`. Optional `next` on explicit `step`, `human_gate` or HTTP
+annotations makes branch convergence/termination explicit. See the
+[risk-routing Skill](../examples/skills/risk-routing/SKILL.md) and the
+[reviewed design](superpowers/specs/2026-11-16-decision-node-design.md).
+LiteGraph gives each branch a separate output port; write-back preserves
+branches and topology. Edit branch rules in DSL, then reimport the graph.
+
+## Descriptive and reserved fields
+
+Explicit DSL 0.2 Agent nodes enforce `requires` as successful node-output
+dependencies and validate `output_schema` before accepting a completed result.
+The root must be an object using the same bounded subset as `input_schema`.
+`connector.kind` is `agent`, `connector.id` selects a registered external
+adapter, and `action` has kind `agent_instruction` and a nonempty instruction.
+Requires IDs must exist and dominate the Agent on every incoming path.
+Agent context includes input and only those required outputs; a missing output
+fails the node without calling the adapter. Completed validated structured
+output is durable business data. See [the protocol](connectors.md#agent-connector-protocol).
+
+`guards` and node `guard` are descriptive HARD-GATE text, not enforced policy.
+`requires`, `produces`, `state_schema`, `checkpoints` and `edges[].condition`
+are reserved and ignored by the 0.1 runtime. In 0.2, `produces`, guards, state
+schema, checkpoints and edge conditions remain descriptive; decisions and node
+transitions determine routing. Explicit Agent `requires` is defined by the
+[Agent protocol design](superpowers/specs/2026-11-16-agent-connector-design.md).
+Until that explicit protocol is used, requires is descriptive too.
+`validate_workflow_notices` and CLI `validate --format json` expose nonempty
+reserved fields as `descriptive_field` notices, separate from errors. These
+notices neither grant execution nor prevent publication. A completed
+descriptive result means recorded progress only.
 
 The Workflow DSL is the execution truth source for `skill2workflow`. Visual graphs, generated LiteGraph JSON, and future UI editors must round-trip through this DSL before execution or publication.
 
 See `docs/workflow-dsl-compatibility.md` for the release-line compatibility policy and `docs/stability.md` for stable versus experimental surfaces.
 
 ## Schema
+
+The development CI job runs `tests.test_schema_conformance` with pinned
+`jsonschema` tooling against every committed workflow example, the Agent
+contract and malformed known-field/conditional contracts. Runtime code still
+uses only the Python standard library. The schemas describe JSON shapes;
+runtime validation additionally checks cross-node references, reachability,
+0.2 DAGs, dependent input-schema rules and UTF-8 byte limits. Unknown extension
+properties remain permitted. Reserved fields must still have their documented
+types even though they do not grant execution semantics.
 
 The versioned JSON Schema lives at:
 
@@ -146,7 +209,7 @@ Published runs promote connector runtime events into control-plane audit events,
 
 ## Failure Transitions
 
-All executable nodes declare `on_success`; nodes that can fail normally declare
+All non-decision executable nodes declare `on_success`; nodes that can fail normally declare
 `on_failure`. A `tool_call` may additionally declare `on_fallback`:
 
 ```json

@@ -87,6 +87,7 @@ class VisualizerTests(TestCase):
                 "event_count": 8,
                 "latest_event_type": "node_completed",
                 "result_status": "completed",
+                "execution": "",
                 "attempts": 2,
                 "max_attempts": 1,
                 "backoff_ms": 0,

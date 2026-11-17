@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -354,7 +355,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
     _qualify_installed_preflight_inputs(repo_root, console_script, isolated_dir)
     _qualify_installed_http_assertions(repo_root, console_script, isolated_dir)
     _qualify_installed_skill_http_actions(repo_root, console_script, isolated_dir)
-    _qualify_installed_quickstart_inputs(python_bin, console_script, isolated_dir)
+    _qualify_installed_quickstart_inputs(repo_root, console_script, isolated_dir)
     _qualify_installed_draft_input_ui(repo_root, console_script, isolated_dir)
     _qualify_installed_ui_static(repo_root, console_script, isolated_dir)
     validate_output = _run(
@@ -425,7 +426,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
             )
         )
         or not isinstance(compile_review.get("notices"), list)
-        or len(compile_review["notices"]) > 3
+        or len(compile_review["notices"]) > compile_review["executable_node_count"] + 3
         or not all(isinstance(notice, str) for notice in compile_review["notices"])
         or any(
             notice
@@ -433,7 +434,7 @@ def run_package_smoke(repo_root: Path, work_dir: Path = DEFAULT_WORK_DIR, reset:
                 "checklist_not_found",
                 "human_gate_not_inferred",
                 "verification_not_inferred",
-            }
+            } and not re.fullmatch(r"inferred_node:[1-9][0-9]*:(step|human_gate|verification):[^:\r\n]*", notice)
             for notice in compile_review["notices"]
         )
         or len(set(compile_review["notices"])) != len(compile_review["notices"])
@@ -1031,13 +1032,11 @@ def _qualify_installed_skill_http_actions(repo_root: Path, console_script: Path,
     return True
 
 
-def _qualify_installed_quickstart_inputs(python_bin: Path, console_script: Path, isolated_dir: Path) -> bool:
-    code = (
-        'import json, os, sys; from pathlib import Path; '
-        'from skill2workflow.quickstart_smoke import _qualify_input_quickstart; '
-        'print(json.dumps(_qualify_input_quickstart(Path(sys.argv[1]), Path(sys.argv[2]), dict(os.environ))))'
-    )
-    result = json.loads(_run([str(python_bin), '-c', code, str(console_script), str(isolated_dir)], cwd=isolated_dir))
+def _qualify_installed_quickstart_inputs(repo_root: Path, console_script: Path, isolated_dir: Path) -> bool:
+    result = json.loads(_run([
+        sys.executable, str(repo_root / 'scripts/quickstart_input_smoke.py'),
+        '--executable', str(console_script), '--work-dir', str(isolated_dir),
+    ], cwd=isolated_dir))
     expected = {name: True for name in ('custom_input_waiting', 'invalid_input_no_workspace',
                 'network_prefix_refused', 'custom_input_approved_http', 'custom_input_compact_result',
                 'quickstart_preview_no_workspace', 'required_mapping_no_workspace',
@@ -1160,7 +1159,7 @@ def _require_installed_process_compile(compiled, section: str, source_file: str,
         "human_gate_count": 1,
         "verification_node_count": 1,
         "hard_gate_count": 0,
-        "notices": [],
+        "notices": ["inferred_node:1:step:", "inferred_node:3:verification:verify"],
     }
     if not isinstance(compiled, dict) or compiled.get("review") != expected_review:
         raise RuntimeError("installed Skill compile did not preserve process step counts and gates")
@@ -1190,6 +1189,8 @@ def _require_installed_process_compile(compiled, section: str, source_file: str,
             "index": index,
             "line": index + source_offset,
             "section": section,
+            **({"inferred_type": "step", "matched_term": None} if index == 1 else
+               {"inferred_type": "verification", "matched_term": "verify"} if index == 3 else {}),
         }:
             raise RuntimeError("installed Skill compile did not preserve process source provenance")
 
@@ -1479,6 +1480,13 @@ def _inspect_wheel(wheel: Path) -> Dict[str, object]:
                     + ", ".join(unexpected_roots)
                 )
 
+            if any(
+                path.parts[0] == "skill2workflow" and path.suffix == ".py"
+                and (path.stem == "demo" or any(part in path.stem for part in ("pilot", "smoke", "lark")))
+                for path in paths
+            ):
+                raise RuntimeError("wheel contains checkout tooling")
+
             forbidden_parts = {"__pycache__", "pilot-evidence", "private", "secrets"}
             forbidden_suffixes = {
                 ".db",
@@ -1573,4 +1581,4 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except RuntimeError as error:
         print(str(error), file=sys.stderr)
-        raise SystemExit(1)
+        raise SystemExit(1) from error

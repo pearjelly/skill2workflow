@@ -77,7 +77,7 @@ def main(argv=None) -> int:
         except subprocess.TimeoutExpired:
             process.kill()
             stdout, stderr = process.communicate(timeout=5)
-            raise RuntimeError("service did not stop after SIGTERM")
+            raise RuntimeError("service did not stop after SIGTERM") from None
 
     try:
         events = [json.loads(line) for line in stdout.splitlines() if line.strip()]

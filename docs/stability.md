@@ -1,5 +1,51 @@
 # Stability Boundaries
 
+CLI commands with `--storage` now default to `sqlite`, aligning local commands
+with the self-hosted production persistence baseline. Use `--storage json` on
+every command accessing an existing JSON workspace. JSON run files are not
+migrated; the existing SQLite control-store import of a JSON registry/audit
+tail remains unchanged. JSON stays supported for examples and evaluation.
+Python library storage defaults remain compatible.
+
+Contributor demo, pilot and qualification helpers are checkout-only under
+`scripts/skill2workflow_testing`; their Python module paths are not runtime API.
+The wheel contains production modules and installed UI/example assets. Package
+qualification rejects accidentally included pilot/smoke modules while preserving
+the existing script entry points and tenant-credential CLI check.
+
+The published JSON Schemas and validator now agree on known-field shapes and
+conditional requirements. Invalid declared fields in 0.1/0.2 drafts no longer
+pass validation; unknown extension fields retain their additive contract.
+Use runtime validation as well as JSON Schema: cross-node references,
+reachability and byte/dependency limits require runtime semantic checks.
+
+The explicit [Agent connector protocol](connectors.md#agent-connector-protocol)
+is an experimental DSL 0.2 capability. Output schemas use the existing bounded
+object-root input-schema subset. Structured business output retention is
+explicit for validated Agent adapters; default external result projection,
+loading authority and runtime dependency policy remain unchanged.
+
+Workflow DSL 0.2.0 decisions are an explicit additive execution capability,
+documented in [the DSL contract](workflow-dsl-contract.md). The 0.1.0 schema
+and existing published workflows retain their behavior. Branch selection is
+deterministic over durable data; reserved fields have advisory notices rather
+than hidden runtime semantics. Graph write-back preserves branch topology.
+
+Run results and audit evidence distinguish `execution: descriptive` from
+`enforced`. The remote run-detail projection uses its additive 0.2.0 schema;
+clients retain legacy 0.1.0 read support. This classification describes the
+mechanism and does not imply a connector succeeded or business intent was met.
+
+HTTP and HTTP-assertion bindings require an object `connector.request` at
+validation/publication time. The structured diagnostic is
+`connector_request_missing`; previously accepted unconfigured bindings always
+failed if reached. Fix such a draft and publish a new immutable version.
+
+Skill prose inference is conservative authoring guidance: English whole words,
+Chinese control terms and explicit approval phrases. It cannot bind HTTP
+actions. Review each `inferred_node` notice and source `matched_term` before
+publication; published Workflow DSL is never recompiled automatically.
+
 `skill2workflow` is at Self-hosted Beta maturity. Some surfaces are stable for
 the `0.1.x` compatibility line, while Production Baseline work and the internals
 listed below remain experimental. This document separates those contracts from
@@ -134,24 +180,24 @@ These surfaces should remain compatible during the `0.1.x` line:
 - `audit-consistency` treats waiting human gates and recovered interrupted runs as clean when their single durable lifecycle projection is present; the status field is not counted as a second event
 - Authenticated `GET /api/v1/audit-consistency` and `service-audit-consistency` reuse the exact run-audit report contract with a 64 KiB response bound, zero-write semantics, and readiness-independent availability when auth and SQLite state are readable
 - Targeted `GET /api/v1/audit-consistency/{run_id}` and `service-audit-consistency --run-id` reuse the same report contract and safe `run_` identifier grammar to inspect one run beyond the global report window
-- Authenticated `GET /api/v1/audit-events` and `service-audit-events` reuse the fixed `skill2workflow-audit-event-list-0.1.0` redacted SQLite projection with exact filters, opaque sequence cursors, a 100-item/64 KiB bound, and no raw payload, credential, connector metadata, or error disclosure, documented in [`remote-audit-events.md`](remote-audit-events.md)
+- Authenticated `GET /api/v1/audit-events` and `service-audit-events` reuse the fixed `skill2workflow-audit-event-list-0.1.0` redacted SQLite projection with exact filters, opaque sequence cursors, a 100-item/64 KiB bound, and no raw payload, credential, connector metadata, or error disclosure, documented in [`remote-audit-events.md`](api-reference.md#remote-audit-events)
 - Authenticated `GET /api/v1/recurring-schedules` and `service-recurring-schedules` reuse the fixed `skill2workflow-recurring-schedule-list-0.1.0` redacted inventory contract with a 64 KiB response bound and no schedule mutation
-- Protected `PATCH /api/v1/recurring-schedules/{schedule_id}` and `service-recurring-schedule-patch` reuse the fixed `skill2workflow-recurring-schedule-patch-0.1.0` redacted response contract with a 1 MiB request/16 KiB response bound, a `next_run_at` compare-and-swap, safe-field-only merging, trigger-input preservation, and no progress reset, documented in [`remote-schedule-patch.md`](remote-schedule-patch.md)
+- Protected `PATCH /api/v1/recurring-schedules/{schedule_id}` and `service-recurring-schedule-patch` reuse the fixed `skill2workflow-recurring-schedule-patch-0.1.0` redacted response contract with a 1 MiB request/16 KiB response bound, a `next_run_at` compare-and-swap, safe-field-only merging, trigger-input preservation, and no progress reset, documented in [`remote-schedule-patch.md`](api-reference.md#remote-schedule-patch)
 - Authenticated recurring-schedule dispatch reads and `service-recurring-dispatches` reuse the fixed `skill2workflow-recurring-schedule-dispatch-list-0.1.0` redacted diagnostics contract with 100-item/64 KiB bounds and no scheduler mutation
-- Cursor-paged recurring-schedule dispatch reads and `service-recurring-dispatch-page` use the separate `skill2workflow-recurring-schedule-dispatch-page-0.1.0` redacted contract with an opaque `(scheduled_for, dispatch_id)` cursor, 100-item/64 KiB bounds, and no scheduler mutation; the fixed recent-tail contract remains unchanged, documented in [`remote-schedule-dispatch-pages.md`](remote-schedule-dispatch-pages.md)
+- Cursor-paged recurring-schedule dispatch reads and `service-recurring-dispatch-page` use the separate `skill2workflow-recurring-schedule-dispatch-page-0.1.0` redacted contract with an opaque `(scheduled_for, dispatch_id)` cursor, 100-item/64 KiB bounds, and no scheduler mutation; the fixed recent-tail contract remains unchanged, documented in [`remote-schedule-dispatch-pages.md`](api-reference.md#remote-schedule-dispatch-pages)
 - Authenticated `GET /api/v1/workflow-artifacts` and `service-workflow-artifacts` reuse the fixed `skill2workflow-workflow-artifact-report-0.1.0` value-free consistency contract with a 64-issue/64 KiB remote bound and no repair mutation
 - Authenticated `GET /api/v1/backup-readiness` and `service-backup-readiness` reuse the fixed `skill2workflow-backup-readiness-0.1.0` value-free preflight contract with a 16 KiB remote bound, active-lease blocking semantics, and no backup mutation
-- Authenticated `GET /api/v1/backup-inventory` and `service-backup-inventory` reuse the fixed `skill2workflow-remote-backup-inventory-0.1.0` redacted contract with a 100-item/64 KiB bound, optional owner-only `runtime.backup_parent_dir` configuration, and no backup mutation, documented in [`remote-backup-inventory.md`](remote-backup-inventory.md)
-- Authenticated `GET /api/v1/backup-inventory-pages` and `service-backup-inventory-page` reuse the fixed `skill2workflow-remote-backup-inventory-page-0.1.0` redacted cursor-page contract with an opaque continuation cursor, 100-item/64 KiB bounds, and no backup mutation, documented in [`remote-backup-inventory-pages.md`](remote-backup-inventory-pages.md)
-- Authenticated `POST /api/v1/backup-retention-plan` and `service-backup-retention-plan` reuse the fixed `skill2workflow-remote-backup-retention-plan-0.1.0` redacted policy-bound aggregate contract with a 64 KiB request/16 KiB response bound, complete-inventory truncation blocking, a fixed `limit + 1` retention scan guard, and no backup mutation, documented in [`remote-backup-retention-plan.md`](remote-backup-retention-plan.md)
-- Authenticated `POST /api/v1/retention-readiness` and `service-retention-readiness` reuse the fixed `skill2workflow-retention-readiness-0.1.0` policy-bound preflight contract with a 64 KiB request/16 KiB response bound, active-lease null-count blocking semantics, and no retention mutation documented in [`remote-retention-readiness.md`](remote-retention-readiness.md)
-- Authenticated `GET /api/v1/operational-readiness` and `service-operational-readiness` reuse the fixed `skill2workflow-operational-readiness-0.1.0` aggregate value-free report with a 16 KiB response bound, no lifecycle mutation, and explicit best-effort cross-database semantics documented in [`remote-operational-readiness.md`](remote-operational-readiness.md)
+- Authenticated `GET /api/v1/backup-inventory` and `service-backup-inventory` reuse the fixed `skill2workflow-remote-backup-inventory-0.1.0` redacted contract with a 100-item/64 KiB bound, optional owner-only `runtime.backup_parent_dir` configuration, and no backup mutation, documented in [`remote-backup-inventory.md`](api-reference.md#remote-backup-inventory)
+- Authenticated `GET /api/v1/backup-inventory-pages` and `service-backup-inventory-page` reuse the fixed `skill2workflow-remote-backup-inventory-page-0.1.0` redacted cursor-page contract with an opaque continuation cursor, 100-item/64 KiB bounds, and no backup mutation, documented in [`remote-backup-inventory-pages.md`](api-reference.md#remote-backup-inventory-pages)
+- Authenticated `POST /api/v1/backup-retention-plan` and `service-backup-retention-plan` reuse the fixed `skill2workflow-remote-backup-retention-plan-0.1.0` redacted policy-bound aggregate contract with a 64 KiB request/16 KiB response bound, complete-inventory truncation blocking, a fixed `limit + 1` retention scan guard, and no backup mutation, documented in [`remote-backup-retention-plan.md`](api-reference.md#remote-backup-retention-plan)
+- Authenticated `POST /api/v1/retention-readiness` and `service-retention-readiness` reuse the fixed `skill2workflow-retention-readiness-0.1.0` policy-bound preflight contract with a 64 KiB request/16 KiB response bound, active-lease null-count blocking semantics, and no retention mutation documented in [`remote-retention-readiness.md`](api-reference.md#remote-retention-readiness)
+- Authenticated `GET /api/v1/operational-readiness` and `service-operational-readiness` reuse the fixed `skill2workflow-operational-readiness-0.1.0` aggregate value-free report with a 16 KiB response bound, no lifecycle mutation, and explicit best-effort cross-database semantics documented in [`remote-operational-readiness.md`](api-reference.md#remote-operational-readiness)
 - The installed `service-probe` command reuses the existing unauthenticated `/healthz` and `/readyz` endpoints through the fixed `skill2workflow-service-probe-0.1.0` contract, with no redirects or proxies, a five-second request timeout, an 8 KiB response bound, and stable exit codes documented in [`service-probe.md`](service-probe.md)
 - The installed `service-wait` command reuses that same fixed probe contract with a 300-second timeout and 10-second poll-interval ceiling; it adds no service route or schema
 - Authenticated `GET /api/v1/audit-integrity` and `service-audit-integrity` reuse the fixed `skill2workflow-audit-integrity-0.1.0` payload-free verification contract with a 16 KiB remote bound, readiness-independent availability, and no repair mutation
 - Authenticated `GET /api/v1/runtime-info` and `service-runtime-info` reuse the fixed `skill2workflow-runtime-info-0.1.0` identity/compatibility contract with a 16 KiB remote bound, no path disclosure, and no upgrade mutation
-- Protected `service-trigger` reuses the authenticated webhook trigger contract with a required idempotency key, shared 1 MiB input/body bounds, safe URL-component validation, and exact compact response validation documented in [`remote-trigger.md`](remote-trigger.md)
-- Protected `POST /api/v1/workflow-releases` and `service-workflow-publish` reuse the fixed `skill2workflow-workflow-release-0.1.0` redacted publication contract with a 1 MiB request bound, immutable SQLite publication semantics, and no artifact-path disclosure documented in [`remote-workflow-release.md`](remote-workflow-release.md)
+- Protected `service-trigger` reuses the authenticated webhook trigger contract with a required idempotency key, shared 1 MiB input/body bounds, safe URL-component validation, and exact compact response validation documented in [`remote-trigger.md`](api-reference.md#remote-trigger)
+- Protected `POST /api/v1/workflow-releases` and `service-workflow-publish` reuse the fixed `skill2workflow-workflow-release-0.1.0` redacted publication contract with a 1 MiB request bound, immutable SQLite publication semantics, and no artifact-path disclosure documented in [`remote-workflow-release.md`](api-reference.md#remote-workflow-release)
 - The installed live UI can stage one local Workflow DSL JSON document and
   confirm its fixed server-side-token publication through the same 1 MiB
   contract. It refreshes redacted inventory after success and does not promote
@@ -221,8 +267,8 @@ These surfaces should remain compatible during the `0.1.x` line:
   It does not accept a user-supplied run id, re-trigger work, refresh state, or
   reconcile a provider outcome; established human-gate and cancel controls
   remain the only run mutations.
-- Protected `POST /api/v1/workflow-promotions` and `service-workflow-promote` reuse the fixed `skill2workflow-workflow-promotion-0.1.0` redacted CAS promotion contract with a 1 MiB request bound, transactional SQLite alias mutation, and no artifact-path disclosure documented in [`remote-workflow-promotion.md`](remote-workflow-promotion.md)
-- Protected `GET /api/v1/workflow-diffs/{workflow_id}/{from_version}/{to_version}` and `service-workflow-diff` reuse the fixed `skill2workflow-workflow-diff-0.1.0` value-free structural review contract with a 64 KiB response bound and no state mutation documented in [`remote-workflow-diff.md`](remote-workflow-diff.md)
+- Protected `POST /api/v1/workflow-promotions` and `service-workflow-promote` reuse the fixed `skill2workflow-workflow-promotion-0.1.0` redacted CAS promotion contract with a 1 MiB request bound, transactional SQLite alias mutation, and no artifact-path disclosure documented in [`remote-workflow-promotion.md`](api-reference.md#remote-workflow-promotion)
+- Protected `GET /api/v1/workflow-diffs/{workflow_id}/{from_version}/{to_version}` and `service-workflow-diff` reuse the fixed `skill2workflow-workflow-diff-0.1.0` value-free structural review contract with a 64 KiB response bound and no state mutation documented in [`remote-workflow-diff.md`](api-reference.md#remote-workflow-diff)
 - Protected `GET /api/v1/workflow-explanations/{workflow_id}/{version}` and `service-workflow-explain` reuse the fixed `skill2workflow-workflow-explanation-0.1.0` side-effect-free plan contract with a 64 KiB response bound and no connector, credential, instruction, or trigger-input values documented in [`workflow-explanation.md`](workflow-explanation.md)
 - Protected `POST /api/v1/workflow-preflights/{workflow_id}/{version}` and `service-workflow-preflight` reuse the fixed `skill2workflow-workflow-preflight-0.1.0` value-free admission contract with 1 MiB request/64 KiB response bounds, no connector calls or credential resolution, and stable input/mapping issue codes documented in [`workflow-preflight.md`](workflow-preflight.md)
 - Preflight uses trigger admission's canonical JSON input copy and 1 MiB UTF-8
@@ -231,16 +277,16 @@ These surfaces should remain compatible during the `0.1.x` line:
   service input uses fixed 400 request refusals, not internal 503 responses;
   clients reject it before token/network access. Transport limits and execution
   admission remain unchanged.
-- Protected `POST /api/v1/workflow-deprecations` and `service-workflow-deprecate` reuse the fixed `skill2workflow-workflow-deprecation-0.1.0` redacted registry-retirement contract with a 1 MiB request bound, idempotent SQLite status/alias mutation, optional checksum-plus-alias-set CAS protection, one audit event, and no artifact deletion documented in [`remote-workflow-deprecation.md`](remote-workflow-deprecation.md)
-- Protected `GET /api/v1/workflows` and `service-workflows` reuse the fixed `skill2workflow-workflow-inventory-0.1.0` redacted version-inventory contract with a 100-item/64 KiB bound, no scheduler lease acquisition, and no state mutation documented in [`remote-workflow-inventory.md`](remote-workflow-inventory.md)
-- Authenticated `POST /api/v1/recurring-schedules/{schedule_id}/enable|disable` and protected `service-schedule-enable`/`service-schedule-disable` reuse the fixed `skill2workflow-recurring-schedule-action-0.1.0` contract, preserve the legacy empty-body form, optionally enforce an atomic `next_run_at` compare-and-swap token, and retain idempotent state transitions plus bounded audit evidence documented in [`remote-schedule-actions.md`](remote-schedule-actions.md)
-- Authenticated `PUT /api/v1/recurring-schedules/{schedule_id}` and protected `service-recurring-schedule-update` reuse the fixed `skill2workflow-recurring-schedule-update-0.1.0` contract, require an observed `next_run_at` compare-and-swap token, preserve durable dispatch progress, and return a fixed `409` on stale updates as documented in [`remote-schedule-update.md`](remote-schedule-update.md)
-- Authenticated `DELETE /api/v1/recurring-schedules/{schedule_id}` and protected `service-recurring-schedule-delete` require explicit confirmation, a `next_run_at` compare-and-swap token, a disabled schedule, and no active claim; the fixed `skill2workflow-recurring-schedule-delete-0.1.0` contract retains dispatch history and makes retries safe with a tombstone as documented in [`remote-schedule-delete.md`](remote-schedule-delete.md)
+- Protected `POST /api/v1/workflow-deprecations` and `service-workflow-deprecate` reuse the fixed `skill2workflow-workflow-deprecation-0.1.0` redacted registry-retirement contract with a 1 MiB request bound, idempotent SQLite status/alias mutation, optional checksum-plus-alias-set CAS protection, one audit event, and no artifact deletion documented in [`remote-workflow-deprecation.md`](api-reference.md#remote-workflow-deprecation)
+- Protected `GET /api/v1/workflows` and `service-workflows` reuse the fixed `skill2workflow-workflow-inventory-0.1.0` redacted version-inventory contract with a 100-item/64 KiB bound, no scheduler lease acquisition, and no state mutation documented in [`remote-workflow-inventory.md`](api-reference.md#remote-workflow-inventory)
+- Authenticated `POST /api/v1/recurring-schedules/{schedule_id}/enable|disable` and protected `service-schedule-enable`/`service-schedule-disable` reuse the fixed `skill2workflow-recurring-schedule-action-0.1.0` contract, preserve the legacy empty-body form, optionally enforce an atomic `next_run_at` compare-and-swap token, and retain idempotent state transitions plus bounded audit evidence documented in [`remote-schedule-actions.md`](api-reference.md#remote-schedule-actions)
+- Authenticated `PUT /api/v1/recurring-schedules/{schedule_id}` and protected `service-recurring-schedule-update` reuse the fixed `skill2workflow-recurring-schedule-update-0.1.0` contract, require an observed `next_run_at` compare-and-swap token, preserve durable dispatch progress, and return a fixed `409` on stale updates as documented in [`remote-schedule-update.md`](api-reference.md#remote-schedule-update)
+- Authenticated `DELETE /api/v1/recurring-schedules/{schedule_id}` and protected `service-recurring-schedule-delete` require explicit confirmation, a `next_run_at` compare-and-swap token, a disabled schedule, and no active claim; the fixed `skill2workflow-recurring-schedule-delete-0.1.0` contract retains dispatch history and makes retries safe with a tombstone as documented in [`remote-schedule-delete.md`](api-reference.md#remote-schedule-delete)
 - Resume, cancellation, and recurring schedule action retries reconcile a
   committed SQLite state mutation with missing control-plane audit evidence
   without replaying workflow execution or a human decision; this is a retry
   recovery contract, not a distributed transaction or provider compensation
-- JSON storage as the dependency-light default
+- JSON storage as an explicitly selected local backend (`--storage json`)
 - Local JSON run-state documents use the fixed 8 MiB regular-file/no-follow,
   device/inode-bound read and write contract documented in
   [`json-run-state-boundary.md`](json-run-state-boundary.md); the JSON state
@@ -249,7 +295,7 @@ These surfaces should remain compatible during the `0.1.x` line:
   no-follow, device/inode-bound read and write contract documented in
   [`json-control-index-boundary.md`](json-control-index-boundary.md); registry
   shape and the JSON-to-SQLite import path remain compatible
-- SQLite storage as an opt-in local persistence mode
+- SQLite storage as the default CLI persistence mode
 - Built-in connector runtime boundaries documented in `docs/connectors.md`
 - Built-in HTTP connector request/response payloads are bounded to 1 MiB with fixed overflow and invalid-UTF-8 failures, as documented in `docs/connectors.md`
 - Built-in HTTP `response_mode` accepts `full` or `metadata`; metadata mode retains only status and bounded size facts after reading, while `full` preserves the legacy headers/body projection

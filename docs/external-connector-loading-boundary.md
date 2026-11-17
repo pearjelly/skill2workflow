@@ -19,8 +19,12 @@ properties before Python compilation:
 
 The loader's result is still validated by `ConnectorRuntime`. The normalized
 connector result remains subject to the existing 1 MiB JSON envelope, and
-credential values, mapped business values, and raw provider payloads remain
-outside durable run state and audit evidence.
+credential values remain outside durable run state and audit evidence.
+Ordinary external mapped business values and raw provider payloads remain
+outside durable state too. Explicit schema-validated
+[Agent output](connectors.md#agent-connector-protocol) opts into structured
+business-result retention; it remains absent from audit evidence. The loading
+boundary and operator code-review responsibility are the same for both.
 
 This is a file-handoff boundary, not a Python sandbox. A fixture executes with
 the privileges of the invoking local process and may perform arbitrary local

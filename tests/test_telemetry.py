@@ -156,7 +156,7 @@ class RuntimeTelemetryTests(TestCase):
             "skill2workflow_scheduler_lease_owned 1",
             'skill2workflow_workflows{status="published"} 1',
             'skill2workflow_runs{status="completed"} 1',
-            "skill2workflow_audit_events 3",
+            "skill2workflow_audit_events 4",
             "skill2workflow_recurring_schedules 1",
             'skill2workflow_http_requests_total{route="workflow_trigger",status_class="2xx"} 1',
             'skill2workflow_http_requests_total{route="control_snapshot",status_class="2xx"} 1',
@@ -223,16 +223,34 @@ class RuntimeTelemetryTests(TestCase):
         self.assertEqual(
             set(aggregate),
             {
-                "service_status", "ready", "scheduler_lease_owned", "uptime_seconds",
-                "workflow_status_counts", "run_status_counts", "dispatch_status_counts",
-                "audit_event_count", "recurring_schedule_count", "http_requests",
+                "service_status",
+                "ready",
+                "scheduler_lease_owned",
+                "uptime_seconds",
+                "workflow_status_counts",
+                "run_status_counts",
+                "dispatch_status_counts",
+                "audit_event_count",
+                "recurring_schedule_count",
+                "http_requests",
             },
         )
         self.assertEqual(
             set(aggregate["http_requests"]),
             {
-                "health", "readiness", "metrics", "control_snapshot", "recurring_schedule_list",
-                "recurring_schedule_create", "recurring_schedule_action", "recurring_schedule_update", "recurring_schedule_patch", "recurring_schedule_delete", "recurring_schedule_dispatch_list", "recurring_schedule_dispatch_page", "recurring_schedule_dispatch_review",
+                "health",
+                "readiness",
+                "metrics",
+                "control_snapshot",
+                "recurring_schedule_list",
+                "recurring_schedule_create",
+                "recurring_schedule_action",
+                "recurring_schedule_update",
+                "recurring_schedule_patch",
+                "recurring_schedule_delete",
+                "recurring_schedule_dispatch_list",
+                "recurring_schedule_dispatch_page",
+                "recurring_schedule_dispatch_review",
                 "workflow_artifact_report",
                 "backup_readiness",
                 "backup_inventory",
@@ -243,9 +261,23 @@ class RuntimeTelemetryTests(TestCase):
                 "audit_integrity",
                 "runtime_info",
                 "audit_consistency",
-                "support_bundle", "run_list", "run_page", "run_detail", "workflow_trigger", "run_cancel",
+                "support_bundle",
+                "run_list",
+                "run_page",
+                "run_detail",
+                "workflow_trigger",
+                "run_cancel",
                 "audit_event_list",
-                "workflow_release", "workflow_release_target_review", "workflow_promotion", "workflow_deprecation", "workflow_inventory", "workflow_diff", "workflow_explanation", "workflow_preflight", "run_resume", "unknown",
+                "workflow_release",
+                "workflow_release_target_review",
+                "workflow_promotion",
+                "workflow_deprecation",
+                "workflow_inventory",
+                "workflow_diff",
+                "workflow_explanation",
+                "workflow_preflight",
+                "run_resume",
+                "unknown",
             },
         )
         serialized = json.dumps(aggregate, ensure_ascii=False)
@@ -259,7 +291,10 @@ class RuntimeTelemetryTests(TestCase):
 
     def test_operational_events_have_strict_allowlisted_ndjson_shapes(self):
         stream = io.StringIO()
-        fixed_now = lambda: datetime(2026, 8, 11, 0, 0, tzinfo=timezone.utc)
+
+        def fixed_now():
+            return datetime(2026, 8, 11, 0, 0, tzinfo=timezone.utc)
+
         logger = OperationalEventLogger(stream=stream, now=fixed_now)
 
         logger.lifecycle("ready")
@@ -372,9 +407,7 @@ def _workflow():
             {"id": "start", "type": "start", "title": "Start", "on_success": "end"},
             {"id": "end", "type": "end", "title": "End"},
         ],
-        "edges": [
-            {"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}
-        ],
+        "edges": [{"id": "edge_start_end", "from": "start", "to": "end", "label": "next"}],
     }
 
 
@@ -404,16 +437,16 @@ def _waiting_workflow():
         },
         "entry": "start",
         "nodes": [
-            {"id": "start", "type": "start", "on_success": "review"},
+            {"id": "start", "title": "start", "type": "start", "on_success": "review"},
             {
-                "id": "review",
+                "id": "review", "title": "review",
                 "type": "human_gate",
                 "connector": {"id": "manual", "kind": "manual"},
                 "on_success": "end",
                 "on_failure": "failure",
             },
-            {"id": "failure", "type": "failure"},
-            {"id": "end", "type": "end"},
+            {"id": "failure", "title": "failure", "type": "failure"},
+            {"id": "end", "title": "end", "type": "end"},
         ],
         "edges": [
             {"id": "edge_start_review", "from": "start", "to": "review", "label": "next"},

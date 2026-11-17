@@ -95,13 +95,12 @@ This conservative onboarding check does not change the general executor or
 insert a gate into the Skill.
 
 Quickstart also refuses an unconfigured HTTP action before workspace creation,
-including during `--dry-run`. A prose step such as “Run a command” can be
-inferred as an HTTP tool node without a request; shell commands are not executed.
+including during `--dry-run`. Explicit HTTP declarations require a request.
+A prose step such as “Run a command” remains descriptive; shell commands are not executed.
 Replace it with a reviewed [explicit HTTP action](skill-http-actions.md) when
 an HTTP request is intended, or revise the Skill to describe the real supported
 workflow. A descriptive step alone does not execute the work. This check applies
-to new Quickstart workspaces, not to existing published workflows or general
-Workflow DSL validation.
+to new Quickstart workspaces; existing published workflows are not recompiled.
 
 ## Provide Business Input
 

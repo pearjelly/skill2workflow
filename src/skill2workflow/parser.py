@@ -6,16 +6,18 @@ import os
 import re
 import stat
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional, Iterator
 from .http_assertions import load_assertion_json, skill_http_assertion_binding
 from .skill_http import skill_http_action_binding
 from .input_schema import INPUT_SCHEMA_MAX_BYTES
 from .skill_input import SKILL_INPUT_SCHEMA_ERROR, skill_input_schema_contract
 from .frontmatter import SkillFenceError, parse_frontmatter
 from .skill_version import SKILL_WORKFLOW_VERSION_ERROR, skill_workflow_version
+from .inference import HUMAN_TERMS, VERIFY_TERMS, TOOL_TERMS, matched_term
+from .agent_protocol import skill_agent_config
 
 
-SkillIR = Dict[str, object]
+from .models import SkillIR
 MAX_SKILL_FILE_BYTES = 2 * 1024 * 1024
 
 
@@ -53,37 +55,29 @@ def parse_skill_text(text: str, *, source_path: str = "SKILL.md") -> SkillIR:
     sections = _parse_sections(body)
     declaration_lines = {
         step['line'] for step in checklist_details
-        if isinstance(step.get('connector'), dict) and step['connector'].get('id') in {'http', 'http_assert'}
+        if step.get('node_type') is not None
     }
     guidance_body = '\n'.join(
         '' if fenced else (
-            re.sub(r'[ \t]+<!-- skill2workflow: (?:http|http_assert) \{.*\} -->[ \t]*$', '', line)
+            re.sub(r'[ \t]+<!-- skill2workflow: (?:human_gate|http|http_assert|decision|step|agent)(?: \{.*\})? -->[ \t]*$', '', line)
             if line_number in declaration_lines else line
         )
         for line_number, line, fenced in _fence_aware_lines(body, body_start_line)
     )
 
-    ir = {
+    ir: SkillIR = {
         "metadata": metadata,
         "description": metadata.get("description", ""),
         "hard_gates": _extract_hard_gates(guidance_body),
         "ordered_steps": checklist,
         "ordered_step_details": checklist_details,
-        "tool_hints": _find_lines(guidance_body, ("tool", "command", "Run:", "Use ")),
+        "tool_hints": _find_lines(guidance_body, TOOL_TERMS),
         "human_gates": _find_lines(
             guidance_body,
-            (
-                "approval",
-                "approve",
-                "ask user",
-                "human",
-                "user review",
-                "user reviews",
-                "wait for user",
-            ),
+            HUMAN_TERMS,
             skip_section_terms=("verification", "validation"),
         ),
-        "verification_rules": _find_lines(guidance_body, ("verify", "test", "check", "validation")),
+        "verification_rules": _find_lines(guidance_body, VERIFY_TERMS),
         "sections": sections,
         "source_path": source_path,
     }
@@ -131,11 +125,11 @@ def _fence_content(line: str, *, allow_list_marker: bool):
     return line[index:], tuple(quotes), column, list_marker
 
 
-def _fence_aware_lines(body: str, start_line: int):
+def _fence_aware_lines(body: str, start_line: int) -> Iterator[Tuple[int, str, bool]]:
     """Conservatively classify top-level and simple nested fenced examples."""
     fence_char, fence_length = '', 0
     fence_quotes, fence_indent = (), 0
-    fence_start = None
+    fence_start = start_line
     for line_number, line in enumerate(body.splitlines(), start=start_line):
         if fence_char:
             content, quotes, indent, _ = _fence_content(line, allow_list_marker=False)
@@ -248,7 +242,7 @@ def _read_skill_file(path: Path) -> str:
     return raw.decode("utf-8")
 
 
-def _parse_frontmatter(text: str) -> Tuple[Dict[str, object], str, int]:
+def _parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str, int]:
     return parse_frontmatter(text)
 
 
@@ -277,14 +271,14 @@ def _extract_hard_gates(body: str) -> List[str]:
     return gates
 
 
-def _extract_ordered_step_details(body: str, start_line: int) -> List[Dict[str, object]]:
+def _extract_ordered_step_details(body: str, start_line: int) -> List[Dict[str, Any]]:
     checklist, has_checklist = _extract_checklist_details(body, start_line)
     steps = checklist if has_checklist else _extract_process_step_details(body, start_line)
     _apply_step_annotations(body, start_line, steps)
     return steps
 
 
-def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, object]]) -> None:
+def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, Any]]) -> None:
     selected = {step['line']: step for step in steps}
     for line_number, line, fenced in _fence_aware_lines(body, start_line):
         if fenced:
@@ -292,7 +286,7 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
         reserved = re.findall(r'<!--\s*skill2workflow\b', line, re.IGNORECASE)
         if not reserved:
             continue
-        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|(?:http|http_assert) (\{.*\})) -->[ \t]*$', line)
+        annotation = re.search(r'[ \t]+<!-- skill2workflow: (human_gate|http|http_assert|decision|step|agent)(?: (\{.*\}))? -->[ \t]*$', line)
         if len(reserved) != 1 or annotation is None or line_number not in selected:
             raise ValueError('Invalid Skill step annotation')
         content = re.sub(
@@ -303,18 +297,36 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
         if not title:
             raise ValueError('Invalid Skill step annotation')
         selected[line_number].update(title=title, detail=detail)
-        if annotation.group(1) == 'human_gate':
-            selected[line_number]['node_type'] = 'human_gate'
-        else:
-            try:
-                payload = annotation.group(2)
-                if '<!--' in payload or '-->' in payload:
-                    raise ValueError('nested comment delimiter')
-                factory = skill_http_action_binding if annotation.group(1).startswith('http ') else skill_http_assertion_binding
-                binding = factory(load_assertion_json(payload))
-            except (ValueError, TypeError, RecursionError, OverflowError) as error:
-                raise ValueError('Invalid Skill step annotation') from error
-            selected[line_number].update(node_type='tool_call', connector=binding)
+        try:
+            kind, payload = annotation.group(1), annotation.group(2)
+            if payload is None and kind != 'human_gate':
+                raise ValueError('configuration required')
+            if payload is not None and ('<!--' in payload or '-->' in payload):
+                raise ValueError('nested comment delimiter')
+            config = load_assertion_json(payload) if payload is not None else {}
+            if kind == 'decision':
+                if set(config) != {'branches', 'default'}:
+                    raise ValueError('decision branches and default required')
+                selected[line_number].update(node_type='decision', decision=config)
+                continue
+            if 'next' in config:
+                target = config.pop('next')
+                if not ((type(target) is int and target > 0) or (isinstance(target, str) and target.strip())):
+                    raise ValueError('invalid next step')
+                selected[line_number]['next'] = target
+            if kind == 'agent':
+                config = skill_agent_config(config)
+                selected[line_number].update(node_type='tool_call', agent=config,
+                                             connector={'id': config['connector'], 'kind': 'agent'})
+            elif kind in {'human_gate', 'step'}:
+                if config:
+                    raise ValueError('unsupported step configuration')
+                selected[line_number]['node_type'] = kind
+            else:
+                factory = skill_http_action_binding if kind == 'http' else skill_http_assertion_binding
+                selected[line_number].update(node_type='tool_call', connector=factory(config))
+        except (ValueError, TypeError, RecursionError, OverflowError) as error:
+            raise ValueError('Invalid Skill step annotation') from error
     # Never let an unrecognized reserved declaration fall through to inference.
     for step in steps:
         if 'node_type' not in step and re.search(
@@ -325,10 +337,10 @@ def _apply_step_annotations(body: str, start_line: int, steps: List[Dict[str, ob
 
 def _extract_checklist_details(
     body: str, start_line: int
-) -> Tuple[List[Dict[str, object]], bool]:
+) -> Tuple[List[Dict[str, Any]], bool]:
     """Read Checklist items with existing list and empty-section precedence."""
 
-    items: List[Dict[str, object]] = []
+    items: List[Dict[str, Any]] = []
     current_section = "_root"
     has_checklist = False
 
@@ -366,11 +378,11 @@ def _extract_checklist_details(
     return items, has_checklist
 
 
-def _extract_process_step_details(body: str, start_line: int) -> List[Dict[str, object]]:
+def _extract_process_step_details(body: str, start_line: int) -> List[Dict[str, Any]]:
     """Read one explicit numbered process without interpreting prose or examples."""
 
     sections = []
-    current = None
+    current: Optional[List[Tuple[int, bool, str, int, str]]] = None
     current_section = ""
     for line_number, raw_line, fenced in _fence_aware_lines(body, start_line):
         if fenced:
@@ -442,7 +454,7 @@ def _split_step_title_detail(value: str) -> Tuple[str, str]:
     return cleaned, ""
 
 
-def _format_step_detail(step: Dict[str, object]) -> str:
+def _format_step_detail(step: Dict[str, Any]) -> str:
     title = str(step["title"])
     detail = str(step.get("detail") or "")
     if detail:
@@ -455,7 +467,6 @@ def _find_lines(
     needles: Tuple[str, ...],
     skip_section_terms: Tuple[str, ...] = (),
 ) -> List[str]:
-    lowered_needles = tuple(needle.lower() for needle in needles)
     lowered_skip_sections = tuple(term.lower() for term in skip_section_terms)
     matches = []
     current_section = "_root"
@@ -472,7 +483,6 @@ def _find_lines(
             continue
         if line.startswith("#"):
             continue
-        lowered = line.lower()
-        if any(needle in lowered for needle in lowered_needles):
+        if matched_term(line, needles) is not None:
             matches.append(line)
     return matches
